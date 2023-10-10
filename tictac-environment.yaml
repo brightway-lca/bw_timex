@@ -1,14 +1,15 @@
-name: tictac-environment
+# in your terminal, run conda: conda env create -f tictac-environment.yaml
+
+name: tictac
 channels:
-  - conda-forge
+  - romainsacchi
   - defaults
+  - conda-forge
+  - cmutel
 dependencies:
   - python=3.10
   - premise
   - jupyterlab
   - matplotlib
-  - unfold
-  - seaborn
-  - brightway2
-  - numpy
-  - pandas
+  - unfold  
+  - bw_temporalis
