@@ -88,28 +88,6 @@ def safety_razor(
     )  
     return datapackage
 
-def add_column_nearest_year_on_timeline(tl_df, dates_list):
-    """
-    Add a column to a timeline with the year of the database, within the list of year of available databases, 
-    that is the nearest to the date in the timeline.
-
-    :param tl_df: Timeline as a dataframe.
-    :param dates_list: List of years of the available databases.
-    
-    :return: Timeline as a dataframe with a column 'nearest_year' (int64) added.
-    -------------------
-    Example:
-    >>> dates_list = [
-        datetime.strptime("2020", "%Y"),
-        datetime.strptime("2022", "%Y"),
-        datetime.strptime("2025", "%Y"),
-    ]
-    >>> add_column_nearest_year_on_timeline(tl_df, dates_list)
-    """
-    if "date" not in list(tl_df.columns):
-        raise ValueError("The timeline does not contain dates.")
-    tl_df['nearest_year'] = tl_df['date'].apply(lambda x: find_closest_date(x, dates_list).year)
-    return tl_df
 
 def add_column_interpolation_weights_on_timeline(tl_df, dates_list, interpolation_type="linear"):
     """
