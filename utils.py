@@ -41,19 +41,20 @@ def find_closest_date(target, dates):
 
     return closest
 
+
 def safety_razor(
-        consumer: Union[bd.Node, Tuple[str, str], int], 
-        previous_producer: Union[bd.Node, Tuple[str, str], int], 
-        new_producer: Union[bd.Node, Tuple[str, str], int], 
-        datapackage: Optional[bwp.Datapackage] = None,
-        amount: Optional[float] = None,
-        name: Optional[str] = None,
-    ) -> bwp.Datapackage:
+    consumer: Union[bd.Node, Tuple[str, str], int],
+    previous_producer: Union[bd.Node, Tuple[str, str], int],
+    new_producer: Union[bd.Node, Tuple[str, str], int],
+    datapackage: Optional[bwp.Datapackage] = None,
+    amount: Optional[float] = None,
+    name: Optional[str] = None,
+) -> bwp.Datapackage:
     """Replace an existing edge with another edge. Zeroes out the existing edge.
 
     Inputs:
     consumer: Union[bd.Node, Tuple[str, str], int]
-        The consuming node 
+        The consuming node
     previous_producer: Union[bd.Node, Tuple[str, str], int]
         The producing node which should be replaced
     new_producer: Union[bd.Node, Tuple[str, str], int]
@@ -64,12 +65,12 @@ def safety_razor(
         Amount of the new edge. Will be the *sum of all (previous_producer, consumer) edge amounts if not provided.
     name: Optional[str]
         Name of this datapackage resource.
-    
+
     Returns a `bw_processing.Datapackage` with the modified data."""
 
     def resolve_node(node: Union[bd.Node, Tuple[str, str], int]) -> bd.Node:
         """Return a Brightway node from many different input possibilities.
-        
+
         This isn't super-efficient - you could look up the `id` values ahead of time.
         In production you don't need fancy logging messages."""
         if isinstance(node, tuple):
@@ -81,7 +82,7 @@ def safety_razor(
             return node
         else:
             raise ValueError(f"Can't understand {node}")
-                
+
     consumer = resolve_node(consumer)
     previous_producer = resolve_node(previous_producer)
     new_producer = resolve_node(new_producer)
@@ -96,8 +97,8 @@ def safety_razor(
 
     if not amount:
         amount = sum(
-            exc['amount'] 
-            for exc in consumer.technosphere() 
+            exc["amount"]
+            for exc in consumer.technosphere()
             if exc.input == previous_producer
         )
         # logger.info(f"Using database net amount {amount}")
@@ -113,22 +114,23 @@ def safety_razor(
         matrix="technosphere_matrix",
         name=name,
         data_array=np.array([0, amount], dtype=float),
-        indices_array=np.array([
-                (previous_producer.id, consumer.id), 
-                (new_producer.id, consumer.id)
-            ], dtype=bwp.INDICES_DTYPE),
-        flip_array=np.array([False, True], dtype=bool)
-    )  
+        indices_array=np.array(
+            [(previous_producer.id, consumer.id), (new_producer.id, consumer.id)],
+            dtype=bwp.INDICES_DTYPE,
+        ),
+        flip_array=np.array([False, True], dtype=bool),
+    )
     return datapackage
+
 
 def add_column_nearest_year_on_timeline(tl_df, dates_list):
     """
-    Add a column to a timeline with the year of the database, within the list of year of available databases, 
+    Add a column to a timeline with the year of the database, within the list of year of available databases,
     that is the nearest to the date in the timeline.
 
     :param tl_df: Timeline as a dataframe.
     :param dates_list: List of years of the available databases.
-    
+
     :return: Timeline as a dataframe with a column 'nearest_year' (int64) added.
     -------------------
     Example:
@@ -141,18 +143,23 @@ def add_column_nearest_year_on_timeline(tl_df, dates_list):
     """
     if "date" not in list(tl_df.columns):
         raise ValueError("The timeline does not contain dates.")
-    tl_df['nearest_year'] = tl_df['date'].apply(lambda x: find_closest_date(x, dates_list).year)
+    tl_df["nearest_year"] = tl_df["date"].apply(
+        lambda x: find_closest_date(x, dates_list).year
+    )
     return tl_df
 
-def get_weights_for_interpolation_between_nearest_years(date, dates_list, interpolation_type="linear"):
+
+def get_weights_for_interpolation_between_nearest_years(
+    date, dates_list, interpolation_type="linear"
+):
     """
     Find the nearest dates (before and after) a given date in a list of dates and calculate the interpolation weights.
 
     :param date: Target date.
     :param dates_list: List of years of the available databases.
-    :param interpolation_type: Type of interpolation between the nearest lower and higher dates. For now, 
+    :param interpolation_type: Type of interpolation between the nearest lower and higher dates. For now,
     only "linear" is available.
-    
+
     :return: Dictionary with years of the available databases to use as keys and the weights for interpolation as values.
     -------------------
     Example:
@@ -164,42 +171,52 @@ def get_weights_for_interpolation_between_nearest_years(date, dates_list, interp
     >>> date_test = datetime(2021,10,11)
     >>> add_column_interpolation_weights_on_timeline(date_test, dates_list, interpolation_type="linear")
     """
-    dates_list = sorted (dates_list)
-    
+    dates_list = sorted(dates_list)
+
     diff_dates_list = [date - x for x in dates_list]
     if timedelta(0) in diff_dates_list:
         exact_match = dates_list[diff_dates_list.index(timedelta(0))]
         return {exact_match.year: 1}
 
     closest_lower = min(
-        dates_list, 
-        key=lambda x: abs(date - x) if (date - x) > timedelta(0) else timedelta.max
+        dates_list,
+        key=lambda x: abs(date - x) if (date - x) > timedelta(0) else timedelta.max,
     )
     closest_higher = min(
-        dates_list, 
-        key=lambda x: abs(date - x) if (date - x) < timedelta(0) else timedelta.max
+        dates_list,
+        key=lambda x: abs(date - x) if (date - x) < timedelta(0) else timedelta.max,
     )
 
     if closest_lower == closest_higher:
-        warnings.warn("Date outside the range of dates covered by the databases.", category=Warning)
+        warnings.warn(
+            "Date outside the range of dates covered by the databases.",
+            category=Warning,
+        )
         return {closest_lower.year: 1}
-        
-    if interpolation_type == "linear":
-        weight = int((date - closest_lower).total_seconds())/int((closest_higher - closest_lower).total_seconds())
-    else:
-        raise ValueError(f"Sorry, but {interpolation_type} interpolation is not available yet.")
-    return {closest_lower.year: weight, closest_higher.year: 1-weight}
 
-def add_column_interpolation_weights_on_timeline(tl_df, dates_list, interpolation_type="linear"):
+    if interpolation_type == "linear":
+        weight = int((date - closest_lower).total_seconds()) / int(
+            (closest_higher - closest_lower).total_seconds()
+        )
+    else:
+        raise ValueError(
+            f"Sorry, but {interpolation_type} interpolation is not available yet."
+        )
+    return {closest_lower.year: weight, closest_higher.year: 1 - weight}
+
+
+def add_column_interpolation_weights_on_timeline(
+    tl_df, dates_list, interpolation_type="linear"
+):
     """
     Add a column to a timeline with the weights for an interpolation between the two nearest dates,
     from the list of dates from the available databases.
 
     :param tl_df: Timeline as a dataframe.
     :param dates_list: List of years of the available databases.
-    :param interpolation_type: Type of interpolation between the nearest lower and higher dates. For now, 
+    :param interpolation_type: Type of interpolation between the nearest lower and higher dates. For now,
     only "linear" is available.
-    
+
     :return: Timeline as a dataframe with a column 'interpolation_weights' (object:dictionnary) added.
     -------------------
     Example:
@@ -212,8 +229,13 @@ def add_column_interpolation_weights_on_timeline(tl_df, dates_list, interpolatio
     """
     if "date" not in list(tl_df.columns):
         raise ValueError("The timeline does not contain dates.")
-    tl_df['interpolation_weights'] = tl_df['date'].apply(lambda x: get_weights_for_interpolation_between_nearest_years(x, dates_list, interpolation_type))
+    tl_df["interpolation_weights"] = tl_df["date"].apply(
+        lambda x: get_weights_for_interpolation_between_nearest_years(
+            x, dates_list, interpolation_type
+        )
+    )
     return tl_df
+
 
 def create_patches_from_timeline(timeline, database_date_dict):
     """
@@ -223,7 +245,7 @@ def create_patches_from_timeline(timeline, database_date_dict):
     :param database_date_dict: Dictionary of available prospective database dates and their names.
     :return: A list of patches as datapackages.
     """
-    
+
     def extract_new_edges_from_row(row, database_dates_dict):
         """
         Extracts new edges based on a row from the timeline DataFrame.
@@ -238,17 +260,25 @@ def create_patches_from_timeline(timeline, database_date_dict):
         # Create new edges based on interpolation_weights from the row
         return [
             (
-                consumer, 
-                previous_producer, 
-                bd.get_activity((database_dates_dict[date], previous_producer['code'])),
-                row.amount * share
+                consumer,
+                previous_producer,
+                bd.get_activity((database_dates_dict[date], previous_producer["code"])),
+                bd.get_node(
+                    **{
+                        "database": database_dates_dict[date],
+                        "name": previous_producer["name"],
+                        "product": previous_producer["reference product"],
+                        "location": previous_producer["location"],
+                    }
+                ),
+                row.amount * share,
             )
             for date, share in row.interpolation_weights.items()
         ]
-    
+
     # Use a nested list comprehension to generate patches from the timeline
     return [
-        safety_razor(*edge) 
-        for row in timeline.df.itertuples() 
+        safety_razor(*edge)
+        for row in timeline.df.itertuples()
         for edge in extract_new_edges_from_row(row, database_date_dict)
     ]
