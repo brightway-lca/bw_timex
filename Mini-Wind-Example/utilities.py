@@ -6,6 +6,7 @@ import bw_processing as bwp
 import uuid
 import logging
 import numpy as np
+import warnings
 
 
 def find_closest_date(target, dates):
