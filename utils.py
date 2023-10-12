@@ -215,15 +215,40 @@ def add_column_interpolation_weights_on_timeline(tl_df, dates_list, interpolatio
     tl_df['interpolation_weights'] = tl_df['date'].apply(lambda x: get_weights_for_interpolation_between_nearest_years(x, dates_list, interpolation_type))
     return tl_df
 
-def extract_edge_from_row(row, database_dates_dict):
-    new_edges = []
-    consumer = bd.get_node(id=row['consumer'])
-    previous_producer = bd.get_node(id=row['producer'])
+def create_patches_from_timeline(timeline, database_date_dict):
+    """
+    Creates patches from a given timeline.
 
-    for date, share in row['interpolation_weights'].items():
-        database = database_dates_dict[date]
-        new_amount = row['amount'] * share
-        new_producer = bd.get_activity((database, previous_producer['code']))
-        new_edges.append((consumer, previous_producer, new_producer, new_amount))
-        
-    return new_edges
+    :param timeline: The input timeline.
+    :param database_date_dict: Dictionary of available prospective database dates and their names.
+    :return: A list of patches as datapackages.
+    """
+    
+    def extract_new_edges_from_row(row, database_dates_dict):
+        """
+        Extracts new edges based on a row from the timeline DataFrame.
+
+        :param row: A row from the timeline DataFrame.
+        :param database_dates_dict: Dictionary of available prospective database dates and their names.
+        :return: List of new edges.
+        """
+        consumer = bd.get_node(id=row.consumer)
+        previous_producer = bd.get_node(id=row.producer)
+
+        # Create new edges based on interpolation_weights from the row
+        return [
+            (
+                consumer, 
+                previous_producer, 
+                bd.get_activity((database_dates_dict[date], previous_producer['code'])),
+                row.amount * share
+            )
+            for date, share in row.interpolation_weights.items()
+        ]
+    
+    # Use a nested list comprehension to generate patches from the timeline
+    return [
+        safety_razor(*edge) 
+        for row in timeline.df.itertuples() 
+        for edge in extract_new_edges_from_row(row, database_date_dict)
+    ]
