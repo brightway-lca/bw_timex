@@ -214,3 +214,16 @@ def add_column_interpolation_weights_on_timeline(tl_df, dates_list, interpolatio
         raise ValueError("The timeline does not contain dates.")
     tl_df['interpolation_weights'] = tl_df['date'].apply(lambda x: get_weights_for_interpolation_between_nearest_years(x, dates_list, interpolation_type))
     return tl_df
+
+def extract_edge_from_row(row, database_dates_dict):
+    new_edges = []
+    consumer = bd.get_node(id=row['consumer'])
+    previous_producer = bd.get_node(id=row['producer'])
+
+    for date, share in row['interpolation_weights'].items():
+        database = database_dates_dict[date]
+        new_amount = row['amount'] * share
+        new_producer = bd.get_activity((database, previous_producer['code']))
+        new_edges.append((consumer, previous_producer, new_producer, new_amount))
+        
+    return new_edges
