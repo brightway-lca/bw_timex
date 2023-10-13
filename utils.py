@@ -7,9 +7,7 @@ import uuid
 import logging
 import numpy as np
 import warnings
-
-
-
+import pandas as pd
 
 
 def safety_razor(
@@ -198,6 +196,16 @@ def add_column_interpolation_weights_on_timeline(tl_df, dates_list, interpolatio
     tl_df['interpolation_weights'] = tl_df['date'].apply(lambda x: get_weights_for_interpolation_between_nearest_years(x, dates_list, interpolation_type))
     return tl_df
 
+def create_grouped_edge_dataframe(tl,dates_list, interpolation_type="linear"):
+    edges_dict_list = [{"datetime": edge.distribution.date, 'amount': edge.distribution.amount, 'producer': edge.producer, 'consumer': edge.consumer, "leaf": edge.leaf} for edge in tl]
+    edges_dataframe = pd.DataFrame(edges_dict_list)
+    edges_dataframe = edges_dataframe.explode(['datetime', "amount"])
+    edges_dataframe['year'] = edges_dataframe['datetime'].apply(lambda x: x.year)
+    edge_dataframe = edges_dataframe.loc[:, "amount":].groupby(['year', 'producer', 'consumer']).sum().reset_index()
+    edge_dataframe['date'] = edge_dataframe['year'].apply(lambda x: datetime(x, 1, 1))
+    timeline_df_with_interpolation = add_column_interpolation_weights_on_timeline(edge_dataframe, dates_list, interpolation_type="linear")
+    timeline_df_with_interpolation['producer_name'] = timeline_df_with_interpolation.producer.apply(lambda x: bd.get_node(id=x)["name"])
+    return edge_dataframe
 
 def create_patches_from_timeline(timeline, database_date_dict):
     """
@@ -244,3 +252,105 @@ def create_patches_from_timeline(timeline, database_date_dict):
         for row in timeline.df.itertuples()
         for edge in extract_new_edges_from_row(row, database_date_dict)
     ]
+
+def get_datapackage_from_edge_timeline(
+    timeline: pd.DataFrame, 
+    database_date_dict: dict, 
+    datapackage: Optional[bwp.Datapackage] = None,
+    name: Optional[str] = None,
+) -> bwp.Datapackage:
+    """
+    Creates patches from a given timeline. # UPDATE THIS!!!
+
+    Inputs:
+    timeline: list
+        A timeline of edges, typically created from EdgeExtracter.create_edge_timeline()
+    database_date_dict: dict
+        A dict of the available prospective database years and their names.  
+        For example:
+        database_date_dict = {
+            2030: 'wind-example-2030',
+            2040: 'wind-example-2040',
+            2050: 'wind-example-2050',
+        }  
+    datapackage: Optional[bwp.Datapackage]
+        Append to this datapackage, if available. Otherwise create a new datapackage.
+    name: Optional[str]
+        Name of this datapackage resource.
+
+    Returns:
+    bwp.Datapackage
+        A list of patches formatted as datapackages.
+    """
+
+    def add_row_to_datapackage(row, datapackage, database_dates_dict, new_nodes): 
+        """
+        Extracts new edges based on a row from the timeline DataFrame.
+
+        :param row: A row from the timeline DataFrame.
+        :param database_dates_dict: Dictionary of available prospective database dates and their names.
+        :return: List of new edges; each edge contains the consumer, the previous producer, the new producer, and the amount.
+        """
+        new_consumer_id = abs(row.consumer)*1000000+row.year
+        new_producer_id = abs(row.producer)*1000000+row.year
+        new_nodes.add(new_consumer_id)
+        new_nodes.add(new_producer_id)
+        previous_producer_id = row.producer
+        previous_producer_node = bd.get_node(id=previous_producer_id) # in future versions, insead of getting node, just provide list of producer ids
+        
+        # Check if previous producer comes from prospective databases
+        if not previous_producer_node['database'] in database_dates_dict.values():
+            datapackage.add_persistent_vector(
+                        matrix="technosphere_matrix",
+                        name=uuid.uuid4().hex,
+                        data_array=np.array([row.amount], dtype=float),
+                        indices_array=np.array(
+                            [(new_producer_id, new_consumer_id)],
+                            dtype=bwp.INDICES_DTYPE,
+                        ),
+                        flip_array=np.array([True], dtype=bool),
+                )
+        
+        else:
+            # Create new edges based on interpolation_weights from the row
+            for date, share in row.interpolation_weights.items():
+                print(date, database_date_dict[date], previous_producer_node["name"])
+                new_producer_id = bd.get_node(
+                        **{
+                            "database": database_dates_dict[date],
+                            "name": previous_producer_node["name"],
+                            # "product": previous_producer_node["reference product"],
+                            # "location": previous_producer_node["location"],
+                        }
+                    ).id   # Get new producer id by looking for the same activity in the new database
+                print(previous_producer_id, row.consumer, new_producer_id, new_consumer_id)
+                datapackage.add_persistent_vector(
+                        matrix="technosphere_matrix",
+                        name=uuid.uuid4().hex,
+                        data_array=np.array([row.amount*share], dtype=float),
+                        indices_array=np.array(
+                            [(new_producer_id, new_consumer_id)],
+                            dtype=bwp.INDICES_DTYPE,
+                        ),
+                        flip_array=np.array([True], dtype=bool),
+                )
+    
+    if not name:
+        name = uuid.uuid4().hex
+        # logger.info(f"Using random name {name}")
+
+    if datapackage is None:
+        datapackage = bwp.create_datapackage(sum_intra_duplicates=False)
+
+    new_nodes = set()
+    for row in timeline.itertuples():
+        add_row_to_datapackage(row, datapackage, database_date_dict, new_nodes)
+        
+    datapackage.add_persistent_vector(
+        matrix="technosphere_matrix",
+        name=uuid.uuid4().hex,
+        data_array=np.ones(len(new_nodes)),
+        indices_array=np.array([(i, i) for i in new_nodes], dtype=bwp.INDICES_DTYPE),
+    )
+
+    return datapackage
