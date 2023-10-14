@@ -9,6 +9,21 @@ import numpy as np
 import warnings
 import pandas as pd
 
+# for prepare_medusa_lca_inputs
+from bw2data import (
+    Database,
+    Method,
+    Normalization,
+    Weighting,
+    databases,
+    methods,
+    normalizations,
+    projects,
+    weightings,
+)
+from bw2data.backends.schema import ActivityDataset as AD
+from bw2data.backends.schema import get_id
+from bw2data.errors import Brightway2Project
 
 # def add_column_interpolation_weights_to_timeline(tl_df, dates_list, interpolation_type="linear"):
 #     """
@@ -117,17 +132,58 @@ import pandas as pd
 #     return tl_df
 
 def create_grouped_edge_dataframe(tl, dates_list, interpolation_type="linear"):
-    edges_dict_list = [{"datetime": edge.distribution.date, 'amount': edge.distribution.amount, 'producer': edge.producer, 'consumer': edge.consumer, "leaf": edge.leaf} for edge in tl]
-    edges_dataframe = pd.DataFrame(edges_dict_list)
-    edges_dataframe = edges_dataframe.explode(['datetime', "amount"])
-    edges_dataframe['year'] = edges_dataframe['datetime'].apply(lambda x: x.year)
-    edge_dataframe = edges_dataframe.loc[:, "amount":].groupby(['year', 'producer', 'consumer']).sum().reset_index()
-    edge_dataframe['date'] = edge_dataframe['year'].apply(lambda x: datetime(x, 1, 1))
-    timeline_df_with_interpolation = add_column_interpolation_weights_to_timeline(edge_dataframe, dates_list, interpolation_type=interpolation_type)
-    timeline_df_with_interpolation['producer_name'] = timeline_df_with_interpolation.producer.apply(lambda x: bd.get_node(id=x)["name"])
-    return edge_dataframe
+    """
+    Create a grouped edge dataframe.
 
-def get_datapackage_from_edge_timeline(
+    :param tl: Timeline containing edge information.
+    :param dates_list: List of dates to be used for interpolation.
+    :param interpolation_type: Type of interpolation (default is "linear").
+    :return: Grouped edge dataframe.
+    """
+    
+    def extract_edge_data(edge):
+        return {
+            "datetime": edge.distribution.date,
+            "amount": edge.distribution.amount,
+            "producer": edge.producer,
+            "consumer": edge.consumer,
+            "leaf": edge.leaf
+        }
+    
+    def get_consumer_name(id):
+        try:
+            return bd.get_node(id=id)['name']
+        except:
+            return '-1'
+
+    # Extract edge data into a list of dictionaries
+    edges_data = [extract_edge_data(edge) for edge in tl]
+    
+    # Convert list of dictionaries to dataframe
+    edges_df = pd.DataFrame(edges_data)
+    
+    # Explode datetime and amount columns
+    edges_df = edges_df.explode(['datetime', 'amount'])
+    
+    # Extract year from datetime column
+    edges_df['year'] = edges_df['datetime'].apply(lambda x: x.year)
+    
+    # Group by year, producer, and consumer and sum amounts
+    edge_df = edges_df.groupby(['year', 'producer', 'consumer'])['amount'].sum().reset_index()
+    
+    # Convert year back to datetime format
+    edge_df['date'] = edge_df['year'].apply(lambda x: datetime(x, 1, 1))
+    
+    # Add interpolation weights to the dataframe
+    timeline_with_interpolation = add_column_interpolation_weights_to_timeline(edge_df, dates_list, interpolation_type=interpolation_type)
+    
+    # Retrieve producer and consumer names
+    timeline_with_interpolation['producer_name'] = timeline_with_interpolation.producer.apply(lambda x: bd.get_node(id=x)["name"])
+    timeline_with_interpolation['consumer_name'] = timeline_with_interpolation.consumer.apply(get_consumer_name)
+    
+    return edge_df
+
+def create_datapackage_from_edge_timeline(
     timeline: pd.DataFrame, 
     database_date_dict: dict, 
     datapackage: Optional[bwp.Datapackage] = None,
@@ -165,21 +221,30 @@ def get_datapackage_from_edge_timeline(
         :param database_dates_dict: Dictionary of available prospective database dates and their names.
         :return: List of new edges; each edge contains the consumer, the previous producer, the new producer, and the amount.
         """
-        if row.consumer == -1:
-            warnings.warn(f"\nMay I have your attention please? Will the real producer please stand up? \n{bd.get_node(id=row.producer)} has no producer. Production exchange missing?", category=Warning)
+        print('Current row:', row.year, ' | ', row.producer_name, ' | ', row.consumer_name)
+        if row.consumer == -1: # ? Why? Might be in the timeline-building code that starts graph traversal at FU and directly goes down the supply chain
+            print('Row contains the functional unit - exploding to new time-specific node')
+            new_producer_id = row.producer*1000000+row.year
+            new_nodes.add(new_producer_id)
+            print(f'New producer id = {new_producer_id}')
+            print()
             return
         
-        new_consumer_id = row.consumer*100000+row.year
-        new_producer_id = row.producer*100000+row.year
+        new_consumer_id = row.consumer*1000000+row.year
+        new_producer_id = row.producer*1000000+row.year # ? In case the producer comes from a background database, we overwrite this, right?
         assert new_consumer_id > 0 , f"New consumer id for {row.consumer} is negative"
         assert new_producer_id > 0, f"New producer id for {row.producer} is negative"
         new_nodes.add(new_consumer_id)
-        new_nodes.add(new_producer_id)
+        new_nodes.add(new_producer_id) # ? In case this is in a background database, we still add this to new nodes here. It shouldnt make a difference, but is not necessary, right?
         previous_producer_id = row.producer
         previous_producer_node = bd.get_node(id=previous_producer_id) # in future versions, insead of getting node, just provide list of producer ids
         
-        # Check if previous producer comes from prospective databases
+        # Check if previous producer comes from foreground database
         if not previous_producer_node['database'] in database_dates_dict.values():
+            print('Row contains internal foreground edge - exploding to new time-specific nodes')
+            print(f'New producer id = {new_producer_id}')
+            print(f'New consumer id = {new_consumer_id}')
+            print()
             datapackage.add_persistent_vector(
                         matrix="technosphere_matrix",
                         name=uuid.uuid4().hex,
@@ -191,10 +256,11 @@ def get_datapackage_from_edge_timeline(
                         flip_array=np.array([True], dtype=bool),
                 )
         
-        else:
+        else:   # Previous producer comes from background database
             # Create new edges based on interpolation_weights from the row
+            print('Row links to background database')
             for date, share in row.interpolation_weights.items():
-                print(f"Choosing {database_date_dict[date]} for year {date}; Previous producer was {previous_producer_node.key}")
+                print(f'New link goes to {database_date_dict[date]} for year {date}')
                 new_producer_id = bd.get_node(
                         **{
                             "database": database_dates_dict[date],
@@ -348,21 +414,6 @@ def add_column_interpolation_weights_to_timeline(tl_df, dates_list, interpolatio
         
     tl_df['interpolation_weights'] = tl_df['date'].apply(lambda x: get_weights_for_interpolation_between_nearest_years(x, dates_list, interpolation_type))
     return tl_df
-
-from bw2data import (
-    Database,
-    Method,
-    Normalization,
-    Weighting,
-    databases,
-    methods,
-    normalizations,
-    projects,
-    weightings,
-)
-from bw2data.backends.schema import ActivityDataset as AD
-from bw2data.backends.schema import get_id
-from bw2data.errors import Brightway2Project
 
 def unpack(dct):
     for obj in dct:
