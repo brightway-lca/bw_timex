@@ -188,11 +188,13 @@ def create_grouped_edge_dataframe(tl, dates_list, interpolation_type="linear"):
     edge_df['date'] = edge_df['year'].apply(lambda x: datetime(x, 1, 1))
     
     # Add interpolation weights to the dataframe
-    timeline_with_interpolation = add_column_interpolation_weights_to_timeline(edge_df, dates_list, interpolation_type=interpolation_type)
+    edge_df = add_column_interpolation_weights_to_timeline(edge_df, dates_list, interpolation_type=interpolation_type)
     
     # Retrieve producer and consumer names
-    timeline_with_interpolation['producer_name'] = timeline_with_interpolation.producer.apply(lambda x: bd.get_node(id=x)["name"])
-    timeline_with_interpolation['consumer_name'] = timeline_with_interpolation.consumer.apply(get_consumer_name)
+    edge_df['producer_name'] = edge_df.producer.apply(lambda x: bd.get_node(id=x)["name"])
+    edge_df['consumer_name'] = edge_df.consumer.apply(get_consumer_name)
+    
+    edge_df = edge_df[['date', 'year', 'producer', 'producer_name', 'consumer', 'consumer_name', 'amount', 'interpolation_weights']]
     
     return edge_df
 
@@ -232,14 +234,14 @@ def create_datapackage_from_edge_timeline(
         :param demand_timing: Dictionary of the demand ids and the years they should be linked to. Can be created using create_demand_timing_dict().
         :return: List of new edges; each edge contains the consumer, the previous producer, the new producer, and the amount.
         """
-        print('Current row:', row.year, ' | ', row.producer_name, ' | ', row.consumer_name)
+        # print('Current row:', row.year, ' | ', row.producer_name, ' | ', row.consumer_name)
 
         if row.consumer == -1: # ? Why? Might be in the timeline-building code that starts graph traversal at FU and directly goes down the supply chain
-            print('Row contains the functional unit - exploding to new time-specific node')
+            # print('Row contains the functional unit - exploding to new time-specific node')
             new_producer_id = row.producer*1000000+row.year
             new_nodes.add(new_producer_id)
-            print(f'New producer id = {new_producer_id}')
-            print()
+            # print(f'New producer id = {new_producer_id}')
+            # print()
             return
         
         new_consumer_id = row.consumer*1000000+row.year
@@ -256,10 +258,10 @@ def create_datapackage_from_edge_timeline(
             if row.consumer in demand_timing.keys():
                 new_consumer_id = row.consumer*1000000+demand_timing[row.consumer]
 
-            print('Row contains internal foreground edge - exploding to new time-specific nodes')
-            print(f'New producer id = {new_producer_id}')
-            print(f'New consumer id = {new_consumer_id}')
-            print()
+            # print('Row contains internal foreground edge - exploding to new time-specific nodes')
+            # print(f'New producer id = {new_producer_id}')
+            # print(f'New consumer id = {new_consumer_id}')
+            # print()
             datapackage.add_persistent_vector(
                         matrix="technosphere_matrix",
                         name=uuid.uuid4().hex,
@@ -272,7 +274,7 @@ def create_datapackage_from_edge_timeline(
                 )
         
         else:   # Previous producer comes from background database
-            print('Row links to background database')
+            # print('Row links to background database')
 
             # dont create new consumer id if consumer is the functional unit
             if row.consumer in demand_timing.keys():
@@ -280,7 +282,7 @@ def create_datapackage_from_edge_timeline(
 
             # Create new edges based on interpolation_weights from the row
             for date, share in row.interpolation_weights.items():
-                print(f'New link goes to {database_date_dict[datetime.strptime(str(date), "%Y")]} for year {date}')
+                # print(f'New link goes to {database_date_dict[datetime.strptime(str(date), "%Y")]} for year {date}')
                 new_producer_id = bd.get_node(
                         **{
                             "database": database_date_dict[datetime.strptime(str(date), "%Y")],
@@ -289,11 +291,11 @@ def create_datapackage_from_edge_timeline(
                             # "location": previous_producer_node["location"],
                         }
                     ).id   # Get new producer id by looking for the same activity in the new database
-                print(f'Previous producer: {previous_producer_node.key}, id = {previous_producer_id}')
-                print(f'Previous consumer: {bd.get_node(id=row.consumer).key}, id = {row.consumer}')
-                print(f'New producer id = {new_producer_id}')
-                print(f'New consumer id = {new_consumer_id}')
-                print()
+                # print(f'Previous producer: {previous_producer_node.key}, id = {previous_producer_id}')
+                # print(f'Previous consumer: {bd.get_node(id=row.consumer).key}, id = {row.consumer}')
+                # print(f'New producer id = {new_producer_id}')
+                # print(f'New consumer id = {new_consumer_id}')
+                # print()
                 datapackage.add_persistent_vector(
                         matrix="technosphere_matrix",
                         name=uuid.uuid4().hex,
