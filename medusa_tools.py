@@ -186,6 +186,7 @@ def create_grouped_edge_dataframe(tl, dates_list, interpolation_type="linear"):
 def create_datapackage_from_edge_timeline(
     timeline: pd.DataFrame, 
     database_date_dict: dict, 
+    demand: dict,
     datapackage: Optional[bwp.Datapackage] = None,
     name: Optional[str] = None,
 ) -> bwp.Datapackage:
@@ -213,7 +214,7 @@ def create_datapackage_from_edge_timeline(
         A list of patches formatted as datapackages.
     """
 
-    def add_row_to_datapackage(row, datapackage, database_dates_dict, new_nodes): 
+    def add_row_to_datapackage(row, datapackage, database_dates_dict, demand_timing, new_nodes): 
         """
         Extracts new edges based on a row from the timeline DataFrame.
 
@@ -241,6 +242,11 @@ def create_datapackage_from_edge_timeline(
         
         # Check if previous producer comes from foreground database
         if not previous_producer_node['database'] in database_dates_dict.values():
+            
+            # dont create new consumer id if consumer is the functional unit
+            if row.consumer in demand_timing.keys():
+                new_consumer_id = row.consumer*1000000+demand_timing[row.consumer]
+
             print('Row contains internal foreground edge - exploding to new time-specific nodes')
             print(f'New producer id = {new_producer_id}')
             print(f'New consumer id = {new_consumer_id}')
@@ -257,8 +263,13 @@ def create_datapackage_from_edge_timeline(
                 )
         
         else:   # Previous producer comes from background database
-            # Create new edges based on interpolation_weights from the row
             print('Row links to background database')
+
+            # dont create new consumer id if consumer is the functional unit
+            if row.consumer in demand_timing.keys():
+                new_consumer_id = row.consumer*1000000+demand_timing[row.consumer]
+
+            # Create new edges based on interpolation_weights from the row
             for date, share in row.interpolation_weights.items():
                 print(f'New link goes to {database_date_dict[date]} for year {date}')
                 new_producer_id = bd.get_node(
@@ -295,9 +306,14 @@ def create_datapackage_from_edge_timeline(
     # for db in bd.databases:
     #     datapackage += [bd.Database(db).datapackage()]
 
+    # finding out which year the demand is in 
+    demand_names = [bd.get_activity(key).id for key in demand.keys()]
+    demand_rows = timeline[timeline['producer'].isin(demand_names) & (timeline['consumer'] == -1)]
+    demand_timing = {row.producer: row.year for row in demand_rows.itertuples()}  
+
     new_nodes = set()
     for row in timeline.itertuples():
-        add_row_to_datapackage(row, datapackage, database_date_dict, new_nodes)
+        add_row_to_datapackage(row, datapackage, database_date_dict, demand_timing, new_nodes)
     
     # Adding ones on diagonal for new nodes
     datapackage.add_persistent_vector(
@@ -451,7 +467,9 @@ def prepare_medusa_lca_inputs(
     # else:
     #     demand_database_names = []
 
-    demand_database_names = [db_label for db_label in databases] # Always load all databases
+    # demand_database_names = [db_label for db_label in databases] # Always load all databases
+    demand_database_names = ['background_2023', 'background_2020'] # Always load all databases
+    
 
     if demand_database_names:
         database_names = set.union(
