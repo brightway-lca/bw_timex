@@ -25,111 +25,6 @@ from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import get_id
 from bw2data.errors import Brightway2Project
 
-# def add_column_interpolation_weights_to_timeline(tl_df, dates_list, interpolation_type="linear"):
-#     """
-#     Add a column to a timeline with the weights for an interpolation between the two nearest dates, from the list of dates from the available databases.
-
-#     :param tl_df: Timeline as a dataframe.
-#     :param dates_list: List of years of the available databases.
-#     :param interpolation_type: Type of interpolation between the nearest lower and higher dates. For now, 
-#     only "linear" is available.
-    
-#     :return: Timeline as a dataframe with a column 'interpolation_weights' (object:dictionnary) added.
-#     -------------------
-#     Example:
-#     >>> dates_list = [
-#         datetime.strptime("2020", "%Y"),
-#         datetime.strptime("2022", "%Y"),
-#         datetime.strptime("2025", "%Y"),
-#     ]
-#     >>> add_column_interpolation_weights_on_timeline(tl_df, dates_list, interpolation_type="linear")
-#     """
-#     def find_closest_date(target, dates):
-#         """
-#         Find the closest date to the target in the dates list.
-    
-#         :param target: Target datetime.datetime object.
-#         :param dates: List of datetime.datetime objects.
-#         :return: Dictionary with the key as the closest datetime.datetime object from the list and a value of 1.
-    
-#         ---------------------
-#         # Example usage
-#         target = datetime.strptime("2023-01-15", "%Y-%m-%d")
-#         dates_list = [
-#             datetime.strptime("2020", "%Y"),
-#             datetime.strptime("2022", "%Y"),
-#             datetime.strptime("2025", "%Y"),
-#         ]
-    
-#         print(closest_date(target, dates_list))
-#         """
-    
-#         # If the list is empty, return None
-#         if not dates:
-#             return None
-    
-#         # Sort the dates
-#         dates = sorted(dates)
-    
-#         # Use min function with a key based on the absolute difference between the target and each date
-#         closest = min(dates, key=lambda date: abs(target - date))
-    
-#         return {closest.year: 1}
-    
-#     def get_weights_for_interpolation_between_nearest_years(date, dates_list, interpolation_type="linear"):
-#         """
-#         Find the nearest dates (before and after) a given date in a list of dates and calculate the interpolation weights.
-    
-#         :param date: Target date.
-#         :param dates_list: List of years of the available databases.
-#         :param interpolation_type: Type of interpolation between the nearest lower and higher dates. For now, 
-#         only "linear" is available.
-        
-#         :return: Dictionary with years of the available databases to use as keys and the weights for interpolation as values.
-#         -------------------
-#         Example:
-#         >>> dates_list = [
-#             datetime.strptime("2020", "%Y"),
-#             datetime.strptime("2022", "%Y"),
-#             datetime.strptime("2025", "%Y"),
-#         ]
-#         >>> date_test = datetime(2021,10,11)
-#         >>> add_column_interpolation_weights_on_timeline(date_test, dates_list, interpolation_type="linear")
-#         """
-#         dates_list = sorted (dates_list)
-        
-#         diff_dates_list = [date - x for x in dates_list]
-#         if timedelta(0) in diff_dates_list:
-#             exact_match = dates_list[diff_dates_list.index(timedelta(0))]
-#             return {exact_match.year: 1}
-    
-#         closest_lower = min(
-#             dates_list, 
-#             key=lambda x: abs(date - x) if (date - x) > timedelta(0) else timedelta.max
-#         )
-#         closest_higher = min(
-#             dates_list, 
-#             key=lambda x: abs(date - x) if (date - x) < timedelta(0) else timedelta.max
-#         )
-    
-#         if closest_lower == closest_higher:
-#             warnings.warn("Date outside the range of dates covered by the databases.", category=Warning)
-#             return {closest_lower.year: 1}
-            
-#         if interpolation_type == "linear":
-#             weight = int((date - closest_lower).total_seconds())/int((closest_higher - closest_lower).total_seconds())
-#         else:
-#             raise ValueError(f"Sorry, but {interpolation_type} interpolation is not available yet.")
-#         return {closest_lower.year: weight, closest_higher.year: 1-weight}
-#         if "date" not in list(tl_df.columns):
-#             raise ValueError("The timeline does not contain dates.")
-        
-#     if interpolation_type == "nearest":
-#         tl_df['interpolation_weights'] = tl_df['date'].apply(lambda x: find_closest_date(x, dates_list))
-#         return tl_df
-        
-#     tl_df['interpolation_weights'] = tl_df['date'].apply(lambda x: get_weights_for_interpolation_between_nearest_years(x, dates_list, interpolation_type))
-#     return tl_df
 
 def create_demand_timing_dict(timeline, demand):
     """
@@ -146,7 +41,14 @@ def create_demand_timing_dict(timeline, demand):
 
 def create_grouped_edge_dataframe(tl, dates_list, interpolation_type="linear"):
     """
-    Create a grouped edge dataframe.
+    Create a grouped edge dataframe. 
+    
+    Edges that occur at different times within the same year are grouped together by year.
+
+    The column "interpolation weights" assigns the ratio [0-1] of the edge's amount to be taken from a respective year-database. 
+    Available interpolation types are:
+        - "linear": linear interpolation between the two closest databases
+        - "closest": closest database is assigned 1
 
     :param tl: Timeline containing edge information.
     :param dates_list: List of dates to be used for interpolation.
@@ -155,6 +57,12 @@ def create_grouped_edge_dataframe(tl, dates_list, interpolation_type="linear"):
     """
     
     def extract_edge_data(edge):
+        """
+        Stores the attributes of an Edge instance in a dictionary.
+
+        :param edge: Edge instance
+        :return: Dictionary with attributes of the edge 
+        """
         return {
             "datetime": edge.distribution.date,
             "amount": edge.distribution.amount,
@@ -164,10 +72,17 @@ def create_grouped_edge_dataframe(tl, dates_list, interpolation_type="linear"):
         }
     
     def get_consumer_name(id):
+        """
+        Returns the name of consumer node. 
+        If consuming node is the functional unit, returns -1.
+
+        :param id: Id of node
+        :return: string of node's name or -1
+        """
         try:
             return bd.get_node(id=id)['name']
         except:
-            return '-1'
+            return '-1' #functional unit
 
     # Extract edge data into a list of dictionaries
     edges_data = [extract_edge_data(edge) for edge in tl]
@@ -182,21 +97,21 @@ def create_grouped_edge_dataframe(tl, dates_list, interpolation_type="linear"):
     edges_df['year'] = edges_df['datetime'].apply(lambda x: x.year)
     
     # Group by year, producer, and consumer and sum amounts
-    edge_df = edges_df.groupby(['year', 'producer', 'consumer'])['amount'].sum().reset_index()
+    grouped_edges = edges_df.groupby(['year', 'producer', 'consumer'])['amount'].sum().reset_index()
     
     # Convert year back to datetime format
-    edge_df['date'] = edge_df['year'].apply(lambda x: datetime(x, 1, 1))
+    grouped_edges['date'] = grouped_edges['year'].apply(lambda x: datetime(x, 1, 1)) #FIXME: assigning January 1 causes incorrect interpolation weights as it overwrites the actual timing. e.g. 2023.12.31 -> 2023 -> 23.01.01.
     
     # Add interpolation weights to the dataframe
-    edge_df = add_column_interpolation_weights_to_timeline(edge_df, dates_list, interpolation_type=interpolation_type)
+    grouped_edges = add_column_interpolation_weights_to_timeline(grouped_edges, dates_list, interpolation_type=interpolation_type)
     
     # Retrieve producer and consumer names
-    edge_df['producer_name'] = edge_df.producer.apply(lambda x: bd.get_node(id=x)["name"])
-    edge_df['consumer_name'] = edge_df.consumer.apply(get_consumer_name)
+    grouped_edges['producer_name'] = grouped_edges.producer.apply(lambda x: bd.get_node(id=x)["name"])
+    grouped_edges['consumer_name'] = grouped_edges.consumer.apply(get_consumer_name)
     
-    edge_df = edge_df[['date', 'year', 'producer', 'producer_name', 'consumer', 'consumer_name', 'amount', 'interpolation_weights']]
+    grouped_edges = grouped_edges[['date', 'year', 'producer', 'producer_name', 'consumer', 'consumer_name', 'amount', 'interpolation_weights']]
     
-    return edge_df
+    return grouped_edges
 
 def create_datapackage_from_edge_timeline(
     timeline: pd.DataFrame, 
@@ -206,7 +121,14 @@ def create_datapackage_from_edge_timeline(
     name: Optional[str] = None,
 ) -> bwp.Datapackage:
     """
-    Creates patches from a given timeline. # UPDATE THIS!!!
+    Creates patches from a given timeline. Patches are datapackages that add or overwrite datapoints in the LCA matrixces before LCA calculations.
+    
+    The heavy lifting of this function happens in its child-function "add_row_to_datapackage":
+    Here, each node with a temporal distribution is "exploded", which means each occurrence of this node (e.g. steel production on 2020-01-01 
+    and steel production 2015-01-01) becomes seperate new node with its own unique id. The exchanges on these node-clones get relinked to the activities 
+    with the same name, reference product and location as previously, but now from the corresponding databases in time.
+
+    The new node-clones also need a 1 on the diagional of their technosphere matrix, which symbolizes the production of the new clone-reference product.
 
     Inputs:
     timeline: list
@@ -227,7 +149,7 @@ def create_datapackage_from_edge_timeline(
 
     def add_row_to_datapackage(row, datapackage, database_date_dict, demand_timing, new_nodes): 
         """
-        Extracts new edges based on a row from the timeline DataFrame.
+        create a datapackage for the new edges based on a row from the timeline DataFrame.
 
         :param row: A row from the timeline DataFrame.
         :param database_dates_dict: Dictionary of available prospective database dates and their names.
@@ -254,9 +176,9 @@ def create_datapackage_from_edge_timeline(
         # Check if previous producer comes from foreground database
         if not previous_producer_node['database'] in database_date_dict.values():
             
-            # dont create new consumer id if consumer is the functional unit
+            # create new consumer id if consumer is the functional unit
             if row.consumer in demand_timing.keys():
-                new_consumer_id = row.consumer*1000000+demand_timing[row.consumer]
+                new_consumer_id = row.consumer*1000000+demand_timing[row.consumer] #Why?
 
             # print('Row contains internal foreground edge - exploding to new time-specific nodes')
             # print(f'New producer id = {new_producer_id}')
@@ -267,7 +189,7 @@ def create_datapackage_from_edge_timeline(
                         name=uuid.uuid4().hex,
                         data_array=np.array([row.amount], dtype=float),
                         indices_array=np.array(
-                            [(new_producer_id, new_consumer_id)],
+                            [(new_producer_id, new_consumer_id)], #FIXME: I think if orevious producer comes from foreground database, new_producer_id should be assigned back to original producer_id from foreground database.
                             dtype=bwp.INDICES_DTYPE,
                         ),
                         flip_array=np.array([True], dtype=bool),
@@ -276,7 +198,7 @@ def create_datapackage_from_edge_timeline(
         else:   # Previous producer comes from background database
             # print('Row links to background database')
 
-            # dont create new consumer id if consumer is the functional unit
+            # create new consumer id if consumer is the functional unit
             if row.consumer in demand_timing.keys():
                 new_consumer_id = row.consumer*1000000+demand_timing[row.consumer]
 
@@ -287,7 +209,7 @@ def create_datapackage_from_edge_timeline(
                         **{
                             "database": database_date_dict[datetime.strptime(str(date), "%Y")],
                             "name": previous_producer_node["name"],
-                            # "product": previous_producer_node["reference product"],
+                            # "product": previous_producer_node["reference product"], #TODO: in future versions, new_producers should also match on reference product and location.
                             # "location": previous_producer_node["location"],
                         }
                     ).id   # Get new producer id by looking for the same activity in the new database
@@ -313,9 +235,6 @@ def create_datapackage_from_edge_timeline(
 
     if datapackage is None:
         datapackage = bwp.create_datapackage()
-
-    # for db in bd.databases:
-    #     datapackage += [bd.Database(db).datapackage()]
 
     new_nodes = set()
     for row in timeline.itertuples():
@@ -454,8 +373,15 @@ def prepare_medusa_lca_inputs(
     remapping=True,
     demand_database_last=True,
 ):
-    """Prepare LCA input arguments in Brightway 2.5 style. 
-    ORIGINALLY FROM bw2data.compat.py"""
+    """
+    Prepare LCA input arguments in Brightway 2.5 style. 
+    ORIGINALLY FROM bw2data.compat.py
+
+    Changes include:
+    - always load all databases in demand_database_names
+    - indexed_demand has the id of the new consumer_id of the "exploded" demand (TODO: think about more elegant way)
+    
+    """
     if not projects.dataset.data.get("25"):
         raise Brightway2Project(
             "Please use `projects.migrate_project_25` before calculating using Brightway 2.5"
@@ -475,7 +401,7 @@ def prepare_medusa_lca_inputs(
     #     demand_database_names = []
 
     demand_database_names = [db_label for db_label in databases] # Always load all databases
-    # demand_database_names = ['background_2023', 'background_2020'] # Always load all databases
+
     
 
     if demand_database_names:
@@ -523,7 +449,7 @@ def prepare_medusa_lca_inputs(
         data_objs.append(Normalization(normalization).datapackage())
 
     if demands:
-        indexed_demand = [{get_id(k)*1000000+demand_timing_dict[get_id(k)]: v for k, v in dct.items()} for dct in demands]
+        indexed_demand = [{get_id(k)*1000000+demand_timing_dict[get_id(k)]: v for k, v in dct.items()} for dct in demands] #why?
     elif demand:
         indexed_demand = {get_id(k)*1000000+demand_timing_dict[get_id(k)]: v for k, v in demand.items()}
     else:
