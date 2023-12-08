@@ -221,7 +221,7 @@ def create_datapackage_from_edge_timeline(
                 datapackage.add_persistent_vector(
                         matrix="technosphere_matrix",
                         name=uuid.uuid4().hex,
-                        data_array=np.array([row.amount*share], dtype=float),
+                        data_array=np.array([share], dtype=float),
                         indices_array=np.array(
                             [(new_producer_id, new_consumer_id)],
                             dtype=bwp.INDICES_DTYPE,
