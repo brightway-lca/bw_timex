@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Optional, KeysView
+from edge_extractor import Edge
 import bw2data as bd
 import bw2calc as bc
 import bw_processing as bwp
@@ -26,7 +27,7 @@ from bw2data.backends.schema import get_id
 from bw2data.errors import Brightway2Project
 
 
-def create_demand_timing_dict(timeline, demand):
+def create_demand_timing_dict(timeline: pd.DataFrame, demand: dict) -> dict:
     """
     Generate a dictionary mapping producer to year for specific demands using the timeline.
     
@@ -39,7 +40,7 @@ def create_demand_timing_dict(timeline, demand):
     demand_rows = timeline[timeline['producer'].isin(demand_names) & (timeline['consumer'] == -1)]
     return {row.producer: row.year for row in demand_rows.itertuples()}  
 
-def create_grouped_edge_dataframe(tl, dates_list, interpolation_type="linear"):
+def create_grouped_edge_dataframe(tl: list, dates_list: KeysView[datetime], interpolation_type: str ="linear") -> pd.DataFrame:
     """
     Create a grouped edge dataframe. 
     
@@ -56,7 +57,7 @@ def create_grouped_edge_dataframe(tl, dates_list, interpolation_type="linear"):
     :return: Grouped edge dataframe.
     """
     
-    def extract_edge_data(edge):
+    def extract_edge_data(edge: Edge) -> dict:
         """
         Stores the attributes of an Edge instance in a dictionary.
 
@@ -71,7 +72,7 @@ def create_grouped_edge_dataframe(tl, dates_list, interpolation_type="linear"):
             "leaf": edge.leaf
         }
     
-    def get_consumer_name(id):
+    def get_consumer_name(id: int) -> str:
         """
         Returns the name of consumer node. 
         If consuming node is the functional unit, returns -1.
@@ -147,15 +148,16 @@ def create_datapackage_from_edge_timeline(
         A list of patches formatted as datapackages.
     """
 
-    def add_row_to_datapackage(row, datapackage, database_date_dict, demand_timing, new_nodes): 
+    def add_row_to_datapackage(row: pd.core.frame, datapackage: bwp.Datapackage, database_date_dict: dict, demand_timing: dict, new_nodes: set) -> None: 
         """
         create a datapackage for the new edges based on a row from the timeline DataFrame.
 
         :param row: A row from the timeline DataFrame.
         :param database_dates_dict: Dictionary of available prospective database dates and their names.
         :param demand_timing: Dictionary of the demand ids and the years they should be linked to. Can be created using create_demand_timing_dict().
-        :return: List of new edges; each edge contains the consumer, the previous producer, the new producer, and the amount.
-        """
+        :param new_nodes: empty set to which new node ids are added
+        :return: None, but adds new edges to the set new_nodes and adds a patch for this new edge to the bwp.Datapackage
+    """
         # print('Current row:', row.year, ' | ', row.producer_name, ' | ', row.consumer_name)
 
         if row.consumer == -1: # ? Why? Might be in the timeline-building code that starts graph traversal at FU and directly goes down the supply chain
@@ -250,7 +252,7 @@ def create_datapackage_from_edge_timeline(
 
     return datapackage
 
-def add_column_interpolation_weights_to_timeline(tl_df, dates_list, interpolation_type="linear"):
+def add_column_interpolation_weights_to_timeline(tl_df: pd.DataFrame, dates_list: KeysView[datetime], interpolation_type: str ="linear") -> pd.DataFrame:
     """
     Add a column to a timeline with the weights for an interpolation between the two nearest dates, from the list of dates from the available databases.
 
@@ -269,7 +271,7 @@ def add_column_interpolation_weights_to_timeline(tl_df, dates_list, interpolatio
     ]
     >>> add_column_interpolation_weights_on_timeline(tl_df, dates_list, interpolation_type="linear")
     """
-    def find_closest_date(target, dates):
+    def find_closest_date(target: datetime, dates: KeysView[datetime]) -> dict:
         """
         Find the closest date to the target in the dates list.
     
@@ -295,18 +297,17 @@ def add_column_interpolation_weights_to_timeline(tl_df, dates_list, interpolatio
     
         # Sort the dates
         dates = sorted(dates)
-    
         # Use min function with a key based on the absolute difference between the target and each date
         closest = min(dates, key=lambda date: abs(target - date))
     
         return {closest.year: 1}
     
-    def get_weights_for_interpolation_between_nearest_years(date, dates_list, interpolation_type="linear"):
+    def get_weights_for_interpolation_between_nearest_years(date: datetime, dates_list: KeysView[datetime], interpolation_type: str = "linear") -> dict:
         """
         Find the nearest dates (before and after) a given date in a list of dates and calculate the interpolation weights.
     
         :param date: Target date.
-        :param dates_list: List of years of the available databases.
+        :param dates_list: KeysView[datetime], which is a list of years of the available databases,.
         :param interpolation_type: Type of interpolation between the nearest lower and higher dates. For now, 
         only "linear" is available.
         
