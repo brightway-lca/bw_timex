@@ -302,11 +302,11 @@ def add_column_interpolation_weights_to_timeline(tl_df: pd.DataFrame, dates_list
     
         return {closest.year: 1}
     
-    def get_weights_for_interpolation_between_nearest_years(date: datetime, dates_list: KeysView[datetime], interpolation_type: str = "linear") -> dict:
+    def get_weights_for_interpolation_between_nearest_years(reference_date: datetime, dates_list: KeysView[datetime], interpolation_type: str = "linear") -> dict:
         """
         Find the nearest dates (before and after) a given date in a list of dates and calculate the interpolation weights.
     
-        :param date: Target date.
+        :param reference_date: Target date.
         :param dates_list: KeysView[datetime], which is a list of years of the available databases,.
         :param interpolation_type: Type of interpolation between the nearest lower and higher dates. For now, 
         only "linear" is available.
@@ -324,31 +324,43 @@ def add_column_interpolation_weights_to_timeline(tl_df: pd.DataFrame, dates_list
         """
         dates_list = sorted (dates_list)
         
-        diff_dates_list = [date - x for x in dates_list]
+        diff_dates_list = [reference_date - x for x in dates_list]
         if timedelta(0) in diff_dates_list:
             exact_match = dates_list[diff_dates_list.index(timedelta(0))]
             return {exact_match.year: 1}
-    
-        closest_lower = min(
-            dates_list, 
-            key=lambda x: abs(date - x) if (date - x) > timedelta(0) else timedelta.max
-        )
-        closest_higher = min(
-            dates_list, 
-            key=lambda x: abs(date - x) if (date - x) < timedelta(0) else timedelta.max
-        )
-    
+        
+
+        closest_lower = None
+        closest_higher = None
+
+        for date in dates_list:
+            if date < reference_date:
+                if closest_lower is None or reference_date - date < reference_date - closest_lower:
+                    closest_lower = date
+            elif date > reference_date:
+                if closest_higher is None or date - reference_date < closest_higher - reference_date:
+                    closest_higher = date
+        
+        if closest_lower is None:
+            print(f"Warning: Reference date {reference_date} is lower than all provided dates. Data will be taken from closest higher .")
+            return {closest_higher.year: 1}
+        
+        if closest_higher is None:
+            print(f"Warning: Reference date {reference_date} is higher than all provided dates. Data will be taken from the closest lower year.")
+            return {closest_lower.year: 1}
+  
         if closest_lower == closest_higher:
             warnings.warn("Date outside the range of dates covered by the databases.", category=Warning)
             return {closest_lower.year: 1}
             
         if interpolation_type == "linear":
-            weight = int((date - closest_lower).total_seconds())/int((closest_higher - closest_lower).total_seconds())
+            weight = int((reference_date - closest_lower).total_seconds())/int((closest_higher - closest_lower).total_seconds())
         else:
             raise ValueError(f"Sorry, but {interpolation_type} interpolation is not available yet.")
         return {closest_lower.year: 1-weight, closest_higher.year: weight}
-        if "date" not in list(tl_df.columns):
-            raise ValueError("The timeline does not contain dates.")
+    
+    if "date" not in list(tl_df.columns):
+        raise ValueError("The timeline does not contain dates.")
         
     if interpolation_type == "nearest":
         tl_df['interpolation_weights'] = tl_df['date'].apply(lambda x: find_closest_date(x, dates_list))
