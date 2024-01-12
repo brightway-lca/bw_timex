@@ -162,14 +162,14 @@ def create_datapackage_from_edge_timeline(
 
         if row.consumer == -1: # ? Why? Might be in the timeline-building code that starts graph traversal at FU and directly goes down the supply chain
             # print('Row contains the functional unit - exploding to new time-specific node')
-            new_producer_id = row.producer*1000000+row.year
+            new_producer_id = row.producer*10000+row.year
             new_nodes.add(new_producer_id)
             # print(f'New producer id = {new_producer_id}')
             # print()
             return
         
-        new_consumer_id = row.consumer*1000000+row.year
-        new_producer_id = row.producer*1000000+row.year # In case the producer comes from a background database, we overwrite this. It currently still gets added to new_nodes, but this is not necessary.
+        new_consumer_id = row.consumer*10000+row.year
+        new_producer_id = row.producer*10000+row.year # In case the producer comes from a background database, we overwrite this. It currently still gets added to new_nodes, but this is not necessary.
         new_nodes.add(new_consumer_id)
         new_nodes.add(new_producer_id) 
         previous_producer_id = row.producer
@@ -180,7 +180,7 @@ def create_datapackage_from_edge_timeline(
             
             # create new consumer id if consumer is the functional unit
             if row.consumer in demand_timing.keys():
-                new_consumer_id = row.consumer*1000000+demand_timing[row.consumer] #Why?
+                new_consumer_id = row.consumer*10000+demand_timing[row.consumer] #Why?
 
             # print('Row contains internal foreground edge - exploding to new time-specific nodes')
             # print(f'New producer id = {new_producer_id}')
@@ -202,7 +202,7 @@ def create_datapackage_from_edge_timeline(
 
             # create new consumer id if consumer is the functional unit
             if row.consumer in demand_timing.keys():
-                new_consumer_id = row.consumer*1000000+demand_timing[row.consumer]
+                new_consumer_id = row.consumer*10000+demand_timing[row.consumer] #reduced by two digits due to OverflowError: Python int too large to convert to C long
 
             # Create new edges based on interpolation_weights from the row
             for date, share in row.interpolation_weights.items():
@@ -211,8 +211,8 @@ def create_datapackage_from_edge_timeline(
                         **{
                             "database": database_date_dict[datetime.strptime(str(date), "%Y")],
                             "name": previous_producer_node["name"],
-                            # "product": previous_producer_node["reference product"], #TODO: in future versions, new_producers should also match on reference product and location.
-                            # "location": previous_producer_node["location"],
+                            "product": previous_producer_node["reference product"], #TODO: in future versions, new_producers should also match on reference product and location.
+                            "location": previous_producer_node["location"],
                         }
                     ).id   # Get new producer id by looking for the same activity in the new database
                 # print(f'Previous producer: {previous_producer_node.key}, id = {previous_producer_id}')
@@ -462,9 +462,9 @@ def prepare_medusa_lca_inputs(
         data_objs.append(Normalization(normalization).datapackage())
 
     if demands:
-        indexed_demand = [{get_id(k)*1000000+demand_timing_dict[get_id(k)]: v for k, v in dct.items()} for dct in demands] #why?
+        indexed_demand = [{get_id(k)*10000+demand_timing_dict[get_id(k)]: v for k, v in dct.items()} for dct in demands] #why?
     elif demand:
-        indexed_demand = {get_id(k)*1000000+demand_timing_dict[get_id(k)]: v for k, v in demand.items()}
+        indexed_demand = {get_id(k)*10000+demand_timing_dict[get_id(k)]: v for k, v in demand.items()}
     else:
         indexed_demand = None
 
