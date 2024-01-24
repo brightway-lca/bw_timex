@@ -354,3 +354,17 @@ def get_datapackage_from_edge_timeline(
     )
 
     return datapackage
+
+
+def extract_date_as_integer(dt_obj : datetime) -> int:
+    """
+    Converts a datetime object to an integer in the format YYYY 
+    #FIXME: ideally we want to add YYYYMMDDHH to the ids, but this cretaes integers that are too long for 32-bit C long
+
+    :param dt_obj: Datetime object.
+    :return: INTEGER in the format YYYY.
+    """    
+    formatted_date = dt_obj.strftime('%Y%m')
+    date_as_integer = int(formatted_date)
+    
+    return date_as_integer
