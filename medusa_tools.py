@@ -148,7 +148,9 @@ def create_datapackage_from_edge_timeline(
         A list of patches formatted as datapackages.
     """
 
-    def add_row_to_datapackage(row: pd.core.frame, datapackage: bwp.Datapackage, database_date_dict: dict, demand_timing: dict, new_nodes: set) -> None: 
+    def add_row_to_datapackage(row: pd.core.frame, datapackage: bwp.Datapackage,
+                               database_date_dict: dict, demand_timing: dict,
+                               new_nodes: set, consumer_years: dict) -> None: 
         """
         create a datapackage for the new edges based on a row from the timeline DataFrame.
 
@@ -168,7 +170,7 @@ def create_datapackage_from_edge_timeline(
             # print()
             return
         
-        new_consumer_id = row.consumer*10000+row.year
+        new_consumer_id = row.consumer*10000+consumer_years[row.consumer]
         new_producer_id = row.producer*10000+row.year # In case the producer comes from a background database, we overwrite this. It currently still gets added to new_nodes, but this is not necessary.
         new_nodes.add(new_consumer_id)
         new_nodes.add(new_producer_id) 
@@ -239,8 +241,15 @@ def create_datapackage_from_edge_timeline(
         datapackage = bwp.create_datapackage()
 
     new_nodes = set()
-    for row in timeline.itertuples():
-        add_row_to_datapackage(row, datapackage, database_date_dict, demand_timing, new_nodes)
+    consumer_years = {}  # a dictionary to store the year of the consuming processes so that the inputs from previous times get linked right
+    for row in timeline.iloc[::-1].itertuples():
+        consumer_years[row.producer] = row.year  # the year of the producer will be the consumer year for this procuess until a it becomesa producer again
+        add_row_to_datapackage(row,
+                               datapackage,
+                               database_date_dict,
+                               demand_timing,
+                               new_nodes,
+                               consumer_years,)
     
     # Adding ones on diagonal for new nodes
     datapackage.add_persistent_vector(
