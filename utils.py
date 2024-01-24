@@ -196,11 +196,27 @@ def add_column_interpolation_weights_on_timeline(tl_df, dates_list, interpolatio
     tl_df['interpolation_weights'] = tl_df['date'].apply(lambda x: get_weights_for_interpolation_between_nearest_years(x, dates_list, interpolation_type))
     return tl_df
 
-def create_grouped_edge_dataframe(tl,dates_list, interpolation_type="linear"):
+def create_grouped_edge_dataframe(tl,dates_list, time_res="year", interpolation_type="linear"):
+    """create a timeline dataframe where the various activities are aggregated based on their datetime.
+    Currently they are all aggregated to the same time resolution, but in the future this can be differentiated
+    for different types of activties.
+    
+    arguments:
+    tl              : Should be a timeline from edge_extractor
+    dates_list      : dictionary containing the different background databases and their years   # NEED TO UPDATE THIS DESCRIPTION
+    time_res        : the time resolution to which the activitiess need to be aggregated. Should be in {'year'}
+    interpolation   : how to interpolate between different background databases
+
+    TODO: make  categorial aggregation possible. EG electricity markets on hourly bases, other processes on yearly bases. 
+    Maybe include seasonal resolution
+    """
+    # For now only yearly ressolution possible
+    time_res = 'year'
+    
     edges_dict_list = [{"datetime": edge.distribution.date, 'amount': edge.distribution.amount, 'producer': edge.producer, 'consumer': edge.consumer, "leaf": edge.leaf} for edge in tl]
     edges_dataframe = pd.DataFrame(edges_dict_list)
     edges_dataframe = edges_dataframe.explode(['datetime', "amount"])
-    edges_dataframe['year'] = edges_dataframe['datetime'].apply(lambda x: x.year)
+    edges_dataframe['time_stamp'] = edges_dataframe['datetime'].apply(lambda x: x.year)
     edge_dataframe = edges_dataframe.loc[:, "amount":].groupby(['year', 'producer', 'consumer']).sum().reset_index()
     edge_dataframe['date'] = edge_dataframe['year'].apply(lambda x: datetime(x, 1, 1))
     timeline_df_with_interpolation = add_column_interpolation_weights_on_timeline(edge_dataframe, dates_list, interpolation_type="linear")
