@@ -139,7 +139,8 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
     grouped_edges['producer_name'] = grouped_edges.producer.apply(lambda x: bd.get_node(id=x)["name"])
     grouped_edges['consumer_name'] = grouped_edges.consumer.apply(get_consumer_name)
     
-    grouped_edges = grouped_edges[['date', 'year', 'producer', 'producer_name', 'consumer', 'consumer_name', 'amount', 'interpolation_weights']]
+    grouped_edges['timestamp'] = grouped_edges['year']  # for now just year but could be calling the function --> extract_date_as_integer(grouped_edges['date'])
+    # grouped_edges = grouped_edges[['date', 'year', 'producer', 'producer_name', 'consumer', 'consumer_name', 'amount', 'interpolation_weights']]
      #TODO: remove year, since we now have flexible time grouping and everything is stored in date. Currently still kept for clarity
     return grouped_edges
 
@@ -179,7 +180,7 @@ def create_datapackage_from_edge_timeline(
 
     def add_row_to_datapackage(row: pd.core.frame, datapackage: bwp.Datapackage,
                                database_date_dict: dict, demand_timing: dict,
-                               new_nodes: set, consumer_years: dict) -> None: 
+                               new_nodes: set, consumer_timestamps: dict) -> None: 
         """
         create a datapackage for the new edges based on a row from the timeline DataFrame.
 
@@ -193,16 +194,16 @@ def create_datapackage_from_edge_timeline(
 
         if row.consumer == -1: # ? Why? Might be in the timeline-building code that starts graph traversal at FU and directly goes down the supply chain
             # print('Row contains the functional unit - exploding to new time-specific node')
-            new_producer_id = row.producer*1000000+extract_date_as_integer(row.date)
+            new_producer_id = row.producer*1000000+row.timestamp
             new_nodes.add(new_producer_id)
             # print(f'New producer id = {new_producer_id}')
             # print()
             return
         
-        new_consumer_id = row.consumer*1000000+extract_date_as_integer(row.date)
+        new_consumer_id = row.consumer*1000000+consumer_timestamps[row.consumer]
         # print(f'New consumer id = {new_consumer_id}')
         # print(f'New added year= {extract_date_as_integer(row.date)}')
-        new_producer_id = row.producer*1000000+extract_date_as_integer(row.date) # In case the producer comes from a background database, we overwrite this. It currently still gets added to new_nodes, but this is not necessary.
+        new_producer_id = row.producer*1000000+row.timestamp # In case the producer comes from a background database, we overwrite this. It currently still gets added to new_nodes, but this is not necessary.
         new_nodes.add(new_consumer_id)
         new_nodes.add(new_producer_id) 
         previous_producer_id = row.producer
@@ -213,7 +214,7 @@ def create_datapackage_from_edge_timeline(
             
             # create new consumer id if consumer is the functional unit
             if row.consumer in demand_timing.keys():
-                new_consumer_id = row.consumer*1000000+demand_timing[row.consumer] #Why?
+                new_consumer_id = row.consumer*1000000+consumer_timestamps[row.consumer] #Why?
 
             # print('Row contains internal foreground edge - exploding to new time-specific nodes')
             # print(f'New producer id = {new_producer_id}')
@@ -235,7 +236,7 @@ def create_datapackage_from_edge_timeline(
 
             # create new consumer id if consumer is the functional unit
             if row.consumer in demand_timing.keys():
-                new_consumer_id = row.consumer*1000000+demand_timing[row.consumer] #reduced by two digits due to OverflowError: Python int too large to convert to C long
+                new_consumer_id = row.consumer*1000000+consumer_timestamps[row.consumer] #reduced by two digits due to OverflowError: Python int too large to convert to C long
 
             # Create new edges based on interpolation_weights from the row
             for database, share in row.interpolation_weights.items():
@@ -272,15 +273,18 @@ def create_datapackage_from_edge_timeline(
         datapackage = bwp.create_datapackage()
 
     new_nodes = set()
-    consumer_years = {}  # a dictionary to store the year of the consuming processes so that the inputs from previous times get linked right
+    consumer_timestamps = {}  # a dictionary to store the year of the consuming processes so that the inputs from previous times get linked right
     for row in timeline.iloc[::-1].itertuples():
-        consumer_years[row.producer] = row.year  # the year of the producer will be the consumer year for this procuess until a it becomesa producer again
+        if row.consumer == -1:
+            consumer_timestamps[row.consumer] = row.timestamp
+        consumer_timestamps[row.producer] = row.timestamp  # the year of the producer will be the consumer year for this procuess until a it becomesa producer again
+        print(row.timestamp, row.producer, row.consumer, consumer_timestamps[row.consumer])
         add_row_to_datapackage(row,
                                datapackage,
                                database_date_dict,
                                demand_timing,
                                new_nodes,
-                               consumer_years,)
+                               consumer_timestamps,)
     
     # Adding ones on diagonal for new nodes
     datapackage.add_persistent_vector(

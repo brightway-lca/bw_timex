@@ -372,15 +372,17 @@ def get_datapackage_from_edge_timeline(
     return datapackage
 
 
-def extract_date_as_integer(dt_obj : datetime) -> int:
+def extract_date_as_integer(dt_obj : datetime, time_res='year') -> int:
     """
     Converts a datetime object to an integer in the format YYYY 
     #FIXME: ideally we want to add YYYYMMDDHH to the ids, but this cretaes integers that are too long for 32-bit C long
 
     :param dt_obj: Datetime object.
+    :time_res: time resolution to be returned: year=YYYY, month=YYYYMM, day=YYYYMMDD, hour=YYYYMMDDHH
     :return: INTEGER in the format YYYY.
     """    
-    formatted_date = dt_obj.strftime('%Y%m')
+    time_res_dict = {'year':'%Y','month':'%Y%m','day':'%Y%m%d','hour':'%Y%m%d%M'}
+    formatted_date = dt_obj.strftime('{}'.format(time_res_dict[time_res]))
     date_as_integer = int(formatted_date)
-    
+
     return date_as_integer
