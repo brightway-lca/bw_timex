@@ -254,27 +254,15 @@ def create_datapackage_from_edge_timeline(
                 # print(f'New producer id = {new_producer_id}')
                 # print(f'New consumer id = {new_consumer_id}')
                 # print()
-
-                # Looking up the unscaled amount of the current edge in the database. The amount from the timeline gets scaled acc. to the FU, so we cant use that here. Looking in the database and not the matrices because we don't have direct access to the matrices here as we don't pass the lca object or the matrices to this function. Could be changed in future versions.
-                unscaled_original_amount = sum(
-                    [
-                        e["amount"]
-                        for e in bd.get_node(id=row.consumer).technosphere()
-                        if e["input"] == previous_producer_node.key
-                    ]
-                )
-
                 datapackage.add_persistent_vector(
                         matrix="technosphere_matrix",
                         name=uuid.uuid4().hex,
-                    data_array=np.array(
-                        [unscaled_original_amount * share], dtype=float
-                    ),
-                    indices_array=np.array(
-                        [(new_producer_id, new_consumer_id)],
-                        dtype=bwp.INDICES_DTYPE,
-                    ),
-                    flip_array=np.array([True], dtype=bool),
+                        data_array=np.array([share], dtype=float),
+                        indices_array=np.array(
+                            [(new_producer_id, new_consumer_id)],
+                            dtype=bwp.INDICES_DTYPE,
+                        ),
+                        flip_array=np.array([True], dtype=bool),
                 )
     
     if not name:
