@@ -278,7 +278,7 @@ def create_datapackage_from_edge_timeline(
         if row.consumer == -1:
             consumer_timestamps[row.consumer] = row.timestamp
         consumer_timestamps[row.producer] = row.timestamp  # the year of the producer will be the consumer year for this procuess until a it becomesa producer again
-        print(row.timestamp, row.producer, row.consumer, consumer_timestamps[row.consumer])
+        # print(row.timestamp, row.producer, row.consumer, consumer_timestamps[row.consumer])
         add_row_to_datapackage(row,
                                datapackage,
                                database_date_dict,
