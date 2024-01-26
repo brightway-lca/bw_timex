@@ -275,7 +275,7 @@ def create_datapackage_from_edge_timeline(
     new_nodes = set()
     consumer_timestamps = {}  # a dictionary to store the year of the consuming processes so that the inputs from previous times get linked right
     for row in timeline.iloc[::-1].itertuples():
-        if row.consumer == -1:
+        if row.consumer not in consumer_timestamps.keys():
             consumer_timestamps[row.consumer] = row.timestamp
         consumer_timestamps[row.producer] = row.timestamp  # the year of the producer will be the consumer year for this procuess until a it becomesa producer again
         # print(row.timestamp, row.producer, row.consumer, consumer_timestamps[row.consumer])
