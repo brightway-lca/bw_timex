@@ -25,6 +25,7 @@ from bw2data import (
 from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import get_id
 from bw2data.errors import Brightway2Project
+from bw_temporalis import TemporalDistribution
 
 from utils import extract_date_as_integer, check_database_names
 
@@ -67,12 +68,15 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
         :param edge: Edge instance
         :return: Dictionary with attributes of the edge 
         """
+        
         return {
             "datetime": edge.distribution.date,
-            "amount": edge.distribution.amount,
+            "amount": edge.distribution.amount, # Do we even need this? 
             "producer": edge.producer,
             "consumer": edge.consumer,
-            "leaf": edge.leaf
+            "leaf": edge.leaf,
+            "total": edge.value.total if isinstance(edge.value, TemporalDistribution) else edge.value,
+            "share": edge.distribution.amount / edge.distribution.total,
         }
     
     def get_consumer_name(id: int) -> str:
@@ -108,7 +112,7 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
     edges_df = pd.DataFrame(edges_data)
     
     # Explode datetime and amount columns
-    edges_df = edges_df.explode(['datetime', 'amount'])
+    edges_df = edges_df.explode(['datetime', 'amount', 'share'])
     
     # Extract different temporal groupings from datetime column: year to hour
     edges_df['year'] = edges_df['datetime'].apply(lambda x: x.year)
@@ -120,7 +124,7 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
     # #FIXME: each assignment uses the first timestamp in the respective period, 
     # e.g. for year: 2024-12-31 gets turned into 2024, possibly grouped with other 2024 rows and then reassigned to 2024-01-01
     if temporal_grouping == 'year': 
-        grouped_edges = edges_df.groupby(['year', 'producer', 'consumer'])['amount'].sum().reset_index()
+        grouped_edges = edges_df.groupby(['year', 'producer', 'consumer']).agg({'amount': 'sum', 'total': 'max', 'share': 'sum'}).reset_index()
         grouped_edges['date'] = grouped_edges['year'].apply(lambda x: datetime(x, 1, 1))
     elif temporal_grouping == 'month':
         grouped_edges = edges_df.groupby(['year', 'year_month', 'producer', 'consumer'])['amount'].sum().reset_index() 
@@ -240,29 +244,40 @@ def create_datapackage_from_edge_timeline(
             # create new consumer id if consumer is the functional unit
             if row.consumer in demand_timing.keys():
                 new_consumer_id = row.consumer*1000000+consumer_timestamps[row.consumer] #reduced by two digits due to OverflowError: Python int too large to convert to C long
-
+                
             # Create new edges based on interpolation_weights from the row
-            for database, share in row.interpolation_weights.items():
-                # print(f'New link goes to {database} for year {row.date}')
-                new_producer_id = bd.get_node(
+            for database, db_share in row.interpolation_weights.items():
+                
+                # Get the producer activity in the corresponding background database
+                producer_id_in_background_db = bd.get_node(
                         **{
                             "database": database, 
                             "name": previous_producer_node["name"],
                             "product": previous_producer_node["reference product"], 
                             "location": previous_producer_node["location"],  #TODO: should we also match on unit?
                         }
-                    ).id   # Get new producer id by looking for the same activity in the new database
-                # print(f'Previous producer: {previous_producer_node.key}, id = {previous_producer_id}')
-                # print(f'Previous consumer: {bd.get_node(id=row.consumer).key}, id = {row.consumer}')
-                # print(f'New producer id = {new_producer_id}')
-                # print(f'New consumer id = {new_consumer_id}')
-                # print()
+                    ).id   
+
+           
+                # Add entry between exploded consumer and exploded producer (not in background database)
                 datapackage.add_persistent_vector(
                         matrix="technosphere_matrix",
                         name=uuid.uuid4().hex,
-                        data_array=np.array([share], dtype=float),
+                        data_array=np.array([row.total * row.share], dtype=float),
                         indices_array=np.array(
                             [(new_producer_id, new_consumer_id)],
+                            dtype=bwp.INDICES_DTYPE,
+                        ),
+                        flip_array=np.array([True], dtype=bool),
+                )                
+                
+                # Add entry between exploded producer and producer in background database ("Temporal Market")
+                datapackage.add_persistent_vector(
+                        matrix="technosphere_matrix",
+                        name=uuid.uuid4().hex,
+                        data_array=np.array([db_share], dtype=float),
+                        indices_array=np.array(
+                            [(producer_id_in_background_db, new_producer_id)],
                             dtype=bwp.INDICES_DTYPE,
                         ),
                         flip_array=np.array([True], dtype=bool),
@@ -273,7 +288,7 @@ def create_datapackage_from_edge_timeline(
         # logger.info(f"Using random name {name}")
 
     if datapackage is None:
-        datapackage = bwp.create_datapackage()
+        datapackage = bwp.create_datapackage(sum_inter_duplicates=True)
 
     new_nodes = set()
     consumer_timestamps = {}  # a dictionary to store the year of the consuming processes so that the inputs from previous times get linked right

@@ -27,6 +27,7 @@ class Edge:
     leaf: bool
     consumer: int
     producer: int
+    value: TemporalDistribution
 
 
 class EdgeExtracter(TemporalisLCA):
@@ -71,6 +72,7 @@ class EdgeExtracter(TemporalisLCA):
                     leaf=False,
                     consumer=self.unique_id,
                     producer=node.activity_datapackage_id,
+                    value=edge.amount,
                 )
             )
 
@@ -103,13 +105,14 @@ class EdgeExtracter(TemporalisLCA):
                         leaf=leaf,
                         consumer=node.activity_datapackage_id,
                         producer=producer.activity_datapackage_id,
+                        value=value,
                     )
                 )
                 if not leaf:
                     heappush(
                         heap,
                         (
-                            1 / node.cumulative_score,
+                            1,
                             distribution,
                             producer,
                         ),
