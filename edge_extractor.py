@@ -112,7 +112,7 @@ class EdgeExtracter(TemporalisLCA):
                     heappush(
                         heap,
                         (
-                            1,
+                            1 / node.cumulative_score,
                             distribution,
                             producer,
                         ),
