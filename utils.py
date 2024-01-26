@@ -389,3 +389,15 @@ def extract_date_as_integer(dt_obj : datetime, time_res : Optional[str] ='year')
     date_as_integer = int(formatted_date)
 
     return date_as_integer
+
+
+def check_database_names(database_date_dict):
+    """
+    Check that the strings of the databases (values of database_date_dict) exist in the databases of the brightway2 project
+   
+    """
+    for db in database_date_dict.values():
+        assert db in bd.databases, f"{db} not in your brightway2 project databases."
+    else:
+        print("All databases in database_date_dict exist as brightway project databases")
+    return

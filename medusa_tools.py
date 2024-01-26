@@ -26,7 +26,7 @@ from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import get_id
 from bw2data.errors import Brightway2Project
 
-from utils import extract_date_as_integer
+from utils import extract_date_as_integer, check_database_names
 
 def create_demand_timing_dict(timeline: pd.DataFrame, demand: dict) -> dict:
     """
@@ -87,6 +87,9 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
             return bd.get_node(id=id)['name']
         except:
             return '-1' #functional unit
+        
+    # check if database names match with databases in BW project
+    check_database_names(database_date_dict)
         
     # Check if temporal_grouping is a valid value
     valid_temporal_groupings = ['year', 'month', 'day', 'hour']
