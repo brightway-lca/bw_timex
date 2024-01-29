@@ -27,7 +27,8 @@ class Edge:
     leaf: bool
     consumer: int
     producer: int
-    value: TemporalDistribution
+    td_producer: TemporalDistribution
+    td_consumer: TemporalDistribution
 
 
 class EdgeExtractor(TemporalisLCA):
@@ -63,6 +64,7 @@ class EdgeExtractor(TemporalisLCA):
                 (
                     1 / node.cumulative_score,
                     self.t0 * edge.amount,
+                    self.t0,
                     node,
                 ),
             )
@@ -72,12 +74,13 @@ class EdgeExtractor(TemporalisLCA):
                     leaf=False,
                     consumer=self.unique_id,
                     producer=node.activity_datapackage_id,
-                    value=edge.amount,
+                    td_producer=edge.amount,
+                    td_consumer=self.t0,
                 )
             )
 
         while heap:
-            _, td, node = heappop(heap)
+            _, td, td_parent, node = heappop(heap)
 
             for edge in self.edge_mapping[node.unique_id]:
                 row_id = self.nodes[edge.producer_unique_id].activity_datapackage_id
@@ -105,7 +108,8 @@ class EdgeExtractor(TemporalisLCA):
                         leaf=leaf,
                         consumer=node.activity_datapackage_id,
                         producer=producer.activity_datapackage_id,
-                        value=value,
+                        td_producer=value,
+                        td_consumer=td_parent,
                     )
                 )
                 if not leaf:
@@ -114,6 +118,7 @@ class EdgeExtractor(TemporalisLCA):
                         (
                             1 / node.cumulative_score,
                             distribution,
+                            value,
                             producer,
                         ),
                     )

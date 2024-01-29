@@ -43,8 +43,10 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
             "consumer": edge.consumer,
             "leaf": edge.leaf,
             "total": edge.value.total if isinstance(edge.value, TemporalDistribution) else edge.value,
-            "share": edge.value.amount/edge.value.total  if isinstance(edge.value, TemporalDistribution) else edge.value,
-            # "share": edge.distribution.amount / edge.distribution.total,
+            "share": edge.distribution.amount / edge.distribution.total,
+            "share2": edge.value.amount / edge.value.total if isinstance(edge.value, TemporalDistribution) else edge.value,
+            "td_consumer": edge.td_consumer,
+            "td_producer": edge.td_producer,
         }
     
     def get_consumer_name(id: int) -> str:
@@ -80,7 +82,7 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
     edges_df = pd.DataFrame(edges_data)
     print(edges_df)
     # Explode datetime and amount columns
-    edges_df = edges_df.explode(['datetime', 'share'])
+    edges_df = edges_df.explode(['datetime', 'amount', 'share'])
     
     # Extract different temporal groupings from datetime column: year to hour
     edges_df['year'] = edges_df['datetime'].apply(lambda x: x.year)
