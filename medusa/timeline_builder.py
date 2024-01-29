@@ -38,7 +38,7 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
         
         return {
             "datetime": edge.distribution.date,
-            # "amount": edge.distribution.amount, # Do we even need this? 
+            "amount": edge.distribution.amount, # Do we even need this? 
             "producer": edge.producer,
             "consumer": edge.consumer,
             "leaf": edge.leaf,
@@ -80,7 +80,7 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
     edges_df = pd.DataFrame(edges_data)
     print(edges_df)
     # Explode datetime and amount columns
-    edges_df = edges_df.explode(['datetime', 'amount', 'share'])
+    edges_df = edges_df.explode(['datetime', 'share'])
     
     # Extract different temporal groupings from datetime column: year to hour
     edges_df['year'] = edges_df['datetime'].apply(lambda x: x.year)
