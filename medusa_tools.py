@@ -71,12 +71,13 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
         
         return {
             "datetime": edge.distribution.date,
-            "amount": edge.distribution.amount, # Do we even need this? 
+            # "amount": edge.distribution.amount, # Do we even need this? 
             "producer": edge.producer,
             "consumer": edge.consumer,
             "leaf": edge.leaf,
             "total": edge.value.total if isinstance(edge.value, TemporalDistribution) else edge.value,
-            "share": edge.value.amount / edge.value.total,
+            "share": edge.value.amount/edge.value.total  if isinstance(edge.value, TemporalDistribution) else edge.value,
+            # "share": edge.distribution.amount / edge.distribution.total,
         }
     
     def get_consumer_name(id: int) -> str:
@@ -110,7 +111,7 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
     
     # Convert list of dictionaries to dataframe
     edges_df = pd.DataFrame(edges_data)
-    
+    print(edges_df)
     # Explode datetime and amount columns
     edges_df = edges_df.explode(['datetime', 'amount', 'share'])
     
