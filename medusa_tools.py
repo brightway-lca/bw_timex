@@ -76,7 +76,7 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
             "consumer": edge.consumer,
             "leaf": edge.leaf,
             "total": edge.value.total if isinstance(edge.value, TemporalDistribution) else edge.value,
-            "share": edge.distribution.amount / edge.distribution.total,
+            "share": edge.value.amount / edge.value.total,
         }
     
     def get_consumer_name(id: int) -> str:
