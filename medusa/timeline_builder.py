@@ -6,7 +6,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import KeysView
 
-from edge_extractor import Edge
+from .edge_extractor import Edge
 from bw_temporalis import TemporalDistribution
 
 
