@@ -29,6 +29,8 @@ class Edge:
     producer: int
     td_producer: TemporalDistribution
     td_consumer: TemporalDistribution
+    abs_td_producer: TemporalDistribution = None
+    abs_td_consumer: TemporalDistribution = None
 
 
 class EdgeExtractor(TemporalisLCA):
