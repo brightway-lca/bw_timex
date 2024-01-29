@@ -30,7 +30,7 @@ class Edge:
     value: TemporalDistribution
 
 
-class EdgeExtracter(TemporalisLCA):
+class EdgeExtractor(TemporalisLCA):
     """
     Child class of TemporalisLCA that traverses the supply chain just as the parent class but can create a timeline of edges, in addition timeline of flows or nodes.
     The edge timeline is then used to match the timestamp of edges to that of background databases and to replace these edges with edges from these background databases using Brightway Datapackages
