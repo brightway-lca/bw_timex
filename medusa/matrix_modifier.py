@@ -55,16 +55,16 @@ def create_datapackage_from_edge_timeline(
 
         if row.consumer == -1: # ? Why? Might be in the timeline-building code that starts graph traversal at FU and directly goes down the supply chain
             # print('Row contains the functional unit - exploding to new time-specific node')
-            new_producer_id = row.producer*1000000+row.timestamp
+            new_producer_id = row.producer*1000000+row.hash_producer
             new_nodes.add(new_producer_id)
             # print(f'New producer id = {new_producer_id}')
             # print()
             return
         
-        new_consumer_id = row.consumer*1000000+row.consumer_datestamp
+        new_consumer_id = row.consumer*1000000+row.hash_consumer
         # print(f'New consumer id = {new_consumer_id}')
         # print(f'New added year= {extract_date_as_integer(row.date)}')
-        new_producer_id = row.producer*1000000+row.timestamp # In case the producer comes from a background database, we overwrite this. It currently still gets added to new_nodes, but this is not necessary.
+        new_producer_id = row.producer*1000000+row.hash_producer# In case the producer comes from a background database, we overwrite this. It currently still gets added to new_nodes, but this is not necessary.
         new_nodes.add(new_consumer_id)
         new_nodes.add(new_producer_id) 
         previous_producer_id = row.producer
@@ -136,11 +136,12 @@ def create_datapackage_from_edge_timeline(
         datapackage = bwp.create_datapackage(sum_inter_duplicates=False)  # 'sum_inter_duplicates=False': If the same market is used mby multiple foreground processes, the market get's created again, inputs should not be summed. 
 
     new_nodes = set()
+    
     consumer_timestamps = {}  # a dictionary to store the year of the consuming processes so that the inputs from previous times get linked right
     for row in timeline.iloc[::-1].itertuples():
-        if row.consumer not in consumer_timestamps.keys():
-            consumer_timestamps[row.consumer] = row.timestamp
-        consumer_timestamps[row.producer] = row.timestamp  # the year of the producer will be the consumer year for this procuess until a it becomesa producer again
+        # if row.consumer not in consumer_timestamps.keys():
+        #     consumer_timestamps[row.consumer] = row.date#row.timestamp
+        # consumer_timestamps[row.producer] = row.date #row.timestamp  # the year of the producer will be the consumer year for this procuess until a it becomesa producer again
         # print(row.timestamp, row.producer, row.consumer, consumer_timestamps[row.consumer])
         add_row_to_datapackage(row,
                                datapackage,

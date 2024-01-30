@@ -3,7 +3,7 @@ import bw2data as bd
 import warnings
 import pandas as pd
 import numpy as np
-
+from typing import Union, Tuple, Optional
 from datetime import datetime, timedelta
 from typing import KeysView
 
@@ -62,7 +62,7 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
         try:
             consumer_date = edge.abs_td_consumer.date
             consumer_date = np.array([consumer_date for i in range(len(edge.td_producer))]).T.flatten()
-            print(consumer_date)
+            #print(consumer_date)
         except AttributeError: 
             consumer_date = None
 
@@ -88,12 +88,62 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
         except:
             return '-1' #functional unit
         
+    def extract_grouping_date_as_string(temporal_grouping: str, timestamp: datetime):
+        """
+        Extracts the grouping date as a string from a datetime object, based on the chosen temporal grouping.
+        e.g. for temporal grouping = 'year', and timestamp = 2023-03-29T01:00:00, it extracts '2023'.
+        """
+        time_res_dict = {'year':'%Y','month':'%Y%m','day':'%Y%m%d','hour':'%Y%m%d%M'}
+        
+        if temporal_grouping not in time_res_dict.keys():
+            warnings.warn('temporal_grouping: {} is not a valid option. Please choose from: {} defaulting to "year"'.format(
+                        temporal_grouping, time_res_dict.keys()), category=Warning)
+            
+        return timestamp.strftime(time_res_dict[temporal_grouping])
+   
+        
+    def convert_grouping_date_string_to_datetime(temporal_grouping, datestring):
+        '''
+        Converts the string of a date used for grouping back to datetime object.
+        e.g. for temporal grouping = 'year', and datestring = '2023', it extracts 2023 (?)
+        '''
+        time_res_dict = {'year':'%Y','month':'%Y%m','day':'%Y%m%d','hour':'%Y%m%d%M'}
+        
+        if temporal_grouping not in time_res_dict.keys():
+            warnings.warn('temporal grouping: {} is not a valid option. Please choose from: {} defaulting to "year"'.format(
+                        temporal_grouping, time_res_dict.keys()), category=Warning)
+            
+        return(datetime.strptime(datestring, time_res_dict[temporal_grouping]))
+            
+
+
+    def extract_date_as_integer(dt_obj : datetime, time_res : Optional[str] ='year') -> int:
+        """
+        Converts a datetime object to an integer in the format YYYY 
+        #FIXME: ideally we want to add YYYYMMDDHH to the ids, but this cretaes integers that are too long for 32-bit C long
+
+        :param dt_obj: Datetime object.
+        :time_res: time resolution to be returned: year=YYYY, month=YYYYMM, day=YYYYMMDD, hour=YYYYMMDDHH
+        :return: INTEGER in the format YYYY.
+    
+        """
+        time_res_dict = {'year':'%Y','month':'%Y%m','day':'%Y%m%d','hour':'%Y%m%d%M'}
+        
+        if time_res not in time_res_dict.keys():
+            warnings.warn('time_res: {} is not a valid option. Please choose from: {} defaulting to "year"'.format(
+                        time_res, time_res_dict.keys()), category=Warning)
+        #print(dt_obj)
+        formatted_date = dt_obj.strftime(time_res_dict[time_res]) 
+        date_as_integer = int(formatted_date)
+        
+        return date_as_integer 
+    
+        
     # check if database names match with databases in BW project
     check_database_names(database_date_dict)
         
     # Check if temporal_grouping is a valid value
     valid_temporal_groupings = ['year', 'month', 'day', 'hour']
-    
     if temporal_grouping not in valid_temporal_groupings:
         raise ValueError(f"Invalid value for 'temporal_grouping'. Allowed values are {valid_temporal_groupings}.")
     
@@ -106,57 +156,37 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
     
     # Convert list of dictionaries to dataframe
     edges_df = pd.DataFrame(edges_data)
-    # print(edges_df)
-    # Explode datetime and amount columns
+   
+    # Explode datetime and amount columns: each row with multiple dates and amounts is exploded into multiple rows with one date and one amount
     edges_df = edges_df.explode(['consumer_date', 'producer_date', 'amount'])
+    
+    # For the Functional Unit: set consumer date = producer date as it occurs at the same time
     edges_df.loc[edges_df['consumer']== -1, 'consumer_date'] = edges_df.loc[edges_df['consumer']== -1, 'producer_date']
     
-    print(edges_df)
+    # extract grouping time of consumer and producer
+    edges_df['consumer_grouping_time'] = edges_df['consumer_date'].apply(lambda x: extract_grouping_date_as_string(temporal_grouping, x))
+    edges_df['producer_grouping_time'] = edges_df['producer_date'].apply(lambda x: extract_grouping_date_as_string(temporal_grouping, x))
     
-    # Extract different temporal groupings from datetime column: year to hour
-    edges_df['year'] = edges_df['producer_date'].apply(lambda x: x.year)
-    edges_df['year_month'] = edges_df['producer_date'].apply(lambda x: x.strftime("%Y-%m"))
-    edges_df['year_month_day'] = edges_df['producer_date'].apply(lambda x: x.strftime("%Y-%m-%d"))
-    edges_df['year_month_day_hour'] = edges_df['producer_date'].apply(lambda x: x.strftime("%Y-%m-%dT%H"))
+    #group by unique pair of consumer and producer within their grouping times
+    grouped_edges = edges_df.groupby(['producer_grouping_time', 'consumer_grouping_time', 'producer', 'consumer']).agg({'amount': 'sum'}).reset_index()
     
-        
-          
-    # Group by selected temporal scope & convert temporal grouping to datetime format: 
-    # #FIXME: each assignment uses the first timestamp in the respective period, 
-    # e.g. for year: 2024-12-31 gets turned into 2024, possibly grouped with other 2024 rows and then reassigned to 2024-01-01
-    if temporal_grouping == 'year': 
-        edges_df['consumer_datestamp'] = edges_df['consumer_date'].apply(lambda x: x.year)
-        grouped_edges = edges_df.groupby(['year', 'producer', 'consumer', 'consumer_datestamp']).agg({'amount': 'sum'}).reset_index()
-        grouped_edges['date'] = grouped_edges['year'].apply(lambda x: datetime(x, 1, 1))
-        
-    elif temporal_grouping == 'month':
-        grouped_edges = edges_df.groupby(['year', 'year_month', 'producer', 'consumer', 'consumer_date'])['amount'].sum().reset_index() 
-        grouped_edges['date'] = grouped_edges['year_month'].apply(lambda x: datetime.strptime(x, '%Y-%m'))
-        grouped_edges['consumer_datestamp'] = edges_df['consumer_datestamp'].apply(lambda x: x.strftime("%Y-%m"))
-         
-    elif temporal_grouping == 'day': 
-        grouped_edges = edges_df.groupby(['year', 'year_month_day', 'producer', 'consumer',  'consumer_datestamp'])['amount'].sum().reset_index()
-        grouped_edges['date'] = grouped_edges['year_month_day'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d"))
-        grouped_edges['consumer_datestamp'] = edges_df['consumer_datestamp'].apply(lambda x: x.strftime("%Y-%m-%d"))
-        
-    elif temporal_grouping == 'hour': 
-        grouped_edges = edges_df.groupby(['year', 'year_month_day_hour', 'producer', 'consumer',  'consumer_datestamp'])['amount'].sum().reset_index()
-        grouped_edges['date'] = grouped_edges['year_month_day_hour'].apply(lambda x: datetime.strptime(x, "%Y-%m-%dT%H"))
-        grouped_edges['consumer_datestamp'] = edges_df['consumer_datestamp'].apply(lambda x: x.strftime("%Y-%m-%dT%H"))
-    else:
-        raise ValueError(f"Sorry, but {temporal_grouping} temporal scope grouping is not available yet.")
+    #date is not really used
+    grouped_edges['date_producer'] = grouped_edges['producer_grouping_time'].apply(lambda x: convert_grouping_date_string_to_datetime(temporal_grouping, x)) # date is date producer, but in long format
+    grouped_edges['hash_producer'] =  grouped_edges['date_producer'].apply(lambda x: extract_date_as_integer(x, time_res=temporal_grouping)) #grouped_edges['year']  # for now just year but could be calling the function --> extract_date_as_integer(grouped_edges['date'])       
     
-    
+    grouped_edges['date_consumer'] = grouped_edges['consumer_grouping_time'].apply(lambda x: convert_grouping_date_string_to_datetime(temporal_grouping, x)) # date is date producer, but in long format
+    grouped_edges['hash_consumer'] =  grouped_edges['date_consumer'].apply(lambda x: extract_date_as_integer(x, time_res=temporal_grouping)) #grouped_edges['year']  # for now just year but could be calling the function --> extract_date_as_integer(grouped_edges['date'])       
+              
     # Add interpolation weights to the dataframe
     grouped_edges = add_column_interpolation_weights_to_timeline(grouped_edges, database_date_dict, interpolation_type=interpolation_type)
     
     # Retrieve producer and consumer names
     grouped_edges['producer_name'] = grouped_edges.producer.apply(lambda x: bd.get_node(id=x)["name"])
-    grouped_edges['consumer_name'] = grouped_edges.consumer.apply(get_consumer_name)
+    grouped_edges['consumer_name'] = grouped_edges.consumer.apply(get_consumer_name) 
     
-    grouped_edges['timestamp'] = grouped_edges['year']  # for now just year but could be calling the function --> extract_date_as_integer(grouped_edges['date'])
-    # grouped_edges = grouped_edges[['date', 'year', 'producer', 'producer_name', 'consumer', 'consumer_name', 'amount', 'interpolation_weights']]
-     #TODO: remove year, since we now have flexible time grouping and everything is stored in date. Currently still kept for clarity
+    # Reorder columns
+    grouped_edges = grouped_edges[['hash_producer', 'date_producer', 'producer', 'producer_name', 'hash_consumer', 'date_consumer',  'consumer', 'consumer_name', 'amount', 'interpolation_weights']]
+
     return grouped_edges
 
 def add_column_interpolation_weights_to_timeline(tl_df: pd.DataFrame, database_date_dict: dict, interpolation_type: str ="linear") -> pd.DataFrame:
@@ -180,8 +210,6 @@ def add_column_interpolation_weights_to_timeline(tl_df: pd.DataFrame, database_d
     
     
     """
-    
-    
     
     def find_closest_date(target: datetime, dates: KeysView[datetime]) -> dict:
         """
@@ -272,18 +300,16 @@ def add_column_interpolation_weights_to_timeline(tl_df: pd.DataFrame, database_d
         return {closest_lower: 1-weight, closest_higher: weight}
     
     dates_list= database_date_dict.keys()
-    if "date" not in list(tl_df.columns):
+    if "date_producer" not in list(tl_df.columns):
         raise ValueError("The timeline does not contain dates.")
         
     if interpolation_type == "nearest":
-        tl_df['interpolation_weights'] = tl_df['date'].apply(lambda x: find_closest_date(x, dates_list))
-        # change key of interplation weights dictionaries to database name instead of year
+        tl_df['interpolation_weights'] = tl_df['date_producer'].apply(lambda x: find_closest_date(x, dates_list))
         tl_df['interpolation_weights'] = tl_df['interpolation_weights'].apply(lambda d: {database_date_dict[x]: v for x, v in d.items()})  
         return tl_df
     
     if interpolation_type == "linear":
-        tl_df['interpolation_weights'] = tl_df['date'].apply(lambda x: get_weights_for_interpolation_between_nearest_years(x, dates_list, interpolation_type))
-        # change key of interplation weights dictionaries to database name instead of year
+        tl_df['interpolation_weights'] = tl_df['date_producer'].apply(lambda x: get_weights_for_interpolation_between_nearest_years(x, dates_list, interpolation_type))
         tl_df['interpolation_weights'] = tl_df['interpolation_weights'].apply(lambda d: {database_date_dict[x]: v for x, v in d.items()})
         
     else:
