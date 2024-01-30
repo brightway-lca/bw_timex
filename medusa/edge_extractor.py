@@ -9,7 +9,6 @@ datetime_type = np.dtype("datetime64[s]")
 timedelta_type = np.dtype("timedelta64[s]")
 
 
-
 @dataclass
 class Edge:
     """
@@ -45,6 +44,7 @@ class EdgeExtractor(TemporalisLCA):
     The current implementation is work in progress and can only handle temporal distributions in the foreground.
 
     """
+
     def __init__(self, *args, edge_filter_function: Callable = None, **kwargs):
         super().__init__(*args, **kwargs)
         if edge_filter_function:
@@ -54,8 +54,8 @@ class EdgeExtractor(TemporalisLCA):
 
     def build_edge_timeline(self) -> List:
         """
-        Creates a timeline of the edges from the graph traversal. Starting from the edges of the functional unit node, it goes through each node using a heap, 
-        and propagates the TemporalDistributions of the edges from node to node through time using convolution-operators during multiplication. 
+        Creates a timeline of the edges from the graph traversal. Starting from the edges of the functional unit node, it goes through each node using a heap,
+        and propagates the TemporalDistributions of the edges from node to node through time using convolution-operators during multiplication.
         It stops in case the current edge is known to have no temporal distribution (=leaf) (e.g. part of background database).
 
         :return: A list of Edge instances with timestamps and amounts, and ids of its producing and consuming node.
@@ -64,7 +64,9 @@ class EdgeExtractor(TemporalisLCA):
         heap = []
         timeline = []
 
-        for edge in self.edge_mapping[self.unique_id]: # starting at the edges of the functional unit
+        for edge in self.edge_mapping[
+            self.unique_id
+        ]:  # starting at the edges of the functional unit
             node = self.nodes[edge.producer_unique_id]
             heappush(
                 heap,
@@ -98,26 +100,28 @@ class EdgeExtractor(TemporalisLCA):
                     input_id=row_id,
                     output_id=col_id,
                 )
-                td_producer = (                           # value is the TemporalDistribution of the edge
+                td_producer = (  # value is the TemporalDistribution of the edge
                     self._exchange_value(
                         exchange=exchange,
                         row_id=row_id,
                         col_id=col_id,
                         matrix_label="technosphere_matrix",
                     )
-                    / node.reference_product_production_amount 
+                    / node.reference_product_production_amount
                 )
                 producer = self.nodes[edge.producer_unique_id]
                 leaf = self.edge_ff(row_id)
-                
+
                 # If an edge does not have a TD, give it a td with timedelta=0 and the amount= 'edge value'
                 if isinstance(value, Number):
                     value = TemporalDistribution(
-                        date=np.array([0], dtype='timedelta64[Y]'),  # `M` is months
-                        amount=np.array([1])
+                        date=np.array([0], dtype="timedelta64[Y]"),  # `M` is months
+                        amount=np.array([1]),
                     )
 
-                distribution = (td * value).simplify() # convolution-multiplication of TemporalDistribution of consuming node (td) and consumed edge (edge) gives TD of producing node
+                distribution = (
+                    td * value
+                ).simplify()  # convolution-multiplication of TemporalDistribution of consuming node (td) and consumed edge (edge) gives TD of producing node
                 timeline.append(
                     Edge(
                         distribution=distribution,
@@ -126,7 +130,9 @@ class EdgeExtractor(TemporalisLCA):
                         producer=producer.activity_datapackage_id,
                         td_producer=value,
                         td_consumer=td_parent,
-                        abs_td_producer=self.join_datetime_and_timedelta_distributions(value,abs_td),
+                        abs_td_producer=self.join_datetime_and_timedelta_distributions(
+                            value, abs_td
+                        ),
                         abs_td_consumer=abs_td,
                     )
                 )
@@ -137,19 +143,27 @@ class EdgeExtractor(TemporalisLCA):
                             1 / node.cumulative_score,
                             distribution,
                             value,
-                            self.join_datetime_and_timedelta_distributions(value,abs_td),
+                            self.join_datetime_and_timedelta_distributions(
+                                value, abs_td
+                            ),
                             producer,
                         ),
                     )
         return timeline
-    
-    def join_datetime_and_timedelta_distributions(self, td_producer: TemporalDistribution, td_consumer: TemporalDistribution) -> TemporalDistribution:
+
+    def join_datetime_and_timedelta_distributions(
+        self, td_producer: TemporalDistribution, td_consumer: TemporalDistribution
+    ) -> TemporalDistribution:
         """TODO: Needs description"""
         # if an edge does not have a TD, then return the consumer_td so that the timeline continues
-        if isinstance(td_consumer, TemporalDistribution) and isinstance(td_producer, Number):
+        if isinstance(td_consumer, TemporalDistribution) and isinstance(
+            td_producer, Number
+        ):
             return td_consumer
         # Else, if both consumer and producer have a td (absolute and relative, respectively) join to TDs
-        if isinstance(td_producer, TemporalDistribution) and isinstance(td_consumer, TemporalDistribution):
+        if isinstance(td_producer, TemporalDistribution) and isinstance(
+            td_consumer, TemporalDistribution
+        ):
             if not (td_consumer.date.dtype == datetime_type):
                 raise ValueError(
                     f"`td_consumer.date` must have dtype `datetime64[s]`, but got `{td_consumer.date.dtype}`"
@@ -158,13 +172,14 @@ class EdgeExtractor(TemporalisLCA):
                 raise ValueError(
                     f"`td_producer.date` must have dtype `timedelta64[s]`, but got `{td_producer.date.dtype}`"
                 )
-            date = (td_consumer.date.reshape((-1, 1)) + td_producer.date.reshape((1, -1))).ravel()
-            amount  = np.array(len(td_consumer) * [td_producer.amount]).ravel()   
+            date = (
+                td_consumer.date.reshape((-1, 1)) + td_producer.date.reshape((1, -1))
+            ).ravel()
+            amount = np.array(len(td_consumer) * [td_producer.amount]).ravel()
             return TemporalDistribution(date, amount)
         else:
             raise ValueError(
-                "Can't join TemporalDistribution and something else: Trying with {} and {}".format(type(td1),type(td2))
-    )
-    
-
-
+                "Can't join TemporalDistribution and something else: Trying with {} and {}".format(
+                    type(td1), type(td2)
+                )
+            )
