@@ -23,21 +23,12 @@ def create_datapackage_from_edge_timeline(
 
     The new node-clones also need a 1 on the diagonal of their technosphere matrix, which symbolizes the production of the new clone-reference product.
 
-    Inputs:
-    timeline: list
-        A timeline of edges, typically created from EdgeExtracter.create_edge_timeline()
-    database_date_dict: dict
-        A dict of the available prospective database: their temporal representativeness (key) and their names (value).
-    demand_timing: dict
-        A dict of the demand ids and the timing they should be linked to. Can be created using create_demand_timing_dict().
-    datapackage: Optional[bwp.Datapackage]
-        Append to this datapackage, if available. Otherwise create a new datapackage.
-    name: Optional[str]
-        Name of this datapackage resource.
-
-    Returns:
-    bwp.Datapackage
-        A list of patches formatted as datapackages.
+    :param timeline: A timeline of edges, typically created from EdgeExtracter.create_edge_timeline()
+    :param database_date_dict: A dict of the available prospective database: their temporal representativeness (key) and their names (value).
+    :param demand_timing: A dict of the demand ids and the timing they should be linked to. Can be created using create_demand_timing_dict().
+    :param datapackage: Append to this datapackage, if available. Otherwise create a new datapackage.
+    :param name: Name of this datapackage resource.
+    :return: A list of patches formatted as datapackages.
     """
 
     def add_row_to_datapackage(
@@ -49,34 +40,29 @@ def create_datapackage_from_edge_timeline(
         consumer_timestamps: dict,
     ) -> None:
         """
-        create a datapackage for the new edges based on a row from the timeline DataFrame.
+        Adds a new row to the given datapackage based on the provided row from the timeline DataFrame.
+
+        This function also updates the set of new nodes with the ids of any new nodes created during this process.
 
         :param row: A row from the timeline DataFrame.
-        :param database_dates_dict: Dictionary of available prospective database dates and their names.
+        :param datapackage: The datapackage to which the new patches will be added.
+        :param database_date_dict: Dictionary of available prospective database dates and their names.
         :param demand_timing: Dictionary of the demand ids and the dates they should be linked to. Can be created using create_demand_timing_dict().
-        :param new_nodes: empty set to which new node ids are added
-        :return: None, but adds new edges to the set new_nodes and adds a patch for this new edge to the bwp.Datapackage
+        :param new_nodes: Set to which new node ids are added.
+        :param consumer_timestamps: Dictionary of consumer ids and their timestamps.
+        :return: None, but updates the set new_nodes and adds a patch for this new edge to the bwp.Datapackage.
         """
-        # print('Current row:', row.year, ' | ', row.producer_name, ' | ', row.consumer_name)
-
-        if (
-            row.consumer == -1
-        ):  # ? Why? Might be in the timeline-building code that starts graph traversal at FU and directly goes down the supply chain
-            # print('Row contains the functional unit - exploding to new time-specific node')
+        if row.consumer == -1:
             new_producer_id = row.producer * 1000000 + row.hash_producer
             new_nodes.add(new_producer_id)
-            # print(f'New producer id = {new_producer_id}')
-            # print()
             return
 
         new_consumer_id = row.consumer * 1000000 + row.hash_consumer
-        # print(f'New consumer id = {new_consumer_id}')
-        # print(f'New added year= {extract_date_as_integer(row.date)}')
-        new_producer_id = (
-            row.producer * 1000000 + row.hash_producer
-        )  # In case the producer comes from a background database, we overwrite this. It currently still gets added to new_nodes, but this is not necessary.
         new_nodes.add(new_consumer_id)
+
+        new_producer_id = row.producer * 1000000 + row.hash_producer
         new_nodes.add(new_producer_id)
+
         previous_producer_id = row.producer
         previous_producer_node = bd.get_node(
             id=previous_producer_id
@@ -98,25 +84,6 @@ def create_datapackage_from_edge_timeline(
 
         # Check if previous producer comes from background database
         if previous_producer_node["database"] in database_date_dict.values():
-            # # create new consumer id if consumer is the functional unit
-            # if row.consumer in demand_timing.keys():
-            #     new_consumer_id = row.consumer*1000000+row.consumer_datestamp #Why?
-
-            # print('Row contains internal foreground edge - exploding to new time-specific nodes')
-            # print(f'New producer id = {new_producer_id}')
-            # print(f'New consumer id = {new_consumer_id}')
-            # print()
-            # datapackage.add_persistent_vector(
-            #             matrix="technosphere_matrix",
-            #             name=uuid.uuid4().hex,
-            #             data_array=np.array([row.amount], dtype=float),
-            #             indices_array=np.array(
-            #                 [(new_producer_id, new_consumer_id)], #FIXME: I think if orevious producer comes from foreground database, new_producer_id should be assigned back to original producer_id from foreground database.
-            #                 dtype=bwp.INDICES_DTYPE,
-            #             ),
-            #             flip_array=np.array([True], dtype=bool),
-            #     )
-
             # Create new edges based on interpolation_weights from the row
             for database, db_share in row.interpolation_weights.items():
                 # Get the producer activity in the corresponding background database
@@ -142,7 +109,6 @@ def create_datapackage_from_edge_timeline(
 
     if not name:
         name = uuid.uuid4().hex  # we dont use this variable?
-        # logger.info(f"Using random name {name}")
 
     if datapackage is None:
         datapackage = bwp.create_datapackage(
@@ -151,14 +117,7 @@ def create_datapackage_from_edge_timeline(
 
     new_nodes = set()
 
-    consumer_timestamps = (
-        {}
-    )  # a dictionary to store the year of the consuming processes so that the inputs from previous times get linked right
     for row in timeline.iloc[::-1].itertuples():
-        # if row.consumer not in consumer_timestamps.keys():
-        #     consumer_timestamps[row.consumer] = row.date#row.timestamp
-        # consumer_timestamps[row.producer] = row.date #row.timestamp  # the year of the producer will be the consumer year for this procuess until a it becomesa producer again
-        # print(row.timestamp, row.producer, row.consumer, consumer_timestamps[row.consumer])
         add_row_to_datapackage(
             row,
             datapackage,
@@ -179,37 +138,54 @@ def create_datapackage_from_edge_timeline(
     return datapackage
 
 
-
-
 def create_datapackage_biosphere(
-        timeline_df: pd.DataFrame,
-        database_date_dict: dict
+    timeline_df: pd.DataFrame, database_date_dict: dict
 ) -> bwp.Datapackage:
-    unique_producers = timeline_df.groupby(['producer', 'hash_producer']).count().index.values  # array of unique (producer, timestamp) tuples
-    
+    """
+    Creates a new biosphere datapackage to add the biosphere flows to the exploded technosphere processes.
+
+    This function iterates over each unique producer and for each biosphere exchange of the original activity,
+    it creates a new biosphere exchange for the new node.
+
+    :param timeline_df: A DataFrame representing the timeline of edges.
+    :param database_date_dict: Dictionary of available prospective database dates and their names.
+    :return: The updated datapackage with new biosphere exchanges for the new nodes.
+    """
+    unique_producers = (
+        timeline_df.groupby(["producer", "hash_producer"]).count().index.values
+    )  # array of unique (producer, timestamp) tuples
+
     datapackage_bio = bwp.create_datapackage(sum_inter_duplicates=False)
     for producer in unique_producers:
         # Skip the -1 producer as this is just a dummy producer of the functional unit
-        if not producer[0] == -1 and not bd.get_activity(producer[0])['database'] in database_date_dict.values():
-            producer_id = producer[0]*1000000+producer[1]  # the producer_id is a combination of the activity_id and the timestamp
+        if (
+            not producer[0] == -1
+            and not bd.get_activity(producer[0])["database"]
+            in database_date_dict.values()
+        ):
+            producer_id = (
+                producer[0] * 1000000 + producer[1]
+            )  # the producer_id is a combination of the activity_id and the timestamp
             producer_node = bd.get_node(id=producer[0])
             print(producer[0], producer[1], producer_id)
-            indices = []  # list of (biosphere, technosphere) indices for the biosphere flow exchanges
+            indices = (
+                []
+            )  # list of (biosphere, technosphere) indices for the biosphere flow exchanges
             amounts = []  # list of amounts corresponding to the bioflows
             for exc in producer_node.biosphere():
                 print(exc.input, producer_id, exc.amount)
-                indices.append((exc.input.id, producer_id))  # directly build a list of tuples to pass into the datapackage, the producer_id is used to for the column of that activity
+                indices.append(
+                    (exc.input.id, producer_id)
+                )  # directly build a list of tuples to pass into the datapackage, the producer_id is used to for the column of that activity
                 amounts.append(exc.amount)
             datapackage_bio.add_persistent_vector(
-                            matrix="biosphere_matrix",
-                            name=uuid.uuid4().hex,
-                            data_array=np.array(amounts, dtype=float),
-                            indices_array=np.array(
-                                indices,
-                                dtype=bwp.INDICES_DTYPE,
-                            ),
-                            flip_array=np.array([False], dtype=bool),
-                    )
+                matrix="biosphere_matrix",
+                name=uuid.uuid4().hex,
+                data_array=np.array(amounts, dtype=float),
+                indices_array=np.array(
+                    indices,
+                    dtype=bwp.INDICES_DTYPE,
+                ),
+                flip_array=np.array([False], dtype=bool),
+            )
     return datapackage_bio
-
-

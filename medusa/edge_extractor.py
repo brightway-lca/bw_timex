@@ -41,11 +41,16 @@ class EdgeExtractor(TemporalisLCA):
     """
     Child class of TemporalisLCA that traverses the supply chain just as the parent class but can create a timeline of edges, in addition timeline of flows or nodes.
     The edge timeline is then used to match the timestamp of edges to that of background databases and to replace these edges with edges from these background databases using Brightway Datapackages
-    The current implementation is work in progress and can only handle temporal distributions in the foreground.
-
     """
 
     def __init__(self, *args, edge_filter_function: Callable = None, **kwargs):
+        """
+        Initialize the EdgeExtractor class.
+
+        :param args: Variable length argument list.
+        :param edge_filter_function: A callable that filters edges. If not provided, a function that always returns False is used.
+        :param kwargs: Arbitrary keyword arguments.
+        """
         super().__init__(*args, **kwargs)
         if edge_filter_function:
             self.edge_ff = edge_filter_function
@@ -118,7 +123,9 @@ class EdgeExtractor(TemporalisLCA):
                         date=np.array([0], dtype="timedelta64[Y]"),  # `M` is months
                         amount=np.array([td_producer]),
                     )
-                    print(node.activity_datapackage_id, producer.activity_datapackage_id)
+                    print(
+                        node.activity_datapackage_id, producer.activity_datapackage_id
+                    )
 
                 distribution = (
                     td * td_producer
@@ -155,7 +162,17 @@ class EdgeExtractor(TemporalisLCA):
     def join_datetime_and_timedelta_distributions(
         self, td_producer: TemporalDistribution, td_consumer: TemporalDistribution
     ) -> TemporalDistribution:
-        """TODO: Needs description"""
+        """
+        Joins a datetime TemporalDistribution (td_producer) with a timedelta TemporalDistribution (td_consumer) to create a new TemporalDistribution.
+
+        If the producer does not have a TemporalDistribution, the consumer's TemporalDistribution is returned to continue the timeline.
+        If both the producer and consumer have TemporalDistributions, they are joined together.
+
+        :param td_producer: TemporalDistribution of the producer. Expected to be a datetime TemporalDistribution.
+        :param td_consumer: TemporalDistribution of the consumer. Expected to be a timedelta TemporalDistribution.
+        :return: A new TemporalDistribution that is the result of joining the producer and consumer TemporalDistributions.
+        :raises ValueError: If the dtype of `td_consumer.date` is not `datetime64[s]` or the dtype of `td_producer.date` is not `timedelta64[s]`.
+        """
         # if an edge does not have a TD, then return the consumer_td so that the timeline continues
         if isinstance(td_consumer, TemporalDistribution) and isinstance(
             td_producer, Number
