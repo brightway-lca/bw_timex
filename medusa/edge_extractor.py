@@ -1,8 +1,13 @@
 from dataclasses import dataclass
 from heapq import heappop, heappush
 from typing import Callable, List
-
+from numbers import Number
+import numpy as np
 from bw_temporalis import TemporalisLCA, TemporalDistribution
+
+datetime_type = np.dtype("datetime64[s]")
+timedelta_type = np.dtype("timedelta64[s]")
+
 
 
 @dataclass
@@ -27,7 +32,10 @@ class Edge:
     leaf: bool
     consumer: int
     producer: int
-    value: TemporalDistribution
+    td_producer: TemporalDistribution
+    td_consumer: TemporalDistribution
+    abs_td_producer: TemporalDistribution = None
+    abs_td_consumer: TemporalDistribution = None
 
 
 class EdgeExtractor(TemporalisLCA):
@@ -63,6 +71,8 @@ class EdgeExtractor(TemporalisLCA):
                 (
                     1 / node.cumulative_score,
                     self.t0 * edge.amount,
+                    self.t0,
+                    self.t0,
                     node,
                 ),
             )
@@ -72,12 +82,14 @@ class EdgeExtractor(TemporalisLCA):
                     leaf=False,
                     consumer=self.unique_id,
                     producer=node.activity_datapackage_id,
-                    value=edge.amount,
+                    td_producer=edge.amount,
+                    td_consumer=self.t0,
+                    abs_td_producer=self.t0,
                 )
             )
 
         while heap:
-            _, td, td_consumer, node = heappop(heap)
+            _, td, td_parent, abs_td, node = heappop(heap)
 
             for edge in self.edge_mapping[node.unique_id]:
                 row_id = self.nodes[edge.producer_unique_id].activity_datapackage_id
@@ -97,6 +109,13 @@ class EdgeExtractor(TemporalisLCA):
                 )
                 producer = self.nodes[edge.producer_unique_id]
                 leaf = self.edge_ff(row_id)
+                
+                # If an edge does not have a TD, give it a td with timedelta=0 and the amount= 'edge value'
+                if isinstance(value, Number):
+                    value = TemporalDistribution(
+                        date=np.array([0], dtype='timedelta64[Y]'),  # `M` is months
+                        amount=np.array([1])
+                    )
 
                 distribution = (td * value).simplify() # convolution-multiplication of TemporalDistribution of consuming node (td) and consumed edge (edge) gives TD of producing node
                 timeline.append(
@@ -105,8 +124,10 @@ class EdgeExtractor(TemporalisLCA):
                         leaf=leaf,
                         consumer=node.activity_datapackage_id,
                         producer=producer.activity_datapackage_id,
-                        td_producer=td_producer,
-                        td_consumer=td_consumer,
+                        td_producer=value,
+                        td_consumer=td_parent,
+                        abs_td_producer=self.join_datetime_and_timedelta_distributions(value,abs_td),
+                        abs_td_consumer=abs_td,
                     )
                 )
                 if not leaf:
@@ -115,8 +136,35 @@ class EdgeExtractor(TemporalisLCA):
                         (
                             1 / node.cumulative_score,
                             distribution,
-                            td_producer,
+                            value,
+                            self.join_datetime_and_timedelta_distributions(value,abs_td),
                             producer,
                         ),
                     )
         return timeline
+    
+    def join_datetime_and_timedelta_distributions(self, td_producer: TemporalDistribution, td_consumer: TemporalDistribution) -> TemporalDistribution:
+        """TODO: Needs description"""
+        # if an edge does not have a TD, then return the consumer_td so that the timeline continues
+        if isinstance(td_consumer, TemporalDistribution) and isinstance(td_producer, Number):
+            return td_consumer
+        # Else, if both consumer and producer have a td (absolute and relative, respectively) join to TDs
+        if isinstance(td_producer, TemporalDistribution) and isinstance(td_consumer, TemporalDistribution):
+            if not (td_consumer.date.dtype == datetime_type):
+                raise ValueError(
+                    f"`td_consumer.date` must have dtype `datetime64[s]`, but got `{td_consumer.date.dtype}`"
+                )
+            if not (td_producer.date.dtype == timedelta_type):
+                raise ValueError(
+                    f"`td_producer.date` must have dtype `timedelta64[s]`, but got `{td_producer.date.dtype}`"
+                )
+            date = (td_consumer.date.reshape((-1, 1)) + td_producer.date.reshape((1, -1))).ravel()
+            amount  = np.array(len(td_consumer) * [td_producer.amount]).ravel()   
+            return TemporalDistribution(date, amount)
+        else:
+            raise ValueError(
+                "Can't join TemporalDistribution and something else: Trying with {} and {}".format(type(td1),type(td2))
+    )
+    
+
+

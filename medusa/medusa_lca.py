@@ -32,7 +32,7 @@ def create_demand_timing_dict(timeline: pd.DataFrame, demand: dict) -> dict:
     """
     demand_ids = [bd.get_activity(key).id for key in demand.keys()]
     demand_rows = timeline[timeline['producer'].isin(demand_ids) & (timeline['consumer'] == -1)]
-    return {row.producer: extract_date_as_integer(row.date) for row in demand_rows.itertuples()}  
+    return {row.producer: row.hash_producer for row in demand_rows.itertuples()}  #old: extract_date_as_integer(row.date)
 
 def extract_date_as_integer(dt_obj : datetime, time_res : Optional[str] ='year') -> int:
     """
