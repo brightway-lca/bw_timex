@@ -100,7 +100,7 @@ class EdgeExtractor(TemporalisLCA):
                     input_id=row_id,
                     output_id=col_id,
                 )
-                td_producer = (  # value is the TemporalDistribution of the edge
+                td_producer = (  # td_producer is the TemporalDistribution of the edge
                     self._exchange_value(
                         exchange=exchange,
                         row_id=row_id,
@@ -113,14 +113,14 @@ class EdgeExtractor(TemporalisLCA):
                 leaf = self.edge_ff(row_id)
 
                 # If an edge does not have a TD, give it a td with timedelta=0 and the amount= 'edge value'
-                if isinstance(value, Number):
-                    value = TemporalDistribution(
+                if isinstance(td_producer, Number):
+                    td_producer = TemporalDistribution(
                         date=np.array([0], dtype="timedelta64[Y]"),  # `M` is months
                         amount=np.array([1]),
                     )
 
                 distribution = (
-                    td * value
+                    td * td_producer
                 ).simplify()  # convolution-multiplication of TemporalDistribution of consuming node (td) and consumed edge (edge) gives TD of producing node
                 timeline.append(
                     Edge(
@@ -128,10 +128,10 @@ class EdgeExtractor(TemporalisLCA):
                         leaf=leaf,
                         consumer=node.activity_datapackage_id,
                         producer=producer.activity_datapackage_id,
-                        td_producer=value,
+                        td_producer=td_producer,
                         td_consumer=td_parent,
                         abs_td_producer=self.join_datetime_and_timedelta_distributions(
-                            value, abs_td
+                            td_producer, abs_td
                         ),
                         abs_td_consumer=abs_td,
                     )
@@ -142,9 +142,9 @@ class EdgeExtractor(TemporalisLCA):
                         (
                             1 / node.cumulative_score,
                             distribution,
-                            value,
+                            td_producer,
                             self.join_datetime_and_timedelta_distributions(
-                                value, abs_td
+                                td_producer, abs_td
                             ),
                             producer,
                         ),

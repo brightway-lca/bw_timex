@@ -177,3 +177,39 @@ def create_datapackage_from_edge_timeline(
     )
 
     return datapackage
+
+
+
+
+def create_datapackage_biosphere(
+        timeline_df: pd.DataFrame,
+        database_date_dict: dict
+) -> bwp.Datapackage:
+    unique_producers = timeline_df.groupby(['producer', 'hash_producer']).count().index.values  # array of unique (producer, timestamp) tuples
+    
+    datapackage_bio = bwp.create_datapackage(sum_inter_duplicates=False)
+    for producer in unique_producers:
+        # Skip the -1 producer as this is just a dummy producer of the functional unit
+        if not producer[0] == -1 and not bd.get_activity(producer[0])['database'] in database_date_dict.values():
+            producer_id = producer[0]*1000000+producer[1]  # the producer_id is a combination of the activity_id and the timestamp
+            producer_node = bd.get_node(id=producer[0])
+            print(producer[0], producer[1], producer_id)
+            indices = []  # list of (biosphere, technosphere) indices for the biosphere flow exchanges
+            amounts = []  # list of amounts corresponding to the bioflows
+            for exc in producer_node.biosphere():
+                print(exc.input, producer_id, exc.amount)
+                indices.append((exc.input.id, producer_id))  # directly build a list of tuples to pass into the datapackage, the producer_id is used to for the column of that activity
+                amounts.append(exc.amount)
+            datapackage_bio.add_persistent_vector(
+                            matrix="biosphere_matrix",
+                            name=uuid.uuid4().hex,
+                            data_array=np.array(amounts, dtype=float),
+                            indices_array=np.array(
+                                indices,
+                                dtype=bwp.INDICES_DTYPE,
+                            ),
+                            flip_array=np.array([False], dtype=bool),
+                    )
+    return datapackage_bio
+
+
