@@ -116,8 +116,9 @@ class EdgeExtractor(TemporalisLCA):
                 if isinstance(td_producer, Number):
                     td_producer = TemporalDistribution(
                         date=np.array([0], dtype="timedelta64[Y]"),  # `M` is months
-                        amount=np.array([1]),
+                        amount=np.array([td_producer]),
                     )
+                    print(node.activity_datapackage_id, producer.activity_datapackage_id)
 
                 distribution = (
                     td * td_producer

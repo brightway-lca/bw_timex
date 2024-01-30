@@ -170,6 +170,7 @@ def create_grouped_edge_dataframe(
 
     # Explode datetime and amount columns: each row with multiple dates and amounts is exploded into multiple rows with one date and one amount
     edges_df = edges_df.explode(["consumer_date", "producer_date", "amount"])
+    edges_df.drop_duplicates(inplace=True)
 
     # For the Functional Unit: set consumer date = producer date as it occurs at the same time
     edges_df.loc[edges_df["consumer"] == -1, "consumer_date"] = edges_df.loc[
