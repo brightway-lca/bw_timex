@@ -114,7 +114,7 @@ class EdgeExtractor(TemporalisLCA):
                 if isinstance(value, Number):
                     value = TemporalDistribution(
                         date=np.array([0], dtype='timedelta64[Y]'),  # `M` is months
-                        amount=np.array([value])
+                        amount=np.array([1])
                     )
 
                 distribution = (td * value).simplify() # convolution-multiplication of TemporalDistribution of consuming node (td) and consumed edge (edge) gives TD of producing node
