@@ -2,6 +2,7 @@
 import bw2data as bd
 import warnings
 import pandas as pd
+import numpy as np
 
 from datetime import datetime, timedelta
 from typing import KeysView
@@ -28,6 +29,29 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
     :return: Grouped edge dataframe.
     """
        
+    # def extract_edge_data(edge: Edge) -> dict:
+    #     """
+    #     Stores the attributes of an Edge instance in a dictionary.
+
+    #     :param edge: Edge instance
+    #     :return: Dictionary with attributes of the edge 
+    #     """
+        
+    #     return {
+    #         "datetime": edge.distribution.date,
+    #         "amount": edge.distribution.amount, # Do we even need this? 
+    #         "producer": edge.producer,
+    #         "consumer": edge.consumer,
+    #         "leaf": edge.leaf,
+    #         "total": edge.value.total if isinstance(edge.value, TemporalDistribution) else edge.value,
+    #         "share": edge.distribution.amount / edge.distribution.total,
+    #         "share2": edge.value.amount / edge.value.total if isinstance(edge.value, TemporalDistribution) else edge.value,
+    #         #"td_consumer": edge.td_consumer,
+    #         #"td_producer": edge.td_producer,
+    #         "td_abs_consumer": edge.td_abs_consumer,
+    #         'td_abs_producer': edge.td_abs_producer,
+    #     }
+        
     def extract_edge_data(edge: Edge) -> dict:
         """
         Stores the attributes of an Edge instance in a dictionary.
@@ -35,18 +59,20 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
         :param edge: Edge instance
         :return: Dictionary with attributes of the edge 
         """
-        
+        try:
+            consumer_date = edge.abs_td_consumer.date
+            consumer_date = np.array([consumer_date for i in range(len(edge.td_producer))]).T.flatten()
+            print(consumer_date)
+        except AttributeError: 
+            consumer_date = None
+
         return {
-            "datetime": edge.distribution.date,
-            "amount": edge.distribution.amount, # Do we even need this? 
             "producer": edge.producer,
             "consumer": edge.consumer,
             "leaf": edge.leaf,
-            "total": edge.value.total if isinstance(edge.value, TemporalDistribution) else edge.value,
-            "share": edge.distribution.amount / edge.distribution.total,
-            "share2": edge.value.amount / edge.value.total if isinstance(edge.value, TemporalDistribution) else edge.value,
-            "td_consumer": edge.td_consumer,
-            "td_producer": edge.td_producer,
+            "consumer_date": consumer_date,
+            'producer_date': edge.abs_td_producer.date,
+            "amount": edge.abs_td_producer.amount,
         }
     
     def get_consumer_name(id: int) -> str:
@@ -80,31 +106,43 @@ def create_grouped_edge_dataframe(tl: list, database_date_dict: dict, temporal_g
     
     # Convert list of dictionaries to dataframe
     edges_df = pd.DataFrame(edges_data)
-    print(edges_df)
+    # print(edges_df)
     # Explode datetime and amount columns
-    edges_df = edges_df.explode(['datetime', 'amount', 'share'])
+    edges_df = edges_df.explode(['consumer_date', 'producer_date', 'amount'])
+    edges_df.loc[edges_df['consumer']== -1, 'consumer_date'] = edges_df.loc[edges_df['consumer']== -1, 'producer_date']
+    
+    print(edges_df)
     
     # Extract different temporal groupings from datetime column: year to hour
-    edges_df['year'] = edges_df['datetime'].apply(lambda x: x.year)
-    edges_df['year_month'] = edges_df['datetime'].apply(lambda x: x.strftime("%Y-%m"))
-    edges_df['year_month_day'] = edges_df['datetime'].apply(lambda x: x.strftime("%Y-%m-%d"))
-    edges_df['year_month_day_hour'] = edges_df['datetime'].apply(lambda x: x.strftime("%Y-%m-%dT%H"))
+    edges_df['year'] = edges_df['producer_date'].apply(lambda x: x.year)
+    edges_df['year_month'] = edges_df['producer_date'].apply(lambda x: x.strftime("%Y-%m"))
+    edges_df['year_month_day'] = edges_df['producer_date'].apply(lambda x: x.strftime("%Y-%m-%d"))
+    edges_df['year_month_day_hour'] = edges_df['producer_date'].apply(lambda x: x.strftime("%Y-%m-%dT%H"))
+    
+        
           
     # Group by selected temporal scope & convert temporal grouping to datetime format: 
     # #FIXME: each assignment uses the first timestamp in the respective period, 
     # e.g. for year: 2024-12-31 gets turned into 2024, possibly grouped with other 2024 rows and then reassigned to 2024-01-01
     if temporal_grouping == 'year': 
-        grouped_edges = edges_df.groupby(['year', 'producer', 'consumer']).agg({'amount': 'sum', 'total': 'max', 'share': 'sum'}).reset_index()
+        edges_df['consumer_datestamp'] = edges_df['consumer_date'].apply(lambda x: x.year)
+        grouped_edges = edges_df.groupby(['year', 'producer', 'consumer', 'consumer_datestamp']).agg({'amount': 'sum'}).reset_index()
         grouped_edges['date'] = grouped_edges['year'].apply(lambda x: datetime(x, 1, 1))
+        
     elif temporal_grouping == 'month':
-        grouped_edges = edges_df.groupby(['year', 'year_month', 'producer', 'consumer'])['amount'].sum().reset_index() 
+        grouped_edges = edges_df.groupby(['year', 'year_month', 'producer', 'consumer', 'consumer_date'])['amount'].sum().reset_index() 
         grouped_edges['date'] = grouped_edges['year_month'].apply(lambda x: datetime.strptime(x, '%Y-%m'))
+        grouped_edges['consumer_datestamp'] = edges_df['consumer_datestamp'].apply(lambda x: x.strftime("%Y-%m"))
+         
     elif temporal_grouping == 'day': 
-        grouped_edges = edges_df.groupby(['year', 'year_month_day', 'producer', 'consumer'])['amount'].sum().reset_index()
+        grouped_edges = edges_df.groupby(['year', 'year_month_day', 'producer', 'consumer',  'consumer_datestamp'])['amount'].sum().reset_index()
         grouped_edges['date'] = grouped_edges['year_month_day'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d"))
+        grouped_edges['consumer_datestamp'] = edges_df['consumer_datestamp'].apply(lambda x: x.strftime("%Y-%m-%d"))
+        
     elif temporal_grouping == 'hour': 
-        grouped_edges = edges_df.groupby(['year', 'year_month_day_hour', 'producer', 'consumer'])['amount'].sum().reset_index()
+        grouped_edges = edges_df.groupby(['year', 'year_month_day_hour', 'producer', 'consumer',  'consumer_datestamp'])['amount'].sum().reset_index()
         grouped_edges['date'] = grouped_edges['year_month_day_hour'].apply(lambda x: datetime.strptime(x, "%Y-%m-%dT%H"))
+        grouped_edges['consumer_datestamp'] = edges_df['consumer_datestamp'].apply(lambda x: x.strftime("%Y-%m-%dT%H"))
     else:
         raise ValueError(f"Sorry, but {temporal_grouping} temporal scope grouping is not available yet.")
     

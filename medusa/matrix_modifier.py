@@ -61,7 +61,7 @@ def create_datapackage_from_edge_timeline(
             # print()
             return
         
-        new_consumer_id = row.consumer*1000000+consumer_timestamps[row.consumer]
+        new_consumer_id = row.consumer*1000000+row.consumer_datestamp
         # print(f'New consumer id = {new_consumer_id}')
         # print(f'New added year= {extract_date_as_integer(row.date)}')
         new_producer_id = row.producer*1000000+row.timestamp # In case the producer comes from a background database, we overwrite this. It currently still gets added to new_nodes, but this is not necessary.
@@ -75,7 +75,7 @@ def create_datapackage_from_edge_timeline(
             
             # create new consumer id if consumer is the functional unit
             if row.consumer in demand_timing.keys():
-                new_consumer_id = row.consumer*1000000+consumer_timestamps[row.consumer] #Why?
+                new_consumer_id = row.consumer*1000000+row.consumer_datestamp #Why?
 
             # print('Row contains internal foreground edge - exploding to new time-specific nodes')
             # print(f'New producer id = {new_producer_id}')
@@ -97,7 +97,7 @@ def create_datapackage_from_edge_timeline(
 
             # create new consumer id if consumer is the functional unit
             if row.consumer in demand_timing.keys():
-                new_consumer_id = row.consumer*1000000+consumer_timestamps[row.consumer] #reduced by two digits due to OverflowError: Python int too large to convert to C long
+                new_consumer_id = row.consumer*1000000+row.consumer_datestamp #reduced by two digits due to OverflowError: Python int too large to convert to C long
                 
             # Create new edges based on interpolation_weights from the row
             for database, db_share in row.interpolation_weights.items():
@@ -117,7 +117,7 @@ def create_datapackage_from_edge_timeline(
                 datapackage.add_persistent_vector(
                         matrix="technosphere_matrix",
                         name=uuid.uuid4().hex,
-                        data_array=np.array([row.total * row.share], dtype=float),
+                        data_array=np.array([row.amount], dtype=float), # old: [row.total * row.share]
                         indices_array=np.array(
                             [(new_producer_id, new_consumer_id)],
                             dtype=bwp.INDICES_DTYPE,
