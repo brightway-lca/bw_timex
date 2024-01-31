@@ -1,9 +1,11 @@
-from typing import Optional
 import bw2data as bd
 import bw_processing as bwp
 import uuid
 import numpy as np
 import pandas as pd
+from typing import Optional
+from datetime import datetime
+
 
 
 class MatrixModifier:
@@ -90,10 +92,13 @@ class MatrixModifier:
             )
 
             # Check if previous producer comes from background database
-            if previous_producer_node["database"] in self.database_date_dict.values():
+            if (
+                previous_producer_node["database"] in database_date_dict.keys()
+            ):
                 # Create new edges based on interpolation_weights from the row
                 for database, db_share in row.interpolation_weights.items():
                     # Get the producer activity in the corresponding background database
+                    print(database, previous_producer_node["name"], previous_producer_node["reference product"], previous_producer_node["location"])
                     producer_id_in_background_db = bd.get_node(
                         **{
                             "database": database,
@@ -113,7 +118,6 @@ class MatrixModifier:
                         ),
                         flip_array=np.array([True], dtype=bool),
                     )
-
 
         datapackage = bwp.create_datapackage(
             sum_inter_duplicates=False
@@ -194,4 +198,3 @@ class MatrixModifier:
         technosphere_datapackage = self.create_technosphere_datapackage()
         biosphere_datapackge = self.create_biosphere_datapackage()
         return [technosphere_datapackage, biosphere_datapackge]
-        

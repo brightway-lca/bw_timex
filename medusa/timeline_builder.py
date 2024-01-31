@@ -20,6 +20,7 @@ class TimelineBuilder:
         time_mapping_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
+        **kwargs,
     ):  
         self.slca = slca
         self.edge_filter_function = edge_filter_function
@@ -27,7 +28,7 @@ class TimelineBuilder:
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
         
-        eelca = EdgeExtractor(slca, edge_filter_function=edge_filter_function)
+        eelca = EdgeExtractor(slca, edge_filter_function=edge_filter_function, **kwargs)
         self.timeline = eelca.build_edge_timeline()
         
 
@@ -397,16 +398,19 @@ class TimelineBuilder:
                 )
             return {closest_lower: 1 - weight, closest_higher: weight}
 
-        dates_list = self.database_date_dict.keys()
+        dates_list = [date for date in self.database_date_dict.values() if type(date) == datetime]
         if "date_producer" not in list(tl_df.columns):
             raise ValueError("The timeline does not contain dates.")
 
+        # create reversed dict {date: database} with only static "background" db's
+        self.reversed_database_date_dict = {v: k for k, v in self.database_date_dict.items() if type(v) == datetime}
+        
         if self.interpolation_type == "nearest":
             tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
                 lambda x: find_closest_date(x, dates_list)
             )
             tl_df["interpolation_weights"] = tl_df["interpolation_weights"].apply(
-                lambda d: {self.database_date_dict[x]: v for x, v in d.items()}
+                lambda d: {self.reversed_database_date_dict[x]: v for x, v in d.items()}
             )
             return tl_df
 
@@ -417,7 +421,7 @@ class TimelineBuilder:
                 )
             )
             tl_df["interpolation_weights"] = tl_df["interpolation_weights"].apply(
-                lambda d: {self.database_date_dict[x]: v for x, v in d.items()}
+                lambda d: {self.reversed_database_date_dict[x]: v for x, v in d.items()}
             )
 
         else:
@@ -432,7 +436,7 @@ class TimelineBuilder:
         Check that the strings of the databases (values of database_date_dict) exist in the databases of the brightway2 project
 
         """
-        for db in self.database_date_dict.values():
+        for db in self.database_date_dict.keys():
             assert db in bd.databases, f"{db} not in your brightway2 project databases."
         else:
             print(

@@ -33,10 +33,16 @@ class MedusaLCA:
         database_date_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
+        **kwargs,
     ):
         self.demand = demand
         self.method = method
+        self.edge_filter_function = edge_filter_function
+        self.database_date_dict = database_date_dict
+        self.temporal_grouping = temporal_grouping
+        self.interpolation_type = interpolation_type
         
+        # Calculate static LCA results using a custom prepare_lca_inputs function that includes all background databases in the LCA. We need all the IDs for the time mapping dict.
         fu, data_objs, remapping = self.prepare_static_lca_inputs(demand=self.demand, method=self.method)
         self.static_lca = LCA(
             fu, data_objs=data_objs, remapping_dicts=remapping
@@ -44,20 +50,25 @@ class MedusaLCA:
         self.static_lca.lci()
         self.static_lca.lcia()
          
-        self.edge_filter_function = edge_filter_function
-        self.database_date_dict = database_date_dict
-        self.temporal_grouping = temporal_grouping
-        self.interpolation_type = interpolation_type
-
         self.time_mapping_dict = TimeMappingDict()
+        # self.reversed_database_date_dict = {v: k for k, v in self.database_date_dict.items()}
         
+        # Add all existing processes to the time mapping dict.
+        # TODO create function that handles this
+        for id in self.static_lca.dicts.activity.keys(): # activity ids
+            key = self.static_lca.remapping_dicts['activity'][id] # ('database', 'code')
+            time = self.database_date_dict[key[0]] # datetime (or 'static' for FU)
+            self.time_mapping_dict.add((key, time))
+        
+        self.database_date_dict_static_only = {k: v for k, v in self.database_date_dict.items() if type(v) == datetime}
         self.tl_builder = TimelineBuilder(
             self.static_lca,
             self.edge_filter_function,
-            self.database_date_dict,
+            self.database_date_dict_static_only,
             self.time_mapping_dict,
             self.temporal_grouping,
             self.interpolation_type,
+            **kwargs,
         )
         
 
@@ -74,7 +85,7 @@ class MedusaLCA:
 
         self.create_demand_timing_dict()
         self.matrix_modifier = MatrixModifier(
-            self.timeline, self.database_date_dict, self.demand_timing_dict
+            self.timeline, self.database_date_dict_static_only, self.demand_timing_dict
         )
         self.datapackage = self.matrix_modifier.create_datapackage()
 
