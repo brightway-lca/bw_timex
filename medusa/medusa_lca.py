@@ -21,6 +21,7 @@ from bw2data.errors import Brightway2Project
 from bw2calc import LCA
 from .timeline_builder import TimelineBuilder
 from .matrix_modifier import MatrixModifier
+from .dynamic_biosphere_builder import DynamicBiosphere
 
 
 class MedusaLCA:
@@ -90,6 +91,19 @@ class MedusaLCA:
             warnings.warn("LCI not yet calculated. Call MedusaLCA.lci() first.")
             return
         self.lca.lcia()
+
+    def build_dynamic_biosphere(self):
+        if not hasattr(self, "lca"):
+            warnings.warn(
+                "Static Medusa LCA has not been run. Call MedusaLCA.lci() first."
+            )
+            return
+        self.dynamic_biosphere_builder = DynamicBiosphere(self.lca.biosphere_matrix,
+                                                            self.lca.supply_array,
+                                                            self.timeline,
+                                                            self.database_date_dict
+                                                            )
+        self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
 
     def prepare_medusa_lca_inputs(
         self,
