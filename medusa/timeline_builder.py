@@ -6,31 +6,32 @@ from typing import Union, Tuple, Optional, Callable
 from datetime import datetime, timedelta
 from typing import KeysView
 
-from .edge_extractor import EdgeExtractor, Edge
 from bw_temporalis import TemporalDistribution
 from bw2calc import LCA
+from .edge_extractor import EdgeExtractor, Edge
+from .utils import extract_date_as_integer
 
 
 class TimelineBuilder:
     def __init__(
         self,
-        slca: LCA, # Not sure if this is correct
+        slca: LCA,  # Not sure if this is correct
         edge_filter_function: Callable,
         database_date_dict: dict,
         time_mapping_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
         **kwargs,
-    ):  
+    ):
         self.slca = slca
         self.edge_filter_function = edge_filter_function
         self.database_date_dict = database_date_dict
+        self.time_mapping_dict = time_mapping_dict
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
-        
+
         eelca = EdgeExtractor(slca, edge_filter_function=edge_filter_function, **kwargs)
         self.timeline = eelca.build_edge_timeline()
-        
 
     def build_timeline(self) -> pd.DataFrame:
         """
@@ -133,38 +134,6 @@ class TimelineBuilder:
 
             return datetime.strptime(datestring, time_res_dict[self.temporal_grouping])
 
-        def extract_date_as_integer(
-            dt_obj: datetime, time_res: Optional[str] = "year"
-        ) -> int:
-            """
-            Converts a datetime object to an integer in the format YYYY
-            #FIXME: ideally we want to add YYYYMMDDHH to the ids, but this cretaes integers that are too long for 32-bit C long
-
-            :param dt_obj: Datetime object.
-            :time_res: time resolution to be returned: year=YYYY, month=YYYYMM, day=YYYYMMDD, hour=YYYYMMDDHH
-            :return: INTEGER in the format YYYY.
-
-            """
-            time_res_dict = {
-                "year": "%Y",
-                "month": "%Y%m",
-                "day": "%Y%m%d",
-                "hour": "%Y%m%d%M",
-            }
-
-            if time_res not in time_res_dict.keys():
-                warnings.warn(
-                    'time_res: {} is not a valid option. Please choose from: {} defaulting to "year"'.format(
-                        time_res, time_res_dict.keys()
-                    ),
-                    category=Warning,
-                )
-            # print(dt_obj)
-            formatted_date = dt_obj.strftime(time_res_dict[time_res])
-            date_as_integer = int(formatted_date)
-
-            return date_as_integer
-
         # check if database names match with databases in BW project
         self.check_database_names()
 
@@ -220,22 +189,47 @@ class TimelineBuilder:
 
         # date is not really used
         grouped_edges["date_producer"] = grouped_edges["producer_grouping_time"].apply(
-            lambda x: convert_grouping_date_string_to_datetime(self.temporal_grouping, x)
+            lambda x: convert_grouping_date_string_to_datetime(
+                self.temporal_grouping, x
+            )
         )  # date is date producer, but in long format
         grouped_edges["hash_producer"] = grouped_edges["date_producer"].apply(
             lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
         )  # grouped_edges['year']  # for now just year but could be calling the function --> extract_date_as_integer(grouped_edges['date'])
 
         grouped_edges["date_consumer"] = grouped_edges["consumer_grouping_time"].apply(
-            lambda x: convert_grouping_date_string_to_datetime(self.temporal_grouping, x)
+            lambda x: convert_grouping_date_string_to_datetime(
+                self.temporal_grouping, x
+            )
         )  # date is date producer, but in long format
         grouped_edges["hash_consumer"] = grouped_edges["date_consumer"].apply(
             lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
         )  # grouped_edges['year']  # for now just year but could be calling the function --> extract_date_as_integer(grouped_edges['date'])
 
+        for row in grouped_edges.itertuples():
+            self.time_mapping_dict.add(
+                (("exploded", (bd.get_node(id=row.producer)['code'])), row.hash_producer)
+            )
+
+        grouped_edges["time_mapped_producer"] = grouped_edges.apply(
+            lambda row: self.time_mapping_dict[(
+                ("exploded", bd.get_node(id=row.producer)['code']), row.hash_producer
+            )],
+            axis=1,
+        )
+        
+        grouped_edges["time_mapped_consumer"] = grouped_edges.apply(
+            lambda row: self.time_mapping_dict[(
+                ("exploded", bd.get_node(id=row.consumer)['code']), row.hash_consumer
+            )] if row.consumer != -1 else -1,
+            axis=1,
+        )
+
         # Add interpolation weights to the dataframe
         grouped_edges = self.add_column_interpolation_weights_to_timeline(
-            grouped_edges, self.database_date_dict, interpolation_type=self.interpolation_type
+            grouped_edges,
+            self.database_date_dict,
+            interpolation_type=self.interpolation_type,
         )
 
         # Retrieve producer and consumer names
@@ -248,10 +242,12 @@ class TimelineBuilder:
         grouped_edges = grouped_edges[
             [
                 "hash_producer",
+                "time_mapped_producer",
                 "date_producer",
                 "producer",
                 "producer_name",
                 "hash_consumer",
+                "time_mapped_consumer",
                 "date_consumer",
                 "consumer",
                 "consumer_name",
@@ -262,7 +258,8 @@ class TimelineBuilder:
 
         return grouped_edges
 
-    def add_column_interpolation_weights_to_timeline(self,
+    def add_column_interpolation_weights_to_timeline(
+        self,
         tl_df: pd.DataFrame,
         database_date_dict: dict,
         interpolation_type: str = "linear",
@@ -304,8 +301,6 @@ class TimelineBuilder:
                 datetime.strptime("2022", "%Y"),
                 datetime.strptime("2025", "%Y"),
             ]
-
-            print(closest_date(target, dates_list))
             """
 
             # If the list is empty, return None
@@ -394,17 +389,21 @@ class TimelineBuilder:
                 )
             else:
                 raise ValueError(
-                    f"Sorry, but {iself.nterpolation_type} interpolation is not available yet."
+                    f"Sorry, but {interpolation_type} interpolation is not available yet."
                 )
             return {closest_lower: 1 - weight, closest_higher: weight}
 
-        dates_list = [date for date in self.database_date_dict.values() if type(date) == datetime]
+        dates_list = [
+            date for date in self.database_date_dict.values() if type(date) == datetime
+        ]
         if "date_producer" not in list(tl_df.columns):
             raise ValueError("The timeline does not contain dates.")
 
         # create reversed dict {date: database} with only static "background" db's
-        self.reversed_database_date_dict = {v: k for k, v in self.database_date_dict.items() if type(v) == datetime}
-        
+        self.reversed_database_date_dict = {
+            v: k for k, v in self.database_date_dict.items() if type(v) == datetime
+        }
+
         if self.interpolation_type == "nearest":
             tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
                 lambda x: find_closest_date(x, dates_list)

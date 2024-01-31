@@ -22,6 +22,7 @@ from bw2calc import LCA
 from .timeline_builder import TimelineBuilder
 from .matrix_modifier import MatrixModifier
 from .remapping import TimeMappingDict
+from .utils import extract_date_as_integer
 
 
 class MedusaLCA:
@@ -57,9 +58,14 @@ class MedusaLCA:
         # TODO create function that handles this
         for id in self.static_lca.dicts.activity.keys(): # activity ids
             key = self.static_lca.remapping_dicts['activity'][id] # ('database', 'code')
-            time = self.database_date_dict[key[0]] # datetime (or 'static' for FU)
-            self.time_mapping_dict.add((key, time))
-        
+            time = self.database_date_dict[key[0]] # datetime (or 'dynamic' for TD'd processes)
+            if type(time) == str:
+                self.time_mapping_dict.add((key, time))
+            elif type(time) == datetime:
+                self.time_mapping_dict.add((key, extract_date_as_integer(time, self.temporal_grouping)))
+            else:
+                warnings.warn(f"Time of activity {key} is neither datetime nor str.")
+                
         self.database_date_dict_static_only = {k: v for k, v in self.database_date_dict.items() if type(v) == datetime}
         self.tl_builder = TimelineBuilder(
             self.static_lca,
@@ -83,7 +89,7 @@ class MedusaLCA:
             )
             return
 
-        self.create_demand_timing_dict()
+        self.demand_timing_dict = self.create_demand_timing_dict()
         self.matrix_modifier = MatrixModifier(
             self.timeline, self.database_date_dict_static_only, self.demand_timing_dict
         )
@@ -101,13 +107,13 @@ class MedusaLCA:
             )
             return
 
-        fu, data_objs, remapping = self.prepare_medusa_lca_inputs(
+        self.fu, self.data_objs, self.remapping = self.prepare_medusa_lca_inputs(
             demand=self.demand,
             method=self.method,
             demand_timing_dict=self.demand_timing_dict,
         )
         self.lca = LCA(
-            fu, data_objs=data_objs + self.datapackage, remapping_dicts=remapping
+            self.fu, data_objs=self.data_objs + self.datapackage, remapping_dicts=self.remapping
         )
         self.lca.lci()
 
@@ -275,14 +281,14 @@ class MedusaLCA:
         if demands:
             indexed_demand = [
                 {
-                    get_id(k) * 1000000 + demand_timing_dict[get_id(k)]: v
+                    self.time_mapping_dict[(("exploded", bd.get_node(id=bd.get_id(k))['code']), self.demand_timing_dict[bd.get_id(k)])]: v
                     for k, v in dct.items()
                 }
                 for dct in demands
             ]  # why?
         elif demand:
             indexed_demand = {
-                get_id(k) * 1000000 + demand_timing_dict[get_id(k)]: v
+                self.time_mapping_dict[(("exploded", bd.get_node(id=bd.get_id(k))['code']), self.demand_timing_dict[bd.get_id(k)])]: v
                 for k, v in demand.items()
             }
         else:

@@ -7,7 +7,6 @@ from typing import Optional
 from datetime import datetime
 
 
-
 class MatrixModifier:
     def __init__(
         self,
@@ -62,14 +61,14 @@ class MatrixModifier:
             :return: None, but updates the set new_nodes and adds a patch for this new edge to the bwp.Datapackage.
             """
             if row.consumer == -1:
-                new_producer_id = row.producer * 1000000 + row.hash_producer
+                new_producer_id = row.time_mapped_producer
                 new_nodes.add(new_producer_id)
                 return
 
-            new_consumer_id = row.consumer * 1000000 + row.hash_consumer
+            new_consumer_id = row.time_mapped_consumer
             new_nodes.add(new_consumer_id)
 
-            new_producer_id = row.producer * 1000000 + row.hash_producer
+            new_producer_id = row.time_mapped_producer
             new_nodes.add(new_producer_id)
 
             previous_producer_id = row.producer
@@ -92,13 +91,10 @@ class MatrixModifier:
             )
 
             # Check if previous producer comes from background database
-            if (
-                previous_producer_node["database"] in database_date_dict.keys()
-            ):
+            if previous_producer_node["database"] in database_date_dict.keys():
                 # Create new edges based on interpolation_weights from the row
                 for database, db_share in row.interpolation_weights.items():
                     # Get the producer activity in the corresponding background database
-                    print(database, previous_producer_node["name"], previous_producer_node["reference product"], previous_producer_node["location"])
                     producer_id_in_background_db = bd.get_node(
                         **{
                             "database": database,
@@ -158,7 +154,9 @@ class MatrixModifier:
         :return: The updated datapackage with new biosphere exchanges for the new nodes.
         """
         unique_producers = (
-            self.timeline.groupby(["producer", "hash_producer"]).count().index.values
+            self.timeline.groupby(["producer", "time_mapped_producer"])
+            .count()
+            .index.values
         )  # array of unique (producer, timestamp) tuples
 
         datapackage_bio = bwp.create_datapackage(sum_inter_duplicates=False)
@@ -169,9 +167,8 @@ class MatrixModifier:
                 and not bd.get_activity(producer[0])["database"]
                 in self.database_date_dict.values()
             ):
-                producer_id = (
-                    producer[0] * 1000000 + producer[1]
-                )  # the producer_id is a combination of the activity_id and the timestamp
+                producer_id = producer[1]
+                # the producer_id is a combination of the activity_id and the timestamp
                 producer_node = bd.get_node(id=producer[0])
                 indices = (
                     []
