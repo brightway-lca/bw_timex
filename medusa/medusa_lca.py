@@ -27,22 +27,32 @@ from .remapping import TimeMappingDict
 class MedusaLCA:
     def __init__(
         self,
-        slca: LCA,  # Not sure if this is correct
+        demand,
+        method,
         edge_filter_function: Callable,
         database_date_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
     ):
-        self.slca = slca
+        self.demand = demand
+        self.method = method
+        
+        fu, data_objs, remapping = self.prepare_static_lca_inputs(demand=self.demand, method=self.method)
+        self.static_lca = LCA(
+            fu, data_objs=data_objs, remapping_dicts=remapping
+        )
+        self.static_lca.lci()
+        self.static_lca.lcia()
+         
         self.edge_filter_function = edge_filter_function
         self.database_date_dict = database_date_dict
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
 
-        self.time_mapping_dict = TimeMappingDict(max(slca.dicts.activity.values()))
+        self.time_mapping_dict = TimeMappingDict()
         
         self.tl_builder = TimelineBuilder(
-            self.slca,
+            self.static_lca,
             self.edge_filter_function,
             self.database_date_dict,
             self.time_mapping_dict,
@@ -81,8 +91,8 @@ class MedusaLCA:
             return
 
         fu, data_objs, remapping = self.prepare_medusa_lca_inputs(
-            demand=self.slca.demand,
-            method=self.slca.method,
+            demand=self.demand,
+            method=self.method,
             demand_timing_dict=self.demand_timing_dict,
         )
         self.lca = LCA(
@@ -95,6 +105,84 @@ class MedusaLCA:
             warnings.warn("LCI not yet calculated. Call MedusaLCA.lci() first.")
             return
         self.lca.lcia()
+
+    def prepare_static_lca_inputs(
+        self,
+        demand=None,
+        method=None,
+        weighting=None,
+        normalization=None,
+        demands=None,
+        remapping=True,
+        demand_database_last=True,
+    ):
+        """Prepare LCA input arguments in Brightway 2.5 style."""
+        if not projects.dataset.data.get("25"):
+            raise Brightway2Project(
+                "Please use `projects.migrate_project_25` before calculating using Brightway 2.5"
+            )
+
+        databases.clean()
+        data_objs = []
+        remapping_dicts = None
+
+        demand_database_names = [
+            db_label for db_label in databases
+        ]  # Always load all databases. This could be handled more elegantly..
+        
+        if demand_database_names:
+            database_names = set.union(
+                *[
+                    Database(db_label).find_graph_dependents()
+                    for db_label in demand_database_names
+                ]
+            )
+
+            if demand_database_last:
+                database_names = [
+                    x for x in database_names if x not in demand_database_names
+                ] + demand_database_names
+
+            data_objs.extend([Database(obj).datapackage() for obj in database_names])
+
+            if remapping:
+                # This is technically wrong - we could have more complicated queries
+                # to determine what is truly a product, activity, etc.
+                # However, for the default database schema, we know that each node
+                # has a unique ID, so this won't produce incorrect responses,
+                # just too many values. As the dictionary only exists once, this is
+                # not really a problem.
+                reversed_mapping = {
+                    i: (d, c)
+                    for d, c, i in AD.select(AD.database, AD.code, AD.id)
+                    .where(AD.database << database_names)
+                    .tuples()
+                }
+                remapping_dicts = {
+                    "activity": reversed_mapping,
+                    "product": reversed_mapping,
+                    "biosphere": reversed_mapping,
+                }
+
+        if method:
+            assert method in methods
+            data_objs.append(Method(method).datapackage())
+        if weighting:
+            assert weighting in weightings
+            data_objs.append(Weighting(weighting).datapackage())
+        if normalization:
+            assert normalization in normalizations
+            data_objs.append(Normalization(normalization).datapackage())
+
+        if demands:
+            indexed_demand = [{get_id(k): v for k, v in dct.items()} for dct in demands]
+        elif demand:
+            indexed_demand = {get_id(k): v for k, v in demand.items()}
+        else:
+            indexed_demand = None
+
+        return indexed_demand, data_objs, remapping_dicts
+
 
     def prepare_medusa_lca_inputs(
         self,
@@ -201,7 +289,7 @@ class MedusaLCA:
 
         :return: Dictionary mapping producer ids to reference timing (currently YYYYMM) for the specified demands.
         """
-        demand_ids = [bd.get_activity(key).id for key in self.slca.demand.keys()]
+        demand_ids = [bd.get_activity(key).id for key in self.demand.keys()]
         demand_rows = self.timeline[
             self.timeline["producer"].isin(demand_ids)
             & (self.timeline["consumer"] == -1)

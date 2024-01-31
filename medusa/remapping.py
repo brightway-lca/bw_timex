@@ -1,5 +1,5 @@
 class TimeMappingDict(dict):
-    def __init__(self, start_id, *args, **kwargs):
+    def __init__(self, start_id=0, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._current_id = start_id
 
