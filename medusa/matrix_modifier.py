@@ -91,7 +91,7 @@ class MatrixModifier:
             )
 
             # Check if previous producer comes from background database
-            if previous_producer_node["database"] in database_date_dict.keys():
+            if previous_producer_node["database"] in self.database_date_dict.keys():
                 # Create new edges based on interpolation_weights from the row
                 for database, db_share in row.interpolation_weights.items():
                     # Get the producer activity in the corresponding background database
