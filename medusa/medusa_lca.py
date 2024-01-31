@@ -213,5 +213,5 @@ class MedusaLCA:
         """
         try:
             return getattr(self.lca, name)
-        except:
-            AttributeError(f"'MedusaLCA' object has no attribute '{name}'")
+        except AttributeError:
+            print(f"'MedusaLCA' object has no attribute '{name}'")
