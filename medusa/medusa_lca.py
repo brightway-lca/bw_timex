@@ -205,3 +205,13 @@ class MedusaLCA:
             row.producer: row.hash_producer for row in demand_rows.itertuples()
         }
         return self.demand_timing_dict  # old: extract_date_as_integer(row.date)
+
+    def __getattr__(self, name):
+        """
+        Delegate attribute access to the self.lca object if the attribute
+        is not found in the MedusaLCA instance.
+        """
+        try:
+            return getattr(self.lca, name)
+        except:
+            AttributeError(f"'MedusaLCA' object has no attribute '{name}'")
