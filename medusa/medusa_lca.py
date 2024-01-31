@@ -21,6 +21,7 @@ from bw2data.errors import Brightway2Project
 from bw2calc import LCA
 from .timeline_builder import TimelineBuilder
 from .matrix_modifier import MatrixModifier
+from .remapping import TimeMappingDict
 
 
 class MedusaLCA:
@@ -38,13 +39,17 @@ class MedusaLCA:
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
 
+        self.time_mapping_dict = TimeMappingDict(max(slca.dicts.activity.values()))
+        
         self.tl_builder = TimelineBuilder(
             self.slca,
             self.edge_filter_function,
             self.database_date_dict,
+            self.time_mapping_dict,
             self.temporal_grouping,
             self.interpolation_type,
         )
+        
 
     def build_timeline(self):
         self.timeline = self.tl_builder.build_timeline()

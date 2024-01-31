@@ -17,6 +17,7 @@ class TimelineBuilder:
         slca: LCA, # Not sure if this is correct
         edge_filter_function: Callable,
         database_date_dict: dict,
+        time_mapping_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
     ):  
