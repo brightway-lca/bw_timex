@@ -1,6 +1,7 @@
 import bw2data as bd
 import warnings
 import pandas as pd
+import numpy as np
 
 from datetime import datetime
 from typing import Optional, Callable
@@ -46,6 +47,9 @@ class MedusaLCA:
             self.temporal_grouping,
             self.interpolation_type,
         )
+
+        self.dynamic_lci = {}  # dictionary to store the dynamic lci {CO2: {time: [2022, 2023], amount:[3,5]}}
+
 
     def build_timeline(self):
         self.timeline = self.tl_builder.build_timeline()
@@ -104,6 +108,33 @@ class MedusaLCA:
                                                             self.database_date_dict
                                                             )
         self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
+        self.dynamic_biomatrix = self.dynamic_biosphere_builder.dynamic_biomatrix  # FIXME: how to return dynamc_biomatrx from class method build_biomatrix()
+
+    def calculate_dynamic_lci(
+            self,
+            ):
+        if not hasattr(self, "dynamic_biomatrix"):
+            warnings.warn(
+                "dynamic biosphere matrix not yet built. Call MedusaLCA.build_dynamic_biosphere() first."
+            )
+        len_background = self.biosphere_matrix.shape[1]-self.dynamic_biomatrix.shape[1]  # dirty fix to exclude the background
+        # calculate lci from dynamic biosphere matrix
+        unordered_lci = self.dynamic_biomatrix.dot(self.supply_array[len_background:])  # FIXME: include background processes
+
+        # Create dynamic lci dictionary with structure {CO2: {time: [2022, 2023], amount:[3,5]}, CH4: {time: [2022, 2023], amount:[3,5]}, ...}
+        for ((flow, time), amount) in zip(self.dynamic_biosphere_builder.bio_row_mapping.__reversed__(), unordered_lci):
+            print(flow['code'],time,amount)
+            if not flow['code'] in self.dynamic_lci.keys():
+                self.dynamic_lci[flow['code']] = {'time' : [], 'amount' : []}
+            self.dynamic_lci[flow['code']]['time'].append(time)
+            self.dynamic_lci[flow['code']]['amount'].append(amount)
+        # now sort flows based on time
+        for flow in self.dynamic_lci.keys():
+            order = np.argsort(self.dynamic_lci[flow]['time'])
+            self.dynamic_lci[flow]['time'] = np.array(self.dynamic_lci[flow]['time'])[order]
+            self.dynamic_lci[flow]['amount'] = np.array(self.dynamic_lci[flow]['amount'])[order]
+
+
 
     def prepare_medusa_lca_inputs(
         self,
