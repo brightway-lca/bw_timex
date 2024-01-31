@@ -24,7 +24,7 @@ class DynamicBiosphere():
         self.cols = []
         self.values = []
         self.bio_row_mapping = TimeMappingDict(start_id=0)
-        self.act_col_mapping = TimeMappingDict(start_id=0)
+        self.act_col_mapping = TimeMappingDict(start_id=0)  # TODO: can be removed with global activity mapping
 
     def build_dynamic_biosphere_matrix(self):
         cleaned_production_timeline = self.timeline[['hash_producer', 'date_producer', 'producer_name', 'producer']].drop_duplicates()
@@ -34,7 +34,6 @@ class DynamicBiosphere():
         for producing_act in cleaned_production_timeline.itertuples():
             act = bd.get_node(id=producing_act.producer)
             for exc in act.biosphere():
-                #print(exc.input)
                 # Create TD from producer timestamp which is currently a pd.Timestamp and get the date
                 # direct conversion with pd.Timestamp.to_pydatetime() leads to wrong dtype for some reason
                 td_producer = TemporalDistribution(date=np.array([producing_act.date_producer], dtype='datetime64[s]'),
@@ -52,7 +51,6 @@ class DynamicBiosphere():
                 
                 # Add entries to dynamic bio matrix
                 for bio_date, bio_flow in zip(bio_dates, bio_values):
-                    # print(bio_date, type(bio_date), bio_flow, type(bio_flow))
                     # first create a row index for the tuple((db,bio_flow), date))
                     self.create_dynamic_biosphere_matrix_indices(exc.input, bio_date, producing_act.producer, producing_act.hash_producer)
                     bio_row_index = self.bio_row_mapping[(exc.input, bio_date)]
@@ -76,7 +74,6 @@ class DynamicBiosphere():
         
     def build_biomatrix(self):
         shape = (max(self.rows)+1, self.nr_procs)
-        # print((self.values, (self.rows, self.cols)), shape)
         dynamic_biomatrix = sp.coo_matrix((self.values, (self.rows, self.cols)), shape)
         self.dynamic_biomatrix = dynamic_biomatrix.tocsr()
         # return dynamic_biomatrix.tocsr()

@@ -48,7 +48,7 @@ class MedusaLCA:
             self.interpolation_type,
         )
 
-        self.dynamic_lci = {}  # dictionary to store the dynamic lci {CO2: {time: [2022, 2023], amount:[3,5]}}
+        self.dynamic_inventory = {}  # dictionary to store the dynamic lci {CO2: {time: [2022, 2023], amount:[3,5]}}
 
 
     def build_timeline(self):
@@ -123,16 +123,15 @@ class MedusaLCA:
 
         # Create dynamic lci dictionary with structure {CO2: {time: [2022, 2023], amount:[3,5]}, CH4: {time: [2022, 2023], amount:[3,5]}, ...}
         for ((flow, time), amount) in zip(self.dynamic_biosphere_builder.bio_row_mapping.__reversed__(), unordered_lci):
-            print(flow['code'],time,amount)
-            if not flow['code'] in self.dynamic_lci.keys():
-                self.dynamic_lci[flow['code']] = {'time' : [], 'amount' : []}
-            self.dynamic_lci[flow['code']]['time'].append(time)
-            self.dynamic_lci[flow['code']]['amount'].append(amount)
+            if not flow['code'] in self.dynamic_inventory.keys():
+                self.dynamic_inventory[flow['code']] = {'time' : [], 'amount' : []}
+            self.dynamic_inventory[flow['code']]['time'].append(time)
+            self.dynamic_inventory[flow['code']]['amount'].append(amount)
         # now sort flows based on time
-        for flow in self.dynamic_lci.keys():
-            order = np.argsort(self.dynamic_lci[flow]['time'])
-            self.dynamic_lci[flow]['time'] = np.array(self.dynamic_lci[flow]['time'])[order]
-            self.dynamic_lci[flow]['amount'] = np.array(self.dynamic_lci[flow]['amount'])[order]
+        for flow in self.dynamic_inventory.keys():
+            order = np.argsort(self.dynamic_inventory[flow]['time'])
+            self.dynamic_inventory[flow]['time'] = np.array(self.dynamic_inventory[flow]['time'])[order]
+            self.dynamic_inventory[flow]['amount'] = np.array(self.dynamic_inventory[flow]['amount'])[order]
 
 
 
