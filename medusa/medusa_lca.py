@@ -42,32 +42,40 @@ class MedusaLCA:
         self.database_date_dict = database_date_dict
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
-        
+
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all background databases in the LCA. We need all the IDs for the time mapping dict.
-        fu, data_objs, remapping = self.prepare_static_lca_inputs(demand=self.demand, method=self.method)
-        self.static_lca = LCA(
-            fu, data_objs=data_objs, remapping_dicts=remapping
+        fu, data_objs, remapping = self.prepare_static_lca_inputs(
+            demand=self.demand, method=self.method
         )
+        self.static_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
         self.static_lca.lci()
         self.static_lca.lcia()
-         
+
         self.time_mapping_dict = TimeMappingDict()
-        
+
         # Add all existing processes to the time mapping dict.
         # TODO create function that handles this
-        for id in self.static_lca.dicts.activity.keys(): # activity ids
-            key = self.static_lca.remapping_dicts['activity'][id] # ('database', 'code')
-            time = self.database_date_dict[key[0]] # datetime (or 'dynamic' for TD'd processes)
-            if type(time) == str: # if 'dynamic', just add the string
+        for id in self.static_lca.dicts.activity.keys():  # activity ids
+            key = self.static_lca.remapping_dicts["activity"][
+                id
+            ]  # ('database', 'code')
+            time = self.database_date_dict[
+                key[0]
+            ]  # datetime (or 'dynamic' for TD'd processes)
+            if type(time) == str:  # if 'dynamic', just add the string
                 self.time_mapping_dict.add((key, time))
             elif type(time) == datetime:
-                self.time_mapping_dict.add((key, extract_date_as_integer(time, self.temporal_grouping))) # if datetime, map to the date as integer
+                self.time_mapping_dict.add(
+                    (key, extract_date_as_integer(time, self.temporal_grouping))
+                )  # if datetime, map to the date as integer
             else:
                 warnings.warn(f"Time of activity {key} is neither datetime nor str.")
-                
+
         # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
-        self.database_date_dict_static_only = {k: v for k, v in self.database_date_dict.items() if type(v) == datetime}
-        
+        self.database_date_dict_static_only = {
+            k: v for k, v in self.database_date_dict.items() if type(v) == datetime
+        }
+
         # Create timeline builder that does a the graph traversal (similar to bw_temporalis) and extracts all edges with their temporal information. Can later be used to build a timeline with the TimelineBuilder.build_timeline() method.
         self.tl_builder = TimelineBuilder(
             self.static_lca,
@@ -78,7 +86,6 @@ class MedusaLCA:
             self.interpolation_type,
             **kwargs,
         )
-        
 
     def build_timeline(self):
         """
@@ -95,7 +102,7 @@ class MedusaLCA:
             return
 
         self.demand_timing_dict = self.create_demand_timing_dict()
-        
+
         # Create matrix modifier that creates the new datapackage with the exploded processes and new links to background databases.
         self.matrix_modifier = MatrixModifier(
             self.timeline, self.database_date_dict_static_only, self.demand_timing_dict
@@ -120,7 +127,9 @@ class MedusaLCA:
             demand_timing_dict=self.demand_timing_dict,
         )
         self.lca = LCA(
-            self.fu, data_objs=self.data_objs + self.datapackage, remapping_dicts=self.remapping
+            self.fu,
+            data_objs=self.data_objs + self.datapackage,
+            remapping_dicts=self.remapping,
         )
         self.lca.lci()
 
@@ -141,10 +150,10 @@ class MedusaLCA:
         demand_database_last=True,
     ):
         """
-        Prepare LCA input arguments in Brightway 2.5 style. 
+        Prepare LCA input arguments in Brightway 2.5 style.
         ORIGINALLY FROM bw2data.compat.py
-        
-        The difference to the original method is that we load all available databases into the matrices instead of just the ones depending on the demand. We need this for the creation of the time mapping dict that creates a mapping between the producer id and the reference timing of the databases in the database_date_dict. 
+
+        The difference to the original method is that we load all available databases into the matrices instead of just the ones depending on the demand. We need this for the creation of the time mapping dict that creates a mapping between the producer id and the reference timing of the databases in the database_date_dict.
         """
         if not projects.dataset.data.get("25"):
             raise Brightway2Project(
@@ -158,7 +167,7 @@ class MedusaLCA:
         demand_database_names = [
             db_label for db_label in databases
         ]  # Always load all databases. This could be handled more elegantly..
-        
+
         if demand_database_names:
             database_names = set.union(
                 *[
@@ -211,7 +220,6 @@ class MedusaLCA:
             indexed_demand = None
 
         return indexed_demand, data_objs, remapping_dicts
-
 
     def prepare_medusa_lca_inputs(
         self,
@@ -293,14 +301,24 @@ class MedusaLCA:
         if demands:
             indexed_demand = [
                 {
-                    self.time_mapping_dict[(("exploded", bd.get_node(id=bd.get_id(k))['code']), self.demand_timing_dict[bd.get_id(k)])]: v
+                    self.time_mapping_dict[
+                        (
+                            ("exploded", bd.get_node(id=bd.get_id(k))["code"]),
+                            self.demand_timing_dict[bd.get_id(k)],
+                        )
+                    ]: v
                     for k, v in dct.items()
                 }
                 for dct in demands
-            ] 
+            ]
         elif demand:
             indexed_demand = {
-                self.time_mapping_dict[(("exploded", bd.get_node(id=bd.get_id(k))['code']), self.demand_timing_dict[bd.get_id(k)])]: v
+                self.time_mapping_dict[
+                    (
+                        ("exploded", bd.get_node(id=bd.get_id(k))["code"]),
+                        self.demand_timing_dict[bd.get_id(k)],
+                    )
+                ]: v
                 for k, v in demand.items()
             }
         else:
@@ -328,12 +346,35 @@ class MedusaLCA:
         }
         return self.demand_timing_dict  # old: extract_date_as_integer(row.date)
 
+    def create_labelled_technosphere_dataframe(self) -> pd.DataFrame:
+        """
+        Returns the technosphere matrix as a dataframe with comprehensible labels instead of ids.
+        """
+        time_mapping_dict_reversed = {
+            value: key for key, value in self.time_mapping_dict.items()
+        }
+
+        df = pd.DataFrame(self.technosphere_matrix.toarray())
+        df.rename(  # from matrix id to activity id
+            index=self.dicts.activity.reversed,
+            columns=self.dicts.activity.reversed,
+            inplace=True,
+        )
+        df.rename(  # from activity id to ((database, code), time)
+            index=time_mapping_dict_reversed,
+            columns=time_mapping_dict_reversed,
+            inplace=True,
+        )
+        return df
+
     def __getattr__(self, name):
         """
         Delegate attribute access to the self.lca object if the attribute
-        is not found in the MedusaLCA instance.
+        is not found in the MedusaLCA instance itself.
         """
-        try:
+        if hasattr(self.lca, name):
             return getattr(self.lca, name)
-        except AttributeError:
-            print(f"'MedusaLCA' object has no attribute '{name}'")
+        else:
+            raise AttributeError(
+                f"'MedusaLCA' object and its 'lca' attribute have no attribute '{name}'"
+            )
