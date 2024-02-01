@@ -23,35 +23,79 @@ from bw2calc import LCA
 from .timeline_builder import TimelineBuilder
 from .matrix_modifier import MatrixModifier
 from .dynamic_biosphere_builder import DynamicBiosphere
+from .remapping import TimeMappingDict
+from .utils import extract_date_as_integer
 
 
 class MedusaLCA:
     def __init__(
         self,
-        slca: LCA,  # Not sure if this is correct
+        demand,
+        method,
         edge_filter_function: Callable,
         database_date_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
+        **kwargs,
     ):
-        self.slca = slca
+        self.demand = demand
+        self.method = method
         self.edge_filter_function = edge_filter_function
         self.database_date_dict = database_date_dict
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
 
+        # Calculate static LCA results using a custom prepare_lca_inputs function that includes all background databases in the LCA. We need all the IDs for the time mapping dict.
+        fu, data_objs, remapping = self.prepare_static_lca_inputs(
+            demand=self.demand, method=self.method
+        )
+        self.static_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
+        self.static_lca.lci()
+        self.static_lca.lcia()
+
+        self.time_mapping_dict = TimeMappingDict()
+
+        # Add all existing processes to the time mapping dict.
+        # TODO create function that handles this
+        for id in self.static_lca.dicts.activity.keys():  # activity ids
+            key = self.static_lca.remapping_dicts["activity"][
+                id
+            ]  # ('database', 'code')
+            time = self.database_date_dict[
+                key[0]
+            ]  # datetime (or 'dynamic' for TD'd processes)
+            if type(time) == str:  # if 'dynamic', just add the string
+                self.time_mapping_dict.add((key, time))
+            elif type(time) == datetime:
+                self.time_mapping_dict.add(
+                    (key, extract_date_as_integer(time, self.temporal_grouping))
+                )  # if datetime, map to the date as integer
+            else:
+                warnings.warn(f"Time of activity {key} is neither datetime nor str.")
+
+        # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
+        self.database_date_dict_static_only = {
+            k: v for k, v in self.database_date_dict.items() if type(v) == datetime
+        }
+
+        # Create timeline builder that does a the graph traversal (similar to bw_temporalis) and extracts all edges with their temporal information. Can later be used to build a timeline with the TimelineBuilder.build_timeline() method.
         self.tl_builder = TimelineBuilder(
-            self.slca,
+            self.static_lca,
             self.edge_filter_function,
-            self.database_date_dict,
+            self.database_date_dict_static_only,
+            self.time_mapping_dict,
             self.temporal_grouping,
             self.interpolation_type,
+            **kwargs,
         )
 
         self.dynamic_inventory = {}  # dictionary to store the dynamic lci {CO2: {time: [2022, 2023], amount:[3,5]}}
 
 
     def build_timeline(self):
+        """
+        Build a timeline DataFrame using the TimelineBuilder class.
+        """
         self.timeline = self.tl_builder.build_timeline()
         return self.timeline
 
@@ -62,9 +106,11 @@ class MedusaLCA:
             )
             return
 
-        self.create_demand_timing_dict()
+        self.demand_timing_dict = self.create_demand_timing_dict()
+
+        # Create matrix modifier that creates the new datapackage with the exploded processes and new links to background databases.
         self.matrix_modifier = MatrixModifier(
-            self.timeline, self.database_date_dict, self.demand_timing_dict
+            self.timeline, self.database_date_dict_static_only, self.demand_timing_dict
         )
         self.datapackage = self.matrix_modifier.create_datapackage()
 
@@ -80,13 +126,15 @@ class MedusaLCA:
             )
             return
 
-        fu, data_objs, remapping = self.prepare_medusa_lca_inputs(
-            demand=self.slca.demand,
-            method=self.slca.method,
+        self.fu, self.data_objs, self.remapping = self.prepare_medusa_lca_inputs(
+            demand=self.demand,
+            method=self.method,
             demand_timing_dict=self.demand_timing_dict,
         )
         self.lca = LCA(
-            fu, data_objs=data_objs + self.datapackage, remapping_dicts=remapping
+            self.fu,
+            data_objs=self.data_objs + self.datapackage,
+            remapping_dicts=self.remapping,
         )
         self.lca.lci()
 
@@ -134,6 +182,88 @@ class MedusaLCA:
             self.dynamic_inventory[flow]['amount'] = np.array(self.dynamic_inventory[flow]['amount'])[order]
 
 
+
+    def prepare_static_lca_inputs(
+        self,
+        demand=None,
+        method=None,
+        weighting=None,
+        normalization=None,
+        demands=None,
+        remapping=True,
+        demand_database_last=True,
+    ):
+        """
+        Prepare LCA input arguments in Brightway 2.5 style.
+        ORIGINALLY FROM bw2data.compat.py
+
+        The difference to the original method is that we load all available databases into the matrices instead of just the ones depending on the demand. We need this for the creation of the time mapping dict that creates a mapping between the producer id and the reference timing of the databases in the database_date_dict.
+        """
+        if not projects.dataset.data.get("25"):
+            raise Brightway2Project(
+                "Please use `projects.migrate_project_25` before calculating using Brightway 2.5"
+            )
+
+        databases.clean()
+        data_objs = []
+        remapping_dicts = None
+
+        demand_database_names = [
+            db_label for db_label in databases
+        ]  # Always load all databases. This could be handled more elegantly..
+
+        if demand_database_names:
+            database_names = set.union(
+                *[
+                    Database(db_label).find_graph_dependents()
+                    for db_label in demand_database_names
+                ]
+            )
+
+            if demand_database_last:
+                database_names = [
+                    x for x in database_names if x not in demand_database_names
+                ] + demand_database_names
+
+            data_objs.extend([Database(obj).datapackage() for obj in database_names])
+
+            if remapping:
+                # This is technically wrong - we could have more complicated queries
+                # to determine what is truly a product, activity, etc.
+                # However, for the default database schema, we know that each node
+                # has a unique ID, so this won't produce incorrect responses,
+                # just too many values. As the dictionary only exists once, this is
+                # not really a problem.
+                reversed_mapping = {
+                    i: (d, c)
+                    for d, c, i in AD.select(AD.database, AD.code, AD.id)
+                    .where(AD.database << database_names)
+                    .tuples()
+                }
+                remapping_dicts = {
+                    "activity": reversed_mapping,
+                    "product": reversed_mapping,
+                    "biosphere": reversed_mapping,
+                }
+
+        if method:
+            assert method in methods
+            data_objs.append(Method(method).datapackage())
+        if weighting:
+            assert weighting in weightings
+            data_objs.append(Weighting(weighting).datapackage())
+        if normalization:
+            assert normalization in normalizations
+            data_objs.append(Normalization(normalization).datapackage())
+
+        if demands:
+            indexed_demand = [{get_id(k): v for k, v in dct.items()} for dct in demands]
+        elif demand:
+            indexed_demand = {get_id(k): v for k, v in demand.items()}
+        else:
+            indexed_demand = None
+
+        return indexed_demand, data_objs, remapping_dicts
 
     def prepare_medusa_lca_inputs(
         self,
@@ -215,14 +345,24 @@ class MedusaLCA:
         if demands:
             indexed_demand = [
                 {
-                    get_id(k) * 1000000 + demand_timing_dict[get_id(k)]: v
+                    self.time_mapping_dict[
+                        (
+                            ("exploded", bd.get_node(id=bd.get_id(k))["code"]),
+                            self.demand_timing_dict[bd.get_id(k)],
+                        )
+                    ]: v
                     for k, v in dct.items()
                 }
                 for dct in demands
-            ]  # why?
+            ]
         elif demand:
             indexed_demand = {
-                get_id(k) * 1000000 + demand_timing_dict[get_id(k)]: v
+                self.time_mapping_dict[
+                    (
+                        ("exploded", bd.get_node(id=bd.get_id(k))["code"]),
+                        self.demand_timing_dict[bd.get_id(k)],
+                    )
+                ]: v
                 for k, v in demand.items()
             }
         else:
@@ -240,7 +380,7 @@ class MedusaLCA:
 
         :return: Dictionary mapping producer ids to reference timing (currently YYYYMM) for the specified demands.
         """
-        demand_ids = [bd.get_activity(key).id for key in self.slca.demand.keys()]
+        demand_ids = [bd.get_activity(key).id for key in self.demand.keys()]
         demand_rows = self.timeline[
             self.timeline["producer"].isin(demand_ids)
             & (self.timeline["consumer"] == -1)
@@ -250,12 +390,35 @@ class MedusaLCA:
         }
         return self.demand_timing_dict  # old: extract_date_as_integer(row.date)
 
+    def create_labelled_technosphere_dataframe(self) -> pd.DataFrame:
+        """
+        Returns the technosphere matrix as a dataframe with comprehensible labels instead of ids.
+        """
+        time_mapping_dict_reversed = {
+            value: key for key, value in self.time_mapping_dict.items()
+        }
+
+        df = pd.DataFrame(self.technosphere_matrix.toarray())
+        df.rename(  # from matrix id to activity id
+            index=self.dicts.activity.reversed,
+            columns=self.dicts.activity.reversed,
+            inplace=True,
+        )
+        df.rename(  # from activity id to ((database, code), time)
+            index=time_mapping_dict_reversed,
+            columns=time_mapping_dict_reversed,
+            inplace=True,
+        )
+        return df
+
     def __getattr__(self, name):
         """
         Delegate attribute access to the self.lca object if the attribute
-        is not found in the MedusaLCA instance.
+        is not found in the MedusaLCA instance itself.
         """
-        try:
+        if hasattr(self.lca, name):
             return getattr(self.lca, name)
-        except AttributeError:
-            print(f"'MedusaLCA' object has no attribute '{name}'")
+        else:
+            raise AttributeError(
+                f"'MedusaLCA' object and its 'lca' attribute have no attribute '{name}'"
+            )

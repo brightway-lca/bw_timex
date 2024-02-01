@@ -1,24 +1,31 @@
-from typing import Optional
 import bw2data as bd
 import bw_processing as bwp
 import uuid
 import numpy as np
 import pandas as pd
+from typing import Optional
+from datetime import datetime
 
 
 class MatrixModifier:
+    """
+    This class is responsible for creating a datapackage that contains matrix entries for the temporally "exploded" processes, based on a timeline dataframe (created from TimelineBuilder.build_timeline()).
+
+    :param timeline: A DataFrame representing the timeline.
+    :param database_date_dict: A dictionary mapping databases to dates.
+    :param demand_timing: A dictionary representing the demand timing.
+    :param name: An optional name for the MatrixModifier instance. Default is None.
+    """
     def __init__(
         self,
         timeline: pd.DataFrame,
         database_date_dict: dict,
         demand_timing: dict,
-        datapackage: Optional[bwp.Datapackage] = None,
         name: Optional[str] = None,
     ):
         self.timeline = timeline
         self.database_date_dict = database_date_dict
         self.demand_timing = demand_timing
-        self.datapackage = datapackage
         self.name = name
 
     def create_technosphere_datapackage(self) -> bwp.Datapackage:
@@ -60,14 +67,14 @@ class MatrixModifier:
             :return: None, but updates the set new_nodes and adds a patch for this new edge to the bwp.Datapackage.
             """
             if row.consumer == -1:
-                new_producer_id = row.producer * 1000000 + row.hash_producer
+                new_producer_id = row.time_mapped_producer
                 new_nodes.add(new_producer_id)
                 return
 
-            new_consumer_id = row.consumer * 1000000 + row.hash_consumer
+            new_consumer_id = row.time_mapped_consumer
             new_nodes.add(new_consumer_id)
 
-            new_producer_id = row.producer * 1000000 + row.hash_producer
+            new_producer_id = row.time_mapped_producer
             new_nodes.add(new_producer_id)
 
             previous_producer_id = row.producer
@@ -90,7 +97,7 @@ class MatrixModifier:
             )
 
             # Check if previous producer comes from background database
-            if previous_producer_node["database"] in self.database_date_dict.values():
+            if previous_producer_node["database"] in self.database_date_dict.keys():
                 # Create new edges based on interpolation_weights from the row
                 for database, db_share in row.interpolation_weights.items():
                     # Get the producer activity in the corresponding background database
@@ -113,7 +120,6 @@ class MatrixModifier:
                         ),
                         flip_array=np.array([True], dtype=bool),
                     )
-
 
         datapackage = bwp.create_datapackage(
             sum_inter_duplicates=False
@@ -154,7 +160,9 @@ class MatrixModifier:
         :return: The updated datapackage with new biosphere exchanges for the new nodes.
         """
         unique_producers = (
-            self.timeline.groupby(["producer", "hash_producer"]).count().index.values
+            self.timeline.groupby(["producer", "time_mapped_producer"])
+            .count()
+            .index.values
         )  # array of unique (producer, timestamp) tuples
 
         datapackage_bio = bwp.create_datapackage(sum_inter_duplicates=False)
@@ -165,9 +173,8 @@ class MatrixModifier:
                 and not bd.get_activity(producer[0])["database"]
                 in self.database_date_dict.values()
             ):
-                producer_id = (
-                    producer[0] * 1000000 + producer[1]
-                )  # the producer_id is a combination of the activity_id and the timestamp
+                producer_id = producer[1]
+                # the producer_id is a combination of the activity_id and the timestamp
                 producer_node = bd.get_node(id=producer[0])
                 indices = (
                     []
@@ -194,4 +201,3 @@ class MatrixModifier:
         technosphere_datapackage = self.create_technosphere_datapackage()
         biosphere_datapackge = self.create_biosphere_datapackage()
         return [technosphere_datapackage, biosphere_datapackge]
-        
