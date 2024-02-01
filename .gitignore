@@ -3,7 +3,7 @@ export
 .idea
 .ipynb_checkpoints
 .DS_Store
-.vscode
+.vscode/
 =======
 # Created by https://www.toptal.com/developers/gitignore/api/jupyternotebooks,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=jupyternotebooks,python
