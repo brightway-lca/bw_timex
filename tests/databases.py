@@ -55,7 +55,7 @@ def db_electrolysis():
                         "input": ("background_2024", "electricity_wind"),
                     },
                     {
-                        "amount": 0.9,
+                        "amount": 1,
                         "type": "biosphere",
                         "input": ("temporalis-bio", "CO2"),
                     },
@@ -94,7 +94,7 @@ def db_electrolysis():
                         "input": ("background_2020", "electricity_wind"),
                     },
                     {
-                        "amount": 1.2,
+                        "amount": 1,
                         "type": "biosphere",
                         "input": ("temporalis-bio", "CO2"),
                     },
