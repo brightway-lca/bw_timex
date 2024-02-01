@@ -8,18 +8,24 @@ from datetime import datetime
 
 
 class MatrixModifier:
+    """
+    This class is responsible for creating a datapackage that contains matrix entries for the temporally "exploded" processes, based on a timeline dataframe (created from TimelineBuilder.build_timeline()).
+
+    :param timeline: A DataFrame representing the timeline.
+    :param database_date_dict: A dictionary mapping databases to dates.
+    :param demand_timing: A dictionary representing the demand timing.
+    :param name: An optional name for the MatrixModifier instance. Default is None.
+    """
     def __init__(
         self,
         timeline: pd.DataFrame,
         database_date_dict: dict,
         demand_timing: dict,
-        datapackage: Optional[bwp.Datapackage] = None,
         name: Optional[str] = None,
     ):
         self.timeline = timeline
         self.database_date_dict = database_date_dict
         self.demand_timing = demand_timing
-        self.datapackage = datapackage
         self.name = name
 
     def create_technosphere_datapackage(self) -> bwp.Datapackage:

@@ -52,21 +52,23 @@ class MedusaLCA:
         self.static_lca.lcia()
          
         self.time_mapping_dict = TimeMappingDict()
-        # self.reversed_database_date_dict = {v: k for k, v in self.database_date_dict.items()}
         
         # Add all existing processes to the time mapping dict.
         # TODO create function that handles this
         for id in self.static_lca.dicts.activity.keys(): # activity ids
             key = self.static_lca.remapping_dicts['activity'][id] # ('database', 'code')
             time = self.database_date_dict[key[0]] # datetime (or 'dynamic' for TD'd processes)
-            if type(time) == str:
+            if type(time) == str: # if 'dynamic', just add the string
                 self.time_mapping_dict.add((key, time))
             elif type(time) == datetime:
-                self.time_mapping_dict.add((key, extract_date_as_integer(time, self.temporal_grouping)))
+                self.time_mapping_dict.add((key, extract_date_as_integer(time, self.temporal_grouping))) # if datetime, map to the date as integer
             else:
                 warnings.warn(f"Time of activity {key} is neither datetime nor str.")
                 
+        # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
         self.database_date_dict_static_only = {k: v for k, v in self.database_date_dict.items() if type(v) == datetime}
+        
+        # Create timeline builder that does a the graph traversal (similar to bw_temporalis) and extracts all edges with their temporal information. Can later be used to build a timeline with the TimelineBuilder.build_timeline() method.
         self.tl_builder = TimelineBuilder(
             self.static_lca,
             self.edge_filter_function,
@@ -79,6 +81,9 @@ class MedusaLCA:
         
 
     def build_timeline(self):
+        """
+        Build a timeline DataFrame using the TimelineBuilder class.
+        """
         self.timeline = self.tl_builder.build_timeline()
         return self.timeline
 
@@ -90,6 +95,8 @@ class MedusaLCA:
             return
 
         self.demand_timing_dict = self.create_demand_timing_dict()
+        
+        # Create matrix modifier that creates the new datapackage with the exploded processes and new links to background databases.
         self.matrix_modifier = MatrixModifier(
             self.timeline, self.database_date_dict_static_only, self.demand_timing_dict
         )
@@ -133,7 +140,12 @@ class MedusaLCA:
         remapping=True,
         demand_database_last=True,
     ):
-        """Prepare LCA input arguments in Brightway 2.5 style."""
+        """
+        Prepare LCA input arguments in Brightway 2.5 style. 
+        ORIGINALLY FROM bw2data.compat.py
+        
+        The difference to the original method is that we load all available databases into the matrices instead of just the ones depending on the demand. We need this for the creation of the time mapping dict that creates a mapping between the producer id and the reference timing of the databases in the database_date_dict. 
+        """
         if not projects.dataset.data.get("25"):
             raise Brightway2Project(
                 "Please use `projects.migrate_project_25` before calculating using Brightway 2.5"
@@ -285,7 +297,7 @@ class MedusaLCA:
                     for k, v in dct.items()
                 }
                 for dct in demands
-            ]  # why?
+            ] 
         elif demand:
             indexed_demand = {
                 self.time_mapping_dict[(("exploded", bd.get_node(id=bd.get_id(k))['code']), self.demand_timing_dict[bd.get_id(k)])]: v

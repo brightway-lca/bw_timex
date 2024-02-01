@@ -12,10 +12,21 @@ from .edge_extractor import EdgeExtractor, Edge
 from .utils import extract_date_as_integer
 
 
-class TimelineBuilder:
+class TimelineBuilder: 
+    """
+    This class is responsible for building a timeline based on the provided static LCA (slca). First, the an EdgeExtractor handles the graph traversal and extracts the edges. On calling TimelineBuilder.build_timeline(), the information from the EdgeExtractor is used to build a timeline dataframe.
+    
+    :param slca: Static LCA.
+    :param edge_filter_function: A callable that filters edges. If not provided, a function that always returns False is used.
+    :param database_date_dict: A dictionary mapping databases to dates.
+    :param time_mapping_dict: A dictionary to map processes to specific times.
+    :param temporal_grouping: The temporal grouping to be used. Default is "year".
+    :param interpolation_type: The type of interpolation to be used. Default is "linear".
+    :param kwargs: Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA. Here, things like the max_calc or cutoff values fot the graph traversal can be set.
+    """
     def __init__(
         self,
-        slca: LCA,  # Not sure if this is correct
+        slca: LCA,
         edge_filter_function: Callable,
         database_date_dict: dict,
         time_mapping_dict: dict,
@@ -31,7 +42,7 @@ class TimelineBuilder:
         self.interpolation_type = interpolation_type
 
         eelca = EdgeExtractor(slca, edge_filter_function=edge_filter_function, **kwargs)
-        self.timeline = eelca.build_edge_timeline()
+        self.edge_timeline = eelca.build_edge_timeline()
 
     def build_timeline(self) -> pd.DataFrame:
         """
@@ -151,7 +162,7 @@ class TimelineBuilder:
             )
 
         # Extract edge data into a list of dictionaries
-        edges_data = [extract_edge_data(edge) for edge in self.timeline]
+        edges_data = [extract_edge_data(edge) for edge in self.edge_timeline]
 
         # Convert list of dictionaries to dataframe
         edges_df = pd.DataFrame(edges_data)
