@@ -9,7 +9,7 @@ class TimeMappingDict(dict):
             self[process_time_tuple] = self._current_id
             self._current_id += 1
 
-    def reversed(self):  # FIXME: not so elegant, check how this is done in BW with dicts.activity.reversed for example and implement
+    def reversed(self):
         '''return a reversed version of dict, update if necessary'''
         if self._check_id != self._current_id:
             self.reversed_dict = {v:k for k,v in self.items()}

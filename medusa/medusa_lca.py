@@ -2,6 +2,7 @@ import bw2data as bd
 import warnings
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 from datetime import datetime
 from typing import Optional, Callable
@@ -32,6 +33,8 @@ class MedusaLCA:
         self,
         demand,
         method,
+        len_bio_db: int,  # the length of the biosphere database
+        len_technosphere_dbs: int,  # combined length of all technosphere dbs
         edge_filter_function: Callable,
         database_date_dict: dict,
         temporal_grouping: str = "year",
@@ -40,6 +43,7 @@ class MedusaLCA:
     ):
         self.demand = demand
         self.method = method
+        self.len_technosphere_dbs = len_technosphere_dbs
         self.edge_filter_function = edge_filter_function
         self.database_date_dict = database_date_dict
         self.temporal_grouping = temporal_grouping
@@ -53,7 +57,7 @@ class MedusaLCA:
         self.static_lca.lci()
         self.static_lca.lcia()
 
-        self.activity_time_mapping_dict = TimeMappingDict()
+        self.activity_time_mapping_dict = TimeMappingDict(start_id=len_bio_db+1)
 
         # Add all existing processes to the time mapping dict.
         # TODO create function that handles this
@@ -152,9 +156,11 @@ class MedusaLCA:
                                                           self.dicts.activity,
                                                           self.activity_time_mapping_dict,
                                                           self.temporal_grouping,
+                                                          self.database_date_dict,
+                                                          self.supply_array,
+                                                          self.len_technosphere_dbs
                                                           )
         self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
-        # self.dynamic_biomatrix = self.dynamic_biosphere_builder.dynamic_biomatrix  # FIXME: how to return dynamc_biomatrx from class method build_biomatrix()
 
     def calculate_dynamic_lci(
             self,
@@ -166,7 +172,7 @@ class MedusaLCA:
             )
         # len_background = self.biosphere_matrix.shape[1]-self.dynamic_biomatrix.shape[1]  # dirty fix to exclude the background
         # calculate lci from dynamic biosphere matrix
-        unordered_lci = self.dynamic_biomatrix.dot(self.supply_array)  # supply_array[len_background:]
+        unordered_lci = self.dynamic_biomatrix.dot(self.dynamic_supply_array)  # supply_array[len_background:]
         self.build_dynamic_inventory_dict(unordered_lci)
 
     def build_dynamic_inventory_dict(
@@ -180,12 +186,9 @@ class MedusaLCA:
         """
         self.dynamic_inventory = {}  # dictionary to store the dynamic lci {CO2: {time: [2022, 2023], amount:[3,5]}}
         for ((flow, time),i) in self.bio_row_mapping.items():
-            print(i,flow,time)
             amount = unordered_lci[i]
             if not flow['code'] in self.dynamic_inventory.keys():
                 self.dynamic_inventory[flow['code']] = {'time' : [], 'amount' : []}
-                print(self.dynamic_inventory)
-            print(time, amount)
             self.dynamic_inventory[flow['code']]['time'].append(time)
             self.dynamic_inventory[flow['code']]['amount'].append(amount)
         # now sort flows based on time
@@ -482,3 +485,10 @@ class MedusaLCA:
             raise AttributeError(
                 f"'MedusaLCA' object and its 'lca'- and dynamic_biosphere_builder- attributes have no attribute '{name}'"
             )
+
+
+    def plot_dynamic_inventory(self, bio_flow):
+        plt.plot(self.dynamic_inventory[bio_flow]['time'], self.dynamic_inventory[bio_flow]['amount'])
+        plt.ylabel(bio_flow)
+        plt.xlabel('time')
+        plt.show()
