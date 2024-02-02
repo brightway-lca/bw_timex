@@ -10,35 +10,43 @@ class DynamicBiosphere():
 
     def __init__(
             self,
-            bio_matrix: sp.csr_matrix,
-            supply: np.array,  # the supply array from the mlca
-            timeline: pd.DataFrame,    # later perhapds just a mapping dictionary
-            database_date_dict: dict,  # the timestamps of the (prospective) background databases
-            # mapping_dictionary_medusa_processes: dict,    # {(('db_name', 'process_name'), timestamp): matrix_index} (Timo is creating this)
+            activity_dict: dict,
+            activity_time_mapping_dict: dict,
+            temporal_grouping: str,
+               # {(('db_name', 'process_code'), timestamp): matrix_index} (Timo is creating this)
            ):
-        self.bio_matrix = bio_matrix
-        self.supply = supply
-        self.timeline = timeline
-        self.database_date_dict = database_date_dict
+        self._time_res_dict = {
+                "year": "datetime64[Y]",
+                "month": "datetime64[M]",
+                "day": "datetime64[D]",
+                "hour": "datetime64[h]",
+            }
+
+        self.activity_dict = activity_dict
+        self.act_time_mapping = activity_time_mapping_dict
+        self.time_res = self._time_res_dict[temporal_grouping]
         self.rows = []
         self.cols = []
         self.values = []
-        self.bio_row_mapping = TimeMappingDict(start_id=0)
-        self.act_col_mapping = TimeMappingDict(start_id=0)  # TODO: can be removed with global activity mapping
+        
 
     def build_dynamic_biosphere_matrix(self):
-        cleaned_production_timeline = self.timeline[['hash_producer', 'date_producer', 'producer_name', 'producer']].drop_duplicates()
-        
-        self.nr_procs = len(cleaned_production_timeline)  # Needs to be changed as soon as we also include background database biosphere flows
+        self.nr_procs = len(self.act_time_mapping)  # these are all the processes in the mapping (incl background)
+        self.bio_row_mapping = TimeMappingDict(start_id=0)  # create new instance of TimeMappingdict for the biosphere flows
 
-        for producing_act in cleaned_production_timeline.itertuples():
-            act = bd.get_node(id=producing_act.producer)
+        # for producing_act in cleaned_production_timeline.itertuples():
+        for (((db,code),time), id) in self.act_time_mapping.items():
+            if time == 'dynamic':
+                continue
+            process_col_index = self.activity_dict[id]   # get the matrix column index 
+            act = bd.get_node(database=db, code=code)
+            # print('time: {}, act["code"]: {}, id: {}, process_col_index: {}'.format(time, act['code'], id, process_col_index))
             for exc in act.biosphere():
                 # Create TD from producer timestamp which is currently a pd.Timestamp and get the date
                 # direct conversion with pd.Timestamp.to_pydatetime() leads to wrong dtype for some reason
-                td_producer = TemporalDistribution(date=np.array([producing_act.date_producer], dtype='datetime64[s]'),
+                td_producer = TemporalDistribution(date=np.array([str(time)], dtype=self.time_res),
                                                        amount=np.array([1])).date
-                
+
                 try:  # case 1: exchange has biosphere TD
                     td_dates = exc['temporal_distribution'].date  # time_delta
                     td_values = exc['temporal_distribution'].amount
@@ -48,15 +56,14 @@ class DynamicBiosphere():
                 except KeyError:  # case 2: exchange does not have TD
                     bio_dates = td_producer  # datetime array
                     bio_values = [exc['amount']]
-                
+                # print('bio_dates: ', bio_dates)
                 # Add entries to dynamic bio matrix
                 for bio_date, bio_flow in zip(bio_dates, bio_values):
                     # first create a row index for the tuple((db,bio_flow), date))
-                    self.create_dynamic_biosphere_matrix_indices(exc.input, bio_date, producing_act.producer, producing_act.hash_producer)
+                    self.bio_row_mapping.add((exc.input, bio_date))
                     bio_row_index = self.bio_row_mapping[(exc.input, bio_date)]
-                    process_col_index = self.act_col_mapping[(producing_act.producer, producing_act.hash_producer)]
-
                     # populate lists with which sparse matrix is constructed
+                    # print('matrix entry: value: {} (row:{}, col:{})'.format(bio_flow,bio_row_index, process_col_index))
                     self.add_matrix_entry_for_biosphere_flows(row=bio_row_index, col=process_col_index, amount=bio_flow)
      
         self.build_biomatrix()
@@ -79,10 +86,4 @@ class DynamicBiosphere():
         # return dynamic_biomatrix.tocsr()
 
 
-    def create_dynamic_biosphere_matrix_indices(self,bio_flow, date, act, act_hash):
-        """creates matrix index for bio flow and adds the bioflow: index to self.bio_row_mapping"""
-        self.bio_row_mapping.add((bio_flow,date))
-        self.act_col_mapping.add((act, act_hash))
-
-    
     
