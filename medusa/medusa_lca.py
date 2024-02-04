@@ -33,7 +33,6 @@ class MedusaLCA:
         self,
         demand,
         method,
-        len_bio_db: int,  # the length of the biosphere database
         edge_filter_function: Callable,
         database_date_dict: dict,
         temporal_grouping: str = "year",
@@ -55,7 +54,7 @@ class MedusaLCA:
         self.static_lca.lci()
         self.static_lca.lcia()
 
-        self.activity_time_mapping_dict = TimeMappingDict(start_id=len_bio_db + 1)
+        self.activity_time_mapping_dict = TimeMappingDict(start_id=len(self.static_lca.dicts.biosphere) + 1) # start at the first id after the biosphere flows to avoid overlap
 
         # Add all existing processes to the time mapping dict.
         # TODO create function that handles this
