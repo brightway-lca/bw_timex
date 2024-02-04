@@ -1,6 +1,8 @@
 import bw2data as bd
 import warnings
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 
 from datetime import datetime
 from typing import Optional, Callable
@@ -21,6 +23,7 @@ from bw2data.errors import Brightway2Project
 from bw2calc import LCA
 from .timeline_builder import TimelineBuilder
 from .matrix_modifier import MatrixModifier
+from .dynamic_biosphere_builder import DynamicBiosphere
 from .remapping import TimeMappingDict
 from .utils import extract_date_as_integer
 
@@ -30,6 +33,8 @@ class MedusaLCA:
         self,
         demand,
         method,
+        len_bio_db: int,  # the length of the biosphere database
+        len_technosphere_dbs: int,  # combined length of all technosphere dbs
         edge_filter_function: Callable,
         database_date_dict: dict,
         temporal_grouping: str = "year",
@@ -38,6 +43,7 @@ class MedusaLCA:
     ):
         self.demand = demand
         self.method = method
+        self.len_technosphere_dbs = len_technosphere_dbs
         self.edge_filter_function = edge_filter_function
         self.database_date_dict = database_date_dict
         self.temporal_grouping = temporal_grouping
@@ -51,7 +57,7 @@ class MedusaLCA:
         self.static_lca.lci()
         self.static_lca.lcia()
 
-        self.time_mapping_dict = TimeMappingDict()
+        self.activity_time_mapping_dict = TimeMappingDict(start_id=len_bio_db+1)
 
         # Add all existing processes to the time mapping dict.
         # TODO create function that handles this
@@ -63,9 +69,9 @@ class MedusaLCA:
                 key[0]
             ]  # datetime (or 'dynamic' for TD'd processes)
             if type(time) == str:  # if 'dynamic', just add the string
-                self.time_mapping_dict.add((key, time))
+                self.activity_time_mapping_dict.add((key, time))
             elif type(time) == datetime:
-                self.time_mapping_dict.add(
+                self.activity_time_mapping_dict.add(
                     (key, extract_date_as_integer(time, self.temporal_grouping))
                 )  # if datetime, map to the date as integer
             else:
@@ -81,11 +87,12 @@ class MedusaLCA:
             self.static_lca,
             self.edge_filter_function,
             self.database_date_dict_static_only,
-            self.time_mapping_dict,
+            self.activity_time_mapping_dict,
             self.temporal_grouping,
             self.interpolation_type,
             **kwargs,
         )
+
 
     def build_timeline(self):
         """
@@ -138,6 +145,59 @@ class MedusaLCA:
             warnings.warn("LCI not yet calculated. Call MedusaLCA.lci() first.")
             return
         self.lca.lcia()
+
+    def build_dynamic_biosphere(self):
+        if not hasattr(self, "lca"):
+            warnings.warn(
+                "Static Medusa LCA has not been run. Call MedusaLCA.lci() first."
+            )
+            return
+        self.dynamic_biosphere_builder = DynamicBiosphere(
+                                                          self.dicts.activity,
+                                                          self.activity_time_mapping_dict,
+                                                          self.temporal_grouping,
+                                                          self.database_date_dict,
+                                                          self.supply_array,
+                                                          self.len_technosphere_dbs
+                                                          )
+        self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
+
+    def calculate_dynamic_lci(
+            self,
+            ):
+        """calcluates the dynamic inventory and calls build_dynamic_inventory_dict"""
+        if not hasattr(self, "dynamic_biomatrix"):
+            warnings.warn(
+                "dynamic biosphere matrix not yet built. Call MedusaLCA.build_dynamic_biosphere() first."
+            )
+        # len_background = self.biosphere_matrix.shape[1]-self.dynamic_biomatrix.shape[1]  # dirty fix to exclude the background
+        # calculate lci from dynamic biosphere matrix
+        unordered_lci = self.dynamic_biomatrix.dot(self.dynamic_supply_array)  # supply_array[len_background:]
+        self.build_dynamic_inventory_dict(unordered_lci)
+
+    def build_dynamic_inventory_dict(
+            self,
+            unordered_lci: np.array,
+            ):
+        """Create dynamic lci dictionary with structure {CO2: {time: [2022, 2023], amount:[3,5]}, 
+                                                         CH4: {time: [2022, 2023], amount:[3,5]}, 
+                                                         ...
+                                                         }  
+        """
+        self.dynamic_inventory = {}  # dictionary to store the dynamic lci {CO2: {time: [2022, 2023], amount:[3,5]}}
+        for ((flow, time),i) in self.bio_row_mapping.items():
+            amount = unordered_lci[i]
+            if not flow['code'] in self.dynamic_inventory.keys():
+                self.dynamic_inventory[flow['code']] = {'time' : [], 'amount' : []}
+            self.dynamic_inventory[flow['code']]['time'].append(time)
+            self.dynamic_inventory[flow['code']]['amount'].append(amount)
+        # now sort flows based on time
+        for flow in self.dynamic_inventory.keys():
+            order = np.argsort(self.dynamic_inventory[flow]['time'])
+            self.dynamic_inventory[flow]['time'] = np.array(self.dynamic_inventory[flow]['time'])[order]
+            self.dynamic_inventory[flow]['amount'] = np.array(self.dynamic_inventory[flow]['amount'])[order]
+
+
 
     def prepare_static_lca_inputs(
         self,
@@ -301,9 +361,9 @@ class MedusaLCA:
         if demands:
             indexed_demand = [
                 {
-                    self.time_mapping_dict[
+                    self.activity_time_mapping_dict[
                         (
-                            ("exploded", bd.get_node(id=bd.get_id(k))["code"]),
+                            bd.get_node(id=bd.get_id(k)).key,
                             self.demand_timing_dict[bd.get_id(k)],
                         )
                     ]: v
@@ -313,9 +373,9 @@ class MedusaLCA:
             ]
         elif demand:
             indexed_demand = {
-                self.time_mapping_dict[
+                self.activity_time_mapping_dict[
                     (
-                        ("exploded", bd.get_node(id=bd.get_id(k))["code"]),
+                        bd.get_node(id=bd.get_id(k)).key,
                         self.demand_timing_dict[bd.get_id(k)],
                     )
                 ]: v
@@ -350,9 +410,9 @@ class MedusaLCA:
         """
         Returns the technosphere matrix as a dataframe with comprehensible labels instead of ids.
         """
-        time_mapping_dict_reversed = {
-            value: key for key, value in self.time_mapping_dict.items()
-        }
+        # time_mapping_dict_reversed = {
+        #     value: key for key, value in self.activity_time_mapping_dict.items()
+        # }
 
         df = pd.DataFrame(self.technosphere_matrix.toarray())
         df.rename(  # from matrix id to activity id
@@ -361,11 +421,56 @@ class MedusaLCA:
             inplace=True,
         )
         df.rename(  # from activity id to ((database, code), time)
-            index=time_mapping_dict_reversed,
-            columns=time_mapping_dict_reversed,
+            # index=time_mapping_dict_reversed,
+            # columns=time_mapping_dict_reversed,
+            index = self.activity_time_mapping_dict.reversed(),
+            columns = self.activity_time_mapping_dict.reversed(),
             inplace=True,
         )
         return df
+    
+    def create_labelled_biosphere_dataframe(self) -> pd.DataFrame:
+        """
+        Returns the biosphere matrix as a dataframe with comprehensible labels instead of ids.
+        """
+        # time_mapping_dict_reversed = {
+        #     value: key for key, value in self.activity_time_mapping_dict.items()
+        # }
+        
+
+        df = pd.DataFrame(self.biosphere_matrix.toarray())
+        df.rename(  # from matrix id to activity id
+            index=self.dicts.biosphere.reversed,
+            columns=self.dicts.activity.reversed,
+            inplace=True,
+        )
+        df.rename(  # from activity id to ((database, code), time)
+            columns=self.activity_time_mapping_dict.reversed(),
+            inplace=True,
+        )
+        return df
+
+    def create_labelled_dynamic_biosphere_dataframe(self) -> pd.DataFrame:
+        """
+        Returns the dynamic biosphere matrix as a dataframe with comprehensible labels instead of ids.
+        """
+        bio_row_mapping_reversed = {
+            index: (flow['code'], time) for (flow, time), index in self.bio_row_mapping.items()
+            # value: (key[0]['code'], key[1]) for key, value in self.activity_time_mapping_dict.items()
+        }
+        
+
+        df = pd.DataFrame(self.dynamic_biomatrix.toarray())
+        df.rename(  # from matrix id to activity id
+            index=bio_row_mapping_reversed,
+            columns=self.dicts.activity.reversed,
+            inplace=True,
+        )
+        df.rename(  # from activity id to ((database, code), time)
+            columns=self.activity_time_mapping_dict.reversed(),
+            inplace=True,
+        )
+        return df    
 
     def __getattr__(self, name):
         """
@@ -374,7 +479,16 @@ class MedusaLCA:
         """
         if hasattr(self.lca, name):
             return getattr(self.lca, name)
+        elif hasattr(self.dynamic_biosphere_builder, name):
+            return getattr(self.dynamic_biosphere_builder, name)
         else:
             raise AttributeError(
-                f"'MedusaLCA' object and its 'lca' attribute have no attribute '{name}'"
+                f"'MedusaLCA' object and its 'lca'- and dynamic_biosphere_builder- attributes have no attribute '{name}'"
             )
+
+
+    def plot_dynamic_inventory(self, bio_flow):
+        plt.plot(self.dynamic_inventory[bio_flow]['time'], self.dynamic_inventory[bio_flow]['amount'])
+        plt.ylabel(bio_flow)
+        plt.xlabel('time')
+        plt.show()

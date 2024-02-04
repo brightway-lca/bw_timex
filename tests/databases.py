@@ -1862,6 +1862,7 @@ def db_abc_loopA_with_biosphere():
                 },
             ]
         },
+        
         ('foreground', 'B'): {
             'name': 'B',
             'location': 'somewhere',
@@ -1884,6 +1885,7 @@ def db_abc_loopA_with_biosphere():
                 },
             ]
         },
+        
         ('foreground', 'A'): {
             'name': 'A',
             'location': 'somewhere',
@@ -1926,5 +1928,262 @@ def db_abc_loopA_with_biosphere():
     bd.Method(("GWP", "example")).write(
         [
             (("temporalis-bio", "CO2"), 1),
+        ]
+    )
+
+def db_abc_loopA_with_biosphere_tds_CO2_and_CH4():
+    project_name = "db_abc_loopA_with_biosphere_tds_CO2_and_CH4"
+    if project_name in bd.projects:
+        bd.projects.delete_project(project_name)
+        bd.projects.purge_deleted_directories()
+
+    bd.projects.set_current(project_name)
+
+    bd.Database('temporalis-bio').write({
+        ('temporalis-bio', "CO2"): {
+            "type": "emission",
+            "name": "carbon dioxide",
+            "temporalis code": "co2",
+        },
+        ('temporalis-bio', "CH4"): {
+            "type": "emission",
+            "name": "methane",
+            "temporalis code": "ch4",
+        },
+    })
+
+    bd.Database('background_2024').write({
+        ('background_2024', 'C'): {
+            'name': 'C',
+            'location': 'somewhere',
+            'reference product': 'c',
+            'exchanges': [
+                {
+                    'amount': 1,
+                    'type': 'production',
+                    'input': ('background_2024', 'C'),
+                },
+                {
+                    'amount': 1,
+                    'type': 'technosphere',
+                    'input': ('background_2024', 'electricity_wind'),
+                },
+            ]
+        },
+        ('background_2024', 'electricity_wind'): {
+            'name': 'Electricity production, wind',
+            'location': 'somewhere',
+            'reference product': 'electricity, wind',
+            'exchanges': [
+                {
+                    'amount': 1,
+                    'type': 'production',
+                    'input': ('background_2024', 'electricity_wind'),
+                },
+                {
+                    'amount': 1,
+                    'type': 'biosphere',
+                    'input': ('temporalis-bio', 'CO2'),
+                },
+            ]
+        }
+    })
+
+    bd.Database('background_2008').write({
+        ('background_2008', 'C'): {
+            'name': 'C',
+            'location': 'somewhere',
+            'reference product': 'c',
+            'exchanges': [
+                {
+                    'amount': 1,
+                    'type': 'production',
+                    'input': ('background_2008', 'C'),
+                },
+                {
+                    'amount': 1,
+                    'type': 'technosphere',
+                    'input': ('background_2008', 'electricity_wind'),
+                },
+            ]
+        },
+        ('background_2008', 'electricity_wind'): {
+            'name': 'Electricity production, wind',
+            'location': 'somewhere',
+            'reference product': 'electricity, wind',
+            'exchanges': [
+                {
+                    'amount': 1,
+                    'type': 'production',
+                    'input': ('background_2008', 'electricity_wind'),
+                },
+                {
+                    'amount': 1,
+                    'type': 'biosphere',
+                    'input': ('temporalis-bio', 'CO2'),
+                },
+            ]
+        }
+    })
+
+    bd.Database('foreground').write({
+    
+        ('foreground', 'E'): {
+                'name': 'E',
+                'location': 'somewhere',
+                'reference product': 'e',
+                'exchanges': [
+                    {
+                        'amount': 1,
+                        'type': 'production',
+                        'input': ('foreground', 'E'),
+                    },
+                    {
+                        'amount': 11,
+                        'type': 'technosphere',
+                        'input': ('background_2024', 'C'),
+                        'temporal_distribution': # e.g. because some hydrogen was stored in the meantime
+                            TemporalDistribution(
+                                date=np.array([10, 5], dtype='timedelta64[Y]'),  # `M` is months
+                                amount=np.array([0.3,0.7])
+                            ),     
+                    },
+                    {
+                        'amount': 8,
+                        'type': 'technosphere',
+                        'input': ('foreground', 'B'),
+                        'temporal_distribution': # e.g. because some hydrogen was stored in the meantime
+                            TemporalDistribution(
+                                date=np.array([-4,-2], dtype='timedelta64[Y]'),  # `M` is months
+                                amount=np.array([0.4,0.6])
+                            ),
+                        
+                    },
+                    {
+                        'amount': 0.1,
+                        'type': 'technosphere',
+                        'input': ('foreground', 'A'),
+                        # 'temporal_distribution': # e.g. because some hydrogen was stored in the meantime
+                        #     TemporalDistribution(
+                        #         date=np.array([-3,-1], dtype='timedelta64[Y]'),  # `M` is months
+                        #         amount=np.array([0.2,0.8])
+                        #     ),
+                        
+                    },
+                ]
+            },
+
+
+
+        ('foreground', 'D'): {
+            'name': 'D',
+            'location': 'somewhere',
+            'reference product': 'd',
+            'exchanges': [
+                {
+                    'amount': 1,
+                    'type': 'production',
+                    'input': ('foreground', 'D'),
+                },
+                {
+                    'amount': 5,
+                    'type': 'technosphere',
+                    'input': ('foreground', 'B'),
+                    'temporal_distribution': # e.g. because some hydrogen was stored in the meantime
+                        TemporalDistribution(
+                            date=np.array([-1,], dtype='timedelta64[Y]'),  # `M` is months
+                            amount=np.array([1])
+                        ),
+                    
+                },
+                {
+                    'amount': 2,
+                    'type': 'technosphere',
+                    'input': ('foreground', 'E'),
+                },
+            ]
+        },
+        
+        ('foreground', 'B'): {
+            'name': 'B',
+            'location': 'somewhere',
+            'reference product': 'b',
+            'exchanges': [
+                {
+                    'amount': 1,
+                    'type': 'production',
+                    'input': ('foreground', 'B'),
+                },
+                {
+                    'amount': 13,
+                    'type': 'technosphere',
+                    'input': ('background_2024', 'C'),
+                    'temporal_distribution': # e.g. because some hydrogen was stored in the meantime
+                        TemporalDistribution(
+                            date=np.array([-5], dtype='timedelta64[Y]'),  # `M` is months
+                            amount=np.array([1])
+                        ),     
+                },
+                {
+                    'amount': 6,
+                    'type': 'biosphere',
+                    'input': ('temporalis-bio', 'CH4'),
+                    'temporal_distribution': # e.g. because some hydrogen was stored in the meantime
+                        TemporalDistribution(
+                            date=np.array([-2, 4, 6], dtype='timedelta64[Y]'),  # `M` is months
+                            amount=np.array([0.2, 0.7, 0.1])
+                        ),
+                },
+            ]
+        },
+        
+        ('foreground', 'A'): {
+            'name': 'A',
+            'location': 'somewhere',
+            'reference product': 'a',
+            'exchanges': [
+                {
+                    'amount': 1,
+                    'type': 'production',
+                    'input': ('foreground', 'A'),
+                },
+                {
+                    'amount': 17,
+                    'type': 'biosphere',
+                    'input': ('temporalis-bio', 'CO2'),
+                    'temporal_distribution': # e.g. because some hydrogen was stored in the meantime
+                        TemporalDistribution(
+                            date=np.array([0, 3], dtype='timedelta64[Y]'),  # `M` is months
+                            amount=np.array([0.3, 0.7])
+                        ),
+                },
+                {
+                    'amount': 4,
+                    'type': 'technosphere',
+                    'input': ('foreground', 'B'),
+                    'temporal_distribution': # e.g. because some hydrogen was stored in the meantime
+                        TemporalDistribution(
+                            date=np.array([-20, 15], dtype='timedelta64[Y]'),  # `M` is months
+                            amount=np.array([0.9, 0.1])
+                        ),
+                },
+                {
+                    'amount': 0.5,
+                    'type': 'technosphere',
+                    'input': ('foreground', 'D'),
+                    'temporal_distribution': # e.g. because some hydrogen was stored in the meantime
+                        TemporalDistribution(
+                            date=np.array([-2, -1], dtype='timedelta64[Y]'),  # `M` is months
+                            amount=np.array([0.7, 0.3])
+                        ),
+                },
+            ]
+        },
+    })
+    
+    bd.Method(("GWP", "example")).write(
+        [
+            (("temporalis-bio", "CO2"), 1),
+            (("temporalis-bio", "CH4"), 25),
         ]
     )

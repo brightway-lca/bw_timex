@@ -219,20 +219,20 @@ class TimelineBuilder:
 
         for row in grouped_edges.itertuples():
             self.time_mapping_dict.add(
-                (("exploded", (bd.get_node(id=row.producer)['code'])), row.hash_producer)
+                (bd.get_node(id=row.producer).key, row.hash_producer)
             )
 
         grouped_edges["time_mapped_producer"] = grouped_edges.apply(
-            lambda row: self.time_mapping_dict[(
-                ("exploded", bd.get_node(id=row.producer)['code']), row.hash_producer
-            )],
+            lambda row: self.time_mapping_dict[
+                (bd.get_node(id=row.producer).key, row.hash_producer)
+                ],
             axis=1,
         )
         
         grouped_edges["time_mapped_consumer"] = grouped_edges.apply(
-            lambda row: self.time_mapping_dict[(
-                ("exploded", bd.get_node(id=row.consumer)['code']), row.hash_consumer
-            )] if row.consumer != -1 else -1,
+            lambda row: self.time_mapping_dict[
+                (bd.get_node(id=row.consumer).key, row.hash_consumer)
+            ] if row.consumer != -1 else -1,
             axis=1,
         )
 
