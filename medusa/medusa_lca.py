@@ -453,6 +453,15 @@ class MedusaLCA:
             columns=self.activity_time_mapping_dict.reversed(),
             inplace=True,
         )
+        
+        # Replace id indexes with biosphere codes
+        bio_labels = []
+        for index in df.index:
+            bio_code= bd.get_node(id=index)['code']
+            bio_labels.append(bio_code)
+
+        df.index = bio_labels
+
         return df
 
     def create_labelled_dynamic_biosphere_dataframe(self) -> pd.DataFrame:
