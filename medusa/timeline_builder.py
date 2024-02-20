@@ -58,9 +58,11 @@ class TimelineBuilder:
             )
         return
     
+    #TODO: rethink structure of build_timeline(): is it good to have all these nested functions?
     def build_timeline(self) -> pd.DataFrame:
         """
-        Create a dataframe with grouped edges and for each grouped edge to the database with the closest time of representativeness.
+        Create a dataframe with grouped edges and for each grouped edge interpolate to the database with the closest time of representativeness.
+
         Edges that occur at different times within the same time window (temporal_grouping) are grouped together. Possible temporal groupings are "year", "month", "day" and "hour".
 
         The column "interpolation weights" assigns the ratio [0-1] of the edge's amount to be taken from the database with the closest time of representativeness.

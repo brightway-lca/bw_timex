@@ -1,4 +1,8 @@
 class TimeMappingDict(dict):
+    """
+    This class is used to create a dictionary that maps a tuple of (flow and timestamp) to an unique integer id.
+    """
+
     def __init__(self, start_id=2, *args, **kwargs): 
         super().__init__(*args, **kwargs)
         self._current_id = start_id
