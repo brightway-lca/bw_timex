@@ -29,6 +29,7 @@ from .utils import extract_date_as_integer
 
 
 class MedusaLCA:
+
     def __init__(
         self,
         demand,
@@ -54,25 +55,9 @@ class MedusaLCA:
         self.static_lca.lci()
         self.static_lca.lcia()
 
+        # Create a time mapping dict that maps each activity to a time_mapping_id in the format (('database', 'code'), datetime_as_integer): time_mapping_id) 
         self.activity_time_mapping_dict = TimeMappingDict(start_id=max(self.static_lca.dicts.biosphere.keys()) + 1) # start at the first id after the biosphere flows to avoid overlap
-
-        # Add all existing processes to the time mapping dict.
-        # TODO create function that handles this
-        for id in self.static_lca.dicts.activity.keys():  # activity ids
-            key = self.static_lca.remapping_dicts["activity"][
-                id
-            ]  # ('database', 'code')
-            time = self.database_date_dict[
-                key[0]
-            ]  # datetime (or 'dynamic' for TD'd processes)
-            if type(time) == str:  # if 'dynamic', just add the string
-                self.activity_time_mapping_dict.add((key, time))
-            elif type(time) == datetime:
-                self.activity_time_mapping_dict.add(
-                    (key, extract_date_as_integer(time, self.temporal_grouping))
-                )  # if datetime, map to the date as integer
-            else:
-                warnings.warn(f"Time of activity {key} is neither datetime nor str.")
+        self.add_activities_to_time_mapping_dict()
 
         # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
         self.database_date_dict_static_only = {
@@ -90,9 +75,33 @@ class MedusaLCA:
             **kwargs,
         )
 
+
+    def add_activities_to_time_mapping_dict(self):
+        """
+        Adds all activities to activity_time_mapping_dict, an instance of TimeMappingDict.
+        This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id) that is later 
+        called in both ways to uniquely identify time-resolved processes.
+        
+        """
+        for id in self.static_lca.dicts.activity.keys():  # activity ids
+            key = self.static_lca.remapping_dicts["activity"][
+                id
+            ]  # ('database', 'code')
+            time = self.database_date_dict[
+                key[0]
+            ]  # datetime (or 'dynamic' for TD'd processes)
+            if type(time) == str:  # if 'dynamic', just add the string
+                self.activity_time_mapping_dict.add((key, time))
+            elif type(time) == datetime:
+                self.activity_time_mapping_dict.add(
+                    (key, extract_date_as_integer(time, self.temporal_grouping))
+                )  # if datetime, map to the date as integer
+            else:
+                warnings.warn(f"Time of activity {key} is neither datetime nor str.")
+
     def build_timeline(self):
         """
-        Build a timeline DataFrame using the TimelineBuilder class.
+        Build a timeline DataFrame of the exchanges using the TimelineBuilder class.
         """
         self.timeline = self.tl_builder.build_timeline()
         return self.timeline
@@ -410,7 +419,7 @@ class MedusaLCA:
         self.demand_timing_dict = {
             row.producer: row.hash_producer for row in demand_rows.itertuples()
         }
-        return self.demand_timing_dict  # old: extract_date_as_integer(row.date)
+        return self.demand_timing_dict  
 
     def create_labelled_technosphere_dataframe(self) -> pd.DataFrame:
         """

@@ -1,5 +1,5 @@
 class TimeMappingDict(dict):
-    def __init__(self, start_id=2, *args, **kwargs): # start_id doesnt work if set lower than 2. WHY?!?!
+    def __init__(self, start_id=2, *args, **kwargs): 
         super().__init__(*args, **kwargs)
         self._current_id = start_id
         self._check_id = start_id - 1  # check_id that is different from the start id for the reversed dict
