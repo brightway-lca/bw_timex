@@ -54,7 +54,7 @@ class MedusaLCA:
         self.static_lca.lci()
         self.static_lca.lcia()
 
-        self.activity_time_mapping_dict = TimeMappingDict(start_id=len(self.static_lca.dicts.biosphere) + 1) # start at the first id after the biosphere flows to avoid overlap
+        self.activity_time_mapping_dict = TimeMappingDict(start_id=max(self.static_lca.dicts.biosphere.keys()) + 1) # start at the first id after the biosphere flows to avoid overlap
 
         # Add all existing processes to the time mapping dict.
         # TODO create function that handles this
