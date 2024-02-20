@@ -15,6 +15,7 @@ from .utils import extract_date_as_integer
 class TimelineBuilder: 
     """
     This class is responsible for building a timeline based on the provided static LCA (slca). First, the an EdgeExtractor handles the graph traversal and extracts the edges. On calling TimelineBuilder.build_timeline(), the information from the EdgeExtractor is used to build a timeline dataframe.
+    The static LCA is needed to inform the priority-first traversal of the supply chain and impact cut-off based on the LCIA score of the chosen impact category. Thus, the decision, which branch to follow is based on the static system.
     
     :param slca: Static LCA.
     :param edge_filter_function: A callable that filters edges. If not provided, a function that always returns False is used.
@@ -43,16 +44,28 @@ class TimelineBuilder:
 
         eelca = EdgeExtractor(slca, edge_filter_function=edge_filter_function, **kwargs)
         self.edge_timeline = eelca.build_edge_timeline()
+    
+    def check_database_names(self):
+        """
+        Check that the strings of the databases exist in the databases of the brightway2 project.
 
+        """
+        for db in self.database_date_dict.keys():
+            assert db in bd.databases, f"{db} not in your brightway2 project databases."
+        else:
+            print(
+                "All databases in database_date_dict exist as brightway project databases"
+            )
+        return
+    
     def build_timeline(self) -> pd.DataFrame:
         """
-        Create a grouped edge dataframe.
-
-        Edges that occur at different times within the same unit of time are grouped together. Th etemporal grouping is currently possible by year and month. Hopefully soon also by day and hour.
+        Create a dataframe with grouped edges and for each grouped edge to the database with the closest time of representativeness.
+        Edges that occur at different times within the same time window (temporal_grouping) are grouped together. Possible temporal groupings are "year", "month", "day" and "hour".
 
         The column "interpolation weights" assigns the ratio [0-1] of the edge's amount to be taken from the database with the closest time of representativeness.
         Available interpolation types are:
-            - "linear": linear interpolation between the two closest databases, based on temporal distance
+            - "linear": linear interpolation between the two closest databases, based on temporal distance.
             - "closest": closest database is assigned 1
 
         :param tl: Timeline containing edge information.
@@ -62,6 +75,7 @@ class TimelineBuilder:
         :return: Grouped edge dataframe.
         """
 
+        
         def extract_edge_data(edge: Edge) -> dict:
             """
             Stores the attributes of an Edge instance in a dictionary.
@@ -104,7 +118,7 @@ class TimelineBuilder:
         ):
             """
             Extracts the grouping date as a string from a datetime object, based on the chosen temporal grouping.
-            e.g. for temporal grouping = 'year', and timestamp = 2023-03-29T01:00:00, it extracts '2023'.
+            e.g. for temporal grouping = 'year', and timestamp = 2023-03-29T01:00:00, it extracts the string '2023'.
             """
             time_res_dict = {
                 "year": "%Y",
@@ -126,7 +140,7 @@ class TimelineBuilder:
         def convert_grouping_date_string_to_datetime(temporal_grouping, datestring):
             """
             Converts the string of a date used for grouping back to datetime object.
-            e.g. for temporal grouping = 'year', and datestring = '2023', it extracts 2023 (?)
+            e.g. for temporal grouping = 'year', and datestring = '2023', it extracts 2023-01-01
             """
             time_res_dict = {
                 "year": "%Y",
@@ -144,6 +158,153 @@ class TimelineBuilder:
                 )
 
             return datetime.strptime(datestring, time_res_dict[self.temporal_grouping])
+        
+        def add_column_interpolation_weights_to_timeline(
+            tl_df: pd.DataFrame,
+            database_date_dict: dict,
+            interpolation_type: str = "linear",
+        ) -> pd.DataFrame:
+            """
+            Add a column to a timeline with the weights for an interpolation between the two nearest dates, from the list of dates of the available databases.
+
+            :param tl_df: Timeline as a dataframe.
+            :param database_date_dict: Mapping dictionary between the name of database (key) and time of representativeness (value)
+            :param interpolation_type: Type of interpolation between the nearest lower and higher dates. Available options: "linear"and "nearest".
+
+            :return: Timeline as a dataframe with a column 'interpolation_weights' added, this column looks like {database_name: weight, database_name: weight}.
+
+            """
+
+            dates_list = [
+                date for date in self.database_date_dict.values() if type(date) == datetime
+            ]
+            if "date_producer" not in list(tl_df.columns):
+                raise ValueError("The timeline does not contain dates.")
+
+            # create reversed dict {date: database} with only static "background" db's
+            self.reversed_database_date_dict = {
+                v: k for k, v in self.database_date_dict.items() if type(v) == datetime
+            }
+
+            if self.interpolation_type == "nearest":
+                tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
+                    lambda x: find_closest_date(x, dates_list)
+                )
+                tl_df["interpolation_weights"] = tl_df["interpolation_weights"].apply(
+                    lambda d: {self.reversed_database_date_dict[x]: v for x, v in d.items()}
+                )
+                return tl_df
+
+            if self.interpolation_type == "linear":
+                tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
+                    lambda x: get_weights_for_interpolation_between_nearest_years(
+                        x, dates_list, self.interpolation_type
+                    )
+                )
+                tl_df["interpolation_weights"] = tl_df["interpolation_weights"].apply(
+                    lambda d: {self.reversed_database_date_dict[x]: v for x, v in d.items()}
+                )
+
+            else:
+                raise ValueError(
+                    f"Sorry, but {self.interpolation_type} interpolation is not available yet."
+                )
+
+            return tl_df
+        
+        def find_closest_date(target: datetime, dates: KeysView[datetime]) -> dict:
+            """
+            Find the closest date to the target in the dates list.
+
+            :param target: Target datetime.datetime object.
+            :param dates: List of datetime.datetime objects.
+            :return: Dictionary with the key as the closest datetime.datetime object from the list and a value of 1.
+
+            """
+
+            # If the list is empty, return None
+            if not dates:
+                return None
+
+            # Sort the dates
+            dates = sorted(dates)
+            # Use min function with a key based on the absolute difference between the target and each date
+            closest = min(dates, key=lambda date: abs(target - date))
+
+            return {closest: 1}
+
+        def get_weights_for_interpolation_between_nearest_years(
+            reference_date: datetime,
+            dates_list: KeysView[datetime],
+            interpolation_type: str = "linear",
+        ) -> dict:
+            """
+            Find the nearest dates (before and after) a given date in a list of dates and calculate the interpolation weights.
+
+            :param reference_date: Target date.
+            :param dates_list: KeysView[datetime], which is a list of the temporal representativeness of the available databases.
+            :param interpolation_type: Type of interpolation between the nearest lower and higher dates. For now,
+            only "linear" is available.
+
+            :return: Dictionary with temporal coverage of the available databases to use as keys and the weights for interpolation as values.
+
+            """
+            dates_list = sorted(dates_list)
+
+            diff_dates_list = [reference_date - x for x in dates_list]
+            
+            if timedelta(0) in diff_dates_list: # date of process == date of database
+                exact_match = dates_list[diff_dates_list.index(timedelta(0))]
+                return {exact_match: 1}
+
+            closest_lower = None
+            closest_higher = None
+
+            #select the closest lower and higher dates of the database in regards to the date of process
+            for date in dates_list:
+                if date < reference_date:
+                    if (
+                        closest_lower is None
+                        or reference_date - date < reference_date - closest_lower
+                    ):
+                        closest_lower = date
+                elif date > reference_date:
+                    if (
+                        closest_higher is None
+                        or date - reference_date < closest_higher - reference_date
+                    ):
+                        closest_higher = date
+
+            if closest_lower is None:
+                warnings.warn(
+                    f"Reference date {reference_date} is lower than all provided dates. Data will be taken from the closest higher year.",
+                    category=Warning,
+                )
+                return {closest_higher: 1}
+
+            if closest_higher is None:
+                warnings.warn(
+                    f"Reference date {reference_date} is higher than all provided dates. Data will be taken from the closest lower year.",
+                    category=Warning,
+                )
+                return {closest_lower: 1}
+
+            # if closest_lower == closest_higher: # TODO delete later, I think this if statement is wrong
+            #     warnings.warn(
+            #         "Date outside the range of dates covered by the databases.",
+            #         category=Warning,
+            #     )
+            #     return {closest_lower: 1}
+
+            if self.interpolation_type == "linear":
+                weight = int((reference_date - closest_lower).total_seconds()) / int(
+                    (closest_higher - closest_lower).total_seconds()
+                )
+            else:
+                raise ValueError(
+                    f"Sorry, but {interpolation_type} interpolation is not available yet."
+                )
+            return {closest_lower: 1 - weight, closest_higher: weight}
 
         # check if database names match with databases in BW project
         self.check_database_names()
@@ -159,6 +320,7 @@ class TimelineBuilder:
         if self.temporal_grouping in ["day", "hour"]:
             raise ValueError(
                 f"Sorry, but temporal grouping is not yet available for 'day' and 'hour'."
+                # TODO fix day and hour
             )
 
         # Extract edge data into a list of dictionaries
@@ -176,7 +338,7 @@ class TimelineBuilder:
             edges_df["consumer"] == -1, "producer_date"
         ]
 
-        # extract grouping time of consumer and producer
+        # extract grouping time of consumer and producer: processes occuring at different times withing in teh same time window of grouping get the same grouping time
         edges_df["consumer_grouping_time"] = edges_df["consumer_date"].apply(
             lambda x: extract_grouping_date_as_string(self.temporal_grouping, x)
         )
@@ -184,7 +346,7 @@ class TimelineBuilder:
             lambda x: extract_grouping_date_as_string(self.temporal_grouping, x)
         )
 
-        # group by unique pair of consumer and producer within their grouping times
+        # group unique pair of consumer and producer with the same grouping times
         grouped_edges = (
             edges_df.groupby(
                 [
@@ -198,30 +360,34 @@ class TimelineBuilder:
             .reset_index()
         )
 
-        # date is not really used
+        # convert grouping times, which was only used as intermediate variable, back to datetime
         grouped_edges["date_producer"] = grouped_edges["producer_grouping_time"].apply(
             lambda x: convert_grouping_date_string_to_datetime(
                 self.temporal_grouping, x
             )
-        )  # date is date producer, but in long format
-        grouped_edges["hash_producer"] = grouped_edges["date_producer"].apply(
-            lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
-        )  # grouped_edges['year']  # for now just year but could be calling the function --> extract_date_as_integer(grouped_edges['date'])
-
+        )  
         grouped_edges["date_consumer"] = grouped_edges["consumer_grouping_time"].apply(
             lambda x: convert_grouping_date_string_to_datetime(
                 self.temporal_grouping, x
             )
-        )  # date is date producer, but in long format
+        )  
+
+        # add dates as integers as hashes to the dataframe
+        grouped_edges["hash_producer"] = grouped_edges["date_producer"].apply(
+            lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
+        )  
+
         grouped_edges["hash_consumer"] = grouped_edges["date_consumer"].apply(
             lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
-        )  # grouped_edges['year']  # for now just year but could be calling the function --> extract_date_as_integer(grouped_edges['date'])
+        )  
 
+        # add new processes to time mapping dict
         for row in grouped_edges.itertuples():
             self.time_mapping_dict.add(
                 (bd.get_node(id=row.producer).key, row.hash_producer)
             )
 
+        # store the ids from the time_mapping_dict in dataframe
         grouped_edges["time_mapped_producer"] = grouped_edges.apply(
             lambda row: self.time_mapping_dict[
                 (bd.get_node(id=row.producer).key, row.hash_producer)
@@ -236,8 +402,8 @@ class TimelineBuilder:
             axis=1,
         )
 
-        # Add interpolation weights to the dataframe
-        grouped_edges = self.add_column_interpolation_weights_to_timeline(
+        # Add interpolation weights to background databases to the dataframe
+        grouped_edges = add_column_interpolation_weights_to_timeline(
             grouped_edges,
             self.database_date_dict,
             interpolation_type=self.interpolation_type,
@@ -269,187 +435,4 @@ class TimelineBuilder:
 
         return grouped_edges
 
-    def add_column_interpolation_weights_to_timeline(
-        self,
-        tl_df: pd.DataFrame,
-        database_date_dict: dict,
-        interpolation_type: str = "linear",
-    ) -> pd.DataFrame:
-        """
-        Add a column to a timeline with the weights for an interpolation between the two nearest dates, from the list of dates from the available databases.
-
-        :param tl_df: Timeline as a dataframe.
-        :param database_date_dict: Mapping dictionary between the time of representativeness (key) and name of database (value)
-        :param interpolation_type: Type of interpolation between the nearest lower and higher dates. For now,
-        only "linear" is available.
-
-        :return: Timeline as a dataframe with a column 'interpolation_weights' (object:dictionnary) added.
-        -------------------
-        Example:
-        >>> dates_list = [
-            datetime.strptime("2020", "%Y"),
-            datetime.strptime("2022", "%Y"),
-            datetime.strptime("2025", "%Y"),
-        ]
-        >>> add_column_interpolation_weights_on_timeline(tl_df, dates_list, interpolation_type="linear")
-
-
-        """
-
-        def find_closest_date(target: datetime, dates: KeysView[datetime]) -> dict:
-            """
-            Find the closest date to the target in the dates list.
-
-            :param target: Target datetime.datetime object.
-            :param dates: List of datetime.datetime objects.
-            :return: Dictionary with the key as the closest datetime.datetime object from the list and a value of 1.
-
-            ---------------------
-            # Example usage
-            target = datetime.strptime("2023-01-15", "%Y-%m-%d")
-            dates_list = [
-                datetime.strptime("2020", "%Y"),
-                datetime.strptime("2022", "%Y"),
-                datetime.strptime("2025", "%Y"),
-            ]
-            """
-
-            # If the list is empty, return None
-            if not dates:
-                return None
-
-            # Sort the dates
-            dates = sorted(dates)
-            # Use min function with a key based on the absolute difference between the target and each date
-            closest = min(dates, key=lambda date: abs(target - date))
-
-            return {closest: 1}
-
-        def get_weights_for_interpolation_between_nearest_years(
-            reference_date: datetime,
-            dates_list: KeysView[datetime],
-            interpolation_type: str = "linear",
-        ) -> dict:
-            """
-            Find the nearest dates (before and after) a given date in a list of dates and calculate the interpolation weights.
-
-            :param reference_date: Target date.
-            :param dates_list: KeysView[datetime], which is a list of temporal coverage of the available databases,.
-            :param interpolation_type: Type of interpolation between the nearest lower and higher dates. For now,
-            only "linear" is available.
-
-            :return: Dictionary with temporal coverage of the available databases to use as keys and the weights for interpolation as values.
-            -------------------
-            Example:
-            >>> dates_list = [
-                datetime.strptime("2020", "%Y"),
-                datetime.strptime("2022", "%Y"),
-                datetime.strptime("2025", "%Y"),
-            ]
-            >>> date_test = datetime(2021,10,11)
-            >>> add_column_interpolation_weights_on_timeline(date_test, dates_list, interpolation_type="linear")
-            """
-            dates_list = sorted(dates_list)
-
-            diff_dates_list = [reference_date - x for x in dates_list]
-            if timedelta(0) in diff_dates_list:
-                exact_match = dates_list[diff_dates_list.index(timedelta(0))]
-                return {exact_match: 1}
-
-            closest_lower = None
-            closest_higher = None
-
-            for date in dates_list:
-                if date < reference_date:
-                    if (
-                        closest_lower is None
-                        or reference_date - date < reference_date - closest_lower
-                    ):
-                        closest_lower = date
-                elif date > reference_date:
-                    if (
-                        closest_higher is None
-                        or date - reference_date < closest_higher - reference_date
-                    ):
-                        closest_higher = date
-
-            if closest_lower is None:
-                warnings.warn(
-                    f"Reference date {reference_date} is lower than all provided dates. Data will be taken from the closest higher year.",
-                    category=Warning,
-                )
-                return {closest_higher: 1}
-
-            if closest_higher is None:
-                warnings.warn(
-                    f"Reference date {reference_date} is higher than all provided dates. Data will be taken from the closest lower year.",
-                    category=Warning,
-                )
-                return {closest_lower: 1}
-
-            if closest_lower == closest_higher:
-                warnings.warn(
-                    "Date outside the range of dates covered by the databases.",
-                    category=Warning,
-                )
-                return {closest_lower: 1}
-
-            if self.interpolation_type == "linear":
-                weight = int((reference_date - closest_lower).total_seconds()) / int(
-                    (closest_higher - closest_lower).total_seconds()
-                )
-            else:
-                raise ValueError(
-                    f"Sorry, but {interpolation_type} interpolation is not available yet."
-                )
-            return {closest_lower: 1 - weight, closest_higher: weight}
-
-        dates_list = [
-            date for date in self.database_date_dict.values() if type(date) == datetime
-        ]
-        if "date_producer" not in list(tl_df.columns):
-            raise ValueError("The timeline does not contain dates.")
-
-        # create reversed dict {date: database} with only static "background" db's
-        self.reversed_database_date_dict = {
-            v: k for k, v in self.database_date_dict.items() if type(v) == datetime
-        }
-
-        if self.interpolation_type == "nearest":
-            tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
-                lambda x: find_closest_date(x, dates_list)
-            )
-            tl_df["interpolation_weights"] = tl_df["interpolation_weights"].apply(
-                lambda d: {self.reversed_database_date_dict[x]: v for x, v in d.items()}
-            )
-            return tl_df
-
-        if self.interpolation_type == "linear":
-            tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
-                lambda x: get_weights_for_interpolation_between_nearest_years(
-                    x, dates_list, self.interpolation_type
-                )
-            )
-            tl_df["interpolation_weights"] = tl_df["interpolation_weights"].apply(
-                lambda d: {self.reversed_database_date_dict[x]: v for x, v in d.items()}
-            )
-
-        else:
-            raise ValueError(
-                f"Sorry, but {self.interpolation_type} interpolation is not available yet."
-            )
-
-        return tl_df
-
-    def check_database_names(self):
-        """
-        Check that the strings of the databases (values of database_date_dict) exist in the databases of the brightway2 project
-
-        """
-        for db in self.database_date_dict.keys():
-            assert db in bd.databases, f"{db} not in your brightway2 project databases."
-        else:
-            print(
-                "All databases in database_date_dict exist as brightway project databases"
-            )
-        return
+    
