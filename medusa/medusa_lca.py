@@ -24,6 +24,7 @@ from bw2calc import LCA
 from .timeline_builder import TimelineBuilder
 from .matrix_modifier import MatrixModifier
 from .dynamic_biosphere_builder import DynamicBiosphere
+from .dynamic_characterization import DynamicCharacterization
 from .remapping import TimeMappingDict
 from .utils import extract_date_as_integer
 
@@ -260,6 +261,32 @@ class MedusaLCA:
                 self.dynamic_inventory[flow]["amount"]
             )[order]
 
+    def characterize_dynamic_lci(
+            
+            self,
+            characterization_dictionary: dict,
+    ):
+        """
+        Characterize the dynamic inventory dictionaries using dynamic characterization functions using the DynamicCharacterization class.
+        Characterization function are provided imported from BW_temporalis and are planned to be extended. The format of the characterization_dictionary is {biosphere_flow_name: characterization_function}.
+        Users can you provide their own dynamic characterization functions, which needs to have the format XZXZ (TODO complete description).
+
+        """
+
+        if not hasattr(self, "dynamic_inventory"):
+            warnings.warn(
+                "Dynamic lci not yet calculated. Call MedusaLCA.calculate_dynamic_lci() first."
+            )
+            
+        self.dynamic_inventory_characterizer = DynamicCharacterization(
+                                            self.dynamic_inventory, 
+                                            self.dicts.activity,
+                                            self.dicts.biosphere.reversed,
+                                            )
+        
+        self.characterized_inventory = self.dynamic_inventory_characterizer.characterize_dynamic_inventory(characterization_dictionary)
+
+      
     def prepare_static_lca_inputs(
         self,
         demand=None,
