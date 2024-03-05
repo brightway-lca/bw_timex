@@ -59,7 +59,7 @@ class EdgeExtractor(TemporalisLCA):
 
     def build_edge_timeline(self) -> List:
         """
-        Creates a timeline of the edges from the graph traversal. Starting from the edges of the functional unit node, it goes through each node using a heap,
+        Creates a timeline of the edges from the graph traversal. Starting from the edges of the functional unit node, it goes through each node using a heap, selecting the node iwth the highest impact first.
         and propagates the TemporalDistributions of the edges from node to node through time using convolution-operators during multiplication.
         It stops in case the current edge is known to have no temporal distribution (=leaf) (e.g. part of background database).
 
@@ -195,6 +195,6 @@ class EdgeExtractor(TemporalisLCA):
         else:
             raise ValueError(
                 "Can't join TemporalDistribution and something else: Trying with {} and {}".format(
-                    type(td1), type(td2)
+                    type(td_consumer.date), type(td_producer.date)
                 )
             )

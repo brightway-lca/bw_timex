@@ -30,18 +30,18 @@ class MatrixModifier:
 
     def create_technosphere_datapackage(self) -> bwp.Datapackage:
         """
-        Creates patches from a given timeline. Patches are datapackages that add or overwrite datapoints in the LCA matrices before LCA calculations.
+        Creates patches to the technosphere matrix from a given timeline of grouped exchanges to add these temporal processes to the technopshere database.
+        Patches are datapackages that add or overwrite datapoints in the LCA matrices before LCA calculations.
 
         The heavy lifting of this function happens in its inner function "add_row_to_datapackage":
         Here, each node with a temporal distribution is "exploded", which means each occurrence of this node (e.g. steel production on 2020-01-01
-        and steel production 2015-01-01) becomes separate new node with its own unique id. The exchanges on these node-clones get relinked to the activities
-        with the same name, reference product and location as previously, but now from the corresponding databases in time.
-
-        The new node-clones also need a 1 on the diagonal of their technosphere matrix, which symbolizes the production of the new clone-reference product.
-
+        and steel production 2015-01-01) becomes a separate new node, by adding the respective elements to the technosphere matrix. 
+        For processes at the interface with background databases, the timing of the exchanges determines which background database to link to in so called "Temporal Market".
+         
+    
         :param timeline: A timeline of edges, typically created from EdgeExtracter.create_edge_timeline()
-        :param database_date_dict: A dict of the available prospective database: their temporal representativeness (key) and their names (value).
-        :param demand_timing: A dict of the demand ids and the timing they should be linked to. Can be created using create_demand_timing_dict().
+        :param database_date_dict: A dict of the available prospective databases: their names (key) and temporal representativeness (value).
+        :param demand_timing: A dict of the demand ids and the timing occur. Can be created using create_demand_timing_dict().
         :param datapackage: Append to this datapackage, if available. Otherwise create a new datapackage.
         :param name: Name of this datapackage resource.
         :return: A list of patches formatted as datapackages.
@@ -55,13 +55,18 @@ class MatrixModifier:
             new_nodes: set,
         ) -> None:
             """
-            Adds a new row to the given datapackage based on the provided row from the timeline DataFrame.
-
+            This adds the required technosphere matrix modifications for each time-dependent exchange (edge) as datapackage elements to a given bwp.Datapackage.
+            Modifications include: 
+            1) Exploded processes: new matrix elements between exploded consumer and exploded producer, representing the temporal edge between them. 
+            2) Temporal markets: new matrix entries between "temporal markets" and the producer in temporally matching background database, with shares based on interpolation. 
+               Processes in the background databases are matched on name, reference product and location.
+            3) Diagonal entries: ones on the diagonal for new nodes.
+              
             This function also updates the set of new nodes with the ids of any new nodes created during this process.
 
             :param row: A row from the timeline DataFrame.
             :param datapackage: The datapackage to which the new patches will be added.
-            :param database_date_dict: Dictionary of available prospective database dates and their names.
+            :param database_date_dict: A dict of the available prospective databases: their names (key) and temporal representativeness (value).
             :param demand_timing: Dictionary of the demand ids and the dates they should be linked to. Can be created using create_demand_timing_dict().
             :param new_nodes: Set to which new node ids are added.
             :return: None, but updates the set new_nodes and adds a patch for this new edge to the bwp.Datapackage.
@@ -123,7 +128,7 @@ class MatrixModifier:
 
         datapackage = bwp.create_datapackage(
             sum_inter_duplicates=False
-        )  # 'sum_inter_duplicates=False': If the same market is used mby multiple foreground processes, the market get's created again, inputs should not be summed.
+        )  # 'sum_inter_duplicates=False': If the same market is used by multiple foreground processes, the market gets created again, inputs should not be summed.
 
         new_nodes = set()
 
@@ -150,13 +155,14 @@ class MatrixModifier:
 
     def create_biosphere_datapackage(self) -> bwp.Datapackage:
         """
-        Creates a new biosphere datapackage to add the biosphere flows to the exploded technosphere processes.
+        Creates list of patches formatted as datapackages for modifications to the biosphere matrix.
+        It adds the biosphere flows to the exploded technosphere processes.
 
         This function iterates over each unique producer and for each biosphere exchange of the original activity,
         it creates a new biosphere exchange for the new node.
 
         :param timeline: A DataFrame representing the timeline of edges.
-        :param database_date_dict: Dictionary of available prospective database dates and their names.
+        :param database_date_dict:A dict of the available prospective databases: their names (key) and temporal representativeness (value).
         :return: The updated datapackage with new biosphere exchanges for the new nodes.
         """
         unique_producers = (
@@ -166,6 +172,7 @@ class MatrixModifier:
         )  # array of unique (producer, timestamp) tuples
 
         datapackage_bio = bwp.create_datapackage(sum_inter_duplicates=False)
+        
         for producer in unique_producers:
             # Skip the -1 producer as this is just a dummy producer of the functional unit
             if (
@@ -185,6 +192,7 @@ class MatrixModifier:
                         (exc.input.id, producer_id)
                     )  # directly build a list of tuples to pass into the datapackage, the producer_id is used to for the column of that activity
                     amounts.append(exc.amount)
+                    
                 datapackage_bio.add_persistent_vector(
                     matrix="biosphere_matrix",
                     name=uuid.uuid4().hex,
@@ -198,6 +206,9 @@ class MatrixModifier:
         return datapackage_bio
 
     def create_datapackage(self) -> None:
+        """
+        Creates a list of datapackages for the technosphere and biosphere matrices.
+        """
         technosphere_datapackage = self.create_technosphere_datapackage()
         biosphere_datapackge = self.create_biosphere_datapackage()
         return [technosphere_datapackage, biosphere_datapackge]
