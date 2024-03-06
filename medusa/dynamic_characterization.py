@@ -1,7 +1,8 @@
-#from bw_temporalis 
+
 from typing import Union, Tuple, Optional, Callable
 import pandas as pd
 import bw2data as bd
+import numpy as np
 
 class DynamicCharacterization():
     '''
@@ -14,6 +15,8 @@ class DynamicCharacterization():
     Characteriztaion functions are retrieved from bw_temporalis, which have them for CO2 and Methane from these publications: 
     https://doi.org/10.5194/acp-13-2793-2013
     http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
+
+    First, the dynamic inventory is formatted as a DataFrame, then the characterization functions are applied in the method characterize_dynamic_inventory
     
     '''
     def __init__(self, 
@@ -22,11 +25,12 @@ class DynamicCharacterization():
                  dynamic_inventory: dict,
                  activity_dict: dict,
                  biosphere_dict_rerversed: dict,
-                 ):
+                                  ):
         self.dynamic_inventory = dynamic_inventory
         self.activity_dict = activity_dict
         self.biosphere_dict_rerversed = biosphere_dict_rerversed
         self.dynamic_lci_df = self.format_dynamic_inventory_as_dataframe()
+        
         
     def format_dynamic_inventory_as_dataframe(self):
         
@@ -34,28 +38,31 @@ class DynamicCharacterization():
         Format needs to be: 
         | date | amount | flow | activity |
         |------|--------|------|----------|
-        | 101  | 33     | CO2    | 2        |
+        | 101  | 33     | 1    | 2        |
         | 102  | 32     | 1    | 2        |
         | 103  | 31     | 1    | 2        |
         
         date is datetime
-        flow = the code of the biosphere flow #TODO implement this
-        activity = activity id #TODO implement this: Here we need to store the producing activity of the emission already in the dynamic inventory dictionary
+        flow = flow id 
+        activity = activity id 
         '''
         flow_mapping= {}
-        for key, values in self.dynamic_inventory.items(): #key is currently code, which is the uuid
-            flow_mapping[key] = bd.get_node(code=key).id #mapping of code (uuid) to id
+        for key, values in self.dynamic_inventory.items(): 
+            flow_mapping[key] = bd.get_node(code=key).id 
 
         dfs = []
         for key, values in self.dynamic_inventory.items():
+
             df = pd.DataFrame(values)
             df['flow'] = key
-            df.rename(columns={'time': 'date'}, inplace=True)                  
-            df['flow'] = df['flow'].replace(flow_mapping)
+            df['flow'] = df['flow'].replace(flow_mapping) #replace code (uuid) with id
+
+            df.rename(columns={'time': 'date'}, inplace=True) 
+            df.rename(columns={'emitting_process': 'activity'}, inplace=True)                  
+            
             dfs.append(df)
+
         inventory_as_dataframe = pd.concat(dfs, ignore_index=True)
-        inventory_as_dataframe['activity']= 76867 #Placeholder, #TODO replace with producing activity Id from mapping'
-        
         return inventory_as_dataframe
     
     
@@ -108,7 +115,7 @@ class DynamicCharacterization():
                 characterized_inventory["amount_sum"] = characterized_inventory["amount"].cumsum() #not usre if cumsum here or after concatenation with other dfs
 
             all_characterized_inventory = pd.concat([all_characterized_inventory, characterized_inventory])
-                
+
         return all_characterized_inventory
         
 

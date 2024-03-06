@@ -13,3 +13,4 @@ dependencies:
   - matplotlib
   - unfold  
   - bw_temporalis
+  - seaborn

@@ -3,6 +3,7 @@ import warnings
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sb
 
 from datetime import datetime
 from typing import Optional, Callable
@@ -183,7 +184,7 @@ class MedusaLCA:
     
     def build_dynamic_biosphere(self):
         """
-        Build the dynamic biosphere matrix, which links the biosphere flows to the correct background databases and keeps the timing èach biosphere flows, using DynamicBiosphere class.
+        Build the dynamic biosphere matrix, which links the biosphere flows to the correct background databases and tracks the timing each biosphere flows, using DynamicBiosphere class.
         
         This returns a matrix of the dimensions (bio_flows at a specific timestep) x (processes)
         
@@ -212,54 +213,105 @@ class MedusaLCA:
     def calculate_dynamic_lci(
         self,
     ):
-        """calcluates the dynamic inventory and calls build_dynamic_inventory_dict.
-        Returns a dictionary with the dynamic inventory of the LCI in the form of {CO2: {time: [2022, 2023], amount:[3,5]}, CH4: {time: [2022, 2023], amount:[3,5]}, ...}
+        """
+        Calcluates the dynamic inventory from the dynamic biosphere matrix by calling build_dynamic_inventory_dict.
+        Returns a dictionary with the dynamic inventory of the LCI in the form of
+          {CO2: {
+                time: [2022, 2023], 
+                amount:[3,5], 
+                emitting_process: [((database, code), year), ((database, code), year)]
+                }, 
+          CH4: {time: [2022, 2023], 
+                amount:[3,5], 
+                emitting_process: [((database, code), year), ((database, code), year)]
+                },
+          ...}
         """
         if not hasattr(self, "dynamic_biomatrix"):
             warnings.warn(
                 "dynamic biosphere matrix not yet built. Call MedusaLCA.build_dynamic_biosphere() first."
             )
-        
+        #old code: process info not pertained:
         # calculate lci from dynamic biosphere matrix
-        unordered_dynamic_lci = self.dynamic_biomatrix.dot(
-            self.dynamic_supply_array #dynamic supply array excludes the original databases
-        )  
-        self.build_dynamic_inventory_dict(unordered_dynamic_lci)
+        # unordered_dynamic_lci = self.dynamic_biomatrix.dot(
+        #     self.dynamic_supply_array 
+        # )  
+
+        #diagnolization of supply array keeps the dimension of the process, which we want to pass as additional information to the dynamic inventory dict    
+        diagonal_supply_array = np.diag(self.dynamic_supply_array.flatten()) #dynamic supply array includes the original databases, contrary to former implementation as otherwise background processes were excluded. TODO: validate with Timo
+        diagonalized_dynamic_lci = self.dynamic_biomatrix.dot(diagonal_supply_array)
+        
+        #unordered_dynamic_lci= np.sum(diagonalized_dynamic_lci, axis=1) #normal lci
+
+        
+        self.build_dynamic_inventory_dict(diagonalized_dynamic_lci)
 
     def build_dynamic_inventory_dict(
         self,
-        unordered_dynamic_lci: np.array,
+        diagonalized_dynamic_lci: np.array,
     ):
         """
         Create dynamic lci dictionary with structure 
-        {CO2: {time: [2022, 2023], amount:[3,5]},
-        CH4: {time: [2022, 2023], amount:[3,5]},
-        ...
-        }
-        :param unordered_dynamic_lci: lci results in an array, whose order is the same as the bio_row_mapping (?)
+        {CO2: {
+                time: [2022, 2023], 
+                amount:[3,5], 
+                emitting_process: [((database, code), year), ((database, code), year)]
+                }, 
+          CH4: {time: [2022, 2023], 
+                amount:[3,5], 
+                emitting_process: [((database, code), year), ((database, code), year)]
+                },
+          ...}
+        :param diagonalized_dynamic_lci: diagnolized lci results, pertaining additional information of emitting activity
         :return: none but sets the dynamic_inventory attribute of the MedusaLCA instance
         """
         self.dynamic_inventory = (
             {}
-        )  # dictionary to store the dynamic lci {CO2: {time: [2022, 2023], amount:[3,5]}}
-        for (flow, time), i in self.bio_row_mapping.items():
-            amount = unordered_dynamic_lci[i]
+        )  # dictionary to store the dynamic lci {CO2: {time: [2022, 2023], amount:[3,5], emitting_process: (database, code)}}
+        
+        self.act_time_mapping_reversed= {v: k for k, v in self.act_time_mapping.items()} #reversed mapping of activity_time_mapping_dict
+
+        for (flow, time), row_id in self.bio_row_mapping.items(): #looping over the rows of the diagnolized df
+            
             # add biosphere flow to dictionary if it does not exist yet
             if not flow["code"] in self.dynamic_inventory.keys():
-                self.dynamic_inventory[flow["code"]] = {"time": [], "amount": []}
-            # fill dictionary
-            self.dynamic_inventory[flow["code"]]["time"].append(time)
-            self.dynamic_inventory[flow["code"]]["amount"].append(amount)
+                self.dynamic_inventory[flow["code"]] = {"time": [], "amount": [], "emitting_process": []}  
+            
+            for col_id in self.activity_dict.reversed.keys(): #looping over the columns of the diagnolized df
+                
+                if diagonalized_dynamic_lci[row_id, col_id] != 0: #store only non-zero elements of diagnolized inventory
+                    
+                    amount = diagonalized_dynamic_lci[row_id, col_id]
+                    emitting_process = self.activity_dict.reversed[col_id]
+                    #print(emitting_process)
+                    self.dynamic_inventory[flow["code"]]["time"].append(time)
+                    self.dynamic_inventory[flow["code"]]["amount"].append(amount)
+                    self.dynamic_inventory[flow["code"]]["emitting_process"].append(emitting_process) 
+            
+            #old code, can be deleted if confidence in new code is established
+            #amount = unordered_dynamic_lci[row_id]
+            # add biosphere flow to dictionary if it does not exist yet
+            # if not flow["code"] in self.dynamic_inventory.keys():
+            #     self.dynamic_inventory[flow["code"]] = {"time": [], "amount": [], "emitting_process": []}
+            # # fill dictionary
+            # self.dynamic_inventory[flow["code"]]["time"].append(time)
+            # self.dynamic_inventory[flow["code"]]["amount"].append(amount)
+            # self.dynamic_inventory[flow["code"]]["emitting_process"].append(np.nan)
 
         # now sort flows based on time
-        for flow in self.dynamic_inventory.keys():
+        for flow, _ in self.dynamic_inventory.items():
             order = np.argsort(self.dynamic_inventory[flow]["time"])
+
             self.dynamic_inventory[flow]["time"] = np.array(
                 self.dynamic_inventory[flow]["time"]
             )[order]
             self.dynamic_inventory[flow]["amount"] = np.array(
                 self.dynamic_inventory[flow]["amount"]
             )[order]
+            self.dynamic_inventory[flow]["emitting_process"] = np.array(
+                self.dynamic_inventory[flow]["emitting_process"]
+            )[order]
+
 
     def characterize_dynamic_lci(
             
@@ -285,8 +337,13 @@ class MedusaLCA:
                                             )
         
         self.characterized_inventory = self.dynamic_inventory_characterizer.characterize_dynamic_inventory(characterization_dictionary)
+        
+        #add meta data and reorder
+        self.characterized_inventory["activity_name"]=self.characterized_inventory["activity"].map(lambda x: self.act_time_mapping_reversed.get(x)[0])
+        self.characterized_inventory["flow_name"] = self.characterized_inventory["flow"].apply(lambda x: bd.get_node(id=x)["name"])
+        self.characterized_inventory = self.characterized_inventory[['date', 'amount', 'flow', 'flow_name','activity','activity_name', 'amount_sum']] 
+        self.characterized_inventory.reset_index(drop=True, inplace=True)
 
-      
     def prepare_static_lca_inputs(
         self,
         demand=None,
@@ -574,6 +631,26 @@ class MedusaLCA:
         )
         plt.ylabel(bio_flow)
         plt.xlabel("time")
+        plt.show()
+
+    def plot_dynamic_characterized_inventory(self):
+        """
+        Plot the characterized inventory of the dynamic LCI in a very simple plot
+        """
+
+        axes = sb.scatterplot(
+            x="date", 
+            y="amount",
+            hue="activity_name",
+            style="flow_name",
+            data=self.characterized_inventory
+        )
+        
+        
+        axes.set_ylabel("GWP in W/m2")
+        axes.set_xlabel("Time (years)")
+        
+        axes.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.show()
 
     def __getattr__(self, name):
