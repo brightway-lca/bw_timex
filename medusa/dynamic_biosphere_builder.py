@@ -47,7 +47,7 @@ class DynamicBiosphere():
         """
         self.nr_procs = len(self.act_time_mapping)  # these are all the processes in the mapping (incl background)
         self.bio_row_mapping = TimeMappingDict(start_id=0)  # create new instance of TimeMappingdict for the biosphere flows, starting at 0 is fine since separate matrix.
-
+        
         # looping over all activities: 
         for (((db,code),time), id) in self.act_time_mapping.items():
             # Check if activity comes from foreground, if so, continue to next activity
@@ -108,7 +108,7 @@ class DynamicBiosphere():
         self.build_biomatrix()
 
         # and set the supply for the original databases to 0 -> why?
-        self.dynamic_supply_array[:self.len_technosphere_dbs] = 0
+        #self.dynamic_supply_array[:self.len_technosphere_dbs] = 0
 
     def add_matrix_entry_for_biosphere_flows(self, 
                                              row,
