@@ -94,8 +94,7 @@ class MedusaLCA:
     def add_activities_to_time_mapping_dict(self):
         """
         Adds all activities to activity_time_mapping_dict, an instance of TimeMappingDict.
-        This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id) that is later 
-        used to uniquely identify time-resolved processes.
+        This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id) that is later used to uniquely identify time-resolved processes.
         
         """
         for id in self.static_lca.dicts.activity.keys():  # activity ids
@@ -106,10 +105,10 @@ class MedusaLCA:
                 key[0]
             ]  # datetime (or 'dynamic' for TD'd processes)
             if type(time) == str:  # if 'dynamic', just add the string
-                self.activity_time_mapping_dict.add((key, time))
+                self.activity_time_mapping_dict.add((key, time), key=id)
             elif type(time) == datetime:
                 self.activity_time_mapping_dict.add(
-                    (key, extract_date_as_integer(time, self.temporal_grouping))
+                    (key, extract_date_as_integer(time, self.temporal_grouping)), key=id
                 )  # if datetime, map to the date as integer
             else:
                 warnings.warn(f"Time of activity {key} is neither datetime nor str.")
@@ -482,7 +481,7 @@ class MedusaLCA:
             inplace=True,
         )
         df.rename(  # from activity id to ((database, code), time)
-               index=self.activity_time_mapping_dict.reversed(),
+            index=self.activity_time_mapping_dict.reversed(),
             columns=self.activity_time_mapping_dict.reversed(),
             inplace=True,
         )
@@ -499,8 +498,9 @@ class MedusaLCA:
             columns=self.dicts.activity.reversed,
             inplace=True,
         )
-        df.rename(  # from activity id to ((database, code), time)
-            columns=self.activity_time_mapping_dict.reversed(),
+        df.rename(  
+            index=self.remapping_dicts['biosphere'], # from activity id to bioflow name
+            columns=self.activity_time_mapping_dict.reversed(), # from activity id to ((database, code), time)
             inplace=True,
         )
         return df
