@@ -3370,7 +3370,7 @@ def db_dynamic_cf_test():
                     'input': ('background_2024', 'electricity_wind'),
                 },
                 {
-                    'amount': 17,
+                    'amount': 12,
                     'type': 'biosphere',
                     'input': ('temporalis-bio', 'CO2'),
                     'temporal_distribution': 
@@ -3424,7 +3424,7 @@ def db_dynamic_cf_test():
                     'input': ('background_2008', 'electricity_wind'),
                 },
                  {
-                    'amount': 17,
+                    'amount': 12,
                     'type': 'biosphere',
                     'input': ('temporalis-bio', 'CO2'),
                     'temporal_distribution': 
@@ -3434,7 +3434,7 @@ def db_dynamic_cf_test():
                         ),
 
                 },
-                {
+                                {
                     'amount': 1,
                     'type': 'biosphere',
                     'input': ('temporalis-bio', 'CO'),
@@ -3518,8 +3518,8 @@ def db_dynamic_cf_test():
                     'input': ('foreground', 'B'),
                     'temporal_distribution': 
                         TemporalDistribution(
-                            date=np.array([-25, 10, 0], dtype='timedelta64[Y]'), 
-                            amount=np.array([0.5, 0.3, 0.2])
+                            date=np.array([-25, 0], dtype='timedelta64[Y]'), 
+                            amount=np.array([0.5, 0.5])
                         ),
        
                 },

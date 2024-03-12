@@ -316,6 +316,10 @@ class MedusaLCA:
     def characterize_dynamic_lci(
             
             self,
+            cumsum: bool | None = True,
+            type: str | None = "radiative_forcing",
+            fixed_TH: bool | None = False, #True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
+            TH: int | None = 100, 
             #characterization_dictionary: dict, #dict is now stored inside dynamic_inventory_characterizer, not sure if this is pythonic
     ):
         """
@@ -337,7 +341,12 @@ class MedusaLCA:
                                             self.act_time_mapping_reversed,
                                             )
         
-        self.characterized_inventory = self.dynamic_inventory_characterizer.characterize_dynamic_inventory() #characterization_dictionary)
+        self.characterized_inventory = self.dynamic_inventory_characterizer.characterize_dynamic_inventory(
+            cumsum,
+            type,
+            fixed_TH, #True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
+            TH, 
+        ) #characterization_dictionary)
         
 
     def prepare_static_lca_inputs(
@@ -629,14 +638,18 @@ class MedusaLCA:
         plt.xlabel("time")
         plt.show()
 
-    def plot_dynamic_characterized_inventory(self):
+    def plot_dynamic_characterized_inventory(self, cumsum: bool = False):
         """
         Plot the characterized inventory of the dynamic LCI in a very simple plot
         """
+        if cumsum is True:
+            amount = "amount_sum"
+        else: 
+            amount = "amount"
 
         axes = sb.scatterplot(
             x="date", 
-            y="amount",
+            y=amount,
             hue="activity_name",
             style="flow_name",
             data=self.characterized_inventory

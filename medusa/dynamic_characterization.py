@@ -108,9 +108,12 @@ class DynamicCharacterization():
     
     def characterize_dynamic_inventory(self, 
                                         #characterization_dictionary: dict, # dictionary: mapping elemental flow (key) with characterization function (value) 
+        cumsum: bool | None = True,
+        type: str | None = "radiative_forcing",
+        fixed_TH: bool | None = False, #True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
+        TH: int | None = 100, 
         flow: set[int] | None = None,
         activity: set[int] | None = None,
-        cumsum: bool | None = True,
         
     ) -> pd.DataFrame:
         
@@ -124,9 +127,12 @@ class DynamicCharacterization():
         The `characterization_function` is applied to each row of the input DataFrame of a timeline for a given `period`. 
         in the case of characterize_co2 and characterize_methane, the timestep is yearly and the time horizon is 100 years
                   
-        # TODO add checks, add visualization of the characterized inventory, think about dynamic characterization as in Levasseur
+        # TODO add checks, add fixed TH
             
         '''
+        if type not in {"radiative_forcing", "GWP"}:
+            raise ValueError(f"impact assessment type must be either 'radiative_forcing' or 'GWP', not {type}")	
+        
         characterization_dictionary = {"carbon dioxide": characterize_co2, "methane": characterize_methane, "carbon monoxide": self.characterize_co, "nitrous oxide": self.characterize_n2o}
         
         all_characterized_inventory = pd.DataFrame()
@@ -145,17 +151,44 @@ class DynamicCharacterization():
                 df = df.loc[self.dynamic_lci_df["flow"]==flow]
                 
             df.reset_index(drop=True, inplace=True)
-
  
-            characterized_inventory = pd.concat(
+            if type == "radiative_forcing":
+                characterized_inventory = pd.concat(
                 [characterization_function(row) for _, row in df.iterrows()] # using characterization function from bw_temporalis
             )
+                #continue
+
+            if type == "GWP": #scale radiative forcing to GWP in CO2 equivalent
+                characterized_inventory = pd.DataFrame()
+                
+                for _, row in df.iterrows():
+                    radiative_forcing_ghg = characterization_function(row) 
+                    row["amount"] = 1 #convert 1 kg CO2 equ.
+                    radiative_forcing_co2 = characterize_co2(row)
+
+                    ghg_integral = radiative_forcing_ghg["amount"].sum() 
+                    co2_integral = radiative_forcing_co2["amount"].sum()
+
+                    co2_equiv = ghg_integral / co2_integral
+
+                    row_data = {
+                            'date': radiative_forcing_ghg.loc[0, 'date'], #start date of emission
+                            'amount': co2_equiv, #ghg emission in co2 equiv
+                            'flow': radiative_forcing_ghg.loc[0, 'flow'],  
+                            'activity': radiative_forcing_ghg.loc[0, 'activity'],
+                        }
+                    row_df = pd.DataFrame([row_data])
+                                        
+                    characterized_inventory = pd.concat([characterized_inventory, row_df], ignore_index=True)
+
+                
             # sort by date
-            if "date" in characterized_inventory.columns:
+            if "date" in characterized_inventory:
                 characterized_inventory.sort_values(by="date", ascending=True, inplace=True)
                 characterized_inventory.reset_index(drop=True, inplace=True)
+                
             if cumsum and "amount" in characterized_inventory:
-                characterized_inventory["amount_sum"] = characterized_inventory["amount"].cumsum() 
+                characterized_inventory["amount_sum"] = characterized_inventory["amount"].cumsum() #not sure if cumsum here correct
 
             all_characterized_inventory = pd.concat([all_characterized_inventory, characterized_inventory])
 
@@ -164,8 +197,10 @@ class DynamicCharacterization():
         all_characterized_inventory["flow_name"] = all_characterized_inventory["flow"].apply(lambda x: bd.get_node(id=x)["name"])
         all_characterized_inventory = all_characterized_inventory[['date', 'amount', 'flow', 'flow_name','activity','activity_name', 'amount_sum']] 
         all_characterized_inventory.reset_index(drop=True, inplace=True)
+        all_characterized_inventory.sort_values(by="date", ascending=True, inplace=True)
         
         return all_characterized_inventory
+    
     
     def characterize_co(self, series, period: int = 100, cumulative=False) -> pd.DataFrame:
         """
