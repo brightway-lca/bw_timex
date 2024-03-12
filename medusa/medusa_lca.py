@@ -180,7 +180,7 @@ class MedusaLCA:
             return
         self.lca.lcia()
 
-    #TODO maybe restructure the dynamic biosphere building into one method, simialr to lci() and lcia()? dynamic_lci(), which calls build_dynamic_biosphere() and calculate_dynamic_lci()?
+    #TODO maybe restructure the dynamic biosphere building into one method, similar to lci() and lcia()? dynamic_lci(), which calls build_dynamic_biosphere() and calculate_dynamic_lci()?
     
     def build_dynamic_biosphere(self):
         """
@@ -316,7 +316,7 @@ class MedusaLCA:
     def characterize_dynamic_lci(
             
             self,
-            characterization_dictionary: dict,
+            #characterization_dictionary: dict, #dict is now stored inside dynamic_inventory_characterizer, not sure if this is pythonic
     ):
         """
         Characterize the dynamic inventory dictionaries using dynamic characterization functions using the DynamicCharacterization class.
@@ -334,15 +334,11 @@ class MedusaLCA:
                                             self.dynamic_inventory, 
                                             self.dicts.activity,
                                             self.dicts.biosphere.reversed,
+                                            self.act_time_mapping_reversed,
                                             )
         
-        self.characterized_inventory = self.dynamic_inventory_characterizer.characterize_dynamic_inventory(characterization_dictionary)
+        self.characterized_inventory = self.dynamic_inventory_characterizer.characterize_dynamic_inventory() #characterization_dictionary)
         
-        #add meta data and reorder
-        self.characterized_inventory["activity_name"]=self.characterized_inventory["activity"].map(lambda x: self.act_time_mapping_reversed.get(x)[0])
-        self.characterized_inventory["flow_name"] = self.characterized_inventory["flow"].apply(lambda x: bd.get_node(id=x)["name"])
-        self.characterized_inventory = self.characterized_inventory[['date', 'amount', 'flow', 'flow_name','activity','activity_name', 'amount_sum']] 
-        self.characterized_inventory.reset_index(drop=True, inplace=True)
 
     def prepare_static_lca_inputs(
         self,
@@ -647,7 +643,7 @@ class MedusaLCA:
         )
         
         
-        axes.set_ylabel("GWP in W/m2")
+        axes.set_ylabel("Radiative forcing in W/m2")
         axes.set_xlabel("Time (years)")
         
         axes.legend(bbox_to_anchor=(1.05, 1), loc='upper left')

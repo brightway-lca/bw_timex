@@ -3327,6 +3327,18 @@ def db_dynamic_cf_test():
             "name": "methane",
             "temporalis code": "ch4",
         },
+
+        ('temporalis-bio', "CO"): {
+            "type": "emission",
+            "name": "carbon monoxide",
+            "temporalis code": "co",
+        },
+
+        ('temporalis-bio', "N2O"): {
+            "type": "emission",
+            "name": "nitrous oxide",
+            "temporalis code": "n2o",
+        },
     })
 
     bd.Database('background_2024').write({
@@ -3365,6 +3377,17 @@ def db_dynamic_cf_test():
                         TemporalDistribution(
                             date=np.array([-20, 10, 20], dtype='timedelta64[Y]'), 
                             amount=np.array([0.2, 0.7, 0.1])
+                        ),
+
+                },
+                {
+                    'amount': 1,
+                    'type': 'biosphere',
+                    'input': ('temporalis-bio', 'CO'),
+                    'temporal_distribution': 
+                        TemporalDistribution(
+                            date=np.array([-1], dtype='timedelta64[Y]'), 
+                            amount=np.array([1])
                         ),
 
                 },
@@ -3411,6 +3434,17 @@ def db_dynamic_cf_test():
                         ),
 
                 },
+                {
+                    'amount': 1,
+                    'type': 'biosphere',
+                    'input': ('temporalis-bio', 'CO'),
+                    'temporal_distribution': 
+                        TemporalDistribution(
+                            date=np.array([-1], dtype='timedelta64[Y]'), 
+                            amount=np.array([1])
+                        ),
+
+                },
             ]
         }
     })
@@ -3444,6 +3478,17 @@ def db_dynamic_cf_test():
                         ),
 
                 },
+                {
+                    'amount': 1,
+                    'type': 'biosphere',
+                    'input': ('temporalis-bio', 'N2O'),
+                    'temporal_distribution': 
+                        TemporalDistribution(
+                            date=np.array([4], dtype='timedelta64[Y]'), 
+                            amount=np.array([1])
+                        ),
+
+                },
             ]
         },
         
@@ -3461,6 +3506,11 @@ def db_dynamic_cf_test():
                     'amount': 17,
                     'type': 'biosphere',
                     'input': ('temporalis-bio', 'CO2'),
+                    'temporal_distribution': 
+                        TemporalDistribution(
+                            date=np.array([-1], dtype='timedelta64[Y]'), 
+                            amount=np.array([1])
+                        ),
                 },
                 {
                     'amount': 4,
@@ -3468,8 +3518,8 @@ def db_dynamic_cf_test():
                     'input': ('foreground', 'B'),
                     'temporal_distribution': 
                         TemporalDistribution(
-                            date=np.array([-13, 5], dtype='timedelta64[Y]'), 
-                            amount=np.array([0.5, 0.5])
+                            date=np.array([-25, 10, 0], dtype='timedelta64[Y]'), 
+                            amount=np.array([0.5, 0.3, 0.2])
                         ),
        
                 },
