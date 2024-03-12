@@ -17,6 +17,7 @@ class DynamicBiosphere:
         self,
         activity_dict: dict,
         activity_time_mapping_dict: dict,
+        biosphere_time_mapping_dict: dict,
         temporal_grouping: str,
         database_date_dict: dict,
         supply_array: np.array,
@@ -30,7 +31,8 @@ class DynamicBiosphere:
         }
 
         self.activity_dict = activity_dict
-        self.act_time_mapping = activity_time_mapping_dict
+        self.activity_time_mapping_dict = activity_time_mapping_dict
+        self.biosphere_time_mapping_dict = biosphere_time_mapping_dict
         self.time_res = self._time_res_dict[temporal_grouping]
         self.database_date_dict = database_date_dict
         self.dynamic_supply_array = supply_array
@@ -46,14 +48,11 @@ class DynamicBiosphere:
         The timing of the emitting process and potential additional temporal information of the bioshpere flow (e.g. delay of emission compared to timing of process) are considered.
         """
         self.nr_procs = len(
-            self.act_time_mapping
+            self.activity_time_mapping_dict
         )  # these are all the processes in the mapping (incl background)
-        self.bio_row_mapping = TimeMappingDict(
-            start_id=0
-        )  # create new instance of TimeMappingdict for the biosphere flows, starting at 0 is fine since separate matrix.
 
         # looping over all activities:
-        for ((db, code), time), id in self.act_time_mapping.items():
+        for ((db, code), time), id in self.activity_time_mapping_dict.items():
             # Check if activity comes from foreground, if so, continue to next activity
             # because there's no need to include their bioflows, as these processes will be exploded and hence no activity links to them
             if time == "dynamic":
@@ -86,8 +85,8 @@ class DynamicBiosphere:
 
                     # Add entry to dynamic bio matrix
                     # first create a row index for the tuple((db,bio_flow), date))
-                    self.bio_row_mapping.add((bio_flow, bio_date))
-                    bio_row_index = self.bio_row_mapping[(bio_flow, bio_date)]
+                    self.biosphere_time_mapping_dict.add((bio_flow, bio_date))
+                    bio_row_index = self.biosphere_time_mapping_dict[(bio_flow, bio_date)]
                     # populate lists with which sparse matrix is constructed
                     self.add_matrix_entry_for_biosphere_flows(
                         row=bio_row_index, col=process_col_index, amount=bio_value
@@ -110,8 +109,8 @@ class DynamicBiosphere:
                 # Add entries to dynamic bio matrix
                 for bio_date, bio_flow in zip(bio_dates, bio_values):
                     # first create a row index for the tuple((db,bio_flow), date))
-                    self.bio_row_mapping.add((exc.input, bio_date))
-                    bio_row_index = self.bio_row_mapping[(exc.input, bio_date)]
+                    self.biosphere_time_mapping_dict.add((exc.input, bio_date))
+                    bio_row_index = self.biosphere_time_mapping_dict[(exc.input, bio_date)]
                     # populate lists with which sparse matrix is constructed
                     self.add_matrix_entry_for_biosphere_flows(
                         row=bio_row_index, col=process_col_index, amount=bio_flow

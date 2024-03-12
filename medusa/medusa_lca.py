@@ -78,6 +78,11 @@ class MedusaLCA:
             start_id=bd.backends.ActivityDataset.select(fn.MAX(AD.id)).scalar() + 1
         )  # making sure to use unique ids for the time mapped processes by counting up from the highest current activity id
         self.add_activities_to_time_mapping_dict()
+        
+        # Create a similar dict for the biosphere flows. This is populated by the dynamic_biosphere_builder
+        self.biosphere_time_mapping_dict = TimeMappingDict(
+            start_id=0
+        )  
 
         # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
         self.database_date_dict_static_only = {
@@ -171,6 +176,7 @@ class MedusaLCA:
             remapping_dicts=self.remapping,
         )
         self.lca.lci()
+        self.calculate_dynamic_biosphere_lci()
 
     def lcia(self):
         """
@@ -203,6 +209,7 @@ class MedusaLCA:
         self.dynamic_biosphere_builder = DynamicBiosphere(
             self.dicts.activity,
             self.activity_time_mapping_dict,
+            self.biosphere_time_mapping_dict,
             self.temporal_grouping,
             self.database_date_dict,
             self.supply_array,
@@ -211,16 +218,13 @@ class MedusaLCA:
         self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
         self.dynamic_biomatrix = self.dynamic_biosphere_builder.dynamic_biomatrix
 
-    def calculate_dynamic_lci(
+    def calculate_dynamic_biosphere_lci(
         self,
     ):
-        """calcluates the dynamic inventory and calls build_dynamic_inventory_dict.
-        Returns a dictionary with the dynamic inventory of the LCI in the form of {CO2: {time: [2022, 2023], amount:[3,5]}, CH4: {time: [2022, 2023], amount:[3,5]}, ...}
         """
-        if not hasattr(self, "dynamic_biomatrix"):
-            warnings.warn(
-                "dynamic biosphere matrix not yet built. Call MedusaLCA.build_dynamic_biosphere() first."
-            )
+        Build the dynamic biosphere and calcluates the dynamic inventory.
+        """
+        self.build_dynamic_biosphere()
 
         # calculate lci from dynamic biosphere matrix
         unordered_dynamic_lci = self.dynamic_biomatrix.dot(
@@ -238,13 +242,13 @@ class MedusaLCA:
         CH4: {time: [2022, 2023], amount:[3,5]},
         ...
         }
-        :param unordered_dynamic_lci: lci results in an array, whose order is the same as the bio_row_mapping (?)
+        :param unordered_dynamic_lci: lci results in an array, whose order is the same as the biosphere_time_mapping_dict (?)
         :return: none but sets the dynamic_inventory attribute of the MedusaLCA instance
         """
         self.dynamic_inventory = (
             {}
         )  # dictionary to store the dynamic lci {CO2: {time: [2022, 2023], amount:[3,5]}}
-        for (flow, time), i in self.bio_row_mapping.items():
+        for (flow, time), i in self.biosphere_time_mapping_dict.items():
             amount = unordered_dynamic_lci[i]
             # add biosphere flow to dictionary if it does not exist yet
             if not flow["code"] in self.dynamic_inventory.keys():
@@ -513,14 +517,14 @@ class MedusaLCA:
         """
         Returns the dynamic biosphere matrix as a dataframe with comprehensible labels instead of ids.
         """
-        bio_row_mapping_reversed = {
+        biosphere_time_mapping_dict_reversed = {
             index: (flow["code"], time)
-            for (flow, time), index in self.bio_row_mapping.items()
+            for (flow, time), index in self.biosphere_time_mapping_dict.items()
         }
 
         df = pd.DataFrame(self.dynamic_biomatrix.toarray())
         df.rename(  # from matrix id to activity id
-            index=bio_row_mapping_reversed,
+            index=biosphere_time_mapping_dict_reversed,
             columns=self.dicts.activity.reversed,
             inplace=True,
         )
@@ -546,7 +550,7 @@ class MedusaLCA:
 
     def remap_inventory_dicts(self) -> None:
         warnings.warn(
-            "bw25's original mapping function doesn't work with our new time-mapped matrix entries. The medusa mapping can be found in acvitity_time_mapping_dict and bio_row_mapping."
+            "bw25's original mapping function doesn't work with our new time-mapped matrix entries. The medusa mapping can be found in acvitity_time_mapping_dict and biosphere_time_mapping_dict."
         )
         return
 

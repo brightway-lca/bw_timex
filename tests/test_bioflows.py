@@ -48,7 +48,7 @@ class TestBioflows(unittest.TestCase):
         )
 
         mlca.build_dynamic_biosphere()
-        mlca.calculate_dynamic_lci()
+        mlca.calculate_dynamic_biosphere_lci()
 
         for idx, row in enumerate(mlca.lca.inventory.toarray()):
             bioflow_matrix_id = mlca.lca.dicts.biosphere.reversed[idx]
