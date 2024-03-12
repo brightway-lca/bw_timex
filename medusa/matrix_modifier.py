@@ -16,6 +16,7 @@ class MatrixModifier:
     :param demand_timing: A dictionary representing the demand timing.
     :param name: An optional name for the MatrixModifier instance. Default is None.
     """
+
     def __init__(
         self,
         timeline: pd.DataFrame,
@@ -35,10 +36,10 @@ class MatrixModifier:
 
         The heavy lifting of this function happens in its inner function "add_row_to_datapackage":
         Here, each node with a temporal distribution is "exploded", which means each occurrence of this node (e.g. steel production on 2020-01-01
-        and steel production 2015-01-01) becomes a separate new node, by adding the respective elements to the technosphere matrix. 
+        and steel production 2015-01-01) becomes a separate new node, by adding the respective elements to the technosphere matrix.
         For processes at the interface with background databases, the timing of the exchanges determines which background database to link to in so called "Temporal Market".
-         
-    
+
+
         :param timeline: A timeline of edges, typically created from EdgeExtracter.create_edge_timeline()
         :param database_date_dict: A dict of the available prospective databases: their names (key) and temporal representativeness (value).
         :param demand_timing: A dict of the demand ids and the timing occur. Can be created using create_demand_timing_dict().
@@ -56,12 +57,12 @@ class MatrixModifier:
         ) -> None:
             """
             This adds the required technosphere matrix modifications for each time-dependent exchange (edge) as datapackage elements to a given bwp.Datapackage.
-            Modifications include: 
-            1) Exploded processes: new matrix elements between exploded consumer and exploded producer, representing the temporal edge between them. 
-            2) Temporal markets: new matrix entries between "temporal markets" and the producer in temporally matching background database, with shares based on interpolation. 
+            Modifications include:
+            1) Exploded processes: new matrix elements between exploded consumer and exploded producer, representing the temporal edge between them.
+            2) Temporal markets: new matrix entries between "temporal markets" and the producer in temporally matching background database, with shares based on interpolation.
                Processes in the background databases are matched on name, reference product and location.
             3) Diagonal entries: ones on the diagonal for new nodes.
-              
+
             This function also updates the set of new nodes with the ids of any new nodes created during this process.
 
             :param row: A row from the timeline DataFrame.
@@ -172,10 +173,11 @@ class MatrixModifier:
         )  # array of unique (producer, timestamp) tuples
 
         datapackage_bio = bwp.create_datapackage(sum_inter_duplicates=False)
-        
+
         for producer in unique_producers:
             if (
-                bd.get_activity(producer[0])["database"] not in self.database_date_dict.keys() # skip temporal markets
+                bd.get_activity(producer[0])["database"]
+                not in self.database_date_dict.keys()  # skip temporal markets
             ):
                 producer_id = producer[1]
                 # the producer_id is a combination of the activity_id and the timestamp
@@ -189,7 +191,7 @@ class MatrixModifier:
                         (exc.input.id, producer_id)
                     )  # directly build a list of tuples to pass into the datapackage, the producer_id is used to for the column of that activity
                     amounts.append(exc.amount)
-                    
+
                 datapackage_bio.add_persistent_vector(
                     matrix="biosphere_matrix",
                     name=uuid.uuid4().hex,

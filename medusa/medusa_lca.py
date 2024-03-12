@@ -28,23 +28,24 @@ from .dynamic_biosphere_builder import DynamicBiosphere
 from .remapping import TimeMappingDict
 from .utils import extract_date_as_integer
 
+
 class MedusaLCA:
     """
     Class to perform dynamic-prospective LCA calculations.
 
     The key point of MedusaLCA is that it retrieves the LCI of processes occuring at a certain time from a database that represents the technology landscape at this point in time.
-    
+
     It first calculates a static LCA, which informs a priority-first graph traversal, from which the temporal relationships between exchanges and processes are derived.
     For processes at the interface with background databases, the timing of the exchanges determines which background database to link to.
-    This temporal relinking is achieved by using datapackages to add new processes, that represent processes happening at a specific time period, to the technopshere matrix 
+    This temporal relinking is achieved by using datapackages to add new processes, that represent processes happening at a specific time period, to the technopshere matrix
     and their corresponding biosphere flows to the biosphere matrix and then linking these to the original demand.
     The temporal information can also be used for dynamic LCIA chalculations.
 
     MedusaLCA calculates:
-     1) a conventional LCA score (MedusaLCA.static_lca.score(), same as BW2 lca.score()), 
+     1) a conventional LCA score (MedusaLCA.static_lca.score(), same as BW2 lca.score()),
      2) a dynamic-prospective LCA score, which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows (MedusaLCA.lca.score())
      3) a dynamic-prospective LCA score with dynamic inventory and dynamic charaterization factors (not yet operational: TODO dynamic CFs in general and optional add Levasseur methodology with TH-cutoff)
-    
+
     """
 
     def __init__(
@@ -72,8 +73,10 @@ class MedusaLCA:
         self.static_lca.lci()
         self.static_lca.lcia()
 
-        # Create a time mapping dict that maps each activity to a activity_time_mapping_id in the format (('database', 'code'), datetime_as_integer): time_mapping_id) 
-        self.activity_time_mapping_dict = TimeMappingDict(start_id=bd.backends.ActivityDataset.select(fn.MAX(AD.id)).scalar() + 1) # making sure to use unique ids for the time mapped processes by counting up from the highest current activity id 
+        # Create a time mapping dict that maps each activity to a activity_time_mapping_id in the format (('database', 'code'), datetime_as_integer): time_mapping_id)
+        self.activity_time_mapping_dict = TimeMappingDict(
+            start_id=bd.backends.ActivityDataset.select(fn.MAX(AD.id)).scalar() + 1
+        )  # making sure to use unique ids for the time mapped processes by counting up from the highest current activity id
         self.add_activities_to_time_mapping_dict()
 
         # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
@@ -96,7 +99,7 @@ class MedusaLCA:
         """
         Adds all activities to activity_time_mapping_dict, an instance of TimeMappingDict.
         This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id) that is later used to uniquely identify time-resolved processes.
-        
+
         """
         for id in self.static_lca.dicts.activity.keys():  # activity ids
             key = self.static_lca.remapping_dicts["activity"][
@@ -130,7 +133,7 @@ class MedusaLCA:
                 "Timeline not yet built. Call MedusaLCA.build_timeline() first."
             )
             return
-        
+
         # mapping of the demand id to demand time
         self.demand_timing_dict = self.create_demand_timing_dict()
 
@@ -178,14 +181,14 @@ class MedusaLCA:
             return
         self.lca.lcia()
 
-    #TODO maybe restructure the dynamic biosphere building into one method, simialr to lci() and lcia()? dynamic_lci(), which calls build_dynamic_biosphere() and calculate_dynamic_lci()?
-    
+    # TODO maybe restructure the dynamic biosphere building into one method, simialr to lci() and lcia()? dynamic_lci(), which calls build_dynamic_biosphere() and calculate_dynamic_lci()?
+
     def build_dynamic_biosphere(self):
         """
         Build the dynamic biosphere matrix, which links the biosphere flows to the correct background databases and keeps the timing èach biosphere flows, using DynamicBiosphere class.
-        
+
         This returns a matrix of the dimensions (bio_flows at a specific timestep) x (processes)
-        
+
         """
 
         if not hasattr(self, "lca"):
@@ -218,11 +221,11 @@ class MedusaLCA:
             warnings.warn(
                 "dynamic biosphere matrix not yet built. Call MedusaLCA.build_dynamic_biosphere() first."
             )
-        
+
         # calculate lci from dynamic biosphere matrix
         unordered_dynamic_lci = self.dynamic_biomatrix.dot(
-            self.dynamic_supply_array #dynamic supply array excludes the original databases
-        )  
+            self.dynamic_supply_array  # dynamic supply array excludes the original databases
+        )
         self.build_dynamic_inventory_dict(unordered_dynamic_lci)
 
     def build_dynamic_inventory_dict(
@@ -230,7 +233,7 @@ class MedusaLCA:
         unordered_dynamic_lci: np.array,
     ):
         """
-        Create dynamic lci dictionary with structure 
+        Create dynamic lci dictionary with structure
         {CO2: {time: [2022, 2023], amount:[3,5]},
         CH4: {time: [2022, 2023], amount:[3,5]},
         ...
@@ -274,7 +277,7 @@ class MedusaLCA:
         Prepare LCA input arguments in Brightway 2.5 style.
         ORIGINALLY FROM bw2data.compat.py
 
-        The difference to the original method is that we load all available databases into the matrices instead of just the ones depending on the demand. 
+        The difference to the original method is that we load all available databases into the matrices instead of just the ones depending on the demand.
         We need this for the creation of the time mapping dict that creates a mapping between the producer id and the reference timing of the databases in the database_date_dict.
         """
         if not projects.dataset.data.get("25"):
@@ -450,9 +453,9 @@ class MedusaLCA:
 
     def create_demand_timing_dict(self) -> dict:
         """
-        Generate a dictionary mapping producer (key) to reference timing (value) for specific demands. 
+        Generate a dictionary mapping producer (key) to reference timing (value) for specific demands.
         Reference timing can have flexible resolution (year=YYYY, month=YYYYMM, day=YYYYMMDD, hour=YYYYMMDDHH) defined in temporal_grouping.
-        
+
         It searches the timeline for those rows that contain the functional units (demand-processes as producer and -1 as consumer) and returns the time of the demand.
 
         :param timeline: Timeline DataFrame, generated by `create_grouped_edge_dataframe`.
@@ -468,8 +471,7 @@ class MedusaLCA:
         self.demand_timing_dict = {
             row.producer: row.hash_producer for row in demand_rows.itertuples()
         }
-        return self.demand_timing_dict  
-
+        return self.demand_timing_dict
 
     def create_labelled_technosphere_dataframe(self) -> pd.DataFrame:
         """
@@ -500,9 +502,9 @@ class MedusaLCA:
             columns=self.dicts.activity.reversed,
             inplace=True,
         )
-        df.rename(  
-            index=self.remapping_dicts['biosphere'], # from activity id to bioflow name
-            columns=self.activity_time_mapping_dict.reversed(), # from activity id to ((database, code), time)
+        df.rename(
+            index=self.remapping_dicts["biosphere"],  # from activity id to bioflow name
+            columns=self.activity_time_mapping_dict.reversed(),  # from activity id to ((database, code), time)
             inplace=True,
         )
         return df
@@ -529,7 +531,7 @@ class MedusaLCA:
         return df
 
     def plot_dynamic_inventory(self, bio_flow: str):
-        """"
+        """ "
         Simple plot of dynamic inventory of a biosphere flow over time.
         :param bio_flow: str, name of the biosphere flow to plot
         :return: none, but shows a plot
@@ -543,9 +545,11 @@ class MedusaLCA:
         plt.show()
 
     def remap_inventory_dicts(self) -> None:
-        warnings.warn("bw25's original mapping function doesn't work with our new time-mapped matrix entries. The medusa mapping can be found in acvitity_time_mapping_dict and bio_row_mapping.")
+        warnings.warn(
+            "bw25's original mapping function doesn't work with our new time-mapped matrix entries. The medusa mapping can be found in acvitity_time_mapping_dict and bio_row_mapping."
+        )
         return
-        
+
     def __getattr__(self, name):
         """
         Delegate attribute access to the self.lca object if the attribute

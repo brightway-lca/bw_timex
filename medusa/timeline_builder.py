@@ -12,11 +12,11 @@ from .edge_extractor import EdgeExtractor, Edge
 from .utils import extract_date_as_integer
 
 
-class TimelineBuilder: 
+class TimelineBuilder:
     """
     This class is responsible for building a timeline based on the provided static LCA (slca). First, the an EdgeExtractor handles the graph traversal and extracts the edges. On calling TimelineBuilder.build_timeline(), the information from the EdgeExtractor is used to build a timeline dataframe.
     The static LCA is needed to inform the priority-first traversal of the supply chain and impact cut-off based on the LCIA score of the chosen impact category. Thus, the decision, which branch to follow is based on the static system.
-    
+
     :param slca: Static LCA.
     :param edge_filter_function: A callable that filters edges. If not provided, a function that always returns False is used.
     :param database_date_dict: A dictionary mapping databases to dates.
@@ -25,6 +25,7 @@ class TimelineBuilder:
     :param interpolation_type: The type of interpolation to be used. Default is "linear".
     :param kwargs: Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA. Here, things like the max_calc or cutoff values fot the graph traversal can be set.
     """
+
     def __init__(
         self,
         slca: LCA,
@@ -44,7 +45,7 @@ class TimelineBuilder:
 
         eelca = EdgeExtractor(slca, edge_filter_function=edge_filter_function, **kwargs)
         self.edge_timeline = eelca.build_edge_timeline()
-    
+
     def check_database_names(self):
         """
         Check that the strings of the databases exist in the databases of the brightway2 project.
@@ -57,8 +58,8 @@ class TimelineBuilder:
                 "All databases in database_date_dict exist as brightway project databases"
             )
         return
-    
-    #TODO: rethink structure of build_timeline(): is it good to have all these nested functions?
+
+    # TODO: rethink structure of build_timeline(): is it good to have all these nested functions?
     def build_timeline(self) -> pd.DataFrame:
         """
         Create a dataframe with grouped edges and for each grouped edge interpolate to the database with the closest time of representativeness.
@@ -77,7 +78,6 @@ class TimelineBuilder:
         :return: Grouped edge dataframe.
         """
 
-        
         def extract_edge_data(edge: Edge) -> dict:
             """
             Stores the attributes of an Edge instance in a dictionary.
@@ -160,7 +160,7 @@ class TimelineBuilder:
                 )
 
             return datetime.strptime(datestring, time_res_dict[self.temporal_grouping])
-        
+
         def add_column_interpolation_weights_to_timeline(
             tl_df: pd.DataFrame,
             database_date_dict: dict,
@@ -178,7 +178,9 @@ class TimelineBuilder:
             """
 
             dates_list = [
-                date for date in self.database_date_dict.values() if type(date) == datetime
+                date
+                for date in self.database_date_dict.values()
+                if type(date) == datetime
             ]
             if "date_producer" not in list(tl_df.columns):
                 raise ValueError("The timeline does not contain dates.")
@@ -193,7 +195,9 @@ class TimelineBuilder:
                     lambda x: find_closest_date(x, dates_list)
                 )
                 tl_df["interpolation_weights"] = tl_df["interpolation_weights"].apply(
-                    lambda d: {self.reversed_database_date_dict[x]: v for x, v in d.items()}
+                    lambda d: {
+                        self.reversed_database_date_dict[x]: v for x, v in d.items()
+                    }
                 )
                 return tl_df
 
@@ -204,7 +208,9 @@ class TimelineBuilder:
                     )
                 )
                 tl_df["interpolation_weights"] = tl_df["interpolation_weights"].apply(
-                    lambda d: {self.reversed_database_date_dict[x]: v for x, v in d.items()}
+                    lambda d: {
+                        self.reversed_database_date_dict[x]: v for x, v in d.items()
+                    }
                 )
 
             else:
@@ -213,7 +219,7 @@ class TimelineBuilder:
                 )
 
             return tl_df
-        
+
         def find_closest_date(target: datetime, dates: KeysView[datetime]) -> dict:
             """
             Find the closest date to the target in the dates list.
@@ -254,15 +260,15 @@ class TimelineBuilder:
             dates_list = sorted(dates_list)
 
             diff_dates_list = [reference_date - x for x in dates_list]
-            
-            if timedelta(0) in diff_dates_list: # date of process == date of database
+
+            if timedelta(0) in diff_dates_list:  # date of process == date of database
                 exact_match = dates_list[diff_dates_list.index(timedelta(0))]
                 return {exact_match: 1}
 
             closest_lower = None
             closest_higher = None
 
-            #select the closest lower and higher dates of the database in regards to the date of process
+            # select the closest lower and higher dates of the database in regards to the date of process
             for date in dates_list:
                 if date < reference_date:
                     if (
@@ -367,21 +373,21 @@ class TimelineBuilder:
             lambda x: convert_grouping_date_string_to_datetime(
                 self.temporal_grouping, x
             )
-        )  
+        )
         grouped_edges["date_consumer"] = grouped_edges["consumer_grouping_time"].apply(
             lambda x: convert_grouping_date_string_to_datetime(
                 self.temporal_grouping, x
             )
-        )  
+        )
 
         # add dates as integers as hashes to the dataframe
         grouped_edges["hash_producer"] = grouped_edges["date_producer"].apply(
             lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
-        )  
+        )
 
         grouped_edges["hash_consumer"] = grouped_edges["date_consumer"].apply(
             lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
-        )  
+        )
 
         # add new processes to time mapping dict
         for row in grouped_edges.itertuples():
@@ -393,14 +399,18 @@ class TimelineBuilder:
         grouped_edges["time_mapped_producer"] = grouped_edges.apply(
             lambda row: self.time_mapping_dict[
                 (bd.get_node(id=row.producer).key, row.hash_producer)
-                ],
+            ],
             axis=1,
         )
-        
+
         grouped_edges["time_mapped_consumer"] = grouped_edges.apply(
-            lambda row: self.time_mapping_dict[
-                (bd.get_node(id=row.consumer).key, row.hash_consumer)
-            ] if row.consumer != -1 else -1,
+            lambda row: (
+                self.time_mapping_dict[
+                    (bd.get_node(id=row.consumer).key, row.hash_consumer)
+                ]
+                if row.consumer != -1
+                else -1
+            ),
             axis=1,
         )
 
@@ -436,5 +446,3 @@ class TimelineBuilder:
         ]
 
         return grouped_edges
-
-    
