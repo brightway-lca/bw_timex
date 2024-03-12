@@ -3,6 +3,7 @@ import warnings
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from peewee import fn
 
 from datetime import datetime
 from typing import Optional, Callable
@@ -72,7 +73,7 @@ class MedusaLCA:
         self.static_lca.lcia()
 
         # Create a time mapping dict that maps each activity to a activity_time_mapping_id in the format (('database', 'code'), datetime_as_integer): time_mapping_id) 
-        self.activity_time_mapping_dict = TimeMappingDict(start_id=max(self.static_lca.dicts.biosphere.keys()) + 1) # start at the first id after the biosphere flows to avoid overlap
+        self.activity_time_mapping_dict = TimeMappingDict(start_id=bd.backends.ActivityDataset.select(fn.MAX(AD.id)).scalar() + 1) # making sure to use unique ids for the time mapped processes by counting up from the highest current activity id 
         self.add_activities_to_time_mapping_dict()
 
         # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
@@ -469,6 +470,7 @@ class MedusaLCA:
         }
         return self.demand_timing_dict  
 
+
     def create_labelled_technosphere_dataframe(self) -> pd.DataFrame:
         """
         Returns the technosphere matrix as a dataframe with comprehensible labels instead of ids.
@@ -540,6 +542,10 @@ class MedusaLCA:
         plt.xlabel("time")
         plt.show()
 
+    def remap_inventory_dicts(self) -> None:
+        warnings.warn("bw25's original mapping function doesn't work with our new time-mapped matrix entries. The medusa mapping can be found in acvitity_time_mapping_dict and bio_row_mapping.")
+        return
+        
     def __getattr__(self, name):
         """
         Delegate attribute access to the self.lca object if the attribute

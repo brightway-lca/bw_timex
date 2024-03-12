@@ -174,11 +174,8 @@ class MatrixModifier:
         datapackage_bio = bwp.create_datapackage(sum_inter_duplicates=False)
         
         for producer in unique_producers:
-            # Skip the -1 producer as this is just a dummy producer of the functional unit
             if (
-                not producer[0] == -1
-                and not bd.get_activity(producer[0])["database"]
-                in self.database_date_dict.values()
+                bd.get_activity(producer[0])["database"] not in self.database_date_dict.keys() # skip temporal markets
             ):
                 producer_id = producer[1]
                 # the producer_id is a combination of the activity_id and the timestamp
