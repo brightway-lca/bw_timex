@@ -339,14 +339,17 @@ class MedusaLCA:
                                             self.dicts.activity,
                                             self.dicts.biosphere.reversed,
                                             self.act_time_mapping_reversed,
+                                            self.demand_timing_dict,
+                                            self.temporal_grouping,
                                             )
         
-        self.characterized_inventory = self.dynamic_inventory_characterizer.characterize_dynamic_inventory(
+        (self.characterized_inventory, self.type_of_method, self.fixed_TH, self.TH) = self.dynamic_inventory_characterizer.characterize_dynamic_inventory(
             cumsum,
             type,
             fixed_TH, #True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
             TH, 
-        ) #characterization_dictionary)
+        )
+        self.characterized_dynamic_score = self.characterized_inventory["amount"].sum() 
         
 
     def prepare_static_lca_inputs(
@@ -647,6 +650,26 @@ class MedusaLCA:
         else: 
             amount = "amount"
 
+        if not hasattr(self, "characterized_inventory"):
+            warnings.warn(
+                "Characterized inventory not yet calculated. Call MedusaLCA.characterize_dynamic_lci() first."
+            )
+            return
+        
+        if self.type_of_method == "radiative_forcing":
+            label_legend = "Radiative forcing [W/m2]"
+            title = "Radiative forcing"
+        if self.type_of_method == "GWP":
+            label_legend = "GWP [kg CO2-eq]"
+            title = "GWP"
+        
+        if self.fixed_TH == False: # if TH is calculated from t emission
+            
+            title += " with TH of " + str(self.TH) + " " + str(self.temporal_grouping) + " starting at each emission"
+
+        if self.fixed_TH == True: # if TH is calculated from FU
+            title += " with TH of " + str(self.TH) + " " + str(self.temporal_grouping) + " starting at FU"
+
         axes = sb.scatterplot(
             x="date", 
             y=amount,
@@ -656,10 +679,11 @@ class MedusaLCA:
         )
         
         
-        axes.set_ylabel("Radiative forcing in W/m2")
-        axes.set_xlabel("Time (years)")
+        axes.set_ylabel(label_legend)
+        axes.set_xlabel("Time (" +  str(self.temporal_grouping) +")")
         
         axes.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        axes.set_title(title)
         plt.show()
 
     def __getattr__(self, name):

@@ -5,6 +5,7 @@ import bw2data as bd
 import numpy as np
 import os
 from bw_temporalis.lcia.climate import characterize_methane, characterize_co2
+from datetime import datetime, timedelta
 
 
 
@@ -30,11 +31,15 @@ class DynamicCharacterization():
                  activity_dict: dict,
                  biosphere_dict_rerversed: dict,
                  act_time_mapping_reversed: dict,
+                 demand_timing_dict: dict,
+                 temporal_grouping: dict,
                                   ):
         self.dynamic_inventory = dynamic_inventory
         self.activity_dict = activity_dict
         self.biosphere_dict_rerversed = biosphere_dict_rerversed
         self.act_time_mapping_reversed = act_time_mapping_reversed
+        self.demand_timing_dict = demand_timing_dict
+        self.temporal_grouping = temporal_grouping
         self.dynamic_lci_df = self.format_dynamic_inventory_as_dataframe()
         self.levasseur_dcfs = self.add_levasseur_dcfs()
 
@@ -108,14 +113,16 @@ class DynamicCharacterization():
     
     def characterize_dynamic_inventory(self, 
                                         #characterization_dictionary: dict, # dictionary: mapping elemental flow (key) with characterization function (value) 
+        #temporal_grouping: str,  #default is yearly defined at instance of MedusaLCA
         cumsum: bool | None = True,
-        type: str | None = "radiative_forcing",
+        type_of_method: str | None = "radiative_forcing",
         fixed_TH: bool | None = False, #True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
         TH: int | None = 100, 
+        
         flow: set[int] | None = None,
         activity: set[int] | None = None,
         
-    ) -> pd.DataFrame:
+    ) -> Tuple[pd.DataFrame, str, bool, int]:
         
         ''' 
         #update description
@@ -130,11 +137,18 @@ class DynamicCharacterization():
         # TODO add checks, add fixed TH
             
         '''
-        if type not in {"radiative_forcing", "GWP"}:
-            raise ValueError(f"impact assessment type must be either 'radiative_forcing' or 'GWP', not {type}")	
+        if type_of_method not in {"radiative_forcing", "GWP"}:
+            raise ValueError(f"impact assessment type must be either 'radiative_forcing' or 'GWP', not {type_of_method}")	
         
         characterization_dictionary = {"carbon dioxide": characterize_co2, "methane": characterize_methane, "carbon monoxide": self.characterize_co, "nitrous oxide": self.characterize_n2o}
-        
+        #TODO think if it makes sense to store characterization dictionary here
+
+        time_res_dict = {
+        "year": "%Y",
+        "month": "%Y%m",
+        "day": "%Y%m%d",
+        "hour": "%Y%m%d%M",
+        }
         all_characterized_inventory = pd.DataFrame()
         
         mapping_flow_to_id = {flow: bd.get_activity(name=flow).id for flow in characterization_dictionary.keys()}
@@ -152,36 +166,84 @@ class DynamicCharacterization():
                 
             df.reset_index(drop=True, inplace=True)
  
-            if type == "radiative_forcing":
-                characterized_inventory = pd.concat(
-                [characterization_function(row) for _, row in df.iterrows()] # using characterization function from bw_temporalis
-            )
-                #continue
+            if type_of_method == "radiative_forcing":
 
-            if type == "GWP": #scale radiative forcing to GWP in CO2 equivalent
+                if not fixed_TH: #conventional approach, emission is calculated from t emission for the length of TH, regardless of when emission occur
+                    characterized_inventory = pd.concat(
+                    [characterization_function(row, period = TH) for _, row in df.iterrows()]
+                    )
+                    
+                else: #fixed TH = True: Levasseur approach: TH for all emissions is calculated from t of FU for the length of TH. 
+                    #An emission occur n years before FU is characterized for TH+n years
+                    timing_FU = [value for value in self.demand_timing_dict.values()] # what if there are multiple FUs?
+                    end_TH_FU = [x + TH for x in timing_FU]
+                    end_TH_FU = datetime.strptime(str(end_TH_FU[0]), time_res_dict[self.temporal_grouping])
+                    
+                    characterized_inventory=pd.DataFrame() #initialize empty df
+                    
+                    for _, row in df.iterrows():
+
+                        timing_emission = row["date"].to_pydatetime() # convert'pandas._libs.tslibs.timestamps.Timestamp' to datetime object 
+                        new_TH = round((end_TH_FU - timing_emission).days / 365.25) #time difference in integer years between emission timing and end of TH of FU
+                        characterized_inventory = pd.concat(
+                        [characterized_inventory, characterization_function(row, period = new_TH)]
+                        )
+
+
+            if type_of_method == "GWP": #scale radiative forcing to GWP in CO2 equivalent
+
                 characterized_inventory = pd.DataFrame()
-                
-                for _, row in df.iterrows():
-                    radiative_forcing_ghg = characterization_function(row) 
-                    row["amount"] = 1 #convert 1 kg CO2 equ.
-                    radiative_forcing_co2 = characterize_co2(row)
 
-                    ghg_integral = radiative_forcing_ghg["amount"].sum() 
-                    co2_integral = radiative_forcing_co2["amount"].sum()
+                if not fixed_TH: #conventional approach, emission is calculated from t emission for the length of TH, regardless of when emission occur
+                    for _, row in df.iterrows():
+                        radiative_forcing_ghg = characterization_function(row, period = TH) 
+                        row["amount"] = 1 #convert 1 kg CO2 equ.
+                        radiative_forcing_co2 = characterize_co2(row, period = TH)
 
-                    co2_equiv = ghg_integral / co2_integral
+                        ghg_integral = radiative_forcing_ghg["amount"].sum() 
+                        co2_integral = radiative_forcing_co2["amount"].sum()
 
-                    row_data = {
-                            'date': radiative_forcing_ghg.loc[0, 'date'], #start date of emission
-                            'amount': co2_equiv, #ghg emission in co2 equiv
-                            'flow': radiative_forcing_ghg.loc[0, 'flow'],  
-                            'activity': radiative_forcing_ghg.loc[0, 'activity'],
-                        }
-                    row_df = pd.DataFrame([row_data])
+                        co2_equiv = ghg_integral / co2_integral
+
+                        row_data = {
+                                'date': radiative_forcing_ghg.loc[0, 'date'], #start date of emission
+                                'amount': co2_equiv, #ghg emission in co2 equiv
+                                'flow': radiative_forcing_ghg.loc[0, 'flow'],  
+                                'activity': radiative_forcing_ghg.loc[0, 'activity'],
+                            }
+                        row_df = pd.DataFrame([row_data])
+                                            
+                        characterized_inventory = pd.concat([characterized_inventory, row_df], ignore_index=True)
+
+                else: #fixed TH = True: Levasseur approach: TH for all emissions is calculated from t of FU for the length of TH.
+                    timing_FU = [value for value in self.demand_timing_dict.values()] # what if there are multiple FUs?
+                    end_TH_FU = [x + TH for x in timing_FU]
+                    end_TH_FU = datetime.strptime(str(end_TH_FU[0]), time_res_dict[self.temporal_grouping])
+                    
                                         
-                    characterized_inventory = pd.concat([characterized_inventory, row_df], ignore_index=True)
+                    for _, row in df.iterrows():
+                        timing_emission = row["date"].to_pydatetime() # convert'pandas._libs.tslibs.timestamps.Timestamp' to datetime object 
+                        new_TH = round((end_TH_FU - timing_emission).days / 365.25) 
 
-                
+                        radiative_forcing_ghg = characterization_function(row, period = new_TH) #indidvidual emissions are calculated for t_emission until t_FU + TH
+                        row["amount"] = 1 #convert 1 kg CO2 equ.
+                        radiative_forcing_co2 = characterize_co2(row, period = TH) # reference substance CO2 is calculated for TH (usually 100 years)
+
+                        ghg_integral = radiative_forcing_ghg["amount"].sum() 
+                        co2_integral = radiative_forcing_co2["amount"].sum()
+
+                        co2_equiv = ghg_integral / co2_integral #integral is now relative to TH from FU (=TH)
+
+                        row_data = {
+                                'date': radiative_forcing_ghg.loc[0, 'date'], #start date of emission
+                                'amount': co2_equiv, #ghg emission in co2 equiv
+                                'flow': radiative_forcing_ghg.loc[0, 'flow'],  
+                                'activity': radiative_forcing_ghg.loc[0, 'activity'],
+                            }
+                        row_df = pd.DataFrame([row_data])
+                                            
+                        characterized_inventory = pd.concat([characterized_inventory, row_df], ignore_index=True)
+
             # sort by date
             if "date" in characterized_inventory:
                 characterized_inventory.sort_values(by="date", ascending=True, inplace=True)
@@ -199,7 +261,7 @@ class DynamicCharacterization():
         all_characterized_inventory.reset_index(drop=True, inplace=True)
         all_characterized_inventory.sort_values(by="date", ascending=True, inplace=True)
         
-        return all_characterized_inventory
+        return all_characterized_inventory, type_of_method, fixed_TH, TH
     
     
     def characterize_co(self, series, period: int = 100, cumulative=False) -> pd.DataFrame:
