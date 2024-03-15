@@ -16,10 +16,12 @@ class DynamicCharacterization():
     Currently, dynamic characterization functions is available for the following emissions:
     - CO2
     - CH4
+    from bw_temporalis, which refers to these publications https://doi.org/10.5194/acp-13-2793-2013, http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
+
+    - CO
+    - N2O
+    from Levasseur et al 2010 (https://ciraig.org/index.php/project/dynco2-dynamic-carbon-footprinter/)
     
-    Characteriztaion functions are retrieved from bw_temporalis, which have them for CO2 and Methane from these publications: 
-    https://doi.org/10.5194/acp-13-2793-2013
-    http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
 
     First, the dynamic inventory is formatted as a DataFrame, then the characterization functions are applied in the method characterize_dynamic_inventory
     
@@ -34,6 +36,9 @@ class DynamicCharacterization():
                  demand_timing_dict: dict,
                  temporal_grouping: dict,
                                   ):
+        """
+        Initialize the DynamicCharacterization object.
+        """
         self.dynamic_inventory = dynamic_inventory
         self.activity_dict = activity_dict
         self.biosphere_dict_rerversed = biosphere_dict_rerversed
@@ -41,12 +46,14 @@ class DynamicCharacterization():
         self.demand_timing_dict = demand_timing_dict
         self.temporal_grouping = temporal_grouping
         self.dynamic_lci_df = self.format_dynamic_inventory_as_dataframe()
-        self.levasseur_dcfs = self.add_levasseur_dcfs()
+        self.levasseur_dcfs = self.import_levasseur_dcfs()
 
-    def add_levasseur_dcfs(self):
+    def import_levasseur_dcfs(self):
         """
-        Extracts the yearly radiative forcing values of various GHG based on Levasseur 2010 for 2000 years(https://ciraig.org/index.php/project/dynco2-dynamic-carbon-footprinter/)
-        Unit of forcing is W/m2/kg of GHG emitted
+        Extracts the yearly radiative forcing values of various GHG based on Levasseur 2010 for 0 - 2000 years (https://ciraig.org/index.php/project/dynco2-dynamic-carbon-footprinter/)
+        Unit of forcing is W/m2/kg of GHG emitted.
+
+        Because of the deviation between the functions in bw_temporalis and Levasseur for CO2, we use the bw_temporalis for CO2 and the Levasseur values for the other GHGs.
 
         param: None
         return: dict of dicts with the following structure: {ghg: {year: forcing}}
@@ -67,8 +74,8 @@ class DynamicCharacterization():
         data = data.rename(columns={data.columns[0]: 'year'}) # replace the first column label (NaN) with 'Year'
         data = data.sort_values('year') #sort by year
 
-        #map names of elemental flows
-        biopshere_flow_mapping = {'CO2': 'carbon dioxide', 'CH4': 'methane', 'N2O': "nitrous oxide", "CO": "carbon monoxide"} #TODO think about impleenting this for biosphere 3
+        #rename of elemental flows
+        biopshere_flow_mapping = {'CO2': 'carbon dioxide', 'CH4': 'methane', 'N2O': "nitrous oxide", "CO": "carbon monoxide"} #TODO think about how to map this to ecoinvent biosphere 
         data = data.rename(columns=biopshere_flow_mapping)
 
         # Convert DataFrame to dictionary
@@ -79,7 +86,7 @@ class DynamicCharacterization():
     
     def format_dynamic_inventory_as_dataframe(self):
         
-        ''' bring the dynamic inventory into the right format to use the characterization functions from bw_temporalis
+        ''' bring the dynamic inventory into the right format to use the characterization functions
         Format needs to be: 
         | date | amount | flow | activity |
         |------|--------|------|----------|
@@ -112,29 +119,38 @@ class DynamicCharacterization():
     
     
     def characterize_dynamic_inventory(self, 
-                                        #characterization_dictionary: dict, # dictionary: mapping elemental flow (key) with characterization function (value) 
-        #temporal_grouping: str,  #default is yearly defined at instance of MedusaLCA
         cumsum: bool | None = True,
         type_of_method: str | None = "radiative_forcing",
         fixed_TH: bool | None = False, #True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
         TH: int | None = 100, 
-        
         flow: set[int] | None = None,
         activity: set[int] | None = None,
         
     ) -> Tuple[pd.DataFrame, str, bool, int]:
         
         ''' 
-        #update description
-        Function adapted from bw_temporalis to the fact that in comparison to bw_temporalis, our timeline not a Timeline instance, but a normal pd.DataFrame.
-        Adjusted to filter the respective elemental flows to be characterized per characterization function, instead of assuming all flows to be categorized.
-        
-        can receive bw_temporalis characterization functions for CO2 and CH4 or user-defined characterization functions of the same format XZXZ.
-        
+        Dynamic inventory, formatted as a Dataframe, is characterized using the respective characterization functions for CO2, CH4, CO, N2O.
         The `characterization_function` is applied to each row of the input DataFrame of a timeline for a given `period`. 
-        in the case of characterize_co2 and characterize_methane, the timestep is yearly and the time horizon is 100 years
-                  
-        # TODO add checks, add fixed TH
+
+        Warming curves for other GHGs are readily available in self.levasseur_dcfs and (TODO) need to be added as automated characterization functions. 
+        Available impact assessment types are Radiative forcing [W/m2] and GWP [kg CO2eq].
+        The time horizon (TH) of assessment can be chosen flexibly, defaulting to 100 years.
+        There is the option to use a fixed TH, which is calculated from the time of the functional unit (FU) instead of the time of emission. 
+        This means that an emission ocuur 10 years after the FU, is characterized for TH - 10 years, similarly an emission occuring 25 years before the FU is characterized for TH + 25 years.
+
+        Function originates from bw_temporalis to the fact that in comparison to bw_temporalis, our timeline not a Timeline instance, but a normal pd.DataFrame.
+        Adjusted to filter the respective elemental flows to be characterized per characterization function, instead of assuming all flows to be categorized.
+
+        TODO: make time resolution flexible, map elemental flows to ecoinvent biosphere flows, add other characterization functions for other GHGs, check with Timo in how far we want to use the depreciated bw_temporalis characterization stuff
+
+        param: cumsum: bool, default True: adds a new column to the characterized inventory that contains the cumulative forcing/GWP over time per flow
+        param: type_of_method: str, default "radiative_forcing". Available options are "radiative_forcing" and "GWP".
+        param: fixed_TH: bool, default False. If True, TH is calculated from the time of the functional unit (FU) instead of the time of emission.
+        param: TH: int, default 100. Time horizon of assessment.
+        param: flow: set[int], default None. Subset of flows to be characterized.
+        param: activity: set[int], default None. Subset of activities to be characterized.
+               
+        return: Tuple[pd.DataFrame, str, bool, int] #characterized inventory, type of method, fixed TH, TH. The latter are stored as attributes of MedusaLCA to be called for plotting.     
             
         '''
         if type_of_method not in {"radiative_forcing", "GWP"}:
@@ -142,6 +158,7 @@ class DynamicCharacterization():
         
         characterization_dictionary = {"carbon dioxide": characterize_co2, "methane": characterize_methane, "carbon monoxide": self.characterize_co, "nitrous oxide": self.characterize_n2o}
         #TODO think if it makes sense to store characterization dictionary here
+        mapping_flow_to_id = {flow: bd.get_activity(name=flow).id for flow in characterization_dictionary.keys()}
 
         time_res_dict = {
         "year": "%Y",
@@ -149,16 +166,15 @@ class DynamicCharacterization():
         "day": "%Y%m%d",
         "hour": "%Y%m%d%M",
         }
+
         all_characterized_inventory = pd.DataFrame()
         
-        mapping_flow_to_id = {flow: bd.get_activity(name=flow).id for flow in characterization_dictionary.keys()}
-
         for characterized_flow, characterization_function in characterization_dictionary.items():
             df = self.dynamic_lci_df.copy()
              
-            df = df.loc[self.dynamic_lci_df["flow"]==mapping_flow_to_id[characterized_flow]] #subset of the inventory including characterized flow
+            df = df.loc[self.dynamic_lci_df["flow"]==mapping_flow_to_id[characterized_flow]] #subset of the inventory that contains the flow to be characterized.
             
-            #in case the user specifies additional subsets
+            #in case the user specifies additional subsets (part of bw_temporalis function -> do we need this?)
             if activity:
                 df = df.loc[self.dynamic_lci_df["activity"].isin(activity)]
             if flow:
@@ -166,35 +182,33 @@ class DynamicCharacterization():
                 
             df.reset_index(drop=True, inplace=True)
  
-            if type_of_method == "radiative_forcing":
+            if type_of_method == "radiative_forcing": #radiative forcing in W/m2
 
-                if not fixed_TH: #conventional approach, emission is calculated from t emission for the length of TH, regardless of when emission occur
+                if not fixed_TH: #fixed_TH = False: conventional approach, emission is calculated from t emission for the length of TH
                     characterized_inventory = pd.concat(
                     [characterization_function(row, period = TH) for _, row in df.iterrows()]
                     )
                     
-                else: #fixed TH = True: Levasseur approach: TH for all emissions is calculated from t of FU for the length of TH. 
-                    #An emission occur n years before FU is characterized for TH+n years
-                    timing_FU = [value for value in self.demand_timing_dict.values()] # what if there are multiple FUs?
+                else: #fixed TH = True: Levasseur approach: TH for all emissions extended or shortened based on timing of FU + TH
+                    #e.g. an emission occuring n years before FU is characterized for TH+n years
+                    timing_FU = [value for value in self.demand_timing_dict.values()] # FIXME what if there are multiple FU occuring at different times?
                     end_TH_FU = [x + TH for x in timing_FU]
                     end_TH_FU = datetime.strptime(str(end_TH_FU[0]), time_res_dict[self.temporal_grouping])
                     
-                    characterized_inventory=pd.DataFrame() #initialize empty df
+                    characterized_inventory=pd.DataFrame() 
                     
                     for _, row in df.iterrows():
-
                         timing_emission = row["date"].to_pydatetime() # convert'pandas._libs.tslibs.timestamps.Timestamp' to datetime object 
                         new_TH = round((end_TH_FU - timing_emission).days / 365.25) #time difference in integer years between emission timing and end of TH of FU
                         characterized_inventory = pd.concat(
                         [characterized_inventory, characterization_function(row, period = new_TH)]
                         )
 
-
-            if type_of_method == "GWP": #scale radiative forcing to GWP in CO2 equivalent
+            if type_of_method == "GWP": #scale radiative forcing to GWP [kg CO2 equivalent]
 
                 characterized_inventory = pd.DataFrame()
 
-                if not fixed_TH: #conventional approach, emission is calculated from t emission for the length of TH, regardless of when emission occur
+                if not fixed_TH: #fixed_TH = False: conventional approach, emission is calculated from t emission for the length of TH
                     for _, row in df.iterrows():
                         radiative_forcing_ghg = characterization_function(row, period = TH) 
                         row["amount"] = 1 #convert 1 kg CO2 equ.
@@ -202,37 +216,33 @@ class DynamicCharacterization():
 
                         ghg_integral = radiative_forcing_ghg["amount"].sum() 
                         co2_integral = radiative_forcing_co2["amount"].sum()
-
                         co2_equiv = ghg_integral / co2_integral
 
                         row_data = {
                                 'date': radiative_forcing_ghg.loc[0, 'date'], #start date of emission
-                                'amount': co2_equiv, #ghg emission in co2 equiv
+                                'amount': co2_equiv, #ghg emission in kg co2 equiv
                                 'flow': radiative_forcing_ghg.loc[0, 'flow'],  
                                 'activity': radiative_forcing_ghg.loc[0, 'activity'],
                             }
-                        row_df = pd.DataFrame([row_data])
-                                            
+                        row_df = pd.DataFrame([row_data])                
                         characterized_inventory = pd.concat([characterized_inventory, row_df], ignore_index=True)
 
-                else: #fixed TH = True: Levasseur approach: TH for all emissions is calculated from t of FU for the length of TH.
+                else: #fixed TH = True: Levasseur approach: TH for all emissions extended or shortened based on timing of FU + TH
                     timing_FU = [value for value in self.demand_timing_dict.values()] # what if there are multiple FUs?
                     end_TH_FU = [x + TH for x in timing_FU]
                     end_TH_FU = datetime.strptime(str(end_TH_FU[0]), time_res_dict[self.temporal_grouping])
-                    
                                         
                     for _, row in df.iterrows():
                         timing_emission = row["date"].to_pydatetime() # convert'pandas._libs.tslibs.timestamps.Timestamp' to datetime object 
-                        new_TH = round((end_TH_FU - timing_emission).days / 365.25) 
+                        new_TH = round((end_TH_FU - timing_emission).days / 365.25) #time difference in integer years between emission timing and end of TH of FU
 
                         radiative_forcing_ghg = characterization_function(row, period = new_TH) #indidvidual emissions are calculated for t_emission until t_FU + TH
                         row["amount"] = 1 #convert 1 kg CO2 equ.
-                        radiative_forcing_co2 = characterize_co2(row, period = TH) # reference substance CO2 is calculated for TH (usually 100 years)
+                        radiative_forcing_co2 = characterize_co2(row, period = TH) # reference substance CO2 is calculated for TH!
 
                         ghg_integral = radiative_forcing_ghg["amount"].sum() 
                         co2_integral = radiative_forcing_co2["amount"].sum()
-
-                        co2_equiv = ghg_integral / co2_integral #integral is now relative to TH from FU (=TH)
+                        co2_equiv = ghg_integral / co2_integral 
 
                         row_data = {
                                 'date': radiative_forcing_ghg.loc[0, 'date'], #start date of emission
@@ -240,8 +250,7 @@ class DynamicCharacterization():
                                 'flow': radiative_forcing_ghg.loc[0, 'flow'],  
                                 'activity': radiative_forcing_ghg.loc[0, 'activity'],
                             }
-                        row_df = pd.DataFrame([row_data])
-                                            
+                        row_df = pd.DataFrame([row_data])                 
                         characterized_inventory = pd.concat([characterized_inventory, row_df], ignore_index=True)
 
             # sort by date
@@ -250,7 +259,7 @@ class DynamicCharacterization():
                 characterized_inventory.reset_index(drop=True, inplace=True)
                 
             if cumsum and "amount" in characterized_inventory:
-                characterized_inventory["amount_sum"] = characterized_inventory["amount"].cumsum() #not sure if cumsum here correct
+                characterized_inventory["amount_sum"] = characterized_inventory["amount"].cumsum() #TODO: there is also an option for cumulative results in the characterization functions themselves. Rethink where this is handled best and to avoid double cumsum
 
             all_characterized_inventory = pd.concat([all_characterized_inventory, characterized_inventory])
 
@@ -262,25 +271,21 @@ class DynamicCharacterization():
         all_characterized_inventory.sort_values(by="date", ascending=True, inplace=True)
         
         return all_characterized_inventory, type_of_method, fixed_TH, TH
-    
-    
+       
     def characterize_co(self, series, period: int = 100, cumulative=False) -> pd.DataFrame:
         """
-        
-        Radiative forcing functions of CO are taken from Levasseur et al 2010
-
+        Radiative forcing function of CO from Levasseur et al 2010 (self.levasseur_dcfs["carbon monoxide"])
         Units are watts/square meter/kilogram of ghg emissions
 
         Parameters
         ----------
-        n20_decay_array:
         series : array-like
-            A single row of the TimeSeries dataframe.
+            A single row of the dynamic inventory dataframe.
         period : int, optional
             Time period for calculation (number of years), by default 100
-        cumulative : bool, optional
-            Should the RF amounts be summed over time?
-
+        cumulative : bool, 
+            cumulative impact
+            
         Returns
         -------
         A TimeSeries dataframe with the following columns:
@@ -293,16 +298,14 @@ class DynamicCharacterization():
         co_decay_array = self.levasseur_dcfs["carbon monoxide"]
 
         date_beginning: np.datetime64 = series["date"].to_numpy()
-        date_characterized: np.ndarray = date_beginning + np.arange(
+        dates_characterized: np.ndarray = date_beginning + np.arange(
             start=0, stop=period, dtype="timedelta64[Y]"
         ).astype("timedelta64[s]")
-
 
         decay_multiplier_y0 = [0] #no forcing in y0
         decay_multipliers_y1to100= [co_decay_array[key] for key in range(1,period) if key in co_decay_array]
         decay_multipliers = decay_multiplier_y0 + decay_multipliers_y1to100
         decay_multipliers= np.cumsum(decay_multipliers)
-
 
         forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
         if not cumulative:
@@ -310,7 +313,7 @@ class DynamicCharacterization():
 
         return pd.DataFrame(
             {
-                "date": pd.Series(data=date_characterized, dtype="datetime64[s]"),
+                "date": pd.Series(data=dates_characterized, dtype="datetime64[s]"),
                 "amount": forcing,
                 "flow": series.flow,
                 "activity": series.activity,
@@ -320,19 +323,18 @@ class DynamicCharacterization():
     def characterize_n2o(self, series, period: int = 100, cumulative=False) -> pd.DataFrame:
         """
         
-        Radiative forcing functions of N2O are taken from Levasseur et al 2010
-
+        Radiative forcing functions of N2O are taken from Levasseur et al 2010 (self.levasseur_dcfs["carbon monoxide"])
         Units are watts/square meter/kilogram of ghg emissions
 
         Parameters
         ----------
         n20_decay_array:
         series : array-like
-            A single row of the TimeSeries dataframe.
+            A single row of the dynamic inventory dataframe.
         period : int, optional
             Time period for calculation (number of years), by default 100
         cumulative : bool, optional
-            Should the RF amounts be summed over time?
+            cumulative impact
 
         Returns
         -------
@@ -348,7 +350,6 @@ class DynamicCharacterization():
         date_characterized: np.ndarray = date_beginning + np.arange(
             start=0, stop=period, dtype="timedelta64[Y]"
         ).astype("timedelta64[s]")
-
 
         decay_multiplier_y0 = [0] #no forcing in y0
         decay_multipliers_y1to100= [n2o_decay_array[key] for key in range(1,period) if key in n2o_decay_array]
@@ -370,6 +371,8 @@ class DynamicCharacterization():
         )
             
 
+#initial attempts to include the depreciated bw_temporalis functions but I found it too complicated and went with teh Levasseur approach instead.
+    
     # def dynamic_characterization_from_giuseppe_levasseur(self,
     #                                                     characterized_inventory: pd.DataFrame,
     #                                                     dynIAM= "GWP",

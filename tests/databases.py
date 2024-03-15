@@ -3468,7 +3468,7 @@ def db_dynamic_cf_test():
          
                 },
                 {
-                    'amount': 1,
+                    'amount': 7,
                     'type': 'biosphere',
                     'input': ('temporalis-bio', 'CH4'),
                     'temporal_distribution': 
@@ -3476,17 +3476,51 @@ def db_dynamic_cf_test():
                             date=np.array([-2], dtype='timedelta64[Y]'), 
                             amount=np.array([1])
                         ),
-
                 },
                 {
                     'amount': 1,
                     'type': 'biosphere',
                     'input': ('temporalis-bio', 'N2O'),
-                    'temporal_distribution': 
-                        TemporalDistribution(
-                            date=np.array([4], dtype='timedelta64[Y]'), 
-                            amount=np.array([1])
-                        ),
+                    # 'temporal_distribution': 
+                    #     TemporalDistribution(
+                    #         date=np.array([4], dtype='timedelta64[Y]'), 
+                    #         amount=np.array([1])
+                    #     ),
+
+                },
+                {
+                    'amount': 1,
+                    'type': 'biosphere',
+                    'input': ('temporalis-bio', 'CO'),
+                    # 'temporal_distribution': 
+                    #     TemporalDistribution(
+                    #         date=np.array([4], dtype='timedelta64[Y]'), 
+                    #         amount=np.array([1])
+                    #     ),
+
+                },
+
+                {
+                    'amount': 1,
+                    'type': 'biosphere',
+                    'input': ('temporalis-bio', 'CH4'),
+                    # 'temporal_distribution': 
+                    #     TemporalDistribution(
+                    #         date=np.array([4], dtype='timedelta64[Y]'), 
+                    #         amount=np.array([1])
+                    #     ),
+
+                },
+
+                {
+                    'amount': 1,
+                    'type': 'biosphere',
+                    'input': ('temporalis-bio', 'CO2'),
+                    # 'temporal_distribution': 
+                    #     TemporalDistribution(
+                    #         date=np.array([4], dtype='timedelta64[Y]'), 
+                    #         amount=np.array([1])
+                    #     ),
 
                 },
             ]
@@ -3513,14 +3547,14 @@ def db_dynamic_cf_test():
                         ),
                 },
                 {
-                    'amount': 4,
+                    'amount': 1,
                     'type': 'technosphere',
                     'input': ('foreground', 'B'),
-                    'temporal_distribution': 
-                        TemporalDistribution(
-                            date=np.array([-25, 0], dtype='timedelta64[Y]'), 
-                            amount=np.array([0.5, 0.5])
-                        ),
+                    # 'temporal_distribution': 
+                    #     TemporalDistribution(
+                    #         date=np.array([0], dtype='timedelta64[Y]'), 
+                    #         amount=np.array([1])
+                    #     ),
        
                 },
             ]
@@ -3530,6 +3564,9 @@ def db_dynamic_cf_test():
     bd.Method(("GWP", "example")).write(
         [
             (("temporalis-bio", "CO2"), 1),
+            (("temporalis-bio", "CH4"), 28.41), #from Levasseur integrals
+            (("temporalis-bio", "N2O"), 263.97), #from Levasseur integrals
+            (("temporalis-bio", "CO"), 1.56), #from Levasseur integrals
         ]
     )
 
