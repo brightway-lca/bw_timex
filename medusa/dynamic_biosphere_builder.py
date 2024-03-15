@@ -120,7 +120,7 @@ class DynamicBiosphere:
         self.build_biomatrix()
 
         # and set the supply for the original databases to 0 -> why?
-        self.dynamic_supply_array[: self.len_technosphere_dbs] = 0
+        # self.dynamic_supply_array[: self.len_technosphere_dbs] = 0
 
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
         """

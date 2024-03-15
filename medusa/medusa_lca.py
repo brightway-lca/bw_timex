@@ -276,7 +276,7 @@ class MedusaLCA:
             {}
         )  # dictionary to store the dynamic lci {CO2: {time: [2022, 2023], amount:[3,5], emitting_process: (database, code)}}
         
-        self.act_time_mapping_reversed= {v: k for k, v in self.activity_time_mapping.items()} #reversed mapping of activity_time_mapping_dict #TODO check if used
+        self.act_time_mapping_reversed= {v: k for k, v in self.activity_time_mapping_dict.items()} #reversed mapping of activity_time_mapping_dict #TODO check if used
 
         for (flow, time), row_id in self.biosphere_time_mapping_dict.items(): #looping over the rows of the diagnolized df
             
@@ -603,14 +603,6 @@ class MedusaLCA:
             columns=self.activity_time_mapping_dict.reversed(),  # from activity id to ((database, code), time)
             inplace=True,
         )
-        
-        # Replace id indexes with biosphere codes
-        bio_labels = []
-        for index in df.index:
-            bio_code= bd.get_node(id=index)['code']
-            bio_labels.append(bio_code)
-
-        df.index = bio_labels
 
         return df
 
