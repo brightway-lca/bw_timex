@@ -1935,7 +1935,7 @@ def db_abc_loopA_with_biosphere_tds_CO2_and_CH4():
     project_name = "db_abc_loopA_with_biosphere_tds_CO2_and_CH4"
     if project_name in bd.projects:
         bd.projects.delete_project(project_name)
-        bd.projects.purge_deleted_directories()
+        #bd.projects.purge_deleted_directories()
 
     bd.projects.set_current(project_name)
 
