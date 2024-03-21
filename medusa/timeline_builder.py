@@ -43,8 +43,8 @@ class TimelineBuilder:
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
 
-        eelca = EdgeExtractor(slca, edge_filter_function=edge_filter_function, **kwargs)
-        self.edge_timeline = eelca.build_edge_timeline()
+        self.eelca = EdgeExtractor(slca, edge_filter_function=edge_filter_function, **kwargs)
+        self.edge_timeline = self.eelca.build_edge_timeline()
 
     def check_database_names(self):
         """
