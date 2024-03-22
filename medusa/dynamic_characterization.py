@@ -212,7 +212,7 @@ class DynamicCharacterization():
                     for _, row in df.iterrows():
                         radiative_forcing_ghg = characterization_function(row, period = TH) 
                         row["amount"] = 1 #convert 1 kg CO2 equ.
-                        radiative_forcing_co2 = characterize_co2(row, period = TH)
+                        radiative_forcing_co2 = self.characterize_co2(row, period = TH)
 
                         ghg_integral = radiative_forcing_ghg["amount"].sum() 
                         co2_integral = radiative_forcing_co2["amount"].sum()
@@ -238,7 +238,7 @@ class DynamicCharacterization():
 
                         radiative_forcing_ghg = characterization_function(row, period = new_TH) #indidvidual emissions are calculated for t_emission until t_FU + TH
                         row["amount"] = 1 #convert 1 kg CO2 equ.
-                        radiative_forcing_co2 = characterize_co2(row, period = TH) # reference substance CO2 is calculated for TH!
+                        radiative_forcing_co2 = self.characterize_co2(row, period = TH) # reference substance CO2 is calculated for TH!
 
                         ghg_integral = radiative_forcing_ghg["amount"].sum() 
                         co2_integral = radiative_forcing_co2["amount"].sum()
