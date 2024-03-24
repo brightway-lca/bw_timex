@@ -168,91 +168,97 @@ class DynamicCharacterization():
         }
 
         all_characterized_inventory = pd.DataFrame()
-        
+
         for characterized_flow, characterization_function in characterization_dictionary.items():
-            df = self.dynamic_lci_df.copy()
-             
-            df = df.loc[self.dynamic_lci_df["flow"]==mapping_flow_to_id[characterized_flow]] #subset of the inventory that contains the flow to be characterized.
             
-            #in case the user specifies additional subsets (part of bw_temporalis function -> do we need this?)
-            if activity:
-                df = df.loc[self.dynamic_lci_df["activity"].isin(activity)]
-            if flow:
-                df = df.loc[self.dynamic_lci_df["flow"]==flow]
+            if mapping_flow_to_id[characterized_flow] not in self.dynamic_lci_df['flow'].unique(): # elemental flow is not in the inventory -> continu eto the next environmental flow and characterization function
+                continue
+
+            else: #elemental flow is in the inventory -> continue with the characterization
+
+                df = self.dynamic_lci_df.copy()
                 
-            df.reset_index(drop=True, inplace=True)
- 
-            if type_of_method == "radiative_forcing": #radiative forcing in W/m2
+                df = df.loc[self.dynamic_lci_df["flow"]==mapping_flow_to_id[characterized_flow]] #subset of the inventory that contains the flow to be characterized.
+                
+                #in case the user specifies additional subsets (part of bw_temporalis function -> do we need this?)
+                if activity:
+                    df = df.loc[self.dynamic_lci_df["activity"].isin(activity)]
+                if flow:
+                    df = df.loc[self.dynamic_lci_df["flow"]==flow]
+                    
+                df.reset_index(drop=True, inplace=True)
+    
+                if type_of_method == "radiative_forcing": #radiative forcing in W/m2
 
-                if not fixed_TH: #fixed_TH = False: conventional approach, emission is calculated from t emission for the length of TH
-                    characterized_inventory = pd.concat(
-                    [characterization_function(row, period = TH) for _, row in df.iterrows()]
-                    )
-                    
-                else: #fixed TH = True: Levasseur approach: TH for all emissions extended or shortened based on timing of FU + TH
-                    #e.g. an emission occuring n years before FU is characterized for TH+n years
-                    timing_FU = [value for value in self.demand_timing_dict.values()] # FIXME what if there are multiple FU occuring at different times?
-                    end_TH_FU = [x + TH for x in timing_FU]
-                    end_TH_FU = datetime.strptime(str(end_TH_FU[0]), time_res_dict[self.temporal_grouping])
-                    
-                    characterized_inventory=pd.DataFrame() 
-                    
-                    for _, row in df.iterrows():
-                        timing_emission = row["date"].to_pydatetime() # convert'pandas._libs.tslibs.timestamps.Timestamp' to datetime object 
-                        new_TH = round((end_TH_FU - timing_emission).days / 365.25) #time difference in integer years between emission timing and end of TH of FU
+                    if not fixed_TH: #fixed_TH = False: conventional approach, emission is calculated from t emission for the length of TH
                         characterized_inventory = pd.concat(
-                        [characterized_inventory, characterization_function(row, period = new_TH)]
+                        [characterization_function(row, period = TH) for _, row in df.iterrows()]
                         )
+                        
+                    else: #fixed TH = True: Levasseur approach: TH for all emissions extended or shortened based on timing of FU + TH
+                        #e.g. an emission occuring n years before FU is characterized for TH+n years
+                        timing_FU = [value for value in self.demand_timing_dict.values()] # FIXME what if there are multiple FU occuring at different times?
+                        end_TH_FU = [x + TH for x in timing_FU]
+                        end_TH_FU = datetime.strptime(str(end_TH_FU[0]), time_res_dict[self.temporal_grouping])
+                        
+                        characterized_inventory=pd.DataFrame() 
+                        
+                        for _, row in df.iterrows():
+                            timing_emission = row["date"].to_pydatetime() # convert'pandas._libs.tslibs.timestamps.Timestamp' to datetime object 
+                            new_TH = round((end_TH_FU - timing_emission).days / 365.25) #time difference in integer years between emission timing and end of TH of FU
+                            characterized_inventory = pd.concat(
+                            [characterized_inventory, characterization_function(row, period = new_TH)]
+                            )
 
-            if type_of_method == "GWP": #scale radiative forcing to GWP [kg CO2 equivalent]
+                if type_of_method == "GWP": #scale radiative forcing to GWP [kg CO2 equivalent]
 
-                characterized_inventory = pd.DataFrame()
+                    characterized_inventory = pd.DataFrame()
 
-                if not fixed_TH: #fixed_TH = False: conventional approach, emission is calculated from t emission for the length of TH
-                    for _, row in df.iterrows():
-                        radiative_forcing_ghg = characterization_function(row, period = TH) 
-                        row["amount"] = 1 #convert 1 kg CO2 equ.
-                        radiative_forcing_co2 = characterize_co2(row, period = TH)
+                    if not fixed_TH: #fixed_TH = False: conventional approach, emission is calculated from t emission for the length of TH
+                        for _, row in df.iterrows():
+                            radiative_forcing_ghg = characterization_function(row, period = TH) 
+                            row["amount"] = 1 #convert 1 kg CO2 equ.
+                            radiative_forcing_co2 = characterize_co2(row, period = TH)
 
-                        ghg_integral = radiative_forcing_ghg["amount"].sum() 
-                        co2_integral = radiative_forcing_co2["amount"].sum()
-                        co2_equiv = ghg_integral / co2_integral
+                            ghg_integral = radiative_forcing_ghg["amount"].sum() 
+                            co2_integral = radiative_forcing_co2["amount"].sum()
+                            co2_equiv = ghg_integral / co2_integral
 
-                        row_data = {
-                                'date': radiative_forcing_ghg.loc[0, 'date'], #start date of emission
-                                'amount': co2_equiv, #ghg emission in kg co2 equiv
-                                'flow': radiative_forcing_ghg.loc[0, 'flow'],  
-                                'activity': radiative_forcing_ghg.loc[0, 'activity'],
-                            }
-                        row_df = pd.DataFrame([row_data])                
-                        characterized_inventory = pd.concat([characterized_inventory, row_df], ignore_index=True)
+                            row_data = {
+                                    'date': radiative_forcing_ghg.loc[0, 'date'], #start date of emission
+                                    'amount': co2_equiv, #ghg emission in kg co2 equiv
+                                    'flow': radiative_forcing_ghg.loc[0, 'flow'],  
+                                    'activity': radiative_forcing_ghg.loc[0, 'activity'],
+                                }
+                            row_df = pd.DataFrame([row_data])                
+                            characterized_inventory = pd.concat([characterized_inventory, row_df], ignore_index=True)
 
-                else: #fixed TH = True: Levasseur approach: TH for all emissions extended or shortened based on timing of FU + TH
-                    timing_FU = [value for value in self.demand_timing_dict.values()] # what if there are multiple FUs?
-                    end_TH_FU = [x + TH for x in timing_FU]
-                    end_TH_FU = datetime.strptime(str(end_TH_FU[0]), time_res_dict[self.temporal_grouping])
-                                        
-                    for _, row in df.iterrows():
-                        timing_emission = row["date"].to_pydatetime() # convert'pandas._libs.tslibs.timestamps.Timestamp' to datetime object 
-                        new_TH = round((end_TH_FU - timing_emission).days / 365.25) #time difference in integer years between emission timing and end of TH of FU
+                    else: #fixed TH = True: Levasseur approach: TH for all emissions extended or shortened based on timing of FU + TH
+                        timing_FU = [value for value in self.demand_timing_dict.values()] # what if there are multiple FUs?
+                        end_TH_FU = [x + TH for x in timing_FU]
+                        end_TH_FU = datetime.strptime(str(end_TH_FU[0]), time_res_dict[self.temporal_grouping])
+                                            
+                        for _, row in df.iterrows():
+                            timing_emission = row["date"].to_pydatetime() # convert'pandas._libs.tslibs.timestamps.Timestamp' to datetime object 
+                            new_TH = round((end_TH_FU - timing_emission).days / 365.25) #time difference in integer years between emission timing and end of TH of FU
 
-                        radiative_forcing_ghg = characterization_function(row, period = new_TH) #indidvidual emissions are calculated for t_emission until t_FU + TH
-                        row["amount"] = 1 #convert 1 kg CO2 equ.
-                        radiative_forcing_co2 = characterize_co2(row, period = TH) # reference substance CO2 is calculated for TH!
+                            radiative_forcing_ghg = characterization_function(row, period = new_TH) #indidvidual emissions are calculated for t_emission until t_FU + TH
+                            row["amount"] = 1 #convert 1 kg CO2 equ.
+                            radiative_forcing_co2 = characterize_co2(row, period = TH) # reference substance CO2 is calculated for TH!
 
-                        ghg_integral = radiative_forcing_ghg["amount"].sum() 
-                        co2_integral = radiative_forcing_co2["amount"].sum()
-                        co2_equiv = ghg_integral / co2_integral 
+                            ghg_integral = radiative_forcing_ghg["amount"].sum() 
+                            co2_integral = radiative_forcing_co2["amount"].sum()
+                            co2_equiv = ghg_integral / co2_integral 
 
-                        row_data = {
-                                'date': radiative_forcing_ghg.loc[0, 'date'], #start date of emission
-                                'amount': co2_equiv, #ghg emission in co2 equiv
-                                'flow': radiative_forcing_ghg.loc[0, 'flow'],  
-                                'activity': radiative_forcing_ghg.loc[0, 'activity'],
-                            }
-                        row_df = pd.DataFrame([row_data])                 
-                        characterized_inventory = pd.concat([characterized_inventory, row_df], ignore_index=True)
-
+                            row_data = {
+                                    'date': radiative_forcing_ghg.loc[0, 'date'], #start date of emission
+                                    'amount': co2_equiv, #ghg emission in co2 equiv
+                                    'flow': radiative_forcing_ghg.loc[0, 'flow'],  
+                                    'activity': radiative_forcing_ghg.loc[0, 'activity'],
+                                }
+                            row_df = pd.DataFrame([row_data])                 
+                            characterized_inventory = pd.concat([characterized_inventory, row_df], ignore_index=True)
+     
             # sort by date
             if "date" in characterized_inventory:
                 characterized_inventory.sort_values(by="date", ascending=True, inplace=True)
