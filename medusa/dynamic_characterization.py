@@ -1,4 +1,3 @@
-
 from typing import Union, Tuple, Optional, Callable
 import pandas as pd
 import bw2data as bd
@@ -6,7 +5,6 @@ import numpy as np
 import os
 # from bw_temporalis.lcia.climate import characterize_methane, characterize_co2
 from datetime import datetime, timedelta
-
 
 
 class DynamicCharacterization():
@@ -58,23 +56,23 @@ class DynamicCharacterization():
         param: None
         return: dict of dicts with the following structure: {ghg: {year: forcing}}
         """
-        #Levasseur
-        
-        #read in excel data
+        # Levasseur
+
+        # read in excel data
         subfolder_name = 'data'
         file = 'Dynamic_LCAcalculatorv.2.0.xlsm'
         file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), subfolder_name, file)
         sheet_name = 'FC'
         data = pd.read_excel(file_path, sheet_name=sheet_name)
 
-        #clean data
+        # clean data
         data = data.iloc[2:] #Remove the first three empty rows
         data.columns = data.iloc[0] # Set the first row as the header
         data = data.iloc[3:,:] #remove row 0-2 (contain units)
         data = data.rename(columns={data.columns[0]: 'year'}) # replace the first column label (NaN) with 'Year'
         data = data.sort_values('year') #sort by year
 
-        #rename of elemental flows
+        # rename of elemental flows
         biopshere_flow_mapping = {'CO2': 'carbon dioxide', 'CH4': 'methane', 'N2O': "nitrous oxide", "CO": "carbon monoxide"} #TODO think about how to map this to ecoinvent biosphere 
         data = data.rename(columns=biopshere_flow_mapping)
 
@@ -83,9 +81,9 @@ class DynamicCharacterization():
         for column in data.columns[1:]: #skipping first column (year)
             levasseur_radiative_forcing[column] = dict(zip(data.iloc[:, 0], data[column])) #{year: forcing}    
         return levasseur_radiative_forcing
-    
+
     def format_dynamic_inventory_as_dataframe(self):
-        
+
         ''' bring the dynamic inventory into the right format to use the characterization functions
         Format needs to be: 
         | date | amount | flow | activity |
@@ -111,13 +109,12 @@ class DynamicCharacterization():
 
             df.rename(columns={'time': 'date'}, inplace=True) 
             df.rename(columns={'emitting_process': 'activity'}, inplace=True)                  
-            
+
             dfs.append(df)
 
         inventory_as_dataframe = pd.concat(dfs, ignore_index=True)
         return inventory_as_dataframe
-    
-    
+
     def characterize_dynamic_inventory(self, 
         cumsum: bool | None = True,
         type_of_method: str | None = "radiative_forcing",
@@ -127,7 +124,7 @@ class DynamicCharacterization():
         activity: set[int] | None = None,
         
     ) -> Tuple[pd.DataFrame, str, bool, int]:
-        
+
         ''' 
         Dynamic inventory, formatted as a Dataframe, is characterized using the respective characterization functions for CO2, CH4, CO, N2O.
         The `characterization_function` is applied to each row of the input DataFrame of a timeline for a given `period`. 
@@ -155,9 +152,9 @@ class DynamicCharacterization():
         '''
         if type_of_method not in {"radiative_forcing", "GWP"}:
             raise ValueError(f"impact assessment type must be either 'radiative_forcing' or 'GWP', not {type_of_method}")	
-        
+
         characterization_dictionary = {"carbon dioxide": self.characterize_co2, "methane": self.characterize_ch4, "carbon monoxide": self.characterize_co, "nitrous oxide": self.characterize_n2o}
-        #TODO think if it makes sense to store characterization dictionary here
+        # TODO think if it makes sense to store characterization dictionary here
         mapping_flow_to_id = {flow: bd.get_activity(name=flow).id for flow in characterization_dictionary.keys()}
 
         time_res_dict = {
@@ -168,35 +165,35 @@ class DynamicCharacterization():
         }
 
         all_characterized_inventory = pd.DataFrame()
-        
+
         for characterized_flow, characterization_function in characterization_dictionary.items():
             df = self.dynamic_lci_df.copy()
-             
+
             df = df.loc[self.dynamic_lci_df["flow"]==mapping_flow_to_id[characterized_flow]] #subset of the inventory that contains the flow to be characterized.
-            
-            #in case the user specifies additional subsets (part of bw_temporalis function -> do we need this?)
+
+            # in case the user specifies additional subsets (part of bw_temporalis function -> do we need this?)
             if activity:
                 df = df.loc[self.dynamic_lci_df["activity"].isin(activity)]
             if flow:
                 df = df.loc[self.dynamic_lci_df["flow"]==flow]
-                
+
             df.reset_index(drop=True, inplace=True)
- 
+
             if type_of_method == "radiative_forcing": #radiative forcing in W/m2
 
                 if not fixed_TH: #fixed_TH = False: conventional approach, emission is calculated from t emission for the length of TH
                     characterized_inventory = pd.concat(
                     [characterization_function(row, period = TH) for _, row in df.iterrows()]
                     )
-                    
+
                 else: #fixed TH = True: Levasseur approach: TH for all emissions extended or shortened based on timing of FU + TH
-                    #e.g. an emission occuring n years before FU is characterized for TH+n years
+                    # e.g. an emission occuring n years before FU is characterized for TH+n years
                     timing_FU = [value for value in self.demand_timing_dict.values()] # FIXME what if there are multiple FU occuring at different times?
                     end_TH_FU = [x + TH for x in timing_FU]
                     end_TH_FU = datetime.strptime(str(end_TH_FU[0]), time_res_dict[self.temporal_grouping])
-                    
+
                     characterized_inventory=pd.DataFrame() 
-                    
+
                     for _, row in df.iterrows():
                         timing_emission = row["date"].to_pydatetime() # convert'pandas._libs.tslibs.timestamps.Timestamp' to datetime object 
                         new_TH = round((end_TH_FU - timing_emission).days / 365.25) #time difference in integer years between emission timing and end of TH of FU
@@ -231,7 +228,7 @@ class DynamicCharacterization():
                     timing_FU = [value for value in self.demand_timing_dict.values()] # what if there are multiple FUs?
                     end_TH_FU = [x + TH for x in timing_FU]
                     end_TH_FU = datetime.strptime(str(end_TH_FU[0]), time_res_dict[self.temporal_grouping])
-                                        
+
                     for _, row in df.iterrows():
                         timing_emission = row["date"].to_pydatetime() # convert'pandas._libs.tslibs.timestamps.Timestamp' to datetime object 
                         new_TH = round((end_TH_FU - timing_emission).days / 365.25) #time difference in integer years between emission timing and end of TH of FU
@@ -257,22 +254,35 @@ class DynamicCharacterization():
             if "date" in characterized_inventory:
                 characterized_inventory.sort_values(by="date", ascending=True, inplace=True)
                 characterized_inventory.reset_index(drop=True, inplace=True)
-                
+
             if cumsum and "amount" in characterized_inventory:
                 characterized_inventory["amount_sum"] = characterized_inventory["amount"].cumsum() #TODO: there is also an option for cumulative results in the characterization functions themselves. Rethink where this is handled best and to avoid double cumsum
 
             all_characterized_inventory = pd.concat([all_characterized_inventory, characterized_inventory])
 
-        #add meta data and reorder
+        # add meta data and reorder
         all_characterized_inventory["activity_name"]=all_characterized_inventory["activity"].map(lambda x: self.act_time_mapping_reversed.get(x)[0])
         all_characterized_inventory["flow_name"] = all_characterized_inventory["flow"].apply(lambda x: bd.get_node(id=x)["name"])
         all_characterized_inventory = all_characterized_inventory[['date', 'amount', 'flow', 'flow_name','activity','activity_name', 'amount_sum']] 
         all_characterized_inventory.reset_index(drop=True, inplace=True)
         all_characterized_inventory.sort_values(by="date", ascending=True, inplace=True)
-        
+
         return all_characterized_inventory, type_of_method, fixed_TH, TH
-       
-       
+
+    def IRF_co2(self, year) -> callable:
+        """
+        Impulse Resonse Function of CO2
+        """
+        alpha_0, alpha_1, alpha_2, alpha_3 = 0.2173, 0.2240, 0.2824, 0.2763
+        tau_1, tau_2, tau_3 = 394.4, 36.54, 4.304
+        exponentials = lambda year, alpha, tau: alpha * tau * (1 - np.exp(-year / tau))
+        return (
+            alpha_0 * year 
+            + exponentials(year, alpha_1, tau_1)
+            + exponentials(year, alpha_2, tau_2)
+            + exponentials(year, alpha_3, tau_3)
+        )
+
     def characterize_co2(self,
     series,
     period: int | None = 100,
@@ -309,17 +319,13 @@ class DynamicCharacterization():
 
         # functional variables and units (from publications listed in docstring)
         radiative_efficiency_ppb = 1.33e-5 # W/m2/ppb; 2019 background co2 concentration; IPCC AR6 Table 7.15 
-        
+
         # for conversion from ppb to kg-CO2
         M_co2 = 44.01 # g/mol
         M_air = 28.97 # g/mol, dry air
         m_atmosphere = 5.135e18 # kg [Trenberth and Smith, 2005]
-        
+
         radiative_efficiency_kg = radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere # W/m2/kg-CO2
-        
-        alpha_0, alpha_1, alpha_2, alpha_3 = 0.2173, 0.2240, 0.2824, 0.2763
-        tau_1, tau_2, tau_3 = 394.4, 36.54, 4.304
-        decay_term = lambda year, alpha, tau: alpha * tau * (1 - np.exp(-year / tau))
 
         date_beginning: np.datetime64 = series["date"].to_numpy()
         date_characterized: np.ndarray = date_beginning + np.arange(
@@ -329,12 +335,7 @@ class DynamicCharacterization():
         decay_multipliers: np.ndarray = np.array(
             [
                 radiative_efficiency_kg
-                * (
-                    alpha_0 * year
-                    + decay_term(year, alpha_1, tau_1)
-                    + decay_term(year, alpha_2, tau_2)
-                    + decay_term(year, alpha_3, tau_3)
-                )
+                * self.IRF_co2(year)
                 for year in range(period)
             ]
         )
@@ -351,8 +352,7 @@ class DynamicCharacterization():
                 "activity": series.activity,
             }
         )
-    
-    
+
     def characterize_ch4(self, series, period: int = 100, cumulative=False) -> pd.DataFrame:
         """
         Based on characterize_methane from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
@@ -392,7 +392,7 @@ class DynamicCharacterization():
         """
 
         # functional variables and units (from publications listed in docstring)
-        radiative_efficiency_ppb = 3.89e-4 # W/m2/ppb; 2019 background cch4 concentration; IPCC AR6 Table 7.15 
+        radiative_efficiency_ppb = 5.7e-4 # # W/m2/ppb; 2019 background cch4 concentration; IPCC AR6 Table 7.15. Section 7.6.1 says its 3.89e-4, but Table 7.15 says 5.7e-4. Both claim to include indirect contributions?!
 
         # for conversion from ppb to kg-CH4
         M_ch4 = 16.04 # g/mol
@@ -400,11 +400,8 @@ class DynamicCharacterization():
         m_atmosphere = 5.135e18 # kg [Trenberth and Smith, 2005]
 
         radiative_efficiency_kg = radiative_efficiency_ppb * M_air / M_ch4 * 1e9 / m_atmosphere # W/m2/kg-CH4; 
-        
-        # TODO I dont really know where this is coming from and what f1 and f2 do. Maybe they account for the decay of CH4 to other GHGs?
-        f1 = 0.5  # Unitless
-        f2 = 0.15  # Unitless
-        tau = 12.4  # Lifetime (years)
+
+        tau = 11.8  # Lifetime (years)
 
         date_beginning: np.datetime64 = series["date"].to_numpy()
         date_characterized: np.ndarray = date_beginning + np.arange(
@@ -413,12 +410,27 @@ class DynamicCharacterization():
 
         decay_multipliers: list = np.array(
             [
-                (1 + f1 + f2) * radiative_efficiency_kg * tau * (1 - np.exp(-year / tau))
+                radiative_efficiency_kg * tau * (1 - np.exp(-year / tau))
                 for year in range(period)
             ]
         )
-
-        forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
+        
+        # conversion of ch4 to co2
+        fraction_to_co2 = 0.75 # mol/mol from AR6;
+        # TODO refactor
+        radiative_efficiency_ppb_co2 = 1.33e-5 # W/m2/ppb; 2019 background co2 concentration; IPCC AR6 Table 7.15 
+        M_co2 = 44.01 # g/mol
+        radiative_efficiency_kg_co2 = radiative_efficiency_ppb_co2 * M_air / M_co2 * 1e9 / m_atmosphere # W/m2/kg-CO2
+        
+        decay_multipliers_ch4_to_co2: list = np.array(
+            [
+                radiative_efficiency_kg_co2 * fraction_to_co2 * M_ch4 / M_co2 * (1 / tau) * np.exp(-year / tau) * self.IRF_co2(year)
+                for year in range(period)
+            ]
+        )
+        decay_multipliers_ch4_to_co2 = 0
+        
+        forcing = pd.Series(data=series.amount * (decay_multipliers + decay_multipliers_ch4_to_co2), dtype="float64")
         if not cumulative:
             forcing = forcing.diff(periods=1).fillna(0)
 
@@ -430,8 +442,7 @@ class DynamicCharacterization():
                 "activity": series.activity,
             }
         )
-    
-    
+
     def characterize_co(self, series, period: int = 100, cumulative=False) -> pd.DataFrame:
         """
         Radiative forcing function of CO from Levasseur et al 2010 (self.levasseur_dcfs["carbon monoxide"])
@@ -479,7 +490,7 @@ class DynamicCharacterization():
                 "activity": series.activity,
             }
         )
-    
+
     def characterize_n2o(self, series, period: int = 100, cumulative=False) -> pd.DataFrame:
         """
         
@@ -516,7 +527,6 @@ class DynamicCharacterization():
         decay_multipliers = decay_multiplier_y0 + decay_multipliers_y1to100
         decay_multipliers= np.cumsum(decay_multipliers)
 
-
         forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
         if not cumulative:
             forcing = forcing.diff(periods=1).fillna(0)
@@ -529,48 +539,48 @@ class DynamicCharacterization():
                 "activity": series.activity,
             }
         )
-            
 
-#initial attempts to include the depreciated bw_temporalis functions but I found it too complicated and went with teh Levasseur approach instead.
-    
-    # def dynamic_characterization_from_giuseppe_levasseur(self,
-    #                                                     characterized_inventory: pd.DataFrame,
-    #                                                     dynIAM= "GWP",
-    #                                                     cumulative: bool = False,
-    #                                                     t0=None, 
-    #                                                     TH: int | None =  100, 
-    #                                                     characterize_dynamic_kwargs={}):
-    #     """
-    #     format of characterized_inventory is:
-    #     | date | amount | flow | activity |
-    #     |------|--------|------|----------|
-    #     | 101  | 33     | 1    | 2        |
-    #     | 102  | 32     | 1    | 2        |
-    #     | 103  | 31     | 1    | 2        |
 
-    #     """
-    #     dyn_m={"GWP":"RadiativeForcing",
-            
-    #         #TODO make it run for GTP as well
-    #         #    "GTP":"AGTP", #default is ar5
-    #         #    "GTP base":"AGTP OP base",
-    #         #    "GTP low":"AGTP OP low",
-    #         #    "GTP high":"AGTP OP high",
-    #         }
-        
-    #     assert dynIAM in dyn_m, "DynamicIAMethod not present, make sure name is correct and `create_climate_methods` was run"
+# initial attempts to include the depreciated bw_temporalis functions but I found it too complicated and went with teh Levasseur approach instead.
 
-    #     #set default start and calculate year of TH end
-    #     th_zero=np.datetime64('now') if t0 is None else np.datetime64(t0)
-    #     th_end=th_zero.astype('datetime64[Y]').astype(str).astype(int) + TH #convert to string first otherwhise gives years relative to POSIX time
+# def dynamic_characterization_from_giuseppe_levasseur(self,
+#                                                     characterized_inventory: pd.DataFrame,
+#                                                     dynIAM= "GWP",
+#                                                     cumulative: bool = False,
+#                                                     t0=None,
+#                                                     TH: int | None =  100,
+#                                                     characterize_dynamic_kwargs={}):
+#     """
+#     format of characterized_inventory is:
+#     | date | amount | flow | activity |
+#     |------|--------|------|----------|
+#     | 101  | 33     | 1    | 2        |
+#     | 102  | 32     | 1    | 2        |
+#     | 103  | 31     | 1    | 2        |
 
-    #     self.characterize_dynamic_G(dyn_m[dynIAM], cumulative) #, **characterize_dynamic_kwargs)
+#     """
+#     dyn_m={"GWP":"RadiativeForcing",
 
-    #     return
+#         #TODO make it run for GTP as well
+#         #    "GTP":"AGTP", #default is ar5
+#         #    "GTP base":"AGTP OP base",
+#         #    "GTP low":"AGTP OP low",
+#         #    "GTP high":"AGTP OP high",
+#         }
 
-    # def characterize_dynamic_G(self, string_method, cumulative = False): #, **characterize_dynamic_kwargs):
-    #     print("test")
-    #     return
+#     assert dynIAM in dyn_m, "DynamicIAMethod not present, make sure name is correct and `create_climate_methods` was run"
+
+#     #set default start and calculate year of TH end
+#     th_zero=np.datetime64('now') if t0 is None else np.datetime64(t0)
+#     th_end=th_zero.astype('datetime64[Y]').astype(str).astype(int) + TH #convert to string first otherwhise gives years relative to POSIX time
+
+#     self.characterize_dynamic_G(dyn_m[dynIAM], cumulative) #, **characterize_dynamic_kwargs)
+
+#     return
+
+# def characterize_dynamic_G(self, string_method, cumulative = False): #, **characterize_dynamic_kwargs):
+#     print("test")
+#     return
 
 
 # # old code
@@ -586,17 +596,16 @@ class DynamicCharacterization():
 # CONSTANTS_PATH = os.path.join(os.path.dirname(__file__), 'constants.pkl')
 
 
-
 # #from https://github.com/brightway-lca/temporalis/blob/master/bw2temporalis/dyn_methods/timedependent_lca.py
 # def time_dependent_LCA(self, demand, dynIAM='GWP',t0=None,TH=100, DynamicLCA_kwargs={}, characterize_dynamic_kwargs={}):
 #     """calculate dynamic GWP or GTP for the functional unit and the time horizon indicated following the approach of Levausseur (2010, doi: 10.1021/es9030003).
 #     It also consider climate effect of forest regrowth of biogenic CO2 (Cherubini 2011  doi: 10.1111/j.1757-1707.2011.01102.x)
 #     assuming a rotation lenght of 100 yrs.
-    
-#     Note that TH is calculated on the basis of t0 i.e. also if first emissions occurs before t0 everything is characterzied till t0+TH. This imply
-#     that, for instance, co2 emissions occuring before t0 but due to `demand` has an impact that his higher than   
 
-    
+#     Note that TH is calculated on the basis of t0 i.e. also if first emissions occurs before t0 everything is characterzied till t0+TH. This imply
+#     that, for instance, co2 emissions occuring before t0 but due to `demand` has an impact that his higher than
+
+
 # Args:
 #     * *demand* (dict):  The functional unit. Same format as in LCA.
 #     * *t0* (datetime,default = now): year 0 of the time horizon considered.
@@ -607,7 +616,7 @@ class DynamicCharacterization():
 
 #     """
 #     CONSTANTS=pickle.load( open( CONSTANTS_PATH , "rb" ) )
-    
+
 #     dyn_m={"GWP":"RadiativeForcing",
 #            "GTP":"AGTP", #default is ar5
 #            "GTP base":"AGTP OP base",
@@ -639,7 +648,7 @@ class DynamicCharacterization():
 #         co2_imp=CONSTANTS['co2_agtp_low_td']
 #     elif dynIAM=='GTP high':
 #         co2_imp=CONSTANTS['co2_agtp_high_td']
-        
+
 #     #calculate lenght of th from first emission occuring
 #     length=len([int(yr) for yr in dyn_lca[0] if int(yr) <= th_end])
 
@@ -647,7 +656,7 @@ class DynamicCharacterization():
 #     res=np.trapz(x=dyn_lca[0][:length] , y=dyn_lca[1][:length]) / np.trapz(
 #                  x=(co2_imp.times.astype('timedelta64[Y]').astype('int') + dyn_lca[0][0])[:length],
 #                  y=co2_imp.values[:length])
-    
+
 #     return res
 
 
@@ -672,13 +681,13 @@ class DynamicCharacterization():
 #     meth = DynamicIAMethod(method)
 #     self.method_data = meth.load()
 #     #update biogenic carbon profile based on emission year and decay profile if passed
-#     if any(v is not None for v in (bio_st_emis_yr,bio_st_decay,rot_stand)):                
+#     if any(v is not None for v in (bio_st_emis_yr,bio_st_decay,rot_stand)):
 #         self.method_data[('static_forest', 'C_biogenic')]="""def custom_co2bio_function(datetime):
 #             from bw2temporalis.dyn_methods.metrics import {0}
 #             from datetime import timedelta
 #             import numpy as np
 #             import collections
-#             custom_co2bio_rf_td={0}("co2_biogenic", np.array((1.,)), np.array(({1} or 0,),dtype=('timedelta64[Y]')), 'Y', 1000,{3} or 100,'{2}' or 'delta') 
+#             custom_co2bio_rf_td={0}("co2_biogenic", np.array((1.,)), np.array(({1} or 0,),dtype=('timedelta64[Y]')), 'Y', 1000,{3} or 100,'{2}' or 'delta')
 #             return_tuple = collections.namedtuple('return_tuple', ['dt', 'amount'])
 #             return [return_tuple(d,v) for d,v in zip((datetime+custom_co2bio_rf_td.times.astype(timedelta)),custom_co2bio_rf_td.values)]""".format(method,bio_st_emis_yr,bio_st_decay,rot_stand)
 
@@ -699,17 +708,17 @@ class DynamicCharacterization():
 #             # continue
 #             #GIU: I would skipe this,we save time plus memory, in groupby_sum_by_flow already skips datapoint not in method_data
 #             #also more consistent in my opinion (the impact is not 0 but is simply not measurable)
-            
+
 #             # self.characterized.append(grouped_dp(
 #                 # obj.dt,
 #                 # obj.flow,
 #                 # obj.amount * method_data.get(obj.flow, 0)
 #             # ))
-            
+
 #     self.characterized.sort(key=lambda x: x.dt)
 
 #     return self._summer(self.characterized, cumulative, stepped)
-    
+
 # #https://github.com/brightway-lca/temporalis/blob/master/bw2temporalis/dynamic_ia_methods.py#L88
 # def create_functions(self, data=None):
 #     """Take method data that defines functions in strings, and turn them into actual Python code. Returns a dictionary with flows as keys and functions as values."""
@@ -729,4 +738,3 @@ class DynamicCharacterization():
 #                 value = value % "created_function"
 #             functions[key] = FunctionWrapper(value)
 #     return functions
-    
