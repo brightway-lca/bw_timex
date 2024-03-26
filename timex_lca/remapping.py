@@ -19,7 +19,7 @@ class TimeMappingDict(dict):
         else:
             self[process_time_tuple] = self._current_id
             self._current_id += 1
-            
+
         return self._current_id
 
     def reversed(self):

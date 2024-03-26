@@ -43,7 +43,9 @@ class TimelineBuilder:
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
 
-        self.eelca = EdgeExtractor(slca, edge_filter_function=edge_filter_function, **kwargs)
+        self.eelca = EdgeExtractor(
+            slca, edge_filter_function=edge_filter_function, **kwargs
+        )
         self.edge_timeline = self.eelca.build_edge_timeline()
 
     def check_database_names(self):
@@ -179,7 +181,7 @@ class TimelineBuilder:
                 )
                 tl_df["interpolation_weights"] = None
                 return tl_df
-            
+
             dates_list = [
                 date
                 for date in self.database_date_dict_static_only.values()
@@ -190,7 +192,9 @@ class TimelineBuilder:
 
             # create reversed dict {date: database} with only static "background" db's
             self.reversed_database_date_dict = {
-                v: k for k, v in self.database_date_dict_static_only.items() if type(v) == datetime
+                v: k
+                for k, v in self.database_date_dict_static_only.items()
+                if type(v) == datetime
             }
 
             if self.interpolation_type == "nearest":

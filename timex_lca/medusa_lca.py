@@ -80,11 +80,9 @@ class MedusaLCA:
             start_id=bd.backends.ActivityDataset.select(fn.MAX(AD.id)).scalar() + 1
         )  # making sure to use unique ids for the time mapped processes by counting up from the highest current activity id
         self.add_activities_to_time_mapping_dict()
-        
+
         # Create a similar dict for the biosphere flows. This is populated by the dynamic_biosphere_builder
-        self.biosphere_time_mapping_dict = TimeMappingDict(
-            start_id=0
-        )  
+        self.biosphere_time_mapping_dict = TimeMappingDict(start_id=0)
 
         # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
         self.database_date_dict_static_only = {
@@ -189,12 +187,12 @@ class MedusaLCA:
             return
         self.lca.lcia()
 
-    #TODO maybe restructure the dynamic biosphere building into one method, similar to lci() and lcia()? dynamic_lci(), which calls build_dynamic_biosphere() and calculate_dynamic_lci()?
-    
+    # TODO maybe restructure the dynamic biosphere building into one method, similar to lci() and lcia()? dynamic_lci(), which calls build_dynamic_biosphere() and calculate_dynamic_lci()?
+
     def build_dynamic_biosphere(self):
         """
         Build the dynamic biosphere matrix, which links the biosphere flows to the correct background databases and tracks the timing each biosphere flows, using DynamicBiosphere class.
-        
+
         This returns a matrix of the dimensions (bio_flows at a specific timestep) x (processes)
 
         """
@@ -227,12 +225,12 @@ class MedusaLCA:
         Calcluates the dynamic inventory from the dynamic biosphere matrix by calling build_dynamic_inventory_dict.
         Returns a dictionary with the dynamic inventory of the LCI in the form of
           {CO2: {
-                time: [2022, 2023], 
-                amount:[3,5], 
+                time: [2022, 2023],
+                amount:[3,5],
                 emitting_process: [((database, code), year), ((database, code), year)]
-                }, 
-          CH4: {time: [2022, 2023], 
-                amount:[3,5], 
+                },
+          CH4: {time: [2022, 2023],
+                amount:[3,5],
                 emitting_process: [((database, code), year), ((database, code), year)]
                 },
           ...}
@@ -241,16 +239,17 @@ class MedusaLCA:
 
         # calculate lci from dynamic biosphere matrix
         # unordered_dynamic_lci = self.dynamic_biomatrix.dot(
-        #     self.dynamic_supply_array 
-        # )  
+        #     self.dynamic_supply_array
+        # )
 
-        #diagnolization of supply array keeps the dimension of the process, which we want to pass as additional information to the dynamic inventory dict    
-        diagonal_supply_array = np.diag(self.dynamic_supply_array.flatten()) #dynamic supply array includes the original databases, contrary to former implementation as otherwise background processes were excluded. TODO: validate with Timo
+        # diagnolization of supply array keeps the dimension of the process, which we want to pass as additional information to the dynamic inventory dict
+        diagonal_supply_array = np.diag(
+            self.dynamic_supply_array.flatten()
+        )  # dynamic supply array includes the original databases, contrary to former implementation as otherwise background processes were excluded. TODO: validate with Timo
         diagonalized_dynamic_lci = self.dynamic_biomatrix.dot(diagonal_supply_array)
-        
-        #unordered_dynamic_lci= np.sum(diagonalized_dynamic_lci, axis=1) #normal lci
 
-        
+        # unordered_dynamic_lci= np.sum(diagonalized_dynamic_lci, axis=1) #normal lci
+
         self.build_dynamic_inventory_dict(diagonalized_dynamic_lci)
 
     def build_dynamic_inventory_dict(
@@ -258,14 +257,14 @@ class MedusaLCA:
         diagonalized_dynamic_lci: np.array,
     ):
         """
-        Create dynamic lci dictionary with structure 
+        Create dynamic lci dictionary with structure
         {CO2: {
-                time: [2022, 2023], 
-                amount:[3,5], 
+                time: [2022, 2023],
+                amount:[3,5],
                 emitting_process: [((database, code), year), ((database, code), year)]
-                }, 
-          CH4: {time: [2022, 2023], 
-                amount:[3,5], 
+                },
+          CH4: {time: [2022, 2023],
+                amount:[3,5],
                 emitting_process: [((database, code), year), ((database, code), year)]
                 },
           ...}
@@ -275,25 +274,44 @@ class MedusaLCA:
         self.dynamic_inventory = (
             {}
         )  # dictionary to store the dynamic lci {CO2: {time: [2022, 2023], amount:[3,5], emitting_process: (database, code)}}
-        
-        self.act_time_mapping_reversed= {v: k for k, v in self.activity_time_mapping_dict.items()} #reversed mapping of activity_time_mapping_dict #TODO check if used
 
-        for (flow, time), row_id in self.biosphere_time_mapping_dict.items(): #looping over the rows of the diagnolized df
-            
+        self.act_time_mapping_reversed = {
+            v: k for k, v in self.activity_time_mapping_dict.items()
+        }  # reversed mapping of activity_time_mapping_dict #TODO check if used
+
+        for (
+            flow,
+            time,
+        ), row_id in (
+            self.biosphere_time_mapping_dict.items()
+        ):  # looping over the rows of the diagnolized df
+
             # add biosphere flow to dictionary if it does not exist yet
             if not flow["code"] in self.dynamic_inventory.keys():
-                self.dynamic_inventory[flow["code"]] = {"time": [], "amount": [], "emitting_process": []}  
-            
-            for col_id in self.activity_dict.reversed.keys(): #looping over the columns of the diagnolized df
-                
-                if diagonalized_dynamic_lci[row_id, col_id] != 0: #store only non-zero elements of diagnolized inventory
-                    
+                self.dynamic_inventory[flow["code"]] = {
+                    "time": [],
+                    "amount": [],
+                    "emitting_process": [],
+                }
+
+            for (
+                col_id
+            ) in (
+                self.activity_dict.reversed.keys()
+            ):  # looping over the columns of the diagnolized df
+
+                if (
+                    diagonalized_dynamic_lci[row_id, col_id] != 0
+                ):  # store only non-zero elements of diagnolized inventory
+
                     amount = diagonalized_dynamic_lci[row_id, col_id]
                     emitting_process = self.activity_dict.reversed[col_id]
                     self.dynamic_inventory[flow["code"]]["time"].append(time)
                     self.dynamic_inventory[flow["code"]]["amount"].append(amount)
-                    self.dynamic_inventory[flow["code"]]["emitting_process"].append(emitting_process) 
-            
+                    self.dynamic_inventory[flow["code"]]["emitting_process"].append(
+                        emitting_process
+                    )
+
         # now sort flows based on time
         for flow, _ in self.dynamic_inventory.items():
             order = np.argsort(self.dynamic_inventory[flow]["time"])
@@ -308,15 +326,15 @@ class MedusaLCA:
                 self.dynamic_inventory[flow]["emitting_process"]
             )[order]
 
-
     def characterize_dynamic_lci(
-            
-            self,
-            cumsum: bool | None = True,
-            type: str | None = "radiative_forcing",
-            fixed_TH: bool | None = False, #True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
-            TH: int | None = 100, 
-            #characterization_dictionary: dict, #dict is now stored inside dynamic_inventory_characterizer, not sure if this is pythonic
+        self,
+        cumsum: bool | None = True,
+        type: str | None = "radiative_forcing",
+        fixed_TH: (
+            bool | None
+        ) = False,  # True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
+        TH: int | None = 100,
+        # characterization_dictionary: dict, #dict is now stored inside dynamic_inventory_characterizer, not sure if this is pythonic
     ):
         """
         Characterize the dynamic inventory dictionaries using dynamic characterization functions using the DynamicCharacterization class.
@@ -329,24 +347,26 @@ class MedusaLCA:
             warnings.warn(
                 "Dynamic lci not yet calculated. Call MedusaLCA.calculate_dynamic_lci() first."
             )
-            
+
         self.dynamic_inventory_characterizer = DynamicCharacterization(
-                                            self.dynamic_inventory, 
-                                            self.dicts.activity,
-                                            self.dicts.biosphere.reversed,
-                                            self.act_time_mapping_reversed,
-                                            self.demand_timing_dict,
-                                            self.temporal_grouping,
-                                            )
-        
-        (self.characterized_inventory, self.type_of_method, self.fixed_TH, self.TH) = self.dynamic_inventory_characterizer.characterize_dynamic_inventory(
-            cumsum,
-            type,
-            fixed_TH, #True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
-            TH, 
+            self.dynamic_inventory,
+            self.dicts.activity,
+            self.dicts.biosphere.reversed,
+            self.act_time_mapping_reversed,
+            self.demand_timing_dict,
+            self.temporal_grouping,
         )
-        self.characterized_dynamic_score = self.characterized_inventory["amount"].sum() 
-        
+
+        (self.characterized_inventory, self.type_of_method, self.fixed_TH, self.TH) = (
+            self.dynamic_inventory_characterizer.characterize_dynamic_inventory(
+                cumsum,
+                type,
+                fixed_TH,  # True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
+                TH,
+            )
+        )
+        self.characterized_dynamic_score = self.characterized_inventory["amount"].sum()
+
         return self.characterized_inventory
 
     def prepare_static_lca_inputs(
@@ -643,7 +663,7 @@ class MedusaLCA:
         """
         if cumsum is True:
             amount = "amount_sum"
-        else: 
+        else:
             amount = "amount"
 
         if not hasattr(self, "characterized_inventory"):
@@ -651,34 +671,45 @@ class MedusaLCA:
                 "Characterized inventory not yet calculated. Call MedusaLCA.characterize_dynamic_lci() first."
             )
             return
-        
+
         if self.type_of_method == "radiative_forcing":
             label_legend = "Radiative forcing [W/m2]"
             title = "Radiative forcing"
         if self.type_of_method == "GWP":
             label_legend = "GWP [kg CO2-eq]"
             title = "GWP"
-        
-        if self.fixed_TH == False: # if TH is calculated from t emission
-            
-            title += " with TH of " + str(self.TH) + " " + str(self.temporal_grouping) + " starting at each emission"
 
-        if self.fixed_TH == True: # if TH is calculated from FU
-            title += " with TH of " + str(self.TH) + " " + str(self.temporal_grouping) + " starting at FU"
+        if self.fixed_TH == False:  # if TH is calculated from t emission
+
+            title += (
+                " with TH of "
+                + str(self.TH)
+                + " "
+                + str(self.temporal_grouping)
+                + " starting at each emission"
+            )
+
+        if self.fixed_TH == True:  # if TH is calculated from FU
+            title += (
+                " with TH of "
+                + str(self.TH)
+                + " "
+                + str(self.temporal_grouping)
+                + " starting at FU"
+            )
 
         axes = sb.scatterplot(
-            x="date", 
+            x="date",
             y=amount,
             hue="activity_name",
             style="flow_name",
-            data=self.characterized_inventory
+            data=self.characterized_inventory,
         )
-        
-        
+
         axes.set_ylabel(label_legend)
-        axes.set_xlabel("Time (" +  str(self.temporal_grouping) +")")
-        
-        axes.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        axes.set_xlabel("Time (" + str(self.temporal_grouping) + ")")
+
+        axes.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
         axes.set_title(title)
         plt.show()
 

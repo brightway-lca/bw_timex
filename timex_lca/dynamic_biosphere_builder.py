@@ -85,7 +85,9 @@ class DynamicBiosphere:
 
                     # Add entry to dynamic bio matrix
                     # first create a row index for the tuple((db,bio_flow), date))
-                    bio_row_index = self.biosphere_time_mapping_dict.add((bio_flow, bio_date))
+                    bio_row_index = self.biosphere_time_mapping_dict.add(
+                        (bio_flow, bio_date)
+                    )
                     # populate lists with which sparse matrix is constructed
                     self.add_matrix_entry_for_biosphere_flows(
                         row=bio_row_index, col=process_col_index, amount=bio_value
@@ -109,7 +111,9 @@ class DynamicBiosphere:
                 for bio_date, bio_flow in zip(bio_dates, bio_values):
                     # first create a row index for the tuple((db,bio_flow), date))
                     self.biosphere_time_mapping_dict.add((exc.input, bio_date))
-                    bio_row_index = self.biosphere_time_mapping_dict[(exc.input, bio_date)]
+                    bio_row_index = self.biosphere_time_mapping_dict[
+                        (exc.input, bio_date)
+                    ]
                     # populate lists with which sparse matrix is constructed
                     self.add_matrix_entry_for_biosphere_flows(
                         row=bio_row_index, col=process_col_index, amount=bio_flow
