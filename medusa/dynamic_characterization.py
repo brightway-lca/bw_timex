@@ -361,7 +361,7 @@ class DynamicCharacterization():
         """
         Based on characterize_methane from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
         
-        Calculate the cumulative or marginal radiative forcing (CRF) from CH4 for each year in a given period.
+        Calculate the cumulative or marginal radiative forcing (CRF) from CH4 for each year in a given period. This DOES include include indirect effects of CH4 on ozone and water vapor, but DOES NOT include the decay to CO2. For more info on that, see the deprecated version of temporalis.
 
         If `cumulative` is True, the cumulative CRF is calculated. If `cumulative` is False, the marginal CRF is calculated.
         Takes a single row of the TimeSeries Pandas DataFrame (corresponding to a set of (`date`/`amount`/`flow`/`activity`).
@@ -419,22 +419,8 @@ class DynamicCharacterization():
             ]
         )
         
-        # conversion of ch4 to co2
-        fraction_to_co2 = 0.75 # mol/mol from AR6;
-        # TODO refactor
-        radiative_efficiency_ppb_co2 = 1.33e-5 # W/m2/ppb; 2019 background co2 concentration; IPCC AR6 Table 7.15 
-        M_co2 = 44.01 # g/mol
-        radiative_efficiency_kg_co2 = radiative_efficiency_ppb_co2 * M_air / M_co2 * 1e9 / m_atmosphere # W/m2/kg-CO2
+        forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
         
-        # TODO THE CONVOLUTION IS WRONG AND NEEDS TO BE UPDATED - bw_temporalis TemporalDistribution COULD BE USED
-        decay_multipliers_ch4_to_co2: list = np.array(
-            [
-                radiative_efficiency_kg_co2 * fraction_to_co2 * M_ch4 / M_co2 * (1 / tau) * np.exp(-year / tau)# * self.IRF_co2(year)
-                for year in range(period)
-            ]
-        )
-        
-        forcing = pd.Series(data=series.amount * (decay_multipliers + decay_multipliers_ch4_to_co2), dtype="float64")
         if not cumulative:
             forcing = forcing.diff(periods=1).fillna(0)
 
