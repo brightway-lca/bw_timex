@@ -19,7 +19,7 @@ class DynamicBiosphere:
         activity_time_mapping_dict: dict,
         biosphere_time_mapping_dict: dict,
         temporal_grouping: str,
-        database_date_dict: dict,
+        database_date_dict_static_only: dict,
         supply_array: np.array,
         len_technosphere_dbs: int,
     ):
@@ -34,7 +34,7 @@ class DynamicBiosphere:
         self.activity_time_mapping_dict = activity_time_mapping_dict
         self.biosphere_time_mapping_dict = biosphere_time_mapping_dict
         self.time_res = self._time_res_dict[temporal_grouping]
-        self.database_date_dict = database_date_dict
+        self.database_date_dict_static_only = database_date_dict_static_only
         self.dynamic_supply_array = supply_array
         self.len_technosphere_dbs = len_technosphere_dbs
         self.rows = []
@@ -69,7 +69,7 @@ class DynamicBiosphere:
 
             # supply chain emissions of activity
             # to avoid double counting, only add supply chain emissions for processes, which are linked to background database,
-            if db in self.database_date_dict.keys() and db != "foreground":
+            if db in self.database_date_dict_static_only.keys():
                 # then calculate lci
                 bg_lca = LCA({act: 1})
                 bg_lca.lci()
@@ -85,8 +85,7 @@ class DynamicBiosphere:
 
                     # Add entry to dynamic bio matrix
                     # first create a row index for the tuple((db,bio_flow), date))
-                    self.biosphere_time_mapping_dict.add((bio_flow, bio_date))
-                    bio_row_index = self.biosphere_time_mapping_dict[(bio_flow, bio_date)]
+                    bio_row_index = self.biosphere_time_mapping_dict.add((bio_flow, bio_date))
                     # populate lists with which sparse matrix is constructed
                     self.add_matrix_entry_for_biosphere_flows(
                         row=bio_row_index, col=process_col_index, amount=bio_value
