@@ -30,7 +30,7 @@ class TimelineBuilder:
         self,
         slca: LCA,
         edge_filter_function: Callable,
-        database_date_dict: dict,
+        database_date_dict_static_only: dict,
         time_mapping_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
@@ -38,7 +38,7 @@ class TimelineBuilder:
     ):
         self.slca = slca
         self.edge_filter_function = edge_filter_function
-        self.database_date_dict = database_date_dict
+        self.database_date_dict_static_only = database_date_dict_static_only
         self.time_mapping_dict = time_mapping_dict
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
@@ -51,7 +51,7 @@ class TimelineBuilder:
         Check that the strings of the databases exist in the databases of the brightway2 project.
 
         """
-        for db in self.database_date_dict.keys():
+        for db in self.database_date_dict_static_only.keys():
             assert db in bd.databases, f"{db} not in your brightway2 project databases."
         else:
             print(
@@ -176,10 +176,17 @@ class TimelineBuilder:
             :return: Timeline as a dataframe with a column 'interpolation_weights' added, this column looks like {database_name: weight, database_name: weight}.
 
             """
-
+            if not database_date_dict:
+                warnings.warn(
+                    "No temporal databases provided.",
+                    category=Warning,
+                )
+                tl_df["interpolation_weights"] = None
+                return tl_df
+            
             dates_list = [
                 date
-                for date in self.database_date_dict.values()
+                for date in self.database_date_dict_static_only.values()
                 if type(date) == datetime
             ]
             if "date_producer" not in list(tl_df.columns):
@@ -187,7 +194,7 @@ class TimelineBuilder:
 
             # create reversed dict {date: database} with only static "background" db's
             self.reversed_database_date_dict = {
-                v: k for k, v in self.database_date_dict.items() if type(v) == datetime
+                v: k for k, v in self.database_date_dict_static_only.items() if type(v) == datetime
             }
 
             if self.interpolation_type == "nearest":
@@ -417,7 +424,7 @@ class TimelineBuilder:
         # Add interpolation weights to background databases to the dataframe
         grouped_edges = add_column_interpolation_weights_to_timeline(
             grouped_edges,
-            self.database_date_dict,
+            self.database_date_dict_static_only,
             interpolation_type=self.interpolation_type,
         )
 
