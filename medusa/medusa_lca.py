@@ -213,7 +213,7 @@ class MedusaLCA:
             self.activity_time_mapping_dict,
             self.biosphere_time_mapping_dict,
             self.temporal_grouping,
-            self.database_date_dict,
+            self.database_date_dict_static_only,
             self.supply_array,
             self.len_technosphere_dbs,
         )
@@ -290,21 +290,10 @@ class MedusaLCA:
                     
                     amount = diagonalized_dynamic_lci[row_id, col_id]
                     emitting_process = self.activity_dict.reversed[col_id]
-                    #print(emitting_process)
                     self.dynamic_inventory[flow["code"]]["time"].append(time)
                     self.dynamic_inventory[flow["code"]]["amount"].append(amount)
                     self.dynamic_inventory[flow["code"]]["emitting_process"].append(emitting_process) 
             
-            #old code, can be deleted if confidence in new code is established
-            #amount = unordered_dynamic_lci[row_id]
-            # add biosphere flow to dictionary if it does not exist yet
-            # if not flow["code"] in self.dynamic_inventory.keys():
-            #     self.dynamic_inventory[flow["code"]] = {"time": [], "amount": [], "emitting_process": []}
-            # # fill dictionary
-            # self.dynamic_inventory[flow["code"]]["time"].append(time)
-            # self.dynamic_inventory[flow["code"]]["amount"].append(amount)
-            # self.dynamic_inventory[flow["code"]]["emitting_process"].append(np.nan)
-
         # now sort flows based on time
         for flow, _ in self.dynamic_inventory.items():
             order = np.argsort(self.dynamic_inventory[flow]["time"])
@@ -358,6 +347,7 @@ class MedusaLCA:
         )
         self.characterized_dynamic_score = self.characterized_inventory["amount"].sum() 
         
+        return self.characterized_inventory
 
     def prepare_static_lca_inputs(
         self,

@@ -53,10 +53,6 @@ class TimelineBuilder:
         """
         for db in self.database_date_dict_static_only.keys():
             assert db in bd.databases, f"{db} not in your brightway2 project databases."
-        else:
-            print(
-                "All databases in database_date_dict exist as brightway project databases"
-            )
         return
 
     # TODO: rethink structure of build_timeline(): is it good to have all these nested functions?

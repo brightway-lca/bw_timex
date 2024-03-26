@@ -3305,14 +3305,12 @@ def db_abc_loopA_with_biosphere_advanced_simple():
         ]
     )
 
-
-
 def db_dynamic_cf_test():
 
-    project_name = "___db_dynamic_cf_test__"
+    project_name = "___db_dynamic_cf_test_ch4_onenodetest__"
     if project_name in bd.projects:
         bd.projects.delete_project(project_name)
-        #bd.projects.purge_deleted_directories()
+        bd.projects.purge_deleted_directories()
 
     bd.projects.set_current(project_name)
 
@@ -3322,212 +3320,20 @@ def db_dynamic_cf_test():
             "name": "carbon dioxide",
             "temporalis code": "co2",
         },
-
         ('temporalis-bio', "CH4"): {
             "type": "emission",
             "name": "methane",
             "temporalis code": "ch4",
         },
-
-        ('temporalis-bio', "CO"): {
-            "type": "emission",
-            "name": "carbon monoxide",
-            "temporalis code": "co",
-        },
-
         ('temporalis-bio', "N2O"): {
             "type": "emission",
             "name": "nitrous oxide",
             "temporalis code": "n2o",
-        },
-    })
-
-    bd.Database('background_2024').write({
-        ('background_2024', 'C'): {
-            'name': 'C',
-            'location': 'somewhere',
-            'reference product': 'c',
-            'exchanges': [
-                {
-                    'amount': 1,
-                    'type': 'production',
-                    'input': ('background_2024', 'C'),
-                },
-                {
-                    'amount': 1,
-                    'type': 'technosphere',
-                    'input': ('background_2024', 'electricity_wind'),
-                },
-            ]
-        },
-        ('background_2024', 'electricity_wind'): {
-            'name': 'Electricity production, wind',
-            'location': 'somewhere',
-            'reference product': 'electricity, wind',
-            'exchanges': [
-                {
-                    'amount': 1,
-                    'type': 'production',
-                    'input': ('background_2024', 'electricity_wind'),
-                },
-                # {
-                #     'amount': 12,
-                #     'type': 'biosphere',
-                #     'input': ('temporalis-bio', 'CO2'),
-                #     'temporal_distribution': 
-                #         TemporalDistribution(
-                #             date=np.array([-4], dtype='timedelta64[Y]'), 
-                #             amount=np.array([1])
-                #         ),
-
-                # },
-                # {
-                #     'amount': 1,
-                #     'type': 'biosphere',
-                #     'input': ('temporalis-bio', 'CO'),
-                #     'temporal_distribution': 
-                #         TemporalDistribution(
-                #             date=np.array([-1], dtype='timedelta64[Y]'), 
-                #             amount=np.array([1])
-                #         ),
-
-                # },
-            ]
         }
     })
 
-    bd.Database('background_2008').write({
-        ('background_2008', 'C'): {
-            'name': 'C',
-            'location': 'somewhere',
-            'reference product': 'c',
-            'exchanges': [
-                {
-                    'amount': 1,
-                    'type': 'production',
-                    'input': ('background_2008', 'C'),
-                },
-                {
-                    'amount': 1,
-                    'type': 'technosphere',
-                    'input': ('background_2008', 'electricity_wind'),
-                },
-            ]
-        },
-        ('background_2008', 'electricity_wind'): {
-            'name': 'Electricity production, wind',
-            'location': 'somewhere',
-            'reference product': 'electricity, wind',
-            'exchanges': [
-                {
-                    'amount': 1,
-                    'type': 'production',
-                    'input': ('background_2008', 'electricity_wind'),
-                },
-                #  {
-                #     'amount': 12,
-                #     'type': 'biosphere',
-                #     'input': ('temporalis-bio', 'CO2'),
-                #     'temporal_distribution': 
-                #         TemporalDistribution(
-                #             date=np.array([-4], dtype='timedelta64[Y]'), 
-                #             amount=np.array([1])
-                #         ),
-
-                # },
-                #                 {
-                #     'amount': 1,
-                #     'type': 'biosphere',
-                #     'input': ('temporalis-bio', 'CO'),
-                #     'temporal_distribution': 
-                #         TemporalDistribution(
-                #             date=np.array([-1], dtype='timedelta64[Y]'), 
-                #             amount=np.array([1])
-                #         ),
-
-                # },
-            ]
-        }
-    })
-
-    bd.Database('foreground').write({
-        
-        ('foreground', 'B'): {
-            'name': 'B',
-            'location': 'somewhere',
-            'reference product': 'b',
-            'exchanges': [
-                {
-                    'amount': 1,
-                    'type': 'production',
-                    'input': ('foreground', 'B'),
-                },
-                {
-                    'amount': 13,
-                    'type': 'technosphere',
-                    'input': ('background_2024', 'C'),
-         
-                },
-                # {
-                #     'amount': 7,
-                #     'type': 'biosphere',
-                #     'input': ('temporalis-bio', 'CH4'),
-                #     'temporal_distribution': 
-                #         TemporalDistribution(
-                #             date=np.array([-2], dtype='timedelta64[Y]'), 
-                #             amount=np.array([1])
-                #         ),
-                # },
-                {
-                    'amount': 0.003,
-                    'type': 'biosphere',
-                    'input': ('temporalis-bio', 'N2O'),
-                    'temporal_distribution': 
-                        TemporalDistribution(
-                            date=np.array([15], dtype='timedelta64[Y]'), 
-                            amount=np.array([1])
-                        ),
-
-                },
-                # {
-                #     'amount': 1,
-                #     'type': 'biosphere',
-                #     'input': ('temporalis-bio', 'CO'),
-                #     'temporal_distribution': 
-                #         TemporalDistribution(
-                #             date=np.array([10], dtype='timedelta64[Y]'), 
-                #             amount=np.array([1])
-                #         ),
-
-                # },
-
-                {
-                    'amount': 0.1,
-                    'type': 'biosphere',
-                    'input': ('temporalis-bio', 'CH4'),
-                    'temporal_distribution': 
-                        TemporalDistribution(
-                            date=np.array([-10], dtype='timedelta64[Y]'), 
-                            amount=np.array([1])
-                        ),
-
-                },
-
-                {
-                    'amount': 3,
-                    'type': 'biosphere',
-                    'input': ('temporalis-bio', 'CO2'),
-                    'temporal_distribution': 
-                        TemporalDistribution(
-                            date=np.array([-5], dtype='timedelta64[Y]'), 
-                            amount=np.array([1])
-                        ),
-
-                },
-            ]
-        },
-        
-        ('foreground', 'A'): {
+    bd.Database('test').write({
+        ('test', 'A'): {
             'name': 'A',
             'location': 'somewhere',
             'reference product': 'a',
@@ -3535,269 +3341,21 @@ def db_dynamic_cf_test():
                 {
                     'amount': 1,
                     'type': 'production',
-                    'input': ('foreground', 'A'),
+                    'input': ('test', 'A'),
                 },
-                # {
-                #     'amount': 17,
-                #     'type': 'biosphere',
-                #     'input': ('temporalis-bio', 'CO2'),
-                #     'temporal_distribution': 
-                #         TemporalDistribution(
-                #             date=np.array([-1], dtype='timedelta64[Y]'), 
-                #             amount=np.array([1])
-                #         ),
-                # },
                 {
                     'amount': 1,
-                    'type': 'technosphere',
-                    'input': ('foreground', 'B'),
-                    # 'temporal_distribution': 
-                    #     TemporalDistribution(
-                    #         date=np.array([0], dtype='timedelta64[Y]'), 
-                    #         amount=np.array([1])
-                    #     ),
-       
+                    'type': 'biosphere',
+                    'input': ('temporalis-bio', 'CH4'),
                 },
             ]
         },
     })
-    
+
     bd.Method(("GWP", "example")).write(
         [
             (("temporalis-bio", "CO2"), 1),
             (("temporalis-bio", "CH4"), 28.41), #from Levasseur integrals
             (("temporalis-bio", "N2O"), 263.97), #from Levasseur integrals
-            (("temporalis-bio", "CO"), 1.56), #from Levasseur integrals
-        ]
-    )
-
-def db_dynamic_cf_test_ch4():
-
-    project_name = "___db_dynamic_cf_test__"
-    if project_name in bd.projects:
-        bd.projects.delete_project(project_name)
-        #bd.projects.purge_deleted_directories()
-
-    bd.projects.set_current(project_name)
-
-    bd.Database('temporalis-bio').write({
-        ('temporalis-bio', "CO2"): {
-            "type": "emission",
-            "name": "carbon dioxide",
-            "temporalis code": "co2",
-        },
-
-        ('temporalis-bio', "CH4"): {
-            "type": "emission",
-            "name": "methane",
-            "temporalis code": "ch4",
-        },
-
-        ('temporalis-bio', "CO"): {
-            "type": "emission",
-            "name": "carbon monoxide",
-            "temporalis code": "co",
-        },
-
-        ('temporalis-bio', "N2O"): {
-            "type": "emission",
-            "name": "nitrous oxide",
-            "temporalis code": "n2o",
-        },
-    })
-
-    bd.Database('background_2024').write({
-        ('background_2024', 'C'): {
-            'name': 'C',
-            'location': 'somewhere',
-            'reference product': 'c',
-            'exchanges': [
-                {
-                    'amount': 1,
-                    'type': 'production',
-                    'input': ('background_2024', 'C'),
-                },
-                {
-                    'amount': 1,
-                    'type': 'technosphere',
-                    'input': ('background_2024', 'electricity_wind'),
-                },
-            ]
-        },
-        ('background_2024', 'electricity_wind'): {
-            'name': 'Electricity production, wind',
-            'location': 'somewhere',
-            'reference product': 'electricity, wind',
-            'exchanges': [
-                {
-                    'amount': 1,
-                    'type': 'production',
-                    'input': ('background_2024', 'electricity_wind'),
-                },
-            ]
-        }
-    })
-
-    bd.Database('background_2008').write({
-        ('background_2008', 'C'): {
-            'name': 'C',
-            'location': 'somewhere',
-            'reference product': 'c',
-            'exchanges': [
-                {
-                    'amount': 1,
-                    'type': 'production',
-                    'input': ('background_2008', 'C'),
-                },
-                {
-                    'amount': 1,
-                    'type': 'technosphere',
-                    'input': ('background_2008', 'electricity_wind'),
-                },
-            ]
-        },
-        ('background_2008', 'electricity_wind'): {
-            'name': 'Electricity production, wind',
-            'location': 'somewhere',
-            'reference product': 'electricity, wind',
-            'exchanges': [
-                {
-                    'amount': 1,
-                    'type': 'production',
-                    'input': ('background_2008', 'electricity_wind'),
-                },
-                                {
-                    'amount': 1,
-                    'type': 'biosphere',
-                    'input': ('temporalis-bio', 'CO'),
-                    'temporal_distribution': 
-                        TemporalDistribution(
-                            date=np.array([-1], dtype='timedelta64[Y]'), 
-                            amount=np.array([1])
-                        ),
-
-                },
-            ]
-        }
-    })
-
-    bd.Database('foreground').write({
-        
-        ('foreground', 'B'): {
-            'name': 'B',
-            'location': 'somewhere',
-            'reference product': 'b',
-            'exchanges': [
-                {
-                    'amount': 1,
-                    'type': 'production',
-                    'input': ('foreground', 'B'),
-                },
-                {
-                    'amount': 13,
-                    'type': 'technosphere',
-                    'input': ('background_2024', 'C'),
-         
-                },
-                {
-                    'amount': 7,
-                    'type': 'biosphere',
-                    'input': ('temporalis-bio', 'CH4'),
-                    'temporal_distribution': 
-                        TemporalDistribution(
-                            date=np.array([-2], dtype='timedelta64[Y]'), 
-                            amount=np.array([1])
-                        ),
-                },
-                {
-                    'amount': 1,
-                    'type': 'biosphere',
-                    'input': ('temporalis-bio', 'N2O'),
-                    # 'temporal_distribution': 
-                    #     TemporalDistribution(
-                    #         date=np.array([4], dtype='timedelta64[Y]'), 
-                    #         amount=np.array([1])
-                    #     ),
-
-                },
-                {
-                    'amount': 1,
-                    'type': 'biosphere',
-                    'input': ('temporalis-bio', 'CO'),
-                    # 'temporal_distribution': 
-                    #     TemporalDistribution(
-                    #         date=np.array([4], dtype='timedelta64[Y]'), 
-                    #         amount=np.array([1])
-                    #     ),
-
-                },
-
-                {
-                    'amount': 1,
-                    'type': 'biosphere',
-                    'input': ('temporalis-bio', 'CH4'),
-                    # 'temporal_distribution': 
-                    #     TemporalDistribution(
-                    #         date=np.array([4], dtype='timedelta64[Y]'), 
-                    #         amount=np.array([1])
-                    #     ),
-
-                },
-
-                {
-                    'amount': 1,
-                    'type': 'biosphere',
-                    'input': ('temporalis-bio', 'CO2'),
-                    # 'temporal_distribution': 
-                    #     TemporalDistribution(
-                    #         date=np.array([4], dtype='timedelta64[Y]'), 
-                    #         amount=np.array([1])
-                    #     ),
-
-                },
-            ]
-        },
-        
-        ('foreground', 'A'): {
-            'name': 'A',
-            'location': 'somewhere',
-            'reference product': 'a',
-            'exchanges': [
-                {
-                    'amount': 1,
-                    'type': 'production',
-                    'input': ('foreground', 'A'),
-                },
-                {
-                    'amount': 17,
-                    'type': 'biosphere',
-                    'input': ('temporalis-bio', 'CO2'),
-                    'temporal_distribution': 
-                        TemporalDistribution(
-                            date=np.array([-1], dtype='timedelta64[Y]'), 
-                            amount=np.array([1])
-                        ),
-                },
-                {
-                    'amount': 1,
-                    'type': 'technosphere',
-                    'input': ('foreground', 'B'),
-                    # 'temporal_distribution': 
-                    #     TemporalDistribution(
-                    #         date=np.array([0], dtype='timedelta64[Y]'), 
-                    #         amount=np.array([1])
-                    #     ),
-       
-                },
-            ]
-        },
-    })
-    
-    bd.Method(("GWP", "example")).write(
-        [
-            (("temporalis-bio", "CO2"), 1),
-            (("temporalis-bio", "CH4"), 28.41), #from Levasseur integrals
-            (("temporalis-bio", "N2O"), 263.97), #from Levasseur integrals
-            (("temporalis-bio", "CO"), 1.56), #from Levasseur integrals
         ]
     )
