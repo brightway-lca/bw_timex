@@ -10,13 +10,13 @@ class TimeMappingDict(dict):
             start_id - 1
         )  # check_id that is different from the start id for the reversed dict
 
-    def add(self, process_time_tuple, key=None):
+    def add(self, process_time_tuple, unique_id=None):
         if process_time_tuple in self:
             return self[process_time_tuple]
 
-        if key is not None:
-            self[process_time_tuple] = key
-            return key
+        if unique_id is not None:
+            self[process_time_tuple] = unique_id
+            return unique_id
         
         self[process_time_tuple] = self._current_id
         self._current_id += 1

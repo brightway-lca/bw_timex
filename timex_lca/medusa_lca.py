@@ -114,10 +114,10 @@ class MedusaLCA:
                 key[0]
             ]  # datetime (or 'dynamic' for TD'd processes)
             if type(time) == str:  # if 'dynamic', just add the string
-                self.activity_time_mapping_dict.add((key, time), key=id)
+                self.activity_time_mapping_dict.add((key, time), unique_id=id)
             elif type(time) == datetime:
                 self.activity_time_mapping_dict.add(
-                    (key, extract_date_as_integer(time, self.temporal_grouping)), key=id
+                    (key, extract_date_as_integer(time, self.temporal_grouping)), unique_id=id
                 )  # if datetime, map to the date as integer
             else:
                 warnings.warn(f"Time of activity {key} is neither datetime nor str.")
