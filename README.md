@@ -18,7 +18,9 @@ The temporal information of all technosphere exchanges in the system is stored i
 Next, the temporally-resolved supply chain from the graph traversal is translated into a matrix format using `datapackages`. This allows to use all conventional matrix-based LCA functionalities later on, which is not possible with a graph-traversal only approach. Datapackages modify the static LCA technosphere and biosphere matrices, adding new time-specific processes for each process in the timeline. At the intersection between the foreground and background system, temporal markets are created that source the corresponding exchange from the most suitable background database based on temporal proximity.
 The matrix modification steps are shown in the figure below for a very simple system with temporal information, consisting of two processes, A and B, and one biosphere flow x occuring at B.
 
-![flowchart for simple system](flowchart.png)
+<p align=center><img width="750" alt="image" src="https://github.com/TimoDiepers/timex/assets/90762029/13f20b29-84aa-4cb4-b7dc-700793330e70"></p>
+
+
 
 ### Life cycle impact assessment options:
 The user can choose to calculate static or dynamic impact assessment with this temporally-resolved LCA matrices. The time-mapped static LCIA uses static characterization with the temporally resolved LCA matrices. Thus, it will provide different static scores than the original LCIA, if there are differences in the LCIs in the background datbases. Dynamic impact assessment also takes the timing of the biosphere flows into account. Biosphere flows are assumed to occur at the same time as their emitting process, unless a `temporal distribution` is added to the biosphere exchange. In this case, the temporal profiles of the emitting process and the biosphere flow are propagated with convolution. Dynamic impact assessment is implemented for radiative forcing and GWP, with flexible time horizons (default of 100 years). Optionally, the time horizon can be fixed for the entire product system (Levasseur 2010 approach), which gives lower impact to emissions occurring later in the life cycle. 
