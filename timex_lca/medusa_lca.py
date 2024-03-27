@@ -69,8 +69,8 @@ class MedusaLCA:
         self.interpolation_type = interpolation_type
 
         if not self.database_date_dict:
-            warnings.warn("No database_date_dict provided. Treating the database containing the functional unit as dynamic.")
-            self.database_date_dict = {list(demand.keys())[0][0]: "dynamic"}
+            warnings.warn("No database_date_dict provided. Treating the databases containing the functional unit as dynamic. No remapping to time explicit databases will be done.")
+            self.database_date_dict = {key[0]: "dynamic" for key in demand.keys()} 
             
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all background databases in the LCA. We need all the IDs for the time mapping dict.
         fu, data_objs, remapping = self.prepare_static_lca_inputs(
