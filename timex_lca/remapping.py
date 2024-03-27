@@ -12,15 +12,16 @@ class TimeMappingDict(dict):
 
     def add(self, process_time_tuple, key=None):
         if process_time_tuple in self:
-            return
+            return self[process_time_tuple]
 
         if key is not None:
             self[process_time_tuple] = key
-        else:
-            self[process_time_tuple] = self._current_id
-            self._current_id += 1
+            return key
+        
+        self[process_time_tuple] = self._current_id
+        self._current_id += 1
 
-        return self._current_id
+        return self._current_id - 1
 
     def reversed(self):
         """return a reversed version of dict, update if necessary"""
