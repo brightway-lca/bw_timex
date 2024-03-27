@@ -54,8 +54,8 @@ class MedusaLCA:
         self,
         demand,
         method,
-        edge_filter_function: Callable,
-        database_date_dict: dict,
+        edge_filter_function: Callable = lambda x: False,
+        database_date_dict: dict = None,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
         *args,
@@ -68,6 +68,10 @@ class MedusaLCA:
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
 
+        if not self.database_date_dict:
+            warnings.warn("No database_date_dict provided. Treating the database containing the functional unit as dynamic.")
+            self.database_date_dict = {list(demand.keys())[0][0]: "dynamic"}
+            
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all background databases in the LCA. We need all the IDs for the time mapping dict.
         fu, data_objs, remapping = self.prepare_static_lca_inputs(
             demand=self.demand, method=self.method
