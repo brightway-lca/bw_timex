@@ -34,6 +34,7 @@ class TimelineBuilder:
         time_mapping_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
+        *args,
         **kwargs,
     ):
         self.slca = slca
@@ -44,7 +45,7 @@ class TimelineBuilder:
         self.interpolation_type = interpolation_type
 
         self.eelca = EdgeExtractor(
-            slca, edge_filter_function=edge_filter_function, **kwargs
+            slca, *args, edge_filter_function=edge_filter_function, **kwargs
         )
         self.edge_timeline = self.eelca.build_edge_timeline()
 

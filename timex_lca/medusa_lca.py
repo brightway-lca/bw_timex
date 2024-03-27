@@ -58,6 +58,7 @@ class MedusaLCA:
         database_date_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
+        *args,
         **kwargs,
     ):
         self.demand = demand
@@ -97,6 +98,7 @@ class MedusaLCA:
             self.activity_time_mapping_dict,
             self.temporal_grouping,
             self.interpolation_type,
+            *args,
             **kwargs,
         )
 
@@ -117,7 +119,8 @@ class MedusaLCA:
                 self.activity_time_mapping_dict.add((key, time), unique_id=id)
             elif type(time) == datetime:
                 self.activity_time_mapping_dict.add(
-                    (key, extract_date_as_integer(time, self.temporal_grouping)), unique_id=id
+                    (key, extract_date_as_integer(time, self.temporal_grouping)),
+                    unique_id=id,
                 )  # if datetime, map to the date as integer
             else:
                 warnings.warn(f"Time of activity {key} is neither datetime nor str.")

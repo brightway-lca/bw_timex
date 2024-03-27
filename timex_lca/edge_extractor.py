@@ -52,6 +52,7 @@ class EdgeExtractor(TemporalisLCA):
         :param kwargs: Arbitrary keyword arguments.
         """
         super().__init__(*args, **kwargs)
+
         if edge_filter_function:
             self.edge_ff = edge_filter_function
         else:
