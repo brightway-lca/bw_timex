@@ -1,6 +1,6 @@
-# in your terminal, run conda: conda env create -f tictac-environment.yaml
+# in your terminal, run conda: conda env create -f timex-environment.yaml
 
-name: tictac
+name: timex_lca
 channels:
   - romainsacchi
   - defaults
