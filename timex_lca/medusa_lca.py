@@ -197,12 +197,12 @@ class MedusaLCA:
             for exc in node.technosphere():
                 if exc.input["database"] in self.database_date_dict_static_only.keys():
                     first_level_background_node_ids_static.add(exc.input.id)
-                    try:
-                        first_level_background_node_ids_all.add(
-                            bd.Database(exc.input["database"]).get(exc.input["code"]).id
-                        )
-                    except:
-                        pass
+                    for background_db in self.database_date_dict_static_only.keys():
+                        try:
+                            other_node = bd.Database(background_db).get(exc.input["code"])
+                            first_level_background_node_ids_all.add(other_node.id)
+                        except:
+                            pass
         self.node_id_collection_dict["first_level_background_node_ids_static"] = (
             first_level_background_node_ids_static
         )

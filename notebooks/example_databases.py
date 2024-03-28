@@ -3431,7 +3431,7 @@ def db_test_dynamic_biosphere():
                         "input": ("background_2024", "electricity_wind"),
                     },
                     {
-                        "amount": 0.9,
+                        "amount": 888,
                         "type": "biosphere",
                         "input": ("temporalis-bio", "CO2"),
                     },
@@ -3470,7 +3470,7 @@ def db_test_dynamic_biosphere():
                         "input": ("background_2008", "electricity_wind"),
                     },
                     {
-                        "amount": 0.9,
+                        "amount": 777,
                         "type": "biosphere",
                         "input": ("temporalis-bio", "CO2"),
                     },
