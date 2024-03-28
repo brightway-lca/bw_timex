@@ -19,7 +19,7 @@ class DynamicBiosphereBuilder:
         activity_dict: dict,
         activity_time_mapping_dict: dict,
         biosphere_time_mapping_dict: dict,
-        node_id_collection_dict: dict,        
+        node_id_collection_dict: dict,
         temporal_grouping: str,
         database_date_dict_static_only: dict,
         len_technosphere_dbs: int,
@@ -59,38 +59,53 @@ class DynamicBiosphereBuilder:
             # Skip activities from dynamic databases as they have exploded time explicit copies which get the bioflows
             if time == "dynamic":
                 continue
-            
+
             process_col_index = self.activity_dict[id]  # get the matrix column index
             act = bd.get_node(database=db, code=code)
-            
+
             # Skip activities from background databases which are not directly linked to the foreground. The bioflows of these activities get aggregated lateron, as they all occur at the same timestamp.
-            if db in self.database_date_dict_static_only.keys() and act.id not in self.node_id_collection_dict['first_level_background_node_ids_all']:
+            if (
+                db in self.database_date_dict_static_only.keys()
+                and act.id
+                not in self.node_id_collection_dict[
+                    "first_level_background_node_ids_all"
+                ]
+            ):
                 continue
-            
+
             # Create TD instance of producer timestamp, which is currently a pd.Timestamp and get the date
             # direct conversion with pd.Timestamp.to_pydatetime() leads to wrong dtype for some reason
             td_producer = TemporalDistribution(
                 date=np.array([str(time)], dtype=self.time_res), amount=np.array([1])
             ).date
-            
+
             # Aggregate biosphere flows of background supply chain emissions, as they all occur at the same timestamp.
-            if act.id in self.node_id_collection_dict['first_level_background_node_ids_all']:
+            if (
+                act.id
+                in self.node_id_collection_dict["first_level_background_node_ids_all"]
+            ):
                 # then calculate lci
                 bg_lca = LCA({act: 1})
                 bg_lca.lci()
-                aggregated_inventory = bg_lca.inventory.sum(axis=1) # aggregated biosphere flows of background supply chain emissions. Rows are bioflows.
-                
-                for idx, amount in enumerate(aggregated_inventory.flatten().tolist()[0]):
+                aggregated_inventory = bg_lca.inventory.sum(
+                    axis=1
+                )  # aggregated biosphere flows of background supply chain emissions. Rows are bioflows.
+
+                for idx, amount in enumerate(
+                    aggregated_inventory.flatten().tolist()[0]
+                ):
                     bioflow = bd.get_activity(bg_lca.dicts.biosphere.reversed[idx])
                     date = td_producer[0]
-                    
-                    time_mapped_matrix_id = self.biosphere_time_mapping_dict.add((bioflow, date))
-                    
+
+                    time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(
+                        (bioflow, date)
+                    )
+
                     self.add_matrix_entry_for_biosphere_flows(
                         row=time_mapped_matrix_id, col=process_col_index, amount=amount
                     )
-                    
-            else: # Activity is an exploded process from the time explicit foreground. 
+
+            else:  # Activity is an exploded process from the time explicit foreground.
                 for exc in act.biosphere():
                     if exc.get("temporal_distribution"):
                         td_dates = exc["temporal_distribution"].date  # time_delta
@@ -100,18 +115,22 @@ class DynamicBiosphereBuilder:
                         )  # we can add a datetime of length 1 to a timedelta of length N without problems
                         values = exc["amount"] * td_values
 
-                    else:  #exchange has no TD
+                    else:  # exchange has no TD
                         dates = td_producer  # datetime array, same time as producer
                         values = [exc["amount"]]
 
                     # Add entries to dynamic bio matrix
                     for date, amount in zip(dates, values):
                         # first create a row index for the tuple((db, bioflow), date))
-                        time_mapped_matrix_id = self.biosphere_time_mapping_dict.add((exc.input, date))
-                       
+                        time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(
+                            (exc.input, date)
+                        )
+
                         # populate lists with which sparse matrix is constructed
                         self.add_matrix_entry_for_biosphere_flows(
-                            row=time_mapped_matrix_id, col=process_col_index, amount=amount
+                            row=time_mapped_matrix_id,
+                            col=process_col_index,
+                            amount=amount,
                         )
 
         # now build the dynamic biosphere matrix

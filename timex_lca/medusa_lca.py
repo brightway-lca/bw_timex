@@ -69,9 +69,11 @@ class MedusaLCA:
         self.interpolation_type = interpolation_type
 
         if not self.database_date_dict:
-            warnings.warn("No database_date_dict provided. Treating the databases containing the functional unit as dynamic. No remapping to time explicit databases will be done.")
-            self.database_date_dict = {key[0]: "dynamic" for key in demand.keys()} 
-            
+            warnings.warn(
+                "No database_date_dict provided. Treating the databases containing the functional unit as dynamic. No remapping to time explicit databases will be done."
+            )
+            self.database_date_dict = {key[0]: "dynamic" for key in demand.keys()}
+
         # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
         self.database_date_dict_static_only = {
             k: v for k, v in self.database_date_dict.items() if type(v) == datetime
@@ -79,7 +81,7 @@ class MedusaLCA:
 
         # Create some collections of nodes that will be useful down the line, e.g. all nodes from the background databases that link to foregroud nodes.
         self.create_node_id_collection_dict()
-        
+
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all background databases in the LCA. We need all the IDs for the time mapping dict.
         fu, data_objs, remapping = self.prepare_static_lca_inputs(
             demand=self.demand, method=self.method
@@ -133,11 +135,11 @@ class MedusaLCA:
                 )  # if datetime, map to the date as integer
             else:
                 warnings.warn(f"Time of activity {key} is neither datetime nor str.")
-                
+
     def create_node_id_collection_dict(self):
         """
         Creates a dict of collections of nodes that will be useful down the line, e.g. to determine static nodes for the graph traversal or create the dynamic biosphere matrix.
-        
+
         Available collections are:
         - demand_database_names: set of database names of the demand processes
         - demand_dependent_database_names: set of database names of all processes that depend on the demand processes
@@ -148,39 +150,66 @@ class MedusaLCA:
         - first_level_background_node_ids_all: like first_level_background_node_ids_static, but includes first level background processes from other time explicit databases.
         """
         self.node_id_collection_dict = {}
-        
+
         # Original variable names preserved, set types for performance and uniqueness
-        demand_database_names = {db for db in self.database_date_dict.keys() if db not in self.database_date_dict_static_only.keys()}
+        demand_database_names = {
+            db
+            for db in self.database_date_dict.keys()
+            if db not in self.database_date_dict_static_only.keys()
+        }
         self.node_id_collection_dict["demand_database_names"] = demand_database_names
-        
+
         demand_dependent_database_names = set()
         for db in demand_database_names:
             demand_dependent_database_names.update(bd.Database(db).find_dependents())
-        self.node_id_collection_dict["demand_dependent_database_names"] = demand_dependent_database_names
-        
-        demand_dependent_background_database_names = demand_dependent_database_names & self.database_date_dict_static_only.keys()
-        self.node_id_collection_dict["demand_dependent_background_database_names"] = demand_dependent_background_database_names
-        
-        demand_dependent_background_node_ids = {node.id for db in demand_dependent_background_database_names for node in bd.Database(db)}
-        self.node_id_collection_dict["demand_dependent_background_node_ids"] = demand_dependent_background_node_ids
-        
-        foreground_node_ids = {node.id for db in self.database_date_dict.keys() if db not in self.database_date_dict_static_only.keys() for node in bd.Database(db)}
+        self.node_id_collection_dict["demand_dependent_database_names"] = (
+            demand_dependent_database_names
+        )
+
+        demand_dependent_background_database_names = (
+            demand_dependent_database_names & self.database_date_dict_static_only.keys()
+        )
+        self.node_id_collection_dict["demand_dependent_background_database_names"] = (
+            demand_dependent_background_database_names
+        )
+
+        demand_dependent_background_node_ids = {
+            node.id
+            for db in demand_dependent_background_database_names
+            for node in bd.Database(db)
+        }
+        self.node_id_collection_dict["demand_dependent_background_node_ids"] = (
+            demand_dependent_background_node_ids
+        )
+
+        foreground_node_ids = {
+            node.id
+            for db in self.database_date_dict.keys()
+            if db not in self.database_date_dict_static_only.keys()
+            for node in bd.Database(db)
+        }
         self.node_id_collection_dict["foreground_node_ids"] = foreground_node_ids
-        
+
         first_level_background_node_ids_static = set()
         first_level_background_node_ids_all = set()
         for node_id in foreground_node_ids:
             node = bd.get_node(id=node_id)
             for exc in node.technosphere():
-                if exc.input['database'] in self.database_date_dict_static_only.keys():
+                if exc.input["database"] in self.database_date_dict_static_only.keys():
                     first_level_background_node_ids_static.add(exc.input.id)
                     try:
-                        first_level_background_node_ids_all.add(bd.Database(exc.input['database']).get(exc.input['code']).id)
+                        first_level_background_node_ids_all.add(
+                            bd.Database(exc.input["database"]).get(exc.input["code"]).id
+                        )
                     except:
                         pass
-        self.node_id_collection_dict["first_level_background_node_ids_static"] = first_level_background_node_ids_static
-        self.node_id_collection_dict["first_level_background_node_ids_all"] = first_level_background_node_ids_all
-                    
+        self.node_id_collection_dict["first_level_background_node_ids_static"] = (
+            first_level_background_node_ids_static
+        )
+        self.node_id_collection_dict["first_level_background_node_ids_all"] = (
+            first_level_background_node_ids_all
+        )
+
     def build_timeline(self):
         """
         Build a timeline DataFrame of the exchanges using the TimelineBuilder class.
@@ -261,11 +290,11 @@ class MedusaLCA:
                 "Static Medusa LCA has not been run. Call MedusaLCA.lci() first."
             )
             return
-        
+
         self.len_technosphere_dbs = sum(
             [len(bd.Database(db)) for db in self.database_date_dict.keys()]
         )
-        
+
         self.dynamic_biosphere_builder = DynamicBiosphereBuilder(
             self.dicts.activity,
             self.activity_time_mapping_dict,

@@ -17,7 +17,7 @@ class TimeMappingDict(dict):
         if unique_id is not None:
             self[process_time_tuple] = unique_id
             return unique_id
-        
+
         self[process_time_tuple] = self._current_id
         self._current_id += 1
 

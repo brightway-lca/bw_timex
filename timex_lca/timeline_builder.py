@@ -49,13 +49,28 @@ class TimelineBuilder:
         self.interpolation_type = interpolation_type
 
         # Finding indices of activities from background databases that are known to be static, i.e. have no temporal distributions connecting to them. These will be be skipped in the graph traversal.
-        static_activity_db_indices = [node_id for node_id in self.node_id_collection_dict["demand_dependent_background_node_ids"] if node_id not in self.node_id_collection_dict["first_level_background_node_ids_static"]]
-        
+        static_activity_db_indices = [
+            node_id
+            for node_id in self.node_id_collection_dict[
+                "demand_dependent_background_node_ids"
+            ]
+            if node_id
+            not in self.node_id_collection_dict[
+                "first_level_background_node_ids_static"
+            ]
+        ]
+
         # The graph traversal needs the matrix indices, not the database / node indices.
-        static_activity_matrix_indices = [self.slca.dicts.product[node_id] for node_id in static_activity_db_indices]
-        
+        static_activity_matrix_indices = [
+            self.slca.dicts.product[node_id] for node_id in static_activity_db_indices
+        ]
+
         self.edge_extractor = EdgeExtractor(
-            slca, *args, edge_filter_function=edge_filter_function, static_activity_indices=set(static_activity_matrix_indices), **kwargs
+            slca,
+            *args,
+            edge_filter_function=edge_filter_function,
+            static_activity_indices=set(static_activity_matrix_indices),
+            **kwargs,
         )
         self.edge_timeline = self.edge_extractor.build_edge_timeline()
 
