@@ -30,8 +30,10 @@ class TimelineBuilder:
         self,
         slca: LCA,
         edge_filter_function: Callable,
+        database_date_dict: dict,
         database_date_dict_static_only: dict,
         time_mapping_dict: dict,
+        node_id_collection_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
         *args,
@@ -39,15 +41,23 @@ class TimelineBuilder:
     ):
         self.slca = slca
         self.edge_filter_function = edge_filter_function
+        self.database_date_dict = database_date_dict
         self.database_date_dict_static_only = database_date_dict_static_only
         self.time_mapping_dict = time_mapping_dict
+        self.node_id_collection_dict = node_id_collection_dict
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
 
-        self.eelca = EdgeExtractor(
-            slca, *args, edge_filter_function=edge_filter_function, **kwargs
+        # Finding indices of activities from background databases that are known to be static, i.e. have no temporal distributions connecting to them. These will be be skipped in the graph traversal.
+        static_activity_db_indices = [node_id for node_id in self.node_id_collection_dict["demand_dependent_background_node_ids"] if node_id not in self.node_id_collection_dict["first_level_background_node_ids_static"]]
+        
+        # The graph traversal needs the matrix indices, not the database / node indices.
+        static_activity_matrix_indices = [self.slca.dicts.product[node_id] for node_id in static_activity_db_indices]
+        
+        self.edge_extractor = EdgeExtractor(
+            slca, *args, edge_filter_function=edge_filter_function, static_activity_indices=set(static_activity_matrix_indices), **kwargs
         )
-        self.edge_timeline = self.eelca.build_edge_timeline()
+        self.edge_timeline = self.edge_extractor.build_edge_timeline()
 
     def check_database_names(self):
         """

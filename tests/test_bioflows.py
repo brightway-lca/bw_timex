@@ -7,7 +7,7 @@ import unittest
 import bw2data as bd
 import bw2calc as bc
 import numpy as np
-from medusa import MedusaLCA
+from timex_lca import MedusaLCA
 from tests.databases import db_abc_loopA_with_biosphere_tds_CO2_and_CH4
 from datetime import datetime
 

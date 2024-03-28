@@ -25,7 +25,7 @@ from bw2data.errors import Brightway2Project
 from bw2calc import LCA
 from .timeline_builder import TimelineBuilder
 from .matrix_modifier import MatrixModifier
-from .dynamic_biosphere_builder import DynamicBiosphere
+from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .dynamic_characterization import DynamicCharacterization
 from .remapping import TimeMappingDict
 from .utils import extract_date_as_integer
@@ -72,6 +72,14 @@ class MedusaLCA:
             warnings.warn("No database_date_dict provided. Treating the databases containing the functional unit as dynamic. No remapping to time explicit databases will be done.")
             self.database_date_dict = {key[0]: "dynamic" for key in demand.keys()} 
             
+        # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
+        self.database_date_dict_static_only = {
+            k: v for k, v in self.database_date_dict.items() if type(v) == datetime
+        }
+
+        # Create some collections of nodes that will be useful down the line, e.g. all nodes from the background databases that link to foregroud nodes.
+        self.create_node_id_collection_dict()
+        
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all background databases in the LCA. We need all the IDs for the time mapping dict.
         fu, data_objs, remapping = self.prepare_static_lca_inputs(
             demand=self.demand, method=self.method
@@ -89,17 +97,14 @@ class MedusaLCA:
         # Create a similar dict for the biosphere flows. This is populated by the dynamic_biosphere_builder
         self.biosphere_time_mapping_dict = TimeMappingDict(start_id=0)
 
-        # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
-        self.database_date_dict_static_only = {
-            k: v for k, v in self.database_date_dict.items() if type(v) == datetime
-        }
-
         # Create timeline builder that does a the graph traversal (similar to bw_temporalis) and extracts all edges with their temporal information. Can later be used to build a timeline with the TimelineBuilder.build_timeline() method.
-        self.tl_builder = TimelineBuilder(
+        self.timeline_builder = TimelineBuilder(
             self.static_lca,
             self.edge_filter_function,
+            self.database_date_dict,
             self.database_date_dict_static_only,
             self.activity_time_mapping_dict,
+            self.node_id_collection_dict,
             self.temporal_grouping,
             self.interpolation_type,
             *args,
@@ -128,12 +133,59 @@ class MedusaLCA:
                 )  # if datetime, map to the date as integer
             else:
                 warnings.warn(f"Time of activity {key} is neither datetime nor str.")
-
+                
+    def create_node_id_collection_dict(self):
+        """
+        Creates a dict of collections of nodes that will be useful down the line, e.g. to determine static nodes for the graph traversal or create the dynamic biosphere matrix.
+        
+        Available collections are:
+        - demand_database_names: set of database names of the demand processes
+        - demand_dependent_database_names: set of database names of all processes that depend on the demand processes
+        - demand_dependent_background_database_names: set of database names of all processes that depend on the demand processes and are in the background databases
+        - demand_dependent_background_node_ids: set of node ids of all processes that depend on the demand processes and are in the background databases
+        - foreground_node_ids: set of node ids of all processes that are not in the background databases
+        - first_level_background_node_ids_static: set of node ids of all processes that are in the background databases and are directly linked to the demand processes
+        - first_level_background_node_ids_all: like first_level_background_node_ids_static, but includes first level background processes from other time explicit databases.
+        """
+        self.node_id_collection_dict = {}
+        
+        # Original variable names preserved, set types for performance and uniqueness
+        demand_database_names = {db for db in self.database_date_dict.keys() if db not in self.database_date_dict_static_only.keys()}
+        self.node_id_collection_dict["demand_database_names"] = demand_database_names
+        
+        demand_dependent_database_names = set()
+        for db in demand_database_names:
+            demand_dependent_database_names.update(bd.Database(db).find_dependents())
+        self.node_id_collection_dict["demand_dependent_database_names"] = demand_dependent_database_names
+        
+        demand_dependent_background_database_names = demand_dependent_database_names & self.database_date_dict_static_only.keys()
+        self.node_id_collection_dict["demand_dependent_background_database_names"] = demand_dependent_background_database_names
+        
+        demand_dependent_background_node_ids = {node.id for db in demand_dependent_background_database_names for node in bd.Database(db)}
+        self.node_id_collection_dict["demand_dependent_background_node_ids"] = demand_dependent_background_node_ids
+        
+        foreground_node_ids = {node.id for db in self.database_date_dict.keys() if db not in self.database_date_dict_static_only.keys() for node in bd.Database(db)}
+        self.node_id_collection_dict["foreground_node_ids"] = foreground_node_ids
+        
+        first_level_background_node_ids_static = set()
+        first_level_background_node_ids_all = set()
+        for node_id in foreground_node_ids:
+            node = bd.get_node(id=node_id)
+            for exc in node.technosphere():
+                if exc.input['database'] in self.database_date_dict_static_only.keys():
+                    first_level_background_node_ids_static.add(exc.input.id)
+                    try:
+                        first_level_background_node_ids_all.add(bd.Database(exc.input['database']).get(exc.input['code']).id)
+                    except:
+                        pass
+        self.node_id_collection_dict["first_level_background_node_ids_static"] = first_level_background_node_ids_static
+        self.node_id_collection_dict["first_level_background_node_ids_all"] = first_level_background_node_ids_all
+                    
     def build_timeline(self):
         """
         Build a timeline DataFrame of the exchanges using the TimelineBuilder class.
         """
-        self.timeline = self.tl_builder.build_timeline()
+        self.timeline = self.timeline_builder.build_timeline()
         return self.timeline
 
     def build_datapackage(self):
@@ -198,7 +250,7 @@ class MedusaLCA:
 
     def build_dynamic_biosphere(self):
         """
-        Build the dynamic biosphere matrix, which links the biosphere flows to the correct background databases and tracks the timing each biosphere flows, using DynamicBiosphere class.
+        Build the dynamic biosphere matrix, which links the biosphere flows to the correct background databases and tracks the timing each biosphere flow using DynamicBiosphereBuilder class.
 
         This returns a matrix of the dimensions (bio_flows at a specific timestep) x (processes)
 
@@ -209,18 +261,20 @@ class MedusaLCA:
                 "Static Medusa LCA has not been run. Call MedusaLCA.lci() first."
             )
             return
-
+        
         self.len_technosphere_dbs = sum(
             [len(bd.Database(db)) for db in self.database_date_dict.keys()]
         )
-        self.dynamic_biosphere_builder = DynamicBiosphere(
+        
+        self.dynamic_biosphere_builder = DynamicBiosphereBuilder(
             self.dicts.activity,
             self.activity_time_mapping_dict,
             self.biosphere_time_mapping_dict,
+            self.node_id_collection_dict,
             self.temporal_grouping,
             self.database_date_dict_static_only,
-            self.supply_array,
             self.len_technosphere_dbs,
+            self.supply_array,
         )
         self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
         self.dynamic_biomatrix = self.dynamic_biosphere_builder.dynamic_biomatrix
