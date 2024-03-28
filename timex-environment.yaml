@@ -1,16 +1,12 @@
 # in your terminal, run conda: conda env create -f timex-environment.yaml
-
-name: timex_lca
+name: timex
 channels:
-  - romainsacchi
-  - defaults
   - conda-forge
   - cmutel
 dependencies:
-  - python=3.10
-  - premise
-  - jupyterlab
-  - matplotlib
-  - unfold  
+  - brightway25 # for Linux/Windows/macOS(x64)
+  # - brightway25_nosolver # for required for macOS ARM
+  # - scikit-umfpack # for required for macOS ARM
   - bw_temporalis
+  - matplotlib
   - seaborn
