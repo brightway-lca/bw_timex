@@ -7,7 +7,7 @@ from .remapping import TimeMappingDict
 from bw2calc import LCA
 
 
-class DynamicBiosphere:
+class DynamicBiosphereBuilder:
     """
     This class is used to build a dynamic biosphere matrix, which in contrast to the normal biosphere matrix has rows for each biosphere flow at their time of emission
     Thus, the dimensions are (bio_flows at a specific timestep) x (processes).
