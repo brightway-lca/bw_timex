@@ -5,8 +5,8 @@ channels:
   - cmutel
 dependencies:
   - brightway25 # for Linux/Windows/macOS(x64)
-  # - brightway25_nosolver # for required for macOS ARM
-  # - scikit-umfpack # for required for macOS ARM
+  # - brightway25_nosolver # switch to this if you're on a macOS ARM machine
+  # - scikit-umfpack # also required for macOS ARM
   - bw_temporalis
   - matplotlib
   - seaborn
