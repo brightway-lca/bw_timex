@@ -486,8 +486,8 @@ class MedusaLCA:
         remapping_dicts = None
 
         demand_database_names = [
-            db_label for db_label in databases
-        ]  # Always load all databases. This could be handled more elegantly..
+            db_label for db_label in self.database_date_dict.keys()
+        ]  # Load all databases that could lateron be linked to 
 
         if demand_database_names:
             database_names = set.union(
@@ -572,8 +572,8 @@ class MedusaLCA:
         remapping_dicts = None
 
         demand_database_names = [
-            db_label for db_label in databases
-        ]  # Always load all databases. This could be handled more elegantly..
+            db_label for db_label in self.database_date_dict.keys()
+        ]  # Load all databases that could lateron be linked to 
 
         if demand_database_names:
             database_names = set.union(

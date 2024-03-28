@@ -50,10 +50,6 @@ class DynamicBiosphereBuilder:
         Thus, every temporally resolved biosphere flow has its own row in the matrix, making it highly sparse.
         The timing of the emitting process and potential additional temporal information of the bioshpere flow (e.g. delay of emission compared to timing of process) are considered.
         """
-        self.nr_procs = len(
-            self.activity_time_mapping_dict
-        )  # these are all the processes in the mapping (incl background)
-
         # looping over all activities:
         for ((db, code), time), id in self.activity_time_mapping_dict.items():
             # Skip activities from dynamic databases as they have exploded time explicit copies which get the bioflows
@@ -156,6 +152,6 @@ class DynamicBiosphereBuilder:
         """
         Builds the dynamic biosphere matrix from the lists of row, col and values
         """
-        shape = (max(self.rows) + 1, self.nr_procs)
+        shape = (max(self.rows) + 1, len(self.activity_time_mapping_dict))
         dynamic_biomatrix = sp.coo_matrix((self.values, (self.rows, self.cols)), shape)
         self.dynamic_biomatrix = dynamic_biomatrix.tocsr()
