@@ -3535,3 +3535,135 @@ def db_test_dynamic_biosphere():
             (("temporalis-bio", "CO2"), 1),
         ]
     )
+
+def db_abc_simple():
+
+    project_name = "___abc_simple__"
+    if project_name in bd.projects:
+        bd.projects.delete_project(project_name)
+        # bd.projects.purge_deleted_directories()
+
+    bd.projects.set_current(project_name)
+
+    bd.Database("temporalis-bio").write(
+        {
+            ("temporalis-bio", "CO2"): {
+                "type": "emission",
+                "name": "carbon dioxide",
+                "temporalis code": "co2",
+            },
+            ("temporalis-bio", "CH4"): {
+                "type": "emission",
+                "name": "methane",
+                "temporalis code": "ch4",
+            },
+        }
+    )
+
+    bd.Database("background_2024").write(
+        {
+            ("background_2024", "C"): {
+                "name": "C",
+                "location": "somewhere",
+                "reference product": "c",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("background_2024", "C"),
+                    },
+                    {
+                        "amount": 1,
+                        "type": "biosphere",
+                        "input": ("temporalis-bio", "CO2"),
+                        "temporal_distribution": TemporalDistribution(
+                            date=np.array([-4, 10, 20], dtype="timedelta64[Y]"),
+                            amount=np.array([1/3, 1/3, 1/3]),
+                            ),
+                    },
+                ],
+            },
+        }
+    )
+
+    bd.Database("background_2008").write(
+        {
+            ("background_2008", "C"): {
+                "name": "C",
+                "location": "somewhere",
+                "reference product": "c",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("background_2008", "C"),
+                    },
+                    {
+                        "amount": 2,
+                        "type": "biosphere",
+                        "input": ("temporalis-bio", "CO2"),
+                           "temporal_distribution": TemporalDistribution(
+                            date=np.array([-4, 10, 20], dtype="timedelta64[Y]"),
+                            amount=np.array([1/3, 1/3, 1/3]),
+                            ),
+                    },
+                ],
+            },
+        }
+    )
+
+    bd.Database("foreground").write(
+        {
+ 
+
+            ("foreground", "B"): {
+                "name": "B",
+                "location": "somewhere",
+                "reference product": "b",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("foreground", "B"),
+                    },
+                    {
+                        "amount": 1,
+                        "type": "technosphere",
+                        "input": ("background_2024", "C"),
+                        "temporal_distribution": TemporalDistribution(
+                            date=np.array([-6], dtype="timedelta64[Y]"),
+                            amount=np.array([1]),)
+                    },
+
+                ],
+            },
+            ("foreground", "A"): {
+                "name": "A",
+                "location": "somewhere",
+                "reference product": "a",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("foreground", "A"),
+                    },
+#
+                    {
+                        "amount": 1,
+                        "type": "technosphere",
+                        "input": ("foreground", "B"),
+                        "temporal_distribution": TemporalDistribution(
+                            date=np.array([-2], dtype="timedelta64[Y]"),
+                            amount=np.array([1]),)
+                    },
+
+                ],
+            },
+        }
+    )
+
+    bd.Method(("GWP", "example")).write(
+        [
+            (("temporalis-bio", "CO2"), 1),
+        ]
+    )
