@@ -199,7 +199,14 @@ class MedusaLCA:
                     first_level_background_node_ids_static.add(exc.input.id)
                     for background_db in self.database_date_dict_static_only.keys():
                         try:
-                            other_node = bd.Database(background_db).get(exc.input["code"])
+                            other_node = bd.get_node(
+                                **{
+                                    "database": background_db,
+                                    "name": exc.input["name"],
+                                    "product": exc.input["reference product"],
+                                    "location": exc.input["location"],
+                                }
+                            )
                             first_level_background_node_ids_all.add(other_node.id)
                         except:
                             pass
@@ -299,6 +306,7 @@ class MedusaLCA:
             self.dicts.activity,
             self.activity_time_mapping_dict,
             self.biosphere_time_mapping_dict,
+            self.demand_timing_dict,
             self.node_id_collection_dict,
             self.temporal_grouping,
             self.database_date_dict_static_only,
@@ -725,6 +733,9 @@ class MedusaLCA:
             columns=self.activity_time_mapping_dict.reversed(),
             inplace=True,
         )
+        
+        df = df.loc[(df != 0).any(axis=1)] # For readablity, remove all-zero rows
+        
         return df
 
     def plot_dynamic_inventory(self, bio_flow: str):

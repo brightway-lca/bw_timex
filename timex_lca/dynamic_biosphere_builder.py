@@ -19,6 +19,7 @@ class DynamicBiosphereBuilder:
         activity_dict: dict,
         activity_time_mapping_dict: dict,
         biosphere_time_mapping_dict: dict,
+        demand_timing_dict: dict,
         node_id_collection_dict: dict,
         temporal_grouping: str,
         database_date_dict_static_only: dict,
@@ -35,6 +36,7 @@ class DynamicBiosphereBuilder:
         self.activity_dict = activity_dict
         self.activity_time_mapping_dict = activity_time_mapping_dict
         self.biosphere_time_mapping_dict = biosphere_time_mapping_dict
+        self.demand_timing_dict = demand_timing_dict
         self.node_id_collection_dict = node_id_collection_dict
         self.time_res = self._time_res_dict[temporal_grouping]
         self.database_date_dict_static_only = database_date_dict_static_only
@@ -59,6 +61,10 @@ class DynamicBiosphereBuilder:
             process_col_index = self.activity_dict[id]  # get the matrix column index
             act = bd.get_node(database=db, code=code)
 
+            # Skip market activities - they should not have bioflows on their own, but just distribute activities over time
+            if datetime.strptime(str(time), "%Y") not in self.database_date_dict_static_only.values() and self.demand_timing_dict.get(act.id) != time:
+                continue
+            
             # Skip activities from background databases which are not directly linked to the foreground. The bioflows of these activities get aggregated lateron, as they all occur at the same timestamp.
             if (
                 db in self.database_date_dict_static_only.keys()
@@ -66,7 +72,8 @@ class DynamicBiosphereBuilder:
                 not in self.node_id_collection_dict[
                     "first_level_background_node_ids_all"
                 ]
-            ):
+            ):  
+                self.dynamic_supply_array[self.activity_dict[act.id]] = 0 # Because we aggregated the first-level background processes, we set the supply of those to 0 so that their biosphere are not double-counted
                 continue
 
             # Create TD instance of producer timestamp, which is currently a pd.Timestamp and get the date
@@ -131,9 +138,6 @@ class DynamicBiosphereBuilder:
 
         # now build the dynamic biosphere matrix
         self.build_biomatrix()
-
-        # and set the supply for the original databases to 0 because we aggregated their bioflows to the first-level background nodes
-        self.dynamic_supply_array[: self.len_technosphere_dbs] = 0
 
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
         """
