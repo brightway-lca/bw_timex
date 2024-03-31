@@ -3431,7 +3431,46 @@ def db_test_dynamic_biosphere():
                         "input": ("background_2024", "electricity_wind"),
                     },
                     {
-                        "amount": 888,
+                        "amount": 900,
+                        "type": "biosphere",
+                        "input": ("temporalis-bio", "CO2"),
+                    },
+                ],
+            },
+        }
+    )
+    
+    bd.Database("background_2035").write(
+        {
+            ("background_2035", "C"): {
+                "name": "C",
+                "location": "somewhere",
+                "reference product": "c",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("background_2035", "C"),
+                    },
+                    {
+                        "amount": 1,
+                        "type": "technosphere",
+                        "input": ("background_2035", "electricity_wind"),
+                    },
+                ],
+            },
+            ("background_2035", "electricity_wind"): {
+                "name": "Electricity production, wind",
+                "location": "somewhere",
+                "reference product": "electricity, wind",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("background_2035", "electricity_wind"),
+                    },
+                    {
+                        "amount": 300,
                         "type": "biosphere",
                         "input": ("temporalis-bio", "CO2"),
                     },
@@ -3440,9 +3479,9 @@ def db_test_dynamic_biosphere():
         }
     )
 
-    bd.Database("background_2008").write(
+    bd.Database("background_2050").write(
         {
-            ("background_2008", "C"): {
+            ("background_2050", "C"): {
                 "name": "C",
                 "location": "somewhere",
                 "reference product": "c",
@@ -3450,16 +3489,16 @@ def db_test_dynamic_biosphere():
                     {
                         "amount": 1,
                         "type": "production",
-                        "input": ("background_2008", "C"),
+                        "input": ("background_2050", "C"),
                     },
                     {
                         "amount": 1,
                         "type": "technosphere",
-                        "input": ("background_2008", "electricity_wind"),
+                        "input": ("background_2050", "electricity_wind"),
                     },
                 ],
             },
-            ("background_2008", "electricity_wind"): {
+            ("background_2050", "electricity_wind"): {
                 "name": "Electricity production, wind",
                 "location": "somewhere",
                 "reference product": "electricity, wind",
@@ -3467,10 +3506,10 @@ def db_test_dynamic_biosphere():
                     {
                         "amount": 1,
                         "type": "production",
-                        "input": ("background_2008", "electricity_wind"),
+                        "input": ("background_2050", "electricity_wind"),
                     },
                     {
-                        "amount": 777,
+                        "amount": 100,
                         "type": "biosphere",
                         "input": ("temporalis-bio", "CO2"),
                     },
@@ -3492,14 +3531,14 @@ def db_test_dynamic_biosphere():
                         "input": ("foreground", "B"),
                     },
                     {
-                        "amount": 13,
+                        "amount": 1,
                         "type": "technosphere",
                         "input": ("background_2024", "C"),
                         "temporal_distribution": TemporalDistribution(  # e.g. because some hydrogen was stored in the meantime
                             date=np.array(
-                                [-5], dtype="timedelta64[Y]"
+                                [2, 15, 25], dtype="timedelta64[Y]"
                             ),  # `M` is months
-                            amount=np.array([1]),
+                            amount=np.array([0.34, 0.33, 0.33]),
                         ),
                     },
                 ],
@@ -3515,12 +3554,12 @@ def db_test_dynamic_biosphere():
                         "input": ("foreground", "A"),
                     },
                     {
-                        "amount": 4,
+                        "amount": 1,
                         "type": "technosphere",
                         "input": ("foreground", "B"),
                         "temporal_distribution": TemporalDistribution(  # e.g. because some hydrogen was stored in the meantime
                             date=np.array(
-                                [-1], dtype="timedelta64[Y]"
+                                [0], dtype="timedelta64[Y]"
                             ),  # `M` is months
                             amount=np.array([1]),
                         ),
