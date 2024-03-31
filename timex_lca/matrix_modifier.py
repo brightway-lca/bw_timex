@@ -107,14 +107,21 @@ class MatrixModifier:
                 # Create new edges based on interpolation_weights from the row
                 for database, db_share in row.interpolation_weights.items():
                     # Get the producer activity in the corresponding background database
-                    producer_id_in_background_db = bd.get_node(
-                        **{
-                            "database": database,
-                            "name": previous_producer_node["name"],
-                            "product": previous_producer_node["reference product"],
-                            "location": previous_producer_node["location"],
-                        }
-                    ).id
+                    try: 
+                        producer_id_in_background_db = bd.get_node(
+                            **{
+                                "database": database,
+                                "name": previous_producer_node["name"],
+                                "product": previous_producer_node["reference product"],
+                                "location": previous_producer_node["location"],
+                            }
+                        ).id
+                    except:
+                        print(
+                            f"Could not find producer in database {database} with name {previous_producer_node['name']}, product {previous_producer_node['reference product']}, location {previous_producer_node['location']}"
+                        )
+                        raise SystemExit                    
+                    
                     # Add entry between exploded producer and producer in background database ("Temporal Market")
                     datapackage.add_persistent_vector(
                         matrix="technosphere_matrix",
