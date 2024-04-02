@@ -16,12 +16,14 @@ class DynamicBiosphereBuilder:
 
     def __init__(
         self,
+        technosphere_matrix: sp.csr_matrix,
         activity_dict: dict,
         activity_time_mapping_dict: dict,
         biosphere_time_mapping_dict: dict,
         demand_timing_dict: dict,
         node_id_collection_dict: dict,
         temporal_grouping: str,
+        database_date_dict: dict,
         database_date_dict_static_only: dict,
         len_technosphere_dbs: int,
         supply_array: np.array,
@@ -33,12 +35,14 @@ class DynamicBiosphereBuilder:
             "hour": "datetime64[h]",
         }
 
+        self.technosphere_matrix = technosphere_matrix
         self.activity_dict = activity_dict
         self.activity_time_mapping_dict = activity_time_mapping_dict
         self.biosphere_time_mapping_dict = biosphere_time_mapping_dict
         self.demand_timing_dict = demand_timing_dict
         self.node_id_collection_dict = node_id_collection_dict
         self.time_res = self._time_res_dict[temporal_grouping]
+        self.database_date_dict = database_date_dict
         self.database_date_dict_static_only = database_date_dict_static_only
         self.len_technosphere_dbs = len_technosphere_dbs
         self.dynamic_supply_array = supply_array
@@ -61,19 +65,15 @@ class DynamicBiosphereBuilder:
             process_col_index = self.activity_dict[id]  # get the matrix column index
             act = bd.get_node(database=db, code=code)
 
-            # Skip market activities - they should not have bioflows on their own, but just distribute activities over time
-            if datetime.strptime(str(time), "%Y") not in self.database_date_dict_static_only.values() and self.demand_timing_dict.get(act.id) != time:
-                continue
-            
-            # Skip activities from background databases which are not directly linked to the foreground. The bioflows of these activities get aggregated lateron, as they all occur at the same timestamp.
+            # Skip activities from background databases. The bioflows of these activities get aggregated lateron, as they all occur at the same timestamp.
             if (
                 db in self.database_date_dict_static_only.keys()
-                and act.id
-                not in self.node_id_collection_dict[
-                    "first_level_background_node_ids_all"
-                ]
-            ):  
-                self.dynamic_supply_array[self.activity_dict[act.id]] = 0 # Because we aggregated the first-level background processes, we set the supply of those to 0 so that their biosphere are not double-counted
+                and datetime.strptime(str(time), "%Y")
+                == self.database_date_dict_static_only[db]
+            ):
+                self.dynamic_supply_array[self.activity_dict[act.id]] = (
+                    0  # Because we aggregated the first-level background processes, we set the supply of those to 0 so that their biosphere are not double-counted
+                )
                 continue
 
             # Create TD instance of producer timestamp, which is currently a pd.Timestamp and get the date
@@ -82,22 +82,42 @@ class DynamicBiosphereBuilder:
                 date=np.array([str(time)], dtype=self.time_res), amount=np.array([1])
             ).date
 
-            # Aggregate biosphere flows of background supply chain emissions, as they all occur at the same timestamp.
+            # Aggregate bioflows for temporal markets. Underlying processes occur all at the same times.
             if (
-                act.id
-                in self.node_id_collection_dict["first_level_background_node_ids_all"]
+                datetime.strptime(str(time), "%Y") != self.database_date_dict[db]
+                and act.id not in self.node_id_collection_dict["foreground_node_ids"]
             ):
-                # then calculate lci
-                bg_lca = LCA({act: 1})
-                bg_lca.lci()
-                aggregated_inventory = bg_lca.inventory.sum(
+                technosphere_column = (
+                    self.technosphere_matrix[:, self.activity_dict[id]]
+                    .toarray()
+                    .flatten()
+                )  # 1-d np.array
+                demand = dict()
+                for idx, amount in enumerate(technosphere_column):
+                    if idx == self.activity_dict[id]:  # Skip production exchange
+                        continue
+                    if amount == 0:
+                        continue
+
+                    node_id = self.activity_dict.reversed[idx]
+
+                    if (
+                        node_id in self.node_id_collection_dict["foreground_node_ids"]
+                    ):  # We only aggregate background process bioflows
+                        continue
+
+                    demand[bd.get_node(id=node_id)] = -amount
+
+                market_lca = LCA(demand)
+                market_lca.lci()
+                aggregated_inventory = market_lca.inventory.sum(
                     axis=1
                 )  # aggregated biosphere flows of background supply chain emissions. Rows are bioflows.
 
                 for idx, amount in enumerate(
                     aggregated_inventory.flatten().tolist()[0]
                 ):
-                    bioflow = bd.get_activity(bg_lca.dicts.biosphere.reversed[idx])
+                    bioflow = bd.get_activity(market_lca.dicts.biosphere.reversed[idx])
                     date = td_producer[0]
 
                     time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(

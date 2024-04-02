@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sb
 from peewee import fn
+from collections import defaultdict
 
 from datetime import datetime
 from typing import Optional, Callable
@@ -303,12 +304,14 @@ class MedusaLCA:
         )
 
         self.dynamic_biosphere_builder = DynamicBiosphereBuilder(
+            self.technosphere_matrix,
             self.dicts.activity,
             self.activity_time_mapping_dict,
             self.biosphere_time_mapping_dict,
             self.demand_timing_dict,
             self.node_id_collection_dict,
             self.temporal_grouping,
+            self.database_date_dict,
             self.database_date_dict_static_only,
             self.len_technosphere_dbs,
             self.supply_array,
@@ -495,7 +498,7 @@ class MedusaLCA:
 
         demand_database_names = [
             db_label for db_label in self.database_date_dict.keys()
-        ]  # Load all databases that could lateron be linked to 
+        ]  # Load all databases that could lateron be linked to
 
         if demand_database_names:
             database_names = set.union(
@@ -581,7 +584,7 @@ class MedusaLCA:
 
         demand_database_names = [
             db_label for db_label in self.database_date_dict.keys()
-        ]  # Load all databases that could lateron be linked to 
+        ]  # Load all databases that could lateron be linked to
 
         if demand_database_names:
             database_names = set.union(
@@ -733,23 +736,57 @@ class MedusaLCA:
             columns=self.activity_time_mapping_dict.reversed(),
             inplace=True,
         )
-        
-        df = df.loc[(df != 0).any(axis=1)] # For readablity, remove all-zero rows
-        
+
+        df = df.loc[(df != 0).any(axis=1)]  # For readablity, remove all-zero rows
+
         return df
 
-    def plot_dynamic_inventory(self, bio_flow: str):
+    def plot_dynamic_inventory(self, bio_flow=None, bio_flows=None):
         """ "
         Simple plot of dynamic inventory of a biosphere flow over time.
         :param bio_flow: str, name of the biosphere flow to plot
         :return: none, but shows a plot
         """
-        plt.plot(
-            self.dynamic_inventory[bio_flow]["time"],
-            self.dynamic_inventory[bio_flow]["amount"],
-        )
-        plt.ylabel(bio_flow)
+        if not bio_flow and not bio_flows:
+            raise ValueError("Either bio_flow or bio_flows must be provided.")
+
+        plt.figure(figsize=(10, 6))
+
+        if bio_flow:
+            plt.plot(
+                self.dynamic_inventory[bio_flow]["time"],
+                self.dynamic_inventory[bio_flow]["amount"],
+                marker="o",
+                linestyle="-",
+            )
+
+        elif bio_flows:
+            # Initialize a defaultdict to store summed amounts for each unique time point
+            time_amounts = defaultdict(float)
+
+            # Iterate over each specified flow and aggregate amounts by time
+            for flow_id in bio_flows:
+                if flow_id in self.dynamic_inventory:
+                    flow_data = self.dynamic_inventory[flow_id]
+                    for time, amount in zip(flow_data["time"], flow_data["amount"]):
+                        time_amounts[
+                            str(time)
+                        ] += amount  # Convert time to string for uniqueness
+
+            # Sort the times and amounts for plotting
+            sorted_times = np.array(sorted(time_amounts.keys()))
+            sorted_amounts = np.array([time_amounts[time] for time in sorted_times])
+
+            # Convert sorted times from strings back to datetime for plotting
+            sorted_times = np.array(sorted_times, dtype="datetime64")
+
+            # Plotting
+            plt.plot(sorted_times, sorted_amounts, marker="o", linestyle="-")
+
         plt.xlabel("time")
+        plt.ylabel("amount [kg]")
+        plt.grid(True)
+        plt.tight_layout()  # Adjust layout to make room for the rotated date labels
         plt.show()
 
     def remap_inventory_dicts(self) -> None:
