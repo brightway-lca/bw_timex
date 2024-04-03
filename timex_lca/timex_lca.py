@@ -9,7 +9,7 @@ from collections import defaultdict
 
 from datetime import datetime
 from typing import Optional, Callable
-from bw2data import (  # for prepare_medusa_lca_inputs
+from bw2data import (  # for prepare_timex_lca_inputs
     Database,
     Method,
     Normalization,
@@ -32,11 +32,11 @@ from .remapping import TimeMappingDict
 from .utils import extract_date_as_integer
 
 
-class MedusaLCA:
+class TimexLCA:
     """
     Class to perform dynamic-prospective LCA calculations.
 
-    The key point of MedusaLCA is that it retrieves the LCI of processes occuring at a certain time from a database that represents the technology landscape at this point in time.
+    The key point of TimexLCA is that it retrieves the LCI of processes occuring at a certain time from a database that represents the technology landscape at this point in time.
 
     It first calculates a static LCA, which informs a priority-first graph traversal, from which the temporal relationships between exchanges and processes are derived.
     For processes at the interface with background databases, the timing of the exchanges determines which background database to link to.
@@ -44,9 +44,9 @@ class MedusaLCA:
     and their corresponding biosphere flows to the biosphere matrix and then linking these to the original demand.
     The temporal information can also be used for dynamic LCIA chalculations.
 
-    MedusaLCA calculates:
-     1) a conventional LCA score (MedusaLCA.static_lca.score(), same as BW2 lca.score()),
-     2) a dynamic-prospective LCA score, which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows (MedusaLCA.lca.score())
+    TimexLCA calculates:
+     1) a conventional LCA score (TimexLCA.static_lca.score(), same as BW2 lca.score()),
+     2) a dynamic-prospective LCA score, which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows (TimexLCA.lca.score())
      3) a dynamic-prospective LCA score with dynamic inventory and dynamic charaterization factors (not yet operational: TODO dynamic CFs in general and optional add Levasseur methodology with TH-cutoff)
 
     """
@@ -231,7 +231,7 @@ class MedusaLCA:
         """
         if not hasattr(self, "timeline"):
             warnings.warn(
-                "Timeline not yet built. Call MedusaLCA.build_timeline() first."
+                "Timeline not yet built. Call TimexLCA.build_timeline() first."
             )
             return
 
@@ -246,21 +246,21 @@ class MedusaLCA:
 
     def lci(self):
         """
-        Calculate the Medusa LCI, which links its LCIs to correct background databases but without timing of biosphere flows, so without dynamic LCIA, which is implemented in build_dynamic_biosphere().
+        Calculate the Timex LCI, which links its LCIs to correct background databases but without timing of biosphere flows, so without dynamic LCIA, which is implemented in build_dynamic_biosphere().
         """
 
         if not hasattr(self, "timeline"):
             warnings.warn(
-                "Timeline not yet built. Call MedusaLCA.build_timeline() first."
+                "Timeline not yet built. Call TimexLCA.build_timeline() first."
             )
             return
         if not hasattr(self, "datapackage"):
             warnings.warn(
-                "Datapackage not yet built. Call MedusaLCA.build_datapackage() first."
+                "Datapackage not yet built. Call TimexLCA.build_datapackage() first."
             )
             return
 
-        self.fu, self.data_objs, self.remapping = self.prepare_medusa_lca_inputs(
+        self.fu, self.data_objs, self.remapping = self.prepare_timex_lca_inputs(
             demand=self.demand,
             method=self.method,
             demand_timing_dict=self.demand_timing_dict,
@@ -276,10 +276,10 @@ class MedusaLCA:
 
     def lcia(self):
         """
-        Calculate the Medusa LCIA, usings LCIs from the correct background databases.
+        Calculate the Timex LCIA, usings LCIs from the correct background databases.
         """
         if not hasattr(self, "lca"):
-            warnings.warn("LCI not yet calculated. Call MedusaLCA.lci() first.")
+            warnings.warn("LCI not yet calculated. Call TimexLCA.lci() first.")
             return
         self.lca.lcia()
 
@@ -295,7 +295,7 @@ class MedusaLCA:
 
         if not hasattr(self, "lca"):
             warnings.warn(
-                "Static Medusa LCA has not been run. Call MedusaLCA.lci() first."
+                "Static Timex LCA has not been run. Call TimexLCA.lci() first."
             )
             return
 
@@ -370,7 +370,7 @@ class MedusaLCA:
                 },
           ...}
         :param diagonalized_dynamic_lci: diagnolized lci results, pertaining additional information of emitting activity
-        :return: none but sets the dynamic_inventory attribute of the MedusaLCA instance
+        :return: none but sets the dynamic_inventory attribute of the TimexLCA instance
         """
         self.dynamic_inventory = (
             {}
@@ -446,7 +446,7 @@ class MedusaLCA:
 
         if not hasattr(self, "dynamic_inventory"):
             warnings.warn(
-                "Dynamic lci not yet calculated. Call MedusaLCA.calculate_dynamic_lci() first."
+                "Dynamic lci not yet calculated. Call TimexLCA.calculate_dynamic_lci() first."
             )
 
         self.dynamic_inventory_characterizer = DynamicCharacterization(
@@ -553,7 +553,7 @@ class MedusaLCA:
 
         return indexed_demand, data_objs, remapping_dicts
 
-    def prepare_medusa_lca_inputs(
+    def prepare_timex_lca_inputs(
         self,
         demand=None,
         method=None,
@@ -791,7 +791,7 @@ class MedusaLCA:
 
     def remap_inventory_dicts(self) -> None:
         warnings.warn(
-            "bw25's original mapping function doesn't work with our new time-mapped matrix entries. The medusa mapping can be found in acvitity_time_mapping_dict and biosphere_time_mapping_dict."
+            "bw25's original mapping function doesn't work with our new time-mapped matrix entries. The Timex mapping can be found in acvitity_time_mapping_dict and biosphere_time_mapping_dict."
         )
         return
 
@@ -806,7 +806,7 @@ class MedusaLCA:
 
         if not hasattr(self, "characterized_inventory"):
             warnings.warn(
-                "Characterized inventory not yet calculated. Call MedusaLCA.characterize_dynamic_lci() first."
+                "Characterized inventory not yet calculated. Call TimexLCA.characterize_dynamic_lci() first."
             )
             return
 
@@ -854,7 +854,7 @@ class MedusaLCA:
     def __getattr__(self, name):
         """
         Delegate attribute access to the self.lca object if the attribute
-        is not found in the MedusaLCA instance itself.
+        is not found in the TimexLCA instance itself.
         """
         if hasattr(self.lca, name):
             return getattr(self.lca, name)
@@ -862,5 +862,5 @@ class MedusaLCA:
             return getattr(self.dynamic_biosphere_builder, name)
         else:
             raise AttributeError(
-                f"'MedusaLCA' object and its 'lca'- and dynamic_biosphere_builder- attributes have no attribute '{name}'"
+                f"'TimexLCA' object and its 'lca'- and dynamic_biosphere_builder- attributes have no attribute '{name}'"
             )

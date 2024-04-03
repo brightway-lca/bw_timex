@@ -161,7 +161,7 @@ class DynamicCharacterization:
         param: flow: set[int], default None. Subset of flows to be characterized.
         param: activity: set[int], default None. Subset of activities to be characterized.
 
-        return: Tuple[pd.DataFrame, str, bool, int] #characterized inventory, type of method, fixed TH, TH. The latter are stored as attributes of MedusaLCA to be called for plotting.
+        return: Tuple[pd.DataFrame, str, bool, int] #characterized inventory, type of method, fixed TH, TH. The latter are stored as attributes of TimexLCA to be called for plotting.
 
         """
         if type_of_method not in {"radiative_forcing", "GWP"}:
