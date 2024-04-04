@@ -435,11 +435,11 @@ class TimexLCA:
             bool | None
         ) = False,  # True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
         TH: int | None = 100,
-        # characterization_dictionary: dict, #dict is now stored inside dynamic_inventory_characterizer, not sure if this is pythonic
+        characterization_functions: dict = None,  # {biosphere_flow_database_id characterization_function}
     ):
         """
         Characterize the dynamic inventory dictionaries using dynamic characterization functions using the DynamicCharacterization class.
-        Characterization function are provided imported from BW_temporalis and are planned to be extended. The format of the characterization_dictionary is {biosphere_flow_name: characterization_function}.
+        Characterization function are provided imported from BW_temporalis and are planned to be extended. The format of the characterization_dictionary is {biosphere_flow_database_id: characterization_function}.
         Users can you provide their own dynamic characterization functions, which needs to have the format XZXZ (TODO complete description).
 
         """
@@ -456,6 +456,7 @@ class TimexLCA:
             self.act_time_mapping_reversed,
             self.demand_timing_dict,
             self.temporal_grouping,
+            characterization_functions,
         )
 
         (self.characterized_inventory, self.type_of_method, self.fixed_TH, self.TH) = (

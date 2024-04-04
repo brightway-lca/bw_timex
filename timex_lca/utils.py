@@ -1,6 +1,6 @@
 import warnings
 from datetime import datetime
-from typing import Optional
+from typing import Callable, Union, List, Optional
 
 
 def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") -> int:
@@ -30,3 +30,20 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
     date_as_integer = int(formatted_date)
 
     return date_as_integer
+
+
+def add_flows_to_characterization_function_dict(flows: Union[str, List[str]], func: Callable, characterization_function_dict: Optional[dict] = dict()) -> dict:
+    """
+    Add a new flow or a list of flows to the available characterization functions.
+    """
+    
+    # Check if the input is a single flow (str) or a list of flows (List[str])
+    if isinstance(flows, str):
+        # It's a single flow, add it directly
+        characterization_function_dict[flows] = func
+    elif isinstance(flows, list):
+        # It's a list of flows, iterate and add each one
+        for flow in flows:
+            characterization_function_dict[flow] = func
+
+    return characterization_function_dict
