@@ -55,7 +55,6 @@ class TimexLCA:
         self,
         demand,
         method,
-        edge_filter_function: Callable = lambda x: False,
         database_date_dict: dict = None,
         edge_filter_function: Callable = None,
         temporal_grouping: str = "year",
@@ -65,7 +64,6 @@ class TimexLCA:
     ):
         self.demand = demand
         self.method = method
-        self.edge_filter_function = edge_filter_function
         self.database_date_dict = database_date_dict
         self.edge_filter_function = edge_filter_function
         self.temporal_grouping = temporal_grouping
@@ -234,7 +232,7 @@ class TimexLCA:
         Build a timeline DataFrame of the exchanges using the TimelineBuilder class.
         """
         self.timeline = self.timeline_builder.build_timeline()
-        return self.timeline
+        return self.timeline[["date_producer", "producer_name", "date_consumer", "consumer_name", "amount", "interpolation_weights"]]
 
     def build_datapackage(self):
         """
@@ -753,24 +751,27 @@ class TimexLCA:
 
         return df
 
-    def plot_dynamic_inventory(self, bio_flow=None, bio_flows=None):
-        """ "
-        Simple plot of dynamic inventory of a biosphere flow over time.
+    def plot_dynamic_inventory(self, bio_flow=None, bio_flows=None, cumulative=False):
+        """
+        Simple plot of dynamic inventory of a biosphere flow over time, with optional cumulative plotting.
         :param bio_flow: str, name of the biosphere flow to plot
+        :param bio_flows: list of str, names of the biosphere flows to plot
+        :param cumulative: bool, if True, plot cumulative amounts over time
         :return: none, but shows a plot
         """
         if not bio_flow and not bio_flows:
             raise ValueError("Either bio_flow or bio_flows must be provided.")
 
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(14, 6))
 
         if bio_flow:
-            plt.plot(
-                self.dynamic_inventory[bio_flow]["time"],
-                self.dynamic_inventory[bio_flow]["amount"],
-                marker="o",
-                linestyle="-",
-            )
+            times = self.dynamic_inventory[bio_flow]["time"]
+            amounts = self.dynamic_inventory[bio_flow]["amount"]
+
+            if cumulative:
+                amounts = np.cumsum(amounts)
+
+            plt.plot(times, amounts, marker="o", linestyle="-")
 
         elif bio_flows:
             # Initialize a defaultdict to store summed amounts for each unique time point
@@ -781,13 +782,14 @@ class TimexLCA:
                 if flow_id in self.dynamic_inventory:
                     flow_data = self.dynamic_inventory[flow_id]
                     for time, amount in zip(flow_data["time"], flow_data["amount"]):
-                        time_amounts[
-                            str(time)
-                        ] += amount  # Convert time to string for uniqueness
+                        time_amounts[str(time)] += amount  # Convert time to string for uniqueness
 
             # Sort the times and amounts for plotting
             sorted_times = np.array(sorted(time_amounts.keys()))
             sorted_amounts = np.array([time_amounts[time] for time in sorted_times])
+
+            if cumulative:
+                sorted_amounts = np.cumsum(sorted_amounts)
 
             # Convert sorted times from strings back to datetime for plotting
             sorted_times = np.array(sorted_times, dtype="datetime64")
@@ -795,6 +797,7 @@ class TimexLCA:
             # Plotting
             plt.plot(sorted_times, sorted_amounts, marker="o", linestyle="-")
 
+        plt.ylim(bottom=0)
         plt.xlabel("time")
         plt.ylabel("amount [kg]")
         plt.grid(True)
@@ -807,11 +810,11 @@ class TimexLCA:
         )
         return
 
-    def plot_dynamic_characterized_inventory(self, cumsum: bool = False):
+    def plot_dynamic_characterized_inventory(self, cumsum: bool = False, sum_emissions_within_activity: bool = False, sum_activities: bool = False):
         """
         Plot the characterized inventory of the dynamic LCI in a very simple plot
         """
-        if cumsum is True:
+        if cumsum:
             amount = "amount_sum"
         else:
             amount = "amount"
@@ -822,46 +825,52 @@ class TimexLCA:
             )
             return
 
+        # Fetch the inventory to use in plotting, modify based on flags
+        plot_data = self.characterized_inventory.copy()
+        
+        if sum_emissions_within_activity:
+            plot_data = plot_data.groupby(['date', 'activity_name']).sum().reset_index()
+            plot_data['amount_sum'] = plot_data['amount'].cumsum()
+        
+        if sum_activities:
+            plot_data = plot_data.groupby('date').sum().reset_index()
+            plot_data['amount_sum'] = plot_data['amount'].cumsum()
+            plot_data["activity_label"] = "All activities"
+            
+        else:
+            plot_data["activity_label"] = plot_data.apply(
+                lambda row: bd.get_activity(row["activity_name"])['name'], axis=1
+            )
+
+        # Determine the plotting labels and titles based on the characterization method
         if self.type_of_method == "radiative_forcing":
             label_legend = "Radiative forcing [W/m2]"
             title = "Radiative forcing"
-        if self.type_of_method == "GWP":
+        elif self.type_of_method == "GWP":
             label_legend = "GWP [kg CO2-eq]"
             title = "GWP"
 
-        if self.fixed_TH == False:  # if TH is calculated from t emission
+        if self.fixed_TH:
+            title += f" with TH of {self.TH} {self.temporal_grouping} starting at FU"
+        else:
+            title += f" with TH of {self.TH} {self.temporal_grouping} starting at each emission"
 
-            title += (
-                " with TH of "
-                + str(self.TH)
-                + " "
-                + str(self.temporal_grouping)
-                + " starting at each emission"
-            )
-
-        if self.fixed_TH == True:  # if TH is calculated from FU
-            title += (
-                " with TH of "
-                + str(self.TH)
-                + " "
-                + str(self.temporal_grouping)
-                + " starting at FU"
-            )
-
+        # Plotting
+        plt.figure(figsize=(14, 6))
         axes = sb.scatterplot(
             x="date",
             y=amount,
-            hue="activity_name",
-            style="flow_name",
-            data=self.characterized_inventory,
+            hue="activity_label",
+            data=plot_data
         )
 
+        axes.set_ylim(bottom=0)
         axes.set_ylabel(label_legend)
-        axes.set_xlabel("Time (" + str(self.temporal_grouping) + ")")
-
+        axes.set_xlabel(f"Time ({self.temporal_grouping})")
         axes.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
         axes.set_title(title)
         plt.show()
+
 
     def __getattr__(self, name):
         """
