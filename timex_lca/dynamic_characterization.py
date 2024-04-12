@@ -269,7 +269,7 @@ class DynamicCharacterization:
                     )  # indidvidual emissions are calculated for t_emission until t_FU + TH
 
                     row["amount"] = 1  # convert 1 kg CO2 equ.
-                    radiative_forcing_co2 = self.characterize_co2(
+                    radiative_forcing_co2 = characterize_co2(
                         row, period=TH
                     )  # reference substance CO2 is calculated for TH!
 

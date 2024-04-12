@@ -57,6 +57,7 @@ class TimexLCA:
         method,
         edge_filter_function: Callable = lambda x: False,
         database_date_dict: dict = None,
+        edge_filter_function: Callable = None,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
         *args,
@@ -66,6 +67,7 @@ class TimexLCA:
         self.method = method
         self.edge_filter_function = edge_filter_function
         self.database_date_dict = database_date_dict
+        self.edge_filter_function = edge_filter_function
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
 
@@ -74,6 +76,15 @@ class TimexLCA:
                 "No database_date_dict provided. Treating the databases containing the functional unit as dynamic. No remapping to time explicit databases will be done."
             )
             self.database_date_dict = {key[0]: "dynamic" for key in demand.keys()}
+
+        if not edge_filter_function:
+            warnings.warn(
+                "No edge filter function provided. Skipping all edges within background databases."
+            )
+            skippable = []
+            for db in self.database_date_dict.keys():
+                skippable.extend([node.id for node in bd.Database(db)])
+            self.edge_filter_function = lambda x: x in skippable
 
         # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
         self.database_date_dict_static_only = {
