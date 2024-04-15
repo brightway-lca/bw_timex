@@ -795,7 +795,7 @@ class TimexLCA:
             sorted_times = np.array(sorted_times, dtype="datetime64")
 
             # Plotting
-            plt.plot(sorted_times, sorted_amounts, marker="o", linestyle="-")
+            plt.plot(sorted_times, sorted_amounts, marker="o", linestyle="none")
 
         plt.ylim(bottom=0)
         plt.xlabel("time")
@@ -863,12 +863,17 @@ class TimexLCA:
             hue="activity_label",
             data=plot_data
         )
-
+        
+        axes.set_title(title)
+        axes.set_axisbelow(True)
         axes.set_ylim(bottom=0)
         axes.set_ylabel(label_legend)
         axes.set_xlabel(f"Time ({self.temporal_grouping})")
-        axes.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-        axes.set_title(title)
+        
+        handles, labels = axes.get_legend_handles_labels()
+        axes.legend(handles[::-1], labels[::-1])  
+        
+        plt.grid()
         plt.show()
 
 
