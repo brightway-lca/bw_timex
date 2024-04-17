@@ -36,13 +36,13 @@ class MatrixModifier:
 
         The heavy lifting of this function happens in its inner function "add_row_to_datapackage":
         Here, each node with a temporal distribution is "exploded", which means each occurrence of this node (e.g. steel production on 2020-01-01
-        and steel production 2015-01-01) becomes a separate new node, by adding the respective elements to the technosphere matrix.
-        For processes at the interface with background databases, the timing of the exchanges determines which background database to link to in so called "Temporal Market".
+        and steel production 2015-01-01) becomes a separate, time-explicit new node, by adding the respective elements to the technosphere matrix.
+        For processes at the interface with background databases, the timing of the exchanges determines which background database to link to in so called "Temporal Markets".
 
 
         :param timeline: A timeline of edges, typically created from EdgeExtracter.create_edge_timeline()
-        :param database_date_dict: A dict of the available prospective databases: their names (key) and temporal representativeness (value).
-        :param demand_timing: A dict of the demand ids and the timing occur. Can be created using create_demand_timing_dict().
+        :param database_date_dict: A dict of the available databases: their names (key) and temporal representativeness (value).
+        :param demand_timing: A dict of the demand ids and their timing. Can be created using create_demand_timing_dict().
         :param datapackage: Append to this datapackage, if available. Otherwise create a new datapackage.
         :param name: Name of this datapackage resource.
         :return: A list of patches formatted as datapackages.
@@ -59,7 +59,7 @@ class MatrixModifier:
             This adds the required technosphere matrix modifications for each time-dependent exchange (edge) as datapackage elements to a given bwp.Datapackage.
             Modifications include:
             1) Exploded processes: new matrix elements between exploded consumer and exploded producer, representing the temporal edge between them.
-            2) Temporal markets: new matrix entries between "temporal markets" and the producer in temporally matching background database, with shares based on interpolation.
+            2) Temporal markets: new matrix entries between "temporal markets" and the producers in temporally matching background databases, with shares based on interpolation.
                Processes in the background databases are matched on name, reference product and location.
             3) Diagonal entries: ones on the diagonal for new nodes.
 
@@ -67,12 +67,13 @@ class MatrixModifier:
 
             :param row: A row from the timeline DataFrame.
             :param datapackage: The datapackage to which the new patches will be added.
-            :param database_date_dict: A dict of the available prospective databases: their names (key) and temporal representativeness (value).
-            :param demand_timing: Dictionary of the demand ids and the dates they should be linked to. Can be created using create_demand_timing_dict().
+            :param database_date_dict: A dict of the available databases: their names (key) and temporal representativeness (value).
+            :param demand_timing: Dictionary of the demand ids and their timing. Can be created using create_demand_timing_dict().
             :param new_nodes: Set to which new node ids are added.
             :return: None, but updates the set new_nodes and adds a patch for this new edge to the bwp.Datapackage.
             """
-            if row.consumer == -1:
+            
+            if row.consumer == -1: # functional unit
                 new_producer_id = row.time_mapped_producer
                 new_nodes.add(new_producer_id)
                 return
@@ -94,16 +95,16 @@ class MatrixModifier:
                 name=uuid.uuid4().hex,
                 data_array=np.array(
                     [row.amount], dtype=float
-                ),  # old: [row.total * row.share]
+                ),
                 indices_array=np.array(
                     [(new_producer_id, new_consumer_id)],
                     dtype=bwp.INDICES_DTYPE,
                 ),
-                flip_array=np.array([True], dtype=bool),
+                flip_array=np.array([True], dtype=bool), #Question: Why is flip-array always True?
             )
 
             # Check if previous producer comes from background database
-            if previous_producer_node["database"] in self.database_date_dict.keys():
+            if previous_producer_node["database"] in self.database_date_dict.keys(): #Question: database_date_dict now also contains foreground, so does this filter correctly still?
                 # Create new edges based on interpolation_weights from the row
                 for database, db_share in row.interpolation_weights.items():
                     # Get the producer activity in the corresponding background database
@@ -126,7 +127,7 @@ class MatrixModifier:
                     datapackage.add_persistent_vector(
                         matrix="technosphere_matrix",
                         name=uuid.uuid4().hex,
-                        data_array=np.array([db_share], dtype=float),
+                        data_array=np.array([db_share], dtype=float), # temporal markets produce 1, so shares divide amount between dbs
                         indices_array=np.array(
                             [(producer_id_in_background_db, new_producer_id)],
                             dtype=bwp.INDICES_DTYPE,
@@ -169,8 +170,10 @@ class MatrixModifier:
         This function iterates over each unique producer and for each biosphere exchange of the original activity,
         it creates a new biosphere exchange for the new node.
 
+        Temporal markets have to biosphere exchanges, as they only divide the amount of the technosphere exchange between the different databases.
+
         :param timeline: A DataFrame representing the timeline of edges.
-        :param database_date_dict:A dict of the available prospective databases: their names (key) and temporal representativeness (value).
+        :param database_date_dict:A dict of the available databases: their names (key) and temporal representativeness (value).
         :return: The updated datapackage with new biosphere exchanges for the new nodes.
         """
         unique_producers = (
@@ -184,7 +187,7 @@ class MatrixModifier:
         for producer in unique_producers:
             if (
                 bd.get_activity(producer[0])["database"]
-                not in self.database_date_dict.keys()  # skip temporal markets
+                not in self.database_date_dict.keys()  # skip temporal markets, #Question: database_date_dict now also contains foreground, so does this filter correctly still?
             ):
                 producer_id = producer[1]
                 # the producer_id is a combination of the activity_id and the timestamp

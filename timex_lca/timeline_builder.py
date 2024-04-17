@@ -14,8 +14,9 @@ from .utils import extract_date_as_integer
 
 class TimelineBuilder:
     """
-    This class is responsible for building a timeline based on the provided static LCA (slca). First, the an EdgeExtractor handles the graph traversal and extracts the edges. On calling TimelineBuilder.build_timeline(), the information from the EdgeExtractor is used to build a timeline dataframe.
+    This class is responsible for building a timeline based on the provided static LCA (slca). First, the EdgeExtractor handles the graph traversal and extracts the edges. On calling TimelineBuilder.build_timeline(), the information from the EdgeExtractor is used to build a timeline dataframe.
     The static LCA is needed to inform the priority-first traversal of the supply chain and impact cut-off based on the LCIA score of the chosen impact category. Thus, the decision, which branch to follow is based on the static system.
+    The priority-first graph traversal is based on BW_temporalis, with EdgeExtractor being a child class of TemporalisLCA.
 
     :param slca: Static LCA.
     :param edge_filter_function: A callable that filters edges. If not provided, a function that always returns False is used.
@@ -76,19 +77,19 @@ class TimelineBuilder:
 
     def check_database_names(self):
         """
-        Check that the strings of the databases exist in the databases of the brightway2 project.
+        Check that the strings of the databases exist in the databases of the brightway project.
 
         """
         for db in self.database_date_dict_static_only.keys():
-            assert db in bd.databases, f"{db} not in your brightway2 project databases."
+            assert db in bd.databases, f"{db} is not in your brightway project databases."
         return
 
     # TODO: rethink structure of build_timeline(): is it good to have all these nested functions?
     def build_timeline(self) -> pd.DataFrame:
         """
-        Create a dataframe with grouped edges and for each grouped edge interpolate to the database with the closest time of representativeness.
+        Create a dataframe with grouped, time-explicit edges and for each grouped edge interpolate to the database with the closest time of representativeness.
 
-        Edges that occur at different times within the same time window (temporal_grouping) are grouped together. Possible temporal groupings are "year", "month", "day" and "hour".
+        Edges from same producer to same consumer that occur at different times within the same time window (temporal_grouping) are grouped together. Possible temporal groupings are "year", "month", "day" and "hour".
 
         The column "interpolation weights" assigns the ratio [0-1] of the edge's amount to be taken from the database with the closest time of representativeness.
         Available interpolation types are:
@@ -96,9 +97,9 @@ class TimelineBuilder:
             - "closest": closest database is assigned 1
 
         :param tl: Timeline containing edge information.
-        :param database_date_dict: Mapping dictionary between the time of representativeness (key) and name of database (value)
+        :param database_date_dict: Mapping dictionary name of database (key) and the time of representativeness (value).
         :param temporal_grouping: Type of temporal grouping (default is "year"). Available options are "year", "month", "day" and "hour" (TODO fix day and hour)
-        :param interpolation_type: Type of interpolation (default is "linear").
+        :param interpolation_type: Type of interpolation (default is "linear"). Available options are "linear" and "nearest".
         :return: Grouped edge dataframe.
         """
 
@@ -329,13 +330,6 @@ class TimelineBuilder:
                     category=Warning,
                 )
                 return {closest_lower: 1}
-
-            # if closest_lower == closest_higher: # TODO delete later, I think this if statement is wrong
-            #     warnings.warn(
-            #         "Date outside the range of dates covered by the databases.",
-            #         category=Warning,
-            #     )
-            #     return {closest_lower: 1}
 
             if self.interpolation_type == "linear":
                 weight = int((reference_date - closest_lower).total_seconds()) / int(
