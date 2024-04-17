@@ -219,8 +219,10 @@ class TimexLCA:
                                 }
                             )
                             first_level_background_node_ids_all.add(other_node.id)
-                        except:
+                        except Exception as e:
+                            warnings.warn(f"Failed to find process in database {background_db} for name='{exc.input['name']}', reference product='{exc.input['reference product']}', location='{exc.input['location']}': {e}")
                             pass
+                        
         self.node_id_collection_dict["first_level_background_node_ids_static"] = (
             first_level_background_node_ids_static
         )
