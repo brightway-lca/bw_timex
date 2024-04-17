@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sb
 from peewee import fn
 from collections import defaultdict
+from scipy import sparse
 
 from datetime import datetime
 from typing import Optional, Callable
@@ -327,7 +328,7 @@ class TimexLCA:
         )
         self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
         self.dynamic_biomatrix = self.dynamic_biosphere_builder.dynamic_biomatrix
-
+        
     def calculate_dynamic_biosphere_lci(
         self,
     ):
@@ -347,19 +348,15 @@ class TimexLCA:
         """
         self.build_dynamic_biosphere()
 
-        # calculate lci from dynamic biosphere matrix
-        # unordered_dynamic_lci = self.dynamic_biomatrix.dot(
-        #     self.dynamic_supply_array
-        # )
+        count = len(self.activity_time_mapping_dict)
 
         # diagnolization of supply array keeps the dimension of the process, which we want to pass as additional information to the dynamic inventory dict
-        diagonal_supply_array = np.diag(
-            self.dynamic_supply_array.flatten()
-        )  # dynamic supply array includes the original databases, contrary to former implementation as otherwise background processes were excluded. TODO: validate with Timo
-        diagonalized_dynamic_lci = self.dynamic_biomatrix.dot(diagonal_supply_array)
+        diagonal_supply_array = sparse.spdiags([self.dynamic_supply_array], [0], count, count) # sparse matrix to save memory
 
-        # unordered_dynamic_lci= np.sum(diagonalized_dynamic_lci, axis=1) #normal lci
+        # calculate dynamic lci
+        diagonalized_dynamic_lci = self.dynamic_biomatrix @ diagonal_supply_array
 
+        # convert into dictionary
         self.build_dynamic_inventory_dict(diagonalized_dynamic_lci)
 
     def build_dynamic_inventory_dict(
