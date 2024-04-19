@@ -76,19 +76,19 @@ class TimexLCA:
             )
             self.database_date_dict = {key[0]: "dynamic" for key in demand.keys()}
 
+        # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
+        self.database_date_dict_static_only = {
+            k: v for k, v in self.database_date_dict.items() if type(v) == datetime
+        }
+        
         if not edge_filter_function:
             warnings.warn(
                 "No edge filter function provided. Skipping all edges within background databases."
             )
             skippable = []
-            for db in self.database_date_dict.keys():
+            for db in self.database_date_dict_static_only.keys():
                 skippable.extend([node.id for node in bd.Database(db)])
             self.edge_filter_function = lambda x: x in skippable
-
-        # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
-        self.database_date_dict_static_only = {
-            k: v for k, v in self.database_date_dict.items() if type(v) == datetime
-        }
 
         # Create some collections of nodes that will be useful down the line, e.g. all nodes from the background databases that link to foregroud nodes.
         self.create_node_id_collection_dict()
