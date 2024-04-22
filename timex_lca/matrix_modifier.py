@@ -28,6 +28,8 @@ class MatrixModifier:
         self.database_date_dict_static_only = database_date_dict_static_only
         self.demand_timing = demand_timing
         self.name = name
+        self.temporalized_process_ids = set()
+        self.temporal_market_ids = set()
 
     def create_technosphere_datapackage(self) -> bwp.Datapackage:
         """
@@ -76,6 +78,7 @@ class MatrixModifier:
             if row.consumer == -1: # functional unit
                 new_producer_id = row.time_mapped_producer
                 new_nodes.add(new_producer_id)
+                self.temporalized_process_ids.add(new_producer_id) # comes from foreground, so it is a temporalized process
                 return
 
             new_consumer_id = row.time_mapped_consumer
@@ -134,7 +137,10 @@ class MatrixModifier:
                         ),
                         flip_array=np.array([True], dtype=bool),
                     )
-
+                    self.temporal_market_ids.add(new_producer_id)
+            else:
+                self.temporalized_process_ids.add(new_producer_id) # comes from foreground, so it is a temporalized process
+                
         datapackage = bwp.create_datapackage(
             sum_inter_duplicates=False
         )  # 'sum_inter_duplicates=False': If the same market is used by multiple foreground processes, the market gets created again, inputs should not be summed.

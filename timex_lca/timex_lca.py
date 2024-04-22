@@ -2,6 +2,7 @@ import bw2data as bd
 import warnings
 import pandas as pd
 import numpy as np
+import copy
 import matplotlib.pyplot as plt
 import seaborn as sb
 from peewee import fn
@@ -254,11 +255,15 @@ class TimexLCA:
         self.matrix_modifier = MatrixModifier(
             self.timeline, self.database_date_dict_static_only, self.demand_timing_dict
         )
+        self.node_id_collection_dict["temporal_markets"] = self.matrix_modifier.temporal_market_ids
+        self.node_id_collection_dict["temporalized_processes"] = self.matrix_modifier.temporalized_process_ids
         self.datapackage = self.matrix_modifier.create_datapackage()
 
-    def lci(self):
+    def lci(self, build_dynamic_biosphere: Optional[bool] = True):
         """
         Calculate the Timex LCI, which links its LCIs to correct background databases but without timing of biosphere flows, so without dynamic LCIA, which is implemented in build_dynamic_biosphere().
+        
+        :param build_dynamic_biosphere: bool, if True, build the dynamic biosphere matrix and calculate the dynamic LCI. Default is True.
         """
 
         if not hasattr(self, "timeline"):
@@ -283,8 +288,13 @@ class TimexLCA:
             data_objs=self.data_objs + self.datapackage,
             remapping_dicts=self.remapping,
         )
-        self.lca.lci()
-        self.calculate_dynamic_biosphere_lci()
+        
+        if build_dynamic_biosphere:
+            self.lca.lci(factorize=True)
+            self.calculate_dynamic_biosphere_lci()
+            self.lca.redo_lci(self.fu)
+        else: 
+            self.lca.lci()
 
     def lcia(self):
         """
@@ -316,8 +326,7 @@ class TimexLCA:
         )
 
         self.dynamic_biosphere_builder = DynamicBiosphereBuilder(
-            self.technosphere_matrix,
-            self.dicts.activity,
+            self.lca,
             self.activity_time_mapping_dict,
             self.biosphere_time_mapping_dict,
             self.demand_timing_dict,
@@ -326,7 +335,6 @@ class TimexLCA:
             self.database_date_dict,
             self.database_date_dict_static_only,
             self.len_technosphere_dbs,
-            self.supply_array,
         )
         self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
         self.dynamic_biomatrix = self.dynamic_biosphere_builder.dynamic_biomatrix
@@ -357,83 +365,42 @@ class TimexLCA:
 
         # calculate dynamic lci
         diagonalized_dynamic_lci = self.dynamic_biomatrix @ diagonal_supply_array
-
+        diagonalized_dynamic_lci = diagonalized_dynamic_lci.todok()
         # convert into dictionary
         self.build_dynamic_inventory_dict(diagonalized_dynamic_lci)
 
-    def build_dynamic_inventory_dict(
-        self,
-        diagonalized_dynamic_lci: np.array,
-    ):
-        """
-        Create dynamic lci dictionary with structure
-        {CO2: {
-                time: [2022, 2023],
-                amount:[3,5],
-                emitting_process: [((database, code), year), ((database, code), year)]
-                },
-          CH4: {time: [2022, 2023],
-                amount:[3,5],
-                emitting_process: [((database, code), year), ((database, code), year)]
-                },
-          ...}
-        :param diagonalized_dynamic_lci: diagnolized lci results, pertaining additional information of emitting activity
-        :return: none but sets the dynamic_inventory attribute of the TimexLCA instance
-        """
-        self.dynamic_inventory = (
-            {}
-        )  # dictionary to store the dynamic lci {CO2: {time: [2022, 2023], amount:[3,5], emitting_process: (database, code)}}
+    def build_dynamic_inventory_dict(self, diagonalized_dynamic_lci):
+        self.dynamic_inventory = {}
+        # Convert DOK matrix to COO for better iteration over non-zero elements
+        if not isinstance(diagonalized_dynamic_lci, sparse.coo_matrix):
+            diagonalized_dynamic_lci = diagonalized_dynamic_lci.tocoo()
 
-        self.act_time_mapping_reversed = {
-            v: k for k, v in self.activity_time_mapping_dict.items()
-        }  # reversed mapping of activity_time_mapping_dict #TODO check if used
+        for (flow, time), row_id in self.biosphere_time_mapping_dict.items():
+            flow_code = flow['code']
+            if flow_code not in self.dynamic_inventory:
+                self.dynamic_inventory[flow_code] = {'time': [], 'amount': [], 'emitting_process': []}
 
-        for (
-            flow,
-            time,
-        ), row_id in (
-            self.biosphere_time_mapping_dict.items()
-        ):  # looping over the rows of the diagnolized df
+            entries = self.dynamic_inventory[flow_code]
 
-            # add biosphere flow to dictionary if it does not exist yet
-            if not flow["code"] in self.dynamic_inventory.keys():
-                self.dynamic_inventory[flow["code"]] = {
-                    "time": [],
-                    "amount": [],
-                    "emitting_process": [],
-                }
+            # Iterate over non-zero elements efficiently
+            for i, j, v in zip(diagonalized_dynamic_lci.row, diagonalized_dynamic_lci.col, diagonalized_dynamic_lci.data):
+                if i == row_id:
+                    emitting_process = self.activity_dict.reversed[j]
+                    entries['time'].append(time)
+                    entries['amount'].append(v)
+                    entries['emitting_process'].append(emitting_process)
 
-            for (
-                col_id
-            ) in (
-                self.activity_dict.reversed.keys()
-            ):  # looping over the columns of the diagnolized df
+        # Convert lists to NumPy arrays before sorting to optimize the sorting process
+        for entries in self.dynamic_inventory.values():
+            time_array = np.array(entries['time'])
+            amount_array = np.array(entries['amount'])
+            emitting_process_array = np.array(entries['emitting_process'])
 
-                if (
-                    diagonalized_dynamic_lci[row_id, col_id] != 0
-                ):  # store only non-zero elements of diagnolized inventory
+            order = np.argsort(time_array)
+            entries['time'] = time_array[order]
+            entries['amount'] = amount_array[order]
+            entries['emitting_process'] = emitting_process_array[order]
 
-                    amount = diagonalized_dynamic_lci[row_id, col_id]
-                    emitting_process = self.activity_dict.reversed[col_id]
-                    self.dynamic_inventory[flow["code"]]["time"].append(time)
-                    self.dynamic_inventory[flow["code"]]["amount"].append(amount)
-                    self.dynamic_inventory[flow["code"]]["emitting_process"].append(
-                        emitting_process
-                    )
-
-        # now sort flows based on time
-        for flow, _ in self.dynamic_inventory.items():
-            order = np.argsort(self.dynamic_inventory[flow]["time"])
-
-            self.dynamic_inventory[flow]["time"] = np.array(
-                self.dynamic_inventory[flow]["time"]
-            )[order]
-            self.dynamic_inventory[flow]["amount"] = np.array(
-                self.dynamic_inventory[flow]["amount"]
-            )[order]
-            self.dynamic_inventory[flow]["emitting_process"] = np.array(
-                self.dynamic_inventory[flow]["emitting_process"]
-            )[order]
 
     def characterize_dynamic_lci(
         self,
