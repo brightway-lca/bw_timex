@@ -367,6 +367,7 @@ class TimelineBuilder:
         # Explode datetime and amount columns: each row with multiple dates and amounts is exploded into multiple rows with one date and one amount
         edges_df = edges_df.explode(["consumer_date", "producer_date", "amount"])
         edges_df.drop_duplicates(inplace=True)
+        edges_df = edges_df[edges_df["amount"] != 0]
 
         # For the Functional Unit: set consumer date = producer date as it occurs at the same time
         edges_df.loc[edges_df["consumer"] == -1, "consumer_date"] = edges_df.loc[

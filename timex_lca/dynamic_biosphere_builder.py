@@ -32,7 +32,7 @@ class DynamicBiosphereBuilder:
             "day": "datetime64[D]",
             "hour": "datetime64[h]",
         }
-        
+
         self.lca_obj = lca_obj
         self.technosphere_matrix = lca_obj.technosphere_matrix
         self.activity_dict = lca_obj.dicts.activity
@@ -55,19 +55,21 @@ class DynamicBiosphereBuilder:
         Thus, every temporally resolved biosphere flow has its own row in the matrix, making it highly sparse.
         The timing of the emitting process and potential additional temporal information of the bioshpere flow (e.g. delay of emission compared to timing of process) are considered.
         """
-               
+
         for id in self.node_id_collection_dict["temporalized_processes"]:
             process_col_index = self.activity_dict[id]  # get the matrix column index
-            
-            ((original_db, original_code), time) = self.activity_time_mapping_dict.reversed()[id]
-            
+
+            ((original_db, original_code), time) = (
+                self.activity_time_mapping_dict.reversed()[id]
+            )
+
             td_producer = TemporalDistribution(
                 date=np.array([str(time)], dtype=self.time_res), amount=np.array([1])
-            ).date # TODO: Simplify
+            ).date  # TODO: Simplify
             date = td_producer[0]
-            
+
             act = bd.get_node(database=original_db, code=original_code)
-            
+
             for exc in act.biosphere():
                 if exc.get("temporal_distribution"):
                     td_dates = exc["temporal_distribution"].date  # time_delta
@@ -94,13 +96,11 @@ class DynamicBiosphereBuilder:
                         col=process_col_index,
                         amount=amount,
                     )
-                    
+
         for id in self.node_id_collection_dict["temporal_markets"]:
             process_col_index = self.activity_dict[id]  # get the matrix column index
             technosphere_column = (
-                self.technosphere_matrix[:, process_col_index]
-                .toarray()
-                .flatten()
+                self.technosphere_matrix[:, process_col_index].toarray().flatten()
             )  # 1-d np.array
             demand = dict()
             for idx, amount in enumerate(technosphere_column):
@@ -124,15 +124,14 @@ class DynamicBiosphereBuilder:
                 axis=1
             )  # aggregated biosphere flows of background supply chain emissions. Rows are bioflows.
 
-            for idx, amount in enumerate(
-                aggregated_inventory.flatten().tolist()[0]
-            ):
+            for idx, amount in enumerate(aggregated_inventory.flatten().tolist()[0]):
                 bioflow = bd.get_activity(self.lca_obj.dicts.biosphere.reversed[idx])
                 ((_, _), time) = self.activity_time_mapping_dict.reversed()[id]
-                
+
                 td_producer = TemporalDistribution(
-                    date=np.array([str(time)], dtype=self.time_res), amount=np.array([1])
-                ).date # TODO: Simplify
+                    date=np.array([str(time)], dtype=self.time_res),
+                    amount=np.array([1]),
+                ).date  # TODO: Simplify
                 date = td_producer[0]
 
                 time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(
@@ -144,7 +143,11 @@ class DynamicBiosphereBuilder:
                 )
 
         # now build the dynamic biosphere matrix
-        self.build_biomatrix()
+        shape = (max(self.rows) + 1, len(self.activity_time_mapping_dict))
+        dynamic_biomatrix = sp.coo_matrix((self.values, (self.rows, self.cols)), shape)
+        self.dynamic_biomatrix = dynamic_biomatrix.tocsr()
+
+        return self.dynamic_biomatrix
 
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
         """
@@ -158,11 +161,3 @@ class DynamicBiosphereBuilder:
         self.rows.append(row)
         self.cols.append(col)
         self.values.append(amount)
-
-    def build_biomatrix(self):
-        """
-        Builds the dynamic biosphere matrix from the lists of row, col and values
-        """
-        shape = (max(self.rows) + 1, len(self.activity_time_mapping_dict))
-        dynamic_biomatrix = sp.coo_matrix((self.values, (self.rows, self.cols)), shape)
-        self.dynamic_biomatrix = dynamic_biomatrix.tocsr()

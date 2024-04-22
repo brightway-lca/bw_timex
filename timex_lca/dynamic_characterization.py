@@ -31,10 +31,11 @@ class DynamicCharacterization:
         self,
         # method: str,
         # **kwargs,
-        dynamic_inventory: dict,
+        dynamic_inventory_df: dict,
         activity_dict: dict,
-        biosphere_dict_rerversed: dict,
+        biosphere_dict: dict,
         activity_time_mapping_dict_reversed: dict,
+        biosphere_time_mapping_dict_reversed: dict,
         demand_timing_dict: dict,
         temporal_grouping: dict,
         characterization_functions: dict = None,
@@ -42,62 +43,26 @@ class DynamicCharacterization:
         """
         Initialize the DynamicCharacterization object.
         """
-        self.dynamic_inventory = dynamic_inventory
+        self.dynamic_inventory_df = dynamic_inventory_df
         self.activity_dict = activity_dict
-        self.biosphere_dict_rerversed = biosphere_dict_rerversed
+        self.biosphere_dict = biosphere_dict
         self.activity_time_mapping_dict_reversed = activity_time_mapping_dict_reversed
+        self.biosphere_time_mapping_dict_reversed = biosphere_time_mapping_dict_reversed
         self.demand_timing_dict = demand_timing_dict
         self.temporal_grouping = temporal_grouping
-        self.dynamic_lci_df = self.format_dynamic_inventory_as_dataframe()
 
         if not characterization_functions:
             warnings.warn(
                 "No characterization functions provided. Using default functions for CO2, CH4, N2O, CO."
             )
-            self.characterization_functions = ( # TODO update these with biosphere3 flows
-                {  # Mapping database ids to characterization functions
-                    bd.get_node(code="CO2").id: characterize_co2,
-                    bd.get_node(code="CH4").id: characterize_ch4,
-                    bd.get_node(code="N2O").id: characterize_n2o,
-                    # bd.get_node(code="CO").id: characterize_co_levasseur,
-                }
-            )
+            self.characterization_functions = {  # TODO update these with biosphere3 flows  # Mapping database ids to characterization functions
+                bd.get_node(code="CO2").id: characterize_co2,
+                bd.get_node(code="CH4").id: characterize_ch4,
+                bd.get_node(code="N2O").id: characterize_n2o,
+                # bd.get_node(code="CO").id: characterize_co_levasseur,
+            }
         else:
             self.characterization_functions = characterization_functions
-
-    
-
-    def format_dynamic_inventory_as_dataframe(self):
-        """bring the dynamic inventory into the right format to use the characterization functions
-        Format needs to be:
-        | date | amount | flow | activity |
-        |------|--------|------|----------|
-        | 101  | 33     | 1    | 2        |
-        | 102  | 32     | 1    | 2        |
-        | 103  | 31     | 1    | 2        |
-
-        date is datetime
-        flow = flow id
-        activity = activity id
-        """
-        flow_mapping = {}
-        for key, values in self.dynamic_inventory.items():
-            flow_mapping[key] = bd.get_node(code=key).id
-
-        dfs = []
-        for key, values in self.dynamic_inventory.items():
-
-            df = pd.DataFrame(values)
-            df["flow"] = key
-            df["flow"] = df["flow"].replace(flow_mapping)  # replace code (uuid) with id
-
-            df.rename(columns={"time": "date"}, inplace=True)
-            df.rename(columns={"emitting_process": "activity"}, inplace=True)
-
-            dfs.append(df)
-
-        inventory_as_dataframe = pd.concat(dfs, ignore_index=True)
-        return inventory_as_dataframe
 
     def characterize_dynamic_inventory(
         self,
@@ -155,11 +120,11 @@ class DynamicCharacterization:
         }
 
         warnings.warn(
-                    f"If there is no dynamic characterization function for a flow, the flow will be ingored."
-                )
-        
+            f"If there is no dynamic characterization function for a flow, the flow will be ingored."
+        )
+
         self.characterized_inventory = pd.DataFrame()
-        for _, row in self.dynamic_lci_df.iterrows():
+        for _, row in self.dynamic_inventory_df.iterrows():
             if row.flow not in self.characterization_functions.keys():
                 continue
 
@@ -171,9 +136,7 @@ class DynamicCharacterization:
                     self.characterized_inventory = pd.concat(
                         [
                             self.characterized_inventory,
-                            self.characterization_functions[
-                                row.flow
-                            ](row, period=TH),
+                            self.characterization_functions[row.flow](row, period=TH),
                         ]
                     )
 
@@ -202,9 +165,9 @@ class DynamicCharacterization:
                     self.characterized_inventory = pd.concat(
                         [
                             self.characterized_inventory,
-                            self.characterization_functions[
-                                row.flow
-                            ](row, period=new_TH),
+                            self.characterization_functions[row.flow](
+                                row, period=new_TH
+                            ),
                         ]
                     )
 
@@ -214,13 +177,15 @@ class DynamicCharacterization:
                 if (
                     not fixed_TH
                 ):  # fixed_TH = False: conventional approach, emission is calculated from t emission for the length of TH
-                    radiative_forcing_ghg = self.characterization_functions[
-                        row.flow
-                    ](row, period=TH)
+                    radiative_forcing_ghg = self.characterization_functions[row.flow](
+                        row, period=TH
+                    )
 
                     row["amount"] = 1  # convert 1 kg CO2 equ.
                     radiative_forcing_co2 = characterize_co2(row, period=TH)
-                    warnings.warn("Using timex' default co2 characterization function for GWP reference.")
+                    warnings.warn(
+                        "Using timex' default co2 characterization function for GWP reference."
+                    )
 
                     ghg_integral = radiative_forcing_ghg["amount"].sum()
                     co2_integral = radiative_forcing_co2["amount"].sum()
@@ -262,9 +227,7 @@ class DynamicCharacterization:
                         (end_TH_FU - timing_emission).days / 365.25
                     )  # time difference in integer years between emission timing and end of TH of FU
 
-                    radiative_forcing_ghg = self.characterization_functions[
-                        row.flow
-                    ](
+                    radiative_forcing_ghg = self.characterization_functions[row.flow](
                         row, period=new_TH
                     )  # indidvidual emissions are calculated for t_emission until t_FU + TH
 
@@ -329,6 +292,7 @@ class DynamicCharacterization:
 
         return self.characterized_inventory, type_of_method, fixed_TH, TH
 
+
 def IRF_co2(year) -> callable:
     """
     Impulse Resonse Function of CO2
@@ -342,6 +306,7 @@ def IRF_co2(year) -> callable:
         + exponentials(year, alpha_2, tau_2)
         + exponentials(year, alpha_3, tau_3)
     )
+
 
 def characterize_co2(
     series,
@@ -413,9 +378,8 @@ def characterize_co2(
         }
     )
 
-def characterize_ch4(
-    series, period: int = 100, cumulative=False
-) -> pd.DataFrame:
+
+def characterize_ch4(series, period: int = 100, cumulative=False) -> pd.DataFrame:
     """
     Based on characterize_methane from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
 
@@ -493,9 +457,8 @@ def characterize_ch4(
         }
     )
 
-def characterize_n2o(
-    series, period: int = 100, cumulative=False
-) -> pd.DataFrame:
+
+def characterize_n2o(series, period: int = 100, cumulative=False) -> pd.DataFrame:
     """
     Based on characterize_methane from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
 
@@ -572,52 +535,54 @@ def characterize_n2o(
         }
     )
 
+
 def import_levasseur_dcfs():
-        """
-        Extracts the yearly radiative forcing values of various GHG based on Levasseur 2010 for 0 - 2000 years (https://ciraig.org/index.php/project/dynco2-dynamic-carbon-footprinter/)
-        Unit of forcing is W/m2/kg of GHG emitted.
+    """
+    Extracts the yearly radiative forcing values of various GHG based on Levasseur 2010 for 0 - 2000 years (https://ciraig.org/index.php/project/dynco2-dynamic-carbon-footprinter/)
+    Unit of forcing is W/m2/kg of GHG emitted.
 
-        Because of the deviation between the functions in bw_temporalis and Levasseur for CO2, we use the bw_temporalis for CO2 and the Levasseur values for the other GHGs.
+    Because of the deviation between the functions in bw_temporalis and Levasseur for CO2, we use the bw_temporalis for CO2 and the Levasseur values for the other GHGs.
 
-        param: None
-        return: dict of dicts with the following structure: {ghg: {year: forcing}}
-        """
-        # Levasseur
+    param: None
+    return: dict of dicts with the following structure: {ghg: {year: forcing}}
+    """
+    # Levasseur
 
-        # read in excel data
-        subfolder_name = "data"
-        file = "Dynamic_LCAcalculatorv.2.0.xlsm"
-        file_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), subfolder_name, file
-        )
-        sheet_name = "FC"
-        data = pd.read_excel(file_path, sheet_name=sheet_name)
+    # read in excel data
+    subfolder_name = "data"
+    file = "Dynamic_LCAcalculatorv.2.0.xlsm"
+    file_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), subfolder_name, file
+    )
+    sheet_name = "FC"
+    data = pd.read_excel(file_path, sheet_name=sheet_name)
 
-        # clean data
-        data = data.iloc[2:]  # Remove the first three empty rows
-        data.columns = data.iloc[0]  # Set the first row as the header
-        data = data.iloc[3:, :]  # remove row 0-2 (contain units)
-        data = data.rename(
-            columns={data.columns[0]: "year"}
-        )  # replace the first column label (NaN) with 'Year'
-        data = data.sort_values("year")  # sort by year
+    # clean data
+    data = data.iloc[2:]  # Remove the first three empty rows
+    data.columns = data.iloc[0]  # Set the first row as the header
+    data = data.iloc[3:, :]  # remove row 0-2 (contain units)
+    data = data.rename(
+        columns={data.columns[0]: "year"}
+    )  # replace the first column label (NaN) with 'Year'
+    data = data.sort_values("year")  # sort by year
 
-        # rename of elemental flows
-        biopshere_flow_mapping = {
-            "CO2": "carbon dioxide",
-            "CH4": "methane",
-            "N2O": "nitrous oxide",
-            "CO": "carbon monoxide",
-        }  # TODO think about how to map this to ecoinvent biosphere
-        data = data.rename(columns=biopshere_flow_mapping)
+    # rename of elemental flows
+    biopshere_flow_mapping = {
+        "CO2": "carbon dioxide",
+        "CH4": "methane",
+        "N2O": "nitrous oxide",
+        "CO": "carbon monoxide",
+    }  # TODO think about how to map this to ecoinvent biosphere
+    data = data.rename(columns=biopshere_flow_mapping)
 
-        # Convert DataFrame to dictionary
-        levasseur_radiative_forcing = {}
-        for column in data.columns[1:]:  # skipping first column (year)
-            levasseur_radiative_forcing[column] = dict(
-                zip(data.iloc[:, 0], data[column])
-            )  # {year: forcing}
-        return levasseur_radiative_forcing
+    # Convert DataFrame to dictionary
+    levasseur_radiative_forcing = {}
+    for column in data.columns[1:]:  # skipping first column (year)
+        levasseur_radiative_forcing[column] = dict(
+            zip(data.iloc[:, 0], data[column])
+        )  # {year: forcing}
+    return levasseur_radiative_forcing
+
 
 def characterize_co_levasseur(
     self, series, period: int = 100, cumulative=False
@@ -644,7 +609,9 @@ def characterize_co_levasseur(
     - activity: str
 
     """
-    levasseur_dcfs = import_levasseur_dcfs() # This is super inefficient, but as Im not sure we'll keep this i didnt bother to change it
+    levasseur_dcfs = (
+        import_levasseur_dcfs()
+    )  # This is super inefficient, but as Im not sure we'll keep this i didnt bother to change it
 
     co_decay_array = levasseur_dcfs["carbon monoxide"]
 
@@ -673,6 +640,7 @@ def characterize_co_levasseur(
         }
     )
 
+
 def characterize_n2o_levasseur(
     self, series, period: int = 100, cumulative=False
 ) -> pd.DataFrame:
@@ -700,7 +668,9 @@ def characterize_n2o_levasseur(
     - activity: str
 
     """
-    levasseur_dcfs = import_levasseur_dcfs() # This is super inefficient, but as Im not sure we'll keep this i didnt bother to change it
+    levasseur_dcfs = (
+        import_levasseur_dcfs()
+    )  # This is super inefficient, but as Im not sure we'll keep this i didnt bother to change it
 
     n2o_decay_array = self.levasseur_dcfs["nitrous oxide"]
     date_beginning: np.datetime64 = series["date"].to_numpy()

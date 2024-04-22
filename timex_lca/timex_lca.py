@@ -81,7 +81,7 @@ class TimexLCA:
         self.database_date_dict_static_only = {
             k: v for k, v in self.database_date_dict.items() if type(v) == datetime
         }
-        
+
         if not edge_filter_function:
             warnings.warn(
                 "No edge filter function provided. Skipping all edges within background databases."
@@ -221,9 +221,11 @@ class TimexLCA:
                             )
                             first_level_background_node_ids_all.add(other_node.id)
                         except Exception as e:
-                            warnings.warn(f"Failed to find process in database {background_db} for name='{exc.input['name']}', reference product='{exc.input['reference product']}', location='{exc.input['location']}': {e}")
+                            warnings.warn(
+                                f"Failed to find process in database {background_db} for name='{exc.input['name']}', reference product='{exc.input['reference product']}', location='{exc.input['location']}': {e}"
+                            )
                             pass
-                        
+
         self.node_id_collection_dict["first_level_background_node_ids_static"] = (
             first_level_background_node_ids_static
         )
@@ -236,7 +238,16 @@ class TimexLCA:
         Build a timeline DataFrame of the exchanges using the TimelineBuilder class.
         """
         self.timeline = self.timeline_builder.build_timeline()
-        return self.timeline[["date_producer", "producer_name", "date_consumer", "consumer_name", "amount", "interpolation_weights"]]
+        return self.timeline[
+            [
+                "date_producer",
+                "producer_name",
+                "date_consumer",
+                "consumer_name",
+                "amount",
+                "interpolation_weights",
+            ]
+        ]
 
     def build_datapackage(self):
         """
@@ -255,14 +266,18 @@ class TimexLCA:
         self.matrix_modifier = MatrixModifier(
             self.timeline, self.database_date_dict_static_only, self.demand_timing_dict
         )
-        self.node_id_collection_dict["temporal_markets"] = self.matrix_modifier.temporal_market_ids
-        self.node_id_collection_dict["temporalized_processes"] = self.matrix_modifier.temporalized_process_ids
+        self.node_id_collection_dict["temporal_markets"] = (
+            self.matrix_modifier.temporal_market_ids
+        )
+        self.node_id_collection_dict["temporalized_processes"] = (
+            self.matrix_modifier.temporalized_process_ids
+        )
         self.datapackage = self.matrix_modifier.create_datapackage()
 
     def lci(self, build_dynamic_biosphere: Optional[bool] = True):
         """
         Calculate the Timex LCI, which links its LCIs to correct background databases but without timing of biosphere flows, so without dynamic LCIA, which is implemented in build_dynamic_biosphere().
-        
+
         :param build_dynamic_biosphere: bool, if True, build the dynamic biosphere matrix and calculate the dynamic LCI. Default is True.
         """
 
@@ -288,31 +303,21 @@ class TimexLCA:
             data_objs=self.data_objs + self.datapackage,
             remapping_dicts=self.remapping,
         )
-        
+
         if build_dynamic_biosphere:
             self.lca.lci(factorize=True)
-            self.calculate_dynamic_biosphere_lci()
-            self.lca.redo_lci(self.fu)
-        else: 
+            self.calculate_dynamic_inventory()
+            self.lca.redo_lci(
+                self.fu
+            )  # to get back the original LCI - necessary because we do some redo_lci's in the dynamic inventory calculation
+        else:
             self.lca.lci()
 
-    def lcia(self):
+    def calculate_dynamic_inventory(
+        self,
+    ):
         """
-        Calculate the Timex LCIA, usings LCIs from the correct background databases.
-        """
-        if not hasattr(self, "lca"):
-            warnings.warn("LCI not yet calculated. Call TimexLCA.lci() first.")
-            return
-        self.lca.lcia()
-
-    # TODO maybe restructure the dynamic biosphere building into one method, similar to lci() and lcia()? dynamic_lci(), which calls build_dynamic_biosphere() and calculate_dynamic_lci()?
-
-    def build_dynamic_biosphere(self):
-        """
-        Build the dynamic biosphere matrix, which links the biosphere flows to the correct background databases and tracks the timing each biosphere flow using DynamicBiosphereBuilder class.
-
-        This returns a matrix of the dimensions (bio_flows at a specific timestep) x (processes)
-
+        Calcluates the dynamic inventory from the dynamic biosphere matrix.
         """
 
         if not hasattr(self, "lca"):
@@ -336,73 +341,36 @@ class TimexLCA:
             self.database_date_dict_static_only,
             self.len_technosphere_dbs,
         )
-        self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
-        self.dynamic_biomatrix = self.dynamic_biosphere_builder.dynamic_biomatrix
-        
-    def calculate_dynamic_biosphere_lci(
-        self,
-    ):
-        """
-        Calcluates the dynamic inventory from the dynamic biosphere matrix by calling build_dynamic_inventory_dict.
-        Returns a dictionary with the dynamic inventory of the LCI in the form of
-          {CO2: {
-                time: [2022, 2023],
-                amount:[3,5],
-                emitting_process: [((database, code), year), ((database, code), year)]
-                },
-          CH4: {time: [2022, 2023],
-                amount:[3,5],
-                emitting_process: [((database, code), year), ((database, code), year)]
-                },
-          ...}
-        """
-        self.build_dynamic_biosphere()
+        self.dynamic_biomatrix = (
+            self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
+        )
 
+        # Build the dynamic inventory
         count = len(self.activity_time_mapping_dict)
+        diagonal_supply_array = sparse.spdiags(
+            [self.dynamic_supply_array], [0], count, count
+        )  # diagnolization of supply array keeps the dimension of the process, which we want to pass as additional information to the dynamic inventory dict
+        self.dynamic_inventory = self.dynamic_biomatrix @ diagonal_supply_array
 
-        # diagnolization of supply array keeps the dimension of the process, which we want to pass as additional information to the dynamic inventory dict
-        diagonal_supply_array = sparse.spdiags([self.dynamic_supply_array], [0], count, count) # sparse matrix to save memory
+        self.biosphere_time_mapping_dict_reversed = {
+            v: k for k, v in self.biosphere_time_mapping_dict.items()
+        }
 
-        # calculate dynamic lci
-        diagonalized_dynamic_lci = self.dynamic_biomatrix @ diagonal_supply_array
-        diagonalized_dynamic_lci = diagonalized_dynamic_lci.todok()
-        # convert into dictionary
-        self.build_dynamic_inventory_dict(diagonalized_dynamic_lci)
+        self.activity_time_mapping_dict_reversed = {
+            v: k for k, v in self.activity_time_mapping_dict.items()
+        }
+        self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe()
 
-    def build_dynamic_inventory_dict(self, diagonalized_dynamic_lci):
-        self.dynamic_inventory = {}
-        # Convert DOK matrix to COO for better iteration over non-zero elements
-        if not isinstance(diagonalized_dynamic_lci, sparse.coo_matrix):
-            diagonalized_dynamic_lci = diagonalized_dynamic_lci.tocoo()
+    def lcia(self):
+        """
+        Calculate the Timex LCIA, usings LCIs from the correct background databases.
+        """
+        if not hasattr(self, "lca"):
+            warnings.warn("LCI not yet calculated. Call TimexLCA.lci() first.")
+            return
+        self.lca.lcia()
 
-        for (flow, time), row_id in self.biosphere_time_mapping_dict.items():
-            flow_code = flow['code']
-            if flow_code not in self.dynamic_inventory:
-                self.dynamic_inventory[flow_code] = {'time': [], 'amount': [], 'emitting_process': []}
-
-            entries = self.dynamic_inventory[flow_code]
-
-            # Iterate over non-zero elements efficiently
-            for i, j, v in zip(diagonalized_dynamic_lci.row, diagonalized_dynamic_lci.col, diagonalized_dynamic_lci.data):
-                if i == row_id:
-                    emitting_process = self.activity_dict.reversed[j]
-                    entries['time'].append(time)
-                    entries['amount'].append(v)
-                    entries['emitting_process'].append(emitting_process)
-
-        # Convert lists to NumPy arrays before sorting to optimize the sorting process
-        for entries in self.dynamic_inventory.values():
-            time_array = np.array(entries['time'])
-            amount_array = np.array(entries['amount'])
-            emitting_process_array = np.array(entries['emitting_process'])
-
-            order = np.argsort(time_array)
-            entries['time'] = time_array[order]
-            entries['amount'] = amount_array[order]
-            entries['emitting_process'] = emitting_process_array[order]
-
-
-    def characterize_dynamic_lci(
+    def characterize_dynamic_inventory(
         self,
         cumsum: bool | None = True,
         type: str | None = "radiative_forcing",
@@ -423,16 +391,13 @@ class TimexLCA:
             warnings.warn(
                 "Dynamic lci not yet calculated. Call TimexLCA.calculate_dynamic_lci() first."
             )
-            
-        self.activity_time_mapping_dict_reversed = {
-            v: k for k, v in self.activity_time_mapping_dict.items()
-        }  # reversed mapping of activity_time_mapping_dict
 
         self.dynamic_inventory_characterizer = DynamicCharacterization(
-            self.dynamic_inventory,
+            self.dynamic_inventory_df,
             self.dicts.activity,
-            self.dicts.biosphere.reversed,
+            self.dicts.biosphere,
             self.activity_time_mapping_dict_reversed,
+            self.biosphere_time_mapping_dict_reversed,
             self.demand_timing_dict,
             self.temporal_grouping,
             characterization_functions,
@@ -446,6 +411,7 @@ class TimexLCA:
                 TH,
             )
         )
+
         self.characterized_dynamic_score = self.characterized_inventory["amount"].sum()
 
         return self.characterized_inventory
@@ -638,12 +604,59 @@ class TimexLCA:
 
         return indexed_demand, data_objs, remapping_dicts
 
+    def create_dynamic_inventory_dataframe(self):
+        """bring the dynamic inventory into the right format to use the characterization functions
+        Format needs to be:
+        | date | amount | flow | activity |
+        |------|--------|------|----------|
+        | 101  | 33     | 1    | 2        |
+        | 102  | 32     | 1    | 2        |
+        | 103  | 31     | 1    | 2        |
+
+        date is datetime
+        flow = flow id
+        activity = activity id
+        """
+
+        dataframe_rows = []
+        for i in range(self.dynamic_inventory.shape[0]):
+            row_start = self.dynamic_inventory.indptr[i]
+            row_end = self.dynamic_inventory.indptr[i + 1]
+            for j in range(row_start, row_end):
+                row = i
+                col = self.dynamic_inventory.indices[j]
+                value = self.dynamic_inventory.data[j]
+
+                col_database_id = self.activity_dict.reversed[col]
+
+                bioflow_node, date = self.biosphere_time_mapping_dict_reversed[
+                    row
+                ]  # indices are already the same as in the matrix, as we create an entirely new biosphere instead of adding new entries (like we do with the technosphere matrix)
+                emitting_process_key, _ = self.activity_time_mapping_dict_reversed[
+                    col_database_id
+                ]
+
+                dataframe_rows.append(
+                    (
+                        date,
+                        value,
+                        bioflow_node.id,
+                        bd.get_activity(emitting_process_key).id,
+                    )
+                )
+
+        df = pd.DataFrame(
+            dataframe_rows, columns=["date", "amount", "flow", "activity"]
+        )
+
+        return df.sort_values(by=["date", "amount"], ascending=[True, False])
+
     def create_demand_timing_dict(self) -> dict:
         """
         Generate a dictionary mapping producer (key) to timing (value) for specific demands.
         It searches the timeline for those rows that contain the functional units (demand-processes as producer and -1 as consumer) and returns the time of the demand.
         Time of demand can have flexible resolution (year=YYYY, month=YYYYMM, day=YYYYMMDD, hour=YYYYMMDDHH) defined in temporal_grouping.
-        
+
         :param timeline: Timeline DataFrame, generated by `create_grouped_edge_dataframe`.
         :param demand: Demand dict
 
@@ -700,14 +713,9 @@ class TimexLCA:
         """
         Returns the dynamic biosphere matrix as a dataframe with comprehensible labels instead of ids.
         """
-        biosphere_time_mapping_dict_reversed = {
-            index: (flow["code"], time)
-            for (flow, time), index in self.biosphere_time_mapping_dict.items()
-        }
-
         df = pd.DataFrame(self.dynamic_biomatrix.toarray())
         df.rename(  # from matrix id to activity id
-            index=biosphere_time_mapping_dict_reversed,
+            index=self.biosphere_time_mapping_dict_reversed,
             columns=self.dicts.activity.reversed,
             inplace=True,
         )
@@ -720,51 +728,26 @@ class TimexLCA:
 
         return df
 
-    def plot_dynamic_inventory(self, bio_flow=None, bio_flows=None, cumulative=False):
+    def plot_dynamic_inventory(self, bio_flows, cumulative=False):
         """
         Simple plot of dynamic inventory of a biosphere flow over time, with optional cumulative plotting.
-        :param bio_flow: str, name of the biosphere flow to plot
-        :param bio_flows: list of str, names of the biosphere flows to plot
+        :param bio_flows: list of int, database ids of the biosphere flows to plot
         :param cumulative: bool, if True, plot cumulative amounts over time
         :return: none, but shows a plot
         """
-        if not bio_flow and not bio_flows:
-            raise ValueError("Either bio_flow or bio_flows must be provided.")
-
         plt.figure(figsize=(14, 6))
 
-        if bio_flow:
-            times = self.dynamic_inventory[bio_flow]["time"]
-            amounts = self.dynamic_inventory[bio_flow]["amount"]
+        filtered_df = self.dynamic_inventory_df[
+            self.dynamic_inventory_df["flow"].isin(bio_flows)
+        ]
+        aggregated_df = filtered_df.groupby("date").sum()["amount"].reset_index()
 
-            if cumulative:
-                amounts = np.cumsum(amounts)
+        if cumulative:
+            aggregated_df["amount"] = np.cumsum(aggregated_df["amount"])
 
-            plt.plot(times, amounts, marker="o", linestyle="-")
-
-        elif bio_flows:
-            # Initialize a defaultdict to store summed amounts for each unique time point
-            time_amounts = defaultdict(float)
-
-            # Iterate over each specified flow and aggregate amounts by time
-            for flow_id in bio_flows:
-                if flow_id in self.dynamic_inventory:
-                    flow_data = self.dynamic_inventory[flow_id]
-                    for time, amount in zip(flow_data["time"], flow_data["amount"]):
-                        time_amounts[str(time)] += amount  # Convert time to string for uniqueness
-
-            # Sort the times and amounts for plotting
-            sorted_times = np.array(sorted(time_amounts.keys()))
-            sorted_amounts = np.array([time_amounts[time] for time in sorted_times])
-
-            if cumulative:
-                sorted_amounts = np.cumsum(sorted_amounts)
-
-            # Convert sorted times from strings back to datetime for plotting
-            sorted_times = np.array(sorted_times, dtype="datetime64")
-
-            # Plotting
-            plt.plot(sorted_times, sorted_amounts, marker="o", linestyle="none")
+        plt.plot(
+            aggregated_df["date"], aggregated_df["amount"], marker="o", linestyle="none"
+        )
 
         plt.ylim(bottom=0)
         plt.xlabel("time")
@@ -779,7 +762,12 @@ class TimexLCA:
         )
         return
 
-    def plot_dynamic_characterized_inventory(self, cumsum: bool = False, sum_emissions_within_activity: bool = False, sum_activities: bool = False):
+    def plot_dynamic_characterized_inventory(
+        self,
+        cumsum: bool = False,
+        sum_emissions_within_activity: bool = False,
+        sum_activities: bool = False,
+    ):
         """
         Plot the characterized inventory of the dynamic LCI in a very simple plot
         """
@@ -796,19 +784,19 @@ class TimexLCA:
 
         # Fetch the inventory to use in plotting, modify based on flags
         plot_data = self.characterized_inventory.copy()
-        
+
         if sum_emissions_within_activity:
-            plot_data = plot_data.groupby(['date', 'activity_name']).sum().reset_index()
-            plot_data['amount_sum'] = plot_data['amount'].cumsum()
-        
+            plot_data = plot_data.groupby(["date", "activity_name"]).sum().reset_index()
+            plot_data["amount_sum"] = plot_data["amount"].cumsum()
+
         if sum_activities:
-            plot_data = plot_data.groupby('date').sum().reset_index()
-            plot_data['amount_sum'] = plot_data['amount'].cumsum()
+            plot_data = plot_data.groupby("date").sum().reset_index()
+            plot_data["amount_sum"] = plot_data["amount"].cumsum()
             plot_data["activity_label"] = "All activities"
-            
+
         else:
             plot_data["activity_label"] = plot_data.apply(
-                lambda row: bd.get_activity(row["activity_name"])['name'], axis=1
+                lambda row: bd.get_activity(row["activity_name"])["name"], axis=1
             )
 
         # Determine the plotting labels and titles based on the characterization method
@@ -826,25 +814,19 @@ class TimexLCA:
 
         # Plotting
         plt.figure(figsize=(14, 6))
-        axes = sb.scatterplot(
-            x="date",
-            y=amount,
-            hue="activity_label",
-            data=plot_data
-        )
-        
+        axes = sb.scatterplot(x="date", y=amount, hue="activity_label", data=plot_data)
+
         axes.set_title(title)
         axes.set_axisbelow(True)
         axes.set_ylim(bottom=0)
         axes.set_ylabel(label_legend)
         axes.set_xlabel(f"Time ({self.temporal_grouping})")
-        
+
         handles, labels = axes.get_legend_handles_labels()
-        axes.legend(handles[::-1], labels[::-1])  
-        
+        axes.legend(handles[::-1], labels[::-1])
+
         plt.grid()
         plt.show()
-
 
     def __getattr__(self, name):
         """
