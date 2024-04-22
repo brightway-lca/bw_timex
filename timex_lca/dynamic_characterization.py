@@ -34,7 +34,7 @@ class DynamicCharacterization:
         dynamic_inventory: dict,
         activity_dict: dict,
         biosphere_dict_rerversed: dict,
-        act_time_mapping_reversed: dict,
+        activity_time_mapping_dict_reversed: dict,
         demand_timing_dict: dict,
         temporal_grouping: dict,
         characterization_functions: dict = None,
@@ -45,7 +45,7 @@ class DynamicCharacterization:
         self.dynamic_inventory = dynamic_inventory
         self.activity_dict = activity_dict
         self.biosphere_dict_rerversed = biosphere_dict_rerversed
-        self.act_time_mapping_reversed = act_time_mapping_reversed
+        self.activity_time_mapping_dict_reversed = activity_time_mapping_dict_reversed
         self.demand_timing_dict = demand_timing_dict
         self.temporal_grouping = temporal_grouping
         self.dynamic_lci_df = self.format_dynamic_inventory_as_dataframe()
@@ -307,7 +307,7 @@ class DynamicCharacterization:
         # add meta data and reorder
         self.characterized_inventory["activity_name"] = self.characterized_inventory[
             "activity"
-        ].map(lambda x: self.act_time_mapping_reversed.get(x)[0])
+        ].map(lambda x: self.activity_time_mapping_dict_reversed.get(x)[0])
         self.characterized_inventory["flow_name"] = self.characterized_inventory[
             "flow"
         ].apply(lambda x: bd.get_node(id=x)["name"])

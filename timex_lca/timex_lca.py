@@ -423,12 +423,16 @@ class TimexLCA:
             warnings.warn(
                 "Dynamic lci not yet calculated. Call TimexLCA.calculate_dynamic_lci() first."
             )
+            
+        self.activity_time_mapping_dict_reversed = {
+            v: k for k, v in self.activity_time_mapping_dict.items()
+        }  # reversed mapping of activity_time_mapping_dict
 
         self.dynamic_inventory_characterizer = DynamicCharacterization(
             self.dynamic_inventory,
             self.dicts.activity,
             self.dicts.biosphere.reversed,
-            self.act_time_mapping_reversed,
+            self.activity_time_mapping_dict_reversed,
             self.demand_timing_dict,
             self.temporal_grouping,
             characterization_functions,
