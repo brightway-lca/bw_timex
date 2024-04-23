@@ -53,7 +53,7 @@ class DynamicCharacterization:
 
         if not characterization_functions:
             warnings.warn(
-                "No characterization functions provided. Using default functions for CO2, CH4, N2O, CO."
+                "No dynamic characterization functions provided. Using default functions for CO2, CH4, N2O, CO."
             )
             self.characterization_functions = {  # TODO update these with biosphere3 flows  # Mapping database ids to characterization functions
                 bd.get_node(code="CO2").id: characterize_co2,
@@ -66,14 +66,14 @@ class DynamicCharacterization:
 
     def characterize_dynamic_inventory(
         self,
-        cumsum: bool | None = True,
-        type_of_method: str | None = "radiative_forcing",
+        metric: str | None = "radiative_forcing",
         fixed_TH: (
             bool | None
         ) = False,  # True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
         TH: int | None = 100,
         flow: set[int] | None = None,
         activity: set[int] | None = None,
+        cumsum: bool | None = True,
     ) -> Tuple[pd.DataFrame, str, bool, int]:
         """
         Dynamic inventory, formatted as a Dataframe, is characterized using the respective characterization functions for CO2, CH4, CO, N2O.
@@ -100,9 +100,9 @@ class DynamicCharacterization:
         return: Tuple[pd.DataFrame, str, bool, int] #characterized inventory, type of method, fixed TH, TH. The latter are stored as attributes of TimexLCA to be called for plotting.
 
         """
-        if type_of_method not in {"radiative_forcing", "GWP"}:
+        if metric not in {"radiative_forcing", "GWP"}:
             raise ValueError(
-                f"impact assessment type must be either 'radiative_forcing' or 'GWP', not {type_of_method}"
+                f"impact assessment type must be either 'radiative_forcing' or 'GWP', not {metric}"
             )
 
         flow_mapping = {}
@@ -119,16 +119,12 @@ class DynamicCharacterization:
             "hour": "%Y%m%d%M",
         }
 
-        warnings.warn(
-            f"If there is no dynamic characterization function for a flow, the flow will be ingored."
-        )
-
         self.characterized_inventory = pd.DataFrame()
         for _, row in self.dynamic_inventory_df.iterrows():
             if row.flow not in self.characterization_functions.keys():
                 continue
 
-            if type_of_method == "radiative_forcing":  # radiative forcing in W/m2
+            if metric == "radiative_forcing":  # radiative forcing in W/m2
 
                 if (
                     not fixed_TH
@@ -172,7 +168,7 @@ class DynamicCharacterization:
                     )
 
             if (
-                type_of_method == "GWP"
+                metric == "GWP"
             ):  # scale radiative forcing to GWP [kg CO2 equivalent]
                 if (
                     not fixed_TH
@@ -290,7 +286,7 @@ class DynamicCharacterization:
             by="date", ascending=True, inplace=True
         )
 
-        return self.characterized_inventory, type_of_method, fixed_TH, TH
+        return self.characterized_inventory, metric, fixed_TH, TH
 
 
 def IRF_co2(year) -> callable:

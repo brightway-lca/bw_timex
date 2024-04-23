@@ -225,5 +225,5 @@ class MatrixModifier:
         Creates a list of datapackages for the technosphere and biosphere matrices.
         """
         technosphere_datapackage = self.create_technosphere_datapackage()
-        biosphere_datapackge = self.create_biosphere_datapackage()
-        return [technosphere_datapackage, biosphere_datapackge]
+        biosphere_datapackage = self.create_biosphere_datapackage() 
+        return [technosphere_datapackage, biosphere_datapackage]

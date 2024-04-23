@@ -253,12 +253,6 @@ class TimexLCA:
         """
         Create the datapackages that contain the modifications to the technopshere and biosphere matrix using the MatrixModifier class.
         """
-        if not hasattr(self, "timeline"):
-            warnings.warn(
-                "Timeline is not yet built. Call TimexLCA.build_timeline() first."
-            )
-            return
-
         # mapping of the demand id to demand time
         self.demand_timing_dict = self.create_demand_timing_dict()
 
@@ -272,11 +266,13 @@ class TimexLCA:
         self.node_id_collection_dict["temporalized_processes"] = (
             self.matrix_modifier.temporalized_process_ids
         )
-        self.datapackage = self.matrix_modifier.create_datapackage()
+        return self.matrix_modifier.create_datapackage()
 
     def lci(self, build_dynamic_biosphere: Optional[bool] = True):
         """
-        Calculate the Timex LCI, which links its LCIs to correct background databases but without timing of biosphere flows, so without dynamic LCIA, which is implemented in build_dynamic_biosphere().
+        Calculate the time-explicit LCI. 
+        
+        Building the dynamic biosphere matrix is optional. Set build_dynamic_biosphere to False if you only want to get a new overall score and don't care about the timing of the emissions. This saves time and memory.
 
         :param build_dynamic_biosphere: bool, if True, build the dynamic biosphere matrix and calculate the dynamic LCI. Default is True.
         """
@@ -286,21 +282,18 @@ class TimexLCA:
                 "Timeline not yet built. Call TimexLCA.build_timeline() first."
             )
             return
-        if not hasattr(self, "datapackage"):
-            warnings.warn(
-                "Datapackage not yet built. Call TimexLCA.build_datapackage() first."
-            )
-            return
+        
+        self.datapackage = self.build_datapackage() # this contains the matrix modifications
 
         self.fu, self.data_objs, self.remapping = self.prepare_timex_lca_inputs(
             demand=self.demand,
             method=self.method,
             demand_timing_dict=self.demand_timing_dict,
         )
-        # using the datapackages with the matrix modifications
+
         self.lca = LCA(
             self.fu,
-            data_objs=self.data_objs + self.datapackage,
+            data_objs=self.data_objs + self.datapackage, # here we include the datapackage
             remapping_dicts=self.remapping,
         )
 
@@ -361,30 +354,32 @@ class TimexLCA:
         }
         self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe()
 
-    def lcia(self):
+    def static_lcia(self):
         """
-        Calculate the Timex LCIA, usings LCIs from the correct background databases.
+        Static LCIA usings time-explicit LCIs with the standard static characterization factors.
         """
         if not hasattr(self, "lca"):
             warnings.warn("LCI not yet calculated. Call TimexLCA.lci() first.")
             return
         self.lca.lcia()
+        self.static_score = self.lca.score
 
-    def characterize_dynamic_inventory(
+    def dynamic_lcia(
         self,
-        cumsum: bool | None = True,
-        type: str | None = "radiative_forcing",
+        metric: str | None = "radiative_forcing",
         fixed_TH: (
             bool | None
         ) = False,  # True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
         TH: int | None = 100,
-        characterization_functions: dict = None,  # {biosphere_flow_database_id characterization_function}
+        characterization_functions: dict = None,  # {biosphere_flow_database_id: characterization_function}
+        cumsum: bool | None = True,
     ):
         """
-        Characterize the dynamic inventory dictionaries using dynamic characterization functions using the DynamicCharacterization class.
-        Characterization function are provided imported from BW_temporalis and are planned to be extended. The format of the characterization_dictionary is {biosphere_flow_database_id: characterization_function}.
-        Users can you provide their own dynamic characterization functions, which needs to have the format XZXZ (TODO complete description).
-
+        Characterize the dynamic inventory dictionaries using dynamic characterization functions.
+        
+        Characterization functions are a user input. We currently provide dynamic characterization functions for co2, ch4, n2o and co in timex_lca.dynamic_characterization. In addition, functions from the original bw_temporalis are compatible. The format of the characterization functions dictionary is {biosphere_flow_database_id: characterization_function}.
+        
+        If there is no characterization function for a biosphere flow, it will be ignored.
         """
 
         if not hasattr(self, "dynamic_inventory"):
@@ -405,14 +400,14 @@ class TimexLCA:
 
         (self.characterized_inventory, self.type_of_method, self.fixed_TH, self.TH) = (
             self.dynamic_inventory_characterizer.characterize_dynamic_inventory(
-                cumsum,
-                type,
+                metric,
                 fixed_TH,  # True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
                 TH,
+                cumsum,
             )
         )
 
-        self.characterized_dynamic_score = self.characterized_inventory["amount"].sum()
+        self.dynamic_score = self.characterized_inventory["amount"].sum()
 
         return self.characterized_inventory
 

@@ -202,10 +202,6 @@ class TimelineBuilder:
 
             """
             if not database_date_dict:
-                warnings.warn(
-                    "No temporal databases provided.",
-                    category=Warning,
-                )
                 tl_df["interpolation_weights"] = None
                 return tl_df
 
