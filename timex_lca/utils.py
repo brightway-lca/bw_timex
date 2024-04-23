@@ -58,7 +58,7 @@ def add_flows_to_characterization_function_dict(
 
 
 def plot_characterized_inventory_as_waterfall(
-    characterized_inventory, static_scores=None, prospective_scores=None
+    characterized_inventory, static_scores=None, prospective_scores=None, order_stacked_activities = None
 ):
     """
     Plot a stacked waterfall chart of characterized inventory data. As comparison, static and prospective scores can be added.
@@ -115,16 +115,9 @@ def plot_characterized_inventory_as_waterfall(
         combined_data.append(pivoted_prospective_data)
 
     combined_df = pd.concat(combined_data, axis=0)
-    combined_df = combined_df[
-        [
-            "market for glider, passenger car",
-            "market for powertrain, for electric passenger car",
-            "battery production, Li-ion, LiMn2O4, rechargeable, prismatic",
-            "market group for electricity, low voltage",
-            "market for manual dismantling of used electric passenger car",
-            "market for used Li-ion battery",
-        ]
-    ]
+
+    if order_stacked_activities:
+        combined_df = combined_df[order_stacked_activities] # change order of activities in the stacked bars of the waterfall
 
     # Calculate the bottom for only the dynamic data
     dynamic_bottom = pivoted_data.sum(axis=1).cumsum().shift(1).fillna(0)
