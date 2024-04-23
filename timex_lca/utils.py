@@ -40,6 +40,7 @@ def add_flows_to_characterization_function_dict(
     flows: Union[str, List[str]],
     func: Callable,
     characterization_function_dict: Optional[dict] = dict(),
+    negative_sign: Optional[bool] = False, # flip the sign of the characterization function if it's an uptake and not release of emission
 ) -> dict:
     """
     Add a new flow or a list of flows to the available characterization functions.
@@ -48,11 +49,11 @@ def add_flows_to_characterization_function_dict(
     # Check if the input is a single flow (str) or a list of flows (List[str])
     if isinstance(flows, str):
         # It's a single flow, add it directly
-        characterization_function_dict[flows] = func
+        characterization_function_dict[flows] = (func, negative_sign)
     elif isinstance(flows, list):
         # It's a list of flows, iterate and add each one
         for flow in flows:
-            characterization_function_dict[flow] = func
+            characterization_function_dict[flow] = (func, negative_sign)
 
     return characterization_function_dict
 

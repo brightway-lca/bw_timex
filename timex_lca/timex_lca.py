@@ -814,9 +814,16 @@ class TimexLCA:
         plt.figure(figsize=(14, 6))
         axes = sb.scatterplot(x="date", y=amount, hue="activity_label", data=plot_data)
 
+        
+        # Determine y-axis limit flexibly
+        if plot_data[amount].min() < 0:
+            ymin = plot_data[amount].min() * 1.1
+        else:
+            ymin = 0
+
         axes.set_title(title)
         axes.set_axisbelow(True)
-        axes.set_ylim(bottom=0)
+        axes.set_ylim(bottom=ymin)
         axes.set_ylabel(label_legend)
         axes.set_xlabel(f"Time ({self.temporal_grouping})")
 
