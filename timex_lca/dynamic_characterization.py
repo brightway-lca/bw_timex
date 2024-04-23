@@ -7,6 +7,7 @@ import warnings
 
 # from bw_temporalis.lcia.climate import characterize_methane, characterize_co2
 from datetime import datetime, timedelta
+from timex_lca.utils import add_flows_to_characterization_function_dict
 
 
 class DynamicCharacterization:
@@ -31,17 +32,18 @@ class DynamicCharacterization:
         self,
         # method: str,
         # **kwargs,
-        dynamic_inventory_df: dict,
+        dynamic_inventory_df: pd.DataFrame,
         activity_dict: dict,
         biosphere_dict: dict,
         activity_time_mapping_dict_reversed: dict,
         biosphere_time_mapping_dict_reversed: dict,
         demand_timing_dict: dict,
         temporal_grouping: dict,
+        method: tuple,
         characterization_functions: dict = None,
     ):
         """
-        Initialize the DynamicCharacterization object.
+        Initialize the DynamicCharacterization object. and add dynamic characterization functions for CO2, CH4, CO, N2O based on IPCC AR6 decay curves in acse users doesn't provide own dynamic characterization functions
         """
         self.dynamic_inventory_df = dynamic_inventory_df
         self.activity_dict = activity_dict
@@ -50,23 +52,49 @@ class DynamicCharacterization:
         self.biosphere_time_mapping_dict_reversed = biosphere_time_mapping_dict_reversed
         self.demand_timing_dict = demand_timing_dict
         self.temporal_grouping = temporal_grouping
+        self.method = method
 
         if not characterization_functions:
             warnings.warn(
-                "No dynamic characterization functions provided. Using default functions for CO2, CH4, N2O, CO."
+                f"No custom dynamic characterization functions provided. \nUsing default dynamic characterization functions for CO2, CH4, N2O, CO with decay functions from IPCC AR6. \nThe selected biosphere flows for these GHGs are based on the selection of the currently chosen impact category: {self.method} and their matrix ids can be looked up with .characterization_functions.keys()"
             )
-            self.characterization_functions = {  # TODO update these with biosphere3 flows  # Mapping database ids to characterization functions
-                bd.get_node(code="CO2").id: characterize_co2,
-                bd.get_node(code="CH4").id: characterize_ch4,
-                bd.get_node(code="N2O").id: characterize_n2o,
-                # bd.get_node(code="CO").id: characterize_co_levasseur,
-            }
+
+            bioflows_in_lcia_method = bd.Method(self.method).load()
+
+            co2_flows = []
+            ch4_flows = []
+            n2o_flows = []
+            co_flows = [] 
+
+            for flow in bioflows_in_lcia_method:
+                node = bd.get_node(code=(flow[0][1]))
+                id = node.id
+                
+                if "carbon dioxide" in node["name"].lower() and "soil" not in node["categories"]: 
+                    #TODO include uptake in soil as positive element in dynamic characterization, maybe with a boolean flag
+                    co2_flows.append(id)
+
+                if "methane, fossil" in node["name"].lower() or "methane, from soil or biomass stock" in node["name"].lower():
+                    #TODO Check why "methane, non-fossil" has a CF of 27 instead of 29.8, currently excluded
+                    ch4_flows.append(id)
+                                
+                if "dinitrogen monoxide" in node["name"].lower():
+                    n2o_flows.append(id)
+
+                if "carbon monoxide" in node["name"].lower(): #Note: CO is not included in IPCC 2021 or EFv3.1, but is included in older LCIA methods, such as IPCC 2013 and EFv3.0
+                    co_flows.append(id)	
+             
+            self.characterization_functions = add_flows_to_characterization_function_dict(co2_flows, characterize_co2)
+            self.characterization_functions = add_flows_to_characterization_function_dict(ch4_flows, characterize_ch4)
+            self.characterization_functions = add_flows_to_characterization_function_dict(n2o_flows, characterize_n2o)
+            self.characterization_functions = add_flows_to_characterization_function_dict(co_flows, characterize_co_levasseur) #TODO add IPCC AR6 CO characterization function
+
         else:
-            self.characterization_functions = characterization_functions
+            self.characterization_functions = characterization_functions # user-provided characterization functions
 
     def characterize_dynamic_inventory(
         self,
-        metric: str | None = "radiative_forcing",
+        metric: str | None = "radiative_forcing", # available metrics are "radiative_forcing" and "GWP"
         fixed_TH: (
             bool | None
         ) = False,  # True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
@@ -76,19 +104,14 @@ class DynamicCharacterization:
         cumsum: bool | None = True,
     ) -> Tuple[pd.DataFrame, str, bool, int]:
         """
-        Dynamic inventory, formatted as a Dataframe, is characterized using the respective characterization functions for CO2, CH4, CO, N2O.
-        The `characterization_function` is applied to each row of the input DataFrame of a timeline for a given `period`.
+        Dynamic inventory, formatted as a Dataframe, is characterized using given dynamic characterization functions. If none are provided,
+        default dynamic characterization functions for CO2, CH4, CO, N2O were created when initializing the DynamicCharacterization object.
 
-        Warming curves for other GHGs are readily available in self.levasseur_dcfs and (TODO) need to be added as automated characterization functions.
         Available impact assessment types are Radiative forcing [W/m2] and GWP [kg CO2eq].
-        The time horizon (TH) of assessment can be chosen flexibly, defaulting to 100 years.
+        The `characterization_function` is applied to each row of the input DataFrame of a timeline for a flexible `TH`, defaulting to 100 years.
+
         There is the option to use a fixed TH, which is calculated from the time of the functional unit (FU) instead of the time of emission.
-        This means that an emission ocuur 10 years after the FU, is characterized for TH - 10 years, similarly an emission occuring 25 years before the FU is characterized for TH + 25 years.
-
-        Function originates from bw_temporalis to the fact that in comparison to bw_temporalis, our timeline not a Timeline instance, but a normal pd.DataFrame.
-        Adjusted to filter the respective elemental flows to be characterized per characterization function, instead of assuming all flows to be categorized.
-
-        TODO: make time resolution flexible, map elemental flows to ecoinvent biosphere flows, add other characterization functions for other GHGs, check with Timo in how far we want to use the depreciated bw_temporalis characterization stuff
+        This means that earlier emissions are characterized for a longer time period than later emissions.
 
         param: cumsum: bool, default True: adds a new column to the characterized inventory that contains the cumulative forcing/GWP over time per flow
         param: type_of_method: str, default "radiative_forcing". Available options are "radiative_forcing" and "GWP".
@@ -97,7 +120,7 @@ class DynamicCharacterization:
         param: flow: set[int], default None. Subset of flows to be characterized.
         param: activity: set[int], default None. Subset of activities to be characterized.
 
-        return: Tuple[pd.DataFrame, str, bool, int] #characterized inventory, type of method, fixed TH, TH. The latter are stored as attributes of TimexLCA to be called for plotting.
+        return: Tuple[pd.DataFrame, str, bool, int] (characterized dynamic inventory, type of method, fixed TH, TH). The latter three are stored as attributes of TimexLCA to be called for plotting.
 
         """
         if metric not in {"radiative_forcing", "GWP"}:
@@ -140,7 +163,7 @@ class DynamicCharacterization:
                     # e.g. an emission occuring n years before FU is characterized for TH+n years
                     timing_FU = [
                         value for value in self.demand_timing_dict.values()
-                    ]  # FIXME what if there are multiple FU occuring at different times?
+                    ] 
                     end_TH_FU_list = [x + TH for x in timing_FU]
 
                     if len(end_TH_FU_list) > 1:

@@ -377,7 +377,9 @@ class TimexLCA:
         """
         Characterize the dynamic inventory dictionaries using dynamic characterization functions.
         
-        Characterization functions are a user input. We currently provide dynamic characterization functions for co2, ch4, n2o and co in timex_lca.dynamic_characterization. In addition, functions from the original bw_temporalis are compatible. The format of the characterization functions dictionary is {biosphere_flow_database_id: characterization_function}.
+        Characterization functions can be given by the user. If none are given, it defaults to dynamic characterization functions for co2, ch4, n2o and co in timex_lca.dynamic_characterization. In addition, functions from the original bw_temporalis are compatible. 
+        
+        The format of the characterization functions dictionary is {biosphere_flow_database_id: characterization_function}.
         
         If there is no characterization function for a biosphere flow, it will be ignored.
         """
@@ -395,6 +397,7 @@ class TimexLCA:
             self.biosphere_time_mapping_dict_reversed,
             self.demand_timing_dict,
             self.temporal_grouping,
+            self.method,
             characterization_functions,
         )
 
