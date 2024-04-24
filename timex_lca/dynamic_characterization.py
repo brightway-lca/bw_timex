@@ -58,47 +58,18 @@ class DynamicCharacterization:
             warnings.warn(
                 f"No custom dynamic characterization functions provided. \nUsing default dynamic characterization functions for CO2, CH4, N2O, CO with decay functions from IPCC AR6. \nThe selected biosphere flows for these GHGs are based on the selection of the currently chosen impact category: {self.method} and their matrix ids can be looked up with .characterization_functions.keys()"
             )
-
-            bioflows_in_lcia_method = bd.Method(self.method).load()
-
-            co2_flows = []
-            co2_flows_negative = []
-            ch4_flows = []
-            n2o_flows = []
-            co_flows = [] 
-
-            for flow in bioflows_in_lcia_method:
-                node = bd.get_node(code=(flow[0][1]))
-                id = node.id
-                
-                if "carbon dioxide" in node["name"].lower() and "soil" not in node["categories"]: 
-                    co2_flows.append(id)
-
-                if "carbon dioxide" in node["name"].lower() and "soil" in node["categories"]: #negative emission because uptake by soil
-                    co2_flows_negative.append(id)
-
-                if "methane, fossil" in node["name"].lower() or "methane, from soil or biomass stock" in node["name"].lower():
-                    #TODO Check why "methane, non-fossil" has a CF of 27 instead of 29.8, currently excluded
-                    ch4_flows.append(id)
-                                
-                if "dinitrogen monoxide" in node["name"].lower():
-                    n2o_flows.append(id)
-
-                if "carbon monoxide" in node["name"].lower(): #Note: CO is not included in IPCC 2021 or EFv3.1, but is included in older LCIA methods, such as IPCC 2013 and EFv3.0
-                    co_flows.append(id)	
-             
-            self.characterization_functions = add_flows_to_characterization_function_dict(co2_flows, characterize_co2)
-            self.characterization_functions = add_flows_to_characterization_function_dict(co2_flows_negative, characterize_co2, negative_sign=True)
-            self.characterization_functions = add_flows_to_characterization_function_dict(ch4_flows, characterize_ch4)
-            self.characterization_functions = add_flows_to_characterization_function_dict(n2o_flows, characterize_n2o)
-            self.characterization_functions = add_flows_to_characterization_function_dict(co_flows, characterize_co_levasseur) #TODO add IPCC AR6 CO characterization function
+            self.add_default_characterization_functions()
 
         else:
-            self.characterization_functions = characterization_functions # user-provided characterization functions
+            self.characterization_functions = (
+                characterization_functions  # user-provided characterization functions
+            )
 
     def characterize_dynamic_inventory(
         self,
-        metric: str | None = "radiative_forcing", # available metrics are "radiative_forcing" and "GWP"
+        metric: (
+            str | None
+        ) = "radiative_forcing",  # available metrics are "radiative_forcing" and "GWP"
         fixed_TH: (
             bool | None
         ) = False,  # True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
@@ -132,15 +103,15 @@ class DynamicCharacterization:
                 f"impact assessment type must be either 'radiative_forcing' or 'GWP', not {metric}"
             )
 
-        flow_mapping = {} #not sure if we have to keep this
+        flow_mapping = {}  # not sure if we have to keep this
         for flow in self.characterization_functions.keys():
             try:
-                flow_mapping[bd.get_activity(flow).id] = flow 
+                flow_mapping[bd.get_activity(flow).id] = flow
             except:
                 print("here")
                 raise ValueError(
-                   f"Flow '{flow}' could not be mapped to a biosphere flow in your database.")
-                
+                    f"Flow '{flow}' could not be mapped to a biosphere flow in your database."
+                )
 
         time_res_dict = {
             "year": "%Y",
@@ -162,15 +133,19 @@ class DynamicCharacterization:
                     self.characterized_inventory = pd.concat(
                         [
                             self.characterized_inventory,
-                            self.characterization_functions[row.flow][0](row, period=TH, negative_sign=self.characterization_functions[row.flow][1]),
+                            self.characterization_functions[row.flow][0](
+                                row,
+                                period=TH,
+                                negative_sign=self.characterization_functions[row.flow][
+                                    1
+                                ],
+                            ),
                         ]
                     )
 
                 else:  # fixed TH = True: Levasseur approach: TH for all emissions extended or shortened based on timing of FU + TH
                     # e.g. an emission occuring n years before FU is characterized for TH+n years
-                    timing_FU = [
-                        value for value in self.demand_timing_dict.values()
-                    ] 
+                    timing_FU = [value for value in self.demand_timing_dict.values()]
                     end_TH_FU_list = [x + TH for x in timing_FU]
 
                     if len(end_TH_FU_list) > 1:
@@ -192,19 +167,25 @@ class DynamicCharacterization:
                         [
                             self.characterized_inventory,
                             self.characterization_functions[row.flow][0](
-                                row, period=new_TH, negative_sign=self.characterization_functions[row.flow][1]
+                                row,
+                                period=new_TH,
+                                negative_sign=self.characterization_functions[row.flow][
+                                    1
+                                ],
                             ),
                         ]
                     )
 
-            if (
-                metric == "GWP"
-            ):  # scale radiative forcing to GWP [kg CO2 equivalent]
+            if metric == "GWP":  # scale radiative forcing to GWP [kg CO2 equivalent]
                 if (
                     not fixed_TH
                 ):  # fixed_TH = False: conventional approach, emission is calculated from t emission for the length of TH
-                    radiative_forcing_ghg = self.characterization_functions[row.flow][0](
-                        row, period=TH, negative_sign=self.characterization_functions[row.flow][1]
+                    radiative_forcing_ghg = self.characterization_functions[row.flow][
+                        0
+                    ](
+                        row,
+                        period=TH,
+                        negative_sign=self.characterization_functions[row.flow][1],
                     )
 
                     row["amount"] = 1  # convert 1 kg CO2 equ.
@@ -253,8 +234,12 @@ class DynamicCharacterization:
                         (end_TH_FU - timing_emission).days / 365.25
                     )  # time difference in integer years between emission timing and end of TH of FU
 
-                    radiative_forcing_ghg = self.characterization_functions[row.flow][0](
-                        row, period=new_TH, negative_sign=self.characterization_functions[row.flow][1]
+                    radiative_forcing_ghg = self.characterization_functions[row.flow][
+                        0
+                    ](
+                        row,
+                        period=new_TH,
+                        negative_sign=self.characterization_functions[row.flow][1],
                     )  # indidvidual emissions are calculated for t_emission until t_FU + TH
 
                     row["amount"] = 1  # convert 1 kg CO2 equ.
@@ -318,6 +303,65 @@ class DynamicCharacterization:
 
         return self.characterized_inventory, metric, fixed_TH, TH
 
+    def add_default_characterization_functions(self):
+        """
+        Add default dynamic characterization functions for CO2, CH4, CO, N2O based on IPCC AR6 decay curves
+        """
+        bioflows_in_lcia_method = bd.Method(self.method).load()
+
+        co2_flows = []
+        co2_flows_negative = []
+        ch4_flows = []
+        n2o_flows = []
+        co_flows = []
+
+        for flow in bioflows_in_lcia_method:
+            node = bd.get_node(code=(flow[0][1]))
+            id = node.id
+
+            if (
+                "carbon dioxide" in node["name"].lower()
+                and "soil" not in node["categories"]
+            ):
+                co2_flows.append(id)
+
+            if (
+                "carbon dioxide" in node["name"].lower()
+                and "soil" in node["categories"]
+            ):  # negative emission because uptake by soil
+                co2_flows_negative.append(id)
+
+            if (
+                "methane, fossil" in node["name"].lower()
+                or "methane, from soil or biomass stock" in node["name"].lower()
+            ):
+                # TODO Check why "methane, non-fossil" has a CF of 27 instead of 29.8, currently excluded
+                ch4_flows.append(id)
+
+            if "dinitrogen monoxide" in node["name"].lower():
+                n2o_flows.append(id)
+
+            if (
+                "carbon monoxide" in node["name"].lower()
+            ):  # Note: CO is not included in IPCC 2021 or EFv3.1, but is included in older LCIA methods, such as IPCC 2013 and EFv3.0
+                co_flows.append(id)
+
+        self.characterization_functions = add_flows_to_characterization_function_dict(
+            co2_flows, characterize_co2
+        )
+        self.characterization_functions = add_flows_to_characterization_function_dict(
+            co2_flows_negative, characterize_co2, negative_sign=True
+        )
+        self.characterization_functions = add_flows_to_characterization_function_dict(
+            ch4_flows, characterize_ch4
+        )
+        self.characterization_functions = add_flows_to_characterization_function_dict(
+            n2o_flows, characterize_n2o
+        )
+        self.characterization_functions = add_flows_to_characterization_function_dict(
+            co_flows, characterize_co_levasseur
+        )  # TODO add IPCC AR6 CO characterization function
+
 
 def IRF_co2(year) -> callable:
     """
@@ -338,7 +382,9 @@ def characterize_co2(
     series,
     period: int | None = 100,
     cumulative: bool | None = False,
-    negative_sign: bool | None = False, #flip the sign of the characterization function if it's an uptake and not release of CO2
+    negative_sign: (
+        bool | None
+    ) = False,  # flip the sign of the characterization function if it's an uptake and not release of CO2
 ) -> pd.DataFrame:
     """
     Based on characterize_co2 from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
@@ -394,8 +440,10 @@ def characterize_co2(
 
     forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
 
-    if negative_sign: #flip the sign of the characterization function if it's an uptake and not release of CO2
-        forcing = -forcing 
+    if (
+        negative_sign
+    ):  # flip the sign of the characterization function if it's an uptake and not release of CO2
+        forcing = -forcing
 
     if not cumulative:
         forcing = forcing.diff(periods=1).fillna(0)
@@ -410,11 +458,14 @@ def characterize_co2(
     )
 
 
-def characterize_ch4(series, 
-                     period: int = 100, 
-                     cumulative=False,
-                     negative_sign: bool | None = False, #simply passed to avoid error message, never used since all CH4 flows are emissions
-                     ) -> pd.DataFrame:
+def characterize_ch4(
+    series,
+    period: int = 100,
+    cumulative=False,
+    negative_sign: (
+        bool | None
+    ) = False,  # simply passed to avoid error message, never used since all CH4 flows are emissions
+) -> pd.DataFrame:
     """
     Based on characterize_methane from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
 
@@ -493,11 +544,14 @@ def characterize_ch4(series,
     )
 
 
-def characterize_n2o(series, 
-                     period: int = 100, 
-                     cumulative=False, 
-                     negative_sign: bool | None = False, #simply passed to avoid error message, never used since all n2o flows are emissions
-                     ) -> pd.DataFrame:
+def characterize_n2o(
+    series,
+    period: int = 100,
+    cumulative=False,
+    negative_sign: (
+        bool | None
+    ) = False,  # simply passed to avoid error message, never used since all n2o flows are emissions
+) -> pd.DataFrame:
     """
     Based on characterize_methane from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
 
