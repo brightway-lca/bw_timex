@@ -59,10 +59,12 @@ def add_flows_to_characterization_function_dict(
 
 
 def plot_characterized_inventory_as_waterfall(
-    characterized_inventory, static_scores=None, prospective_scores=None, order_stacked_activities = None
+    characterized_inventory, metric, static_scores=None, prospective_scores=None, order_stacked_activities = None
 ):
     """
     Plot a stacked waterfall chart of characterized inventory data. As comparison, static and prospective scores can be added.
+    Only works for metric GWP at the moment.
+
     """
     # Check for necessary columns
     if not {"date", "activity_name", "amount"}.issubset(
@@ -71,12 +73,15 @@ def plot_characterized_inventory_as_waterfall(
         raise ValueError(
             "DataFrame must contain 'date', 'activity_name', and 'amount' columns."
         )
+    if metric != "GWP":
+        raise NotImplementedError(f"Only GWP metric is supported at the moment, not {metric}.")
 
     # Grouping and summing data
     plot_data = characterized_inventory.groupby(
         ["date", "activity_name"], as_index=False
     ).sum()
-    plot_data["year"] = plot_data["date"].dt.year
+   
+    plot_data["year"] = plot_data["date"].dt.year #TODO make temporal resolution flexible
 
     # Optimized activity label fetching
     unique_activities = plot_data["activity_name"].unique()
@@ -84,7 +89,6 @@ def plot_characterized_inventory_as_waterfall(
         activity: bd.get_activity(activity)["name"] for activity in unique_activities
     }
     plot_data["activity_label"] = plot_data["activity_name"].map(activity_labels)
-
     # Pivoting data for plotting
     pivoted_data = plot_data.pivot(
         index="year", columns="activity_label", values="amount"
