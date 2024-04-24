@@ -4,6 +4,8 @@ export
 .ipynb_checkpoints
 .DS_Store
 .vscode/
+conda/
+conda-out/
 =======
 # Created by https://www.toptal.com/developers/gitignore/api/jupyternotebooks,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=jupyternotebooks,python
