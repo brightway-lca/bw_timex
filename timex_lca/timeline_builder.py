@@ -188,21 +188,23 @@ class TimelineBuilder:
 
         def add_column_interpolation_weights_to_timeline(
             tl_df: pd.DataFrame,
-            database_date_dict: dict,
             interpolation_type: str = "linear",
         ) -> pd.DataFrame:
             """
             Add a column to a timeline with the weights for an interpolation between the two nearest dates, from the list of dates of the available databases.
 
             :param tl_df: Timeline as a dataframe.
-            :param database_date_dict: Mapping dictionary between the name of database (key) and time of representativeness (value)
             :param interpolation_type: Type of interpolation between the nearest lower and higher dates. Available options: "linear"and "nearest".
 
             :return: Timeline as a dataframe with a column 'interpolation_weights' added, this column looks like {database_name: weight, database_name: weight}.
 
             """
-            if not database_date_dict:
+            if not self.database_date_dict_static_only:
                 tl_df["interpolation_weights"] = None
+                warnings.warn(
+                    "No time-explicit databases are provided. Mapping to time-explicit databases is not possible.",
+                    category=Warning,
+                )
                 return tl_df
 
             dates_list = [
@@ -224,31 +226,38 @@ class TimelineBuilder:
                 tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
                     lambda x: find_closest_date(x, dates_list)
                 )
-                tl_df["interpolation_weights"] = tl_df["interpolation_weights"].apply(
-                    lambda d: {
-                        self.reversed_database_date_dict[x]: v for x, v in d.items()
-                    }
-                )
-                return tl_df
 
             if self.interpolation_type == "linear":
                 tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
                     lambda x: get_weights_for_interpolation_between_nearest_years(
                         x, dates_list, self.interpolation_type
-                    )
-                )
-                tl_df["interpolation_weights"] = tl_df["interpolation_weights"].apply(
-                    lambda d: {
-                        self.reversed_database_date_dict[x]: v for x, v in d.items()
-                    }
+                    )              
                 )
 
             else:
                 raise ValueError(
                     f"Sorry, but {self.interpolation_type} interpolation is not available yet."
                 )
-
+              
+            tl_df["interpolation_weights"] = tl_df.apply(add_interpolation_weights_at_intersection_to_background, axis=1) #add the weights to the timeline for processes at intersection
+                
             return tl_df
+        
+        def add_interpolation_weights_at_intersection_to_background(row): 
+            """
+            returns the interpolation weights to background databases only for those exchanges, where the producing process 
+            actually comes from a background database (temporal markets). 
+            
+            Only these processes are receiving inputs from the background databases. 
+            All other process in the timeline are not directly linked to the background, so the interpolation weight info is not needed.
+            """
+
+            if row["producer"] in self.node_id_collection_dict["first_level_background_node_ids_static"]:
+                return {
+                    self.reversed_database_date_dict[x]: v for x, v in row["interpolation_weights"].items()
+                }
+            else:
+                return None
 
         def find_closest_date(target: datetime, dates: KeysView[datetime]) -> dict:
             """
@@ -441,7 +450,6 @@ class TimelineBuilder:
         # Add interpolation weights to background databases to the dataframe
         grouped_edges = add_column_interpolation_weights_to_timeline(
             grouped_edges,
-            self.database_date_dict_static_only,
             interpolation_type=self.interpolation_type,
         )
 
