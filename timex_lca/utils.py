@@ -35,6 +35,50 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
 
     return date_as_integer
 
+def extract_grouping_date_as_string(
+    temporal_grouping: str, timestamp: datetime
+):
+    """
+    Extracts the grouping date as a string from a datetime object, based on the chosen temporal grouping.
+    e.g. for temporal grouping = 'year', and timestamp = 2023-03-29T01:00:00, it extracts the string '2023'.
+    """
+    time_res_dict = {
+        "year": "%Y",
+        "month": "%Y%m",
+        "day": "%Y%m%d",
+        "hour": "%Y%m%d%M",
+    }
+
+    if temporal_grouping not in time_res_dict.keys():
+        warnings.warn(
+            'temporal_grouping: {} is not a valid option. Please choose from: {} defaulting to "year"'.format(
+                temporal_grouping, time_res_dict.keys()
+            ),
+            category=Warning,
+        )
+    return timestamp.strftime(time_res_dict[temporal_grouping])
+
+def convert_grouping_date_string_to_datetime(temporal_grouping, datestring):
+    """
+    Converts the string of a date used for grouping back to datetime object.
+    e.g. for temporal grouping = 'year', and datestring = '2023', it extracts 2023-01-01
+    """
+    time_res_dict = {
+        "year": "%Y",
+        "month": "%Y%m",
+        "day": "%Y%m%d",
+        "hour": "%Y%m%d%M",
+    }
+
+    if temporal_grouping not in time_res_dict.keys():
+        warnings.warn(
+            'temporal grouping: {} is not a valid option. Please choose from: {} defaulting to "year"'.format(
+                temporal_grouping, time_res_dict.keys()
+            ),
+            category=Warning,
+        )
+    return datetime.strptime(datestring, time_res_dict[temporal_grouping])
+
 
 def add_flows_to_characterization_function_dict(
     flows: Union[str, List[str]],

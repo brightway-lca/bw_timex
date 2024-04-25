@@ -6,6 +6,7 @@ from bw_temporalis import TemporalDistribution
 from .remapping import TimeMappingDict
 from bw2calc import LCA
 from datetime import datetime
+from .utils import convert_grouping_date_string_to_datetime
 
 
 class DynamicBiosphereBuilder:
@@ -41,6 +42,7 @@ class DynamicBiosphereBuilder:
         self.demand_timing_dict = demand_timing_dict
         self.node_id_collection_dict = node_id_collection_dict
         self.time_res = self._time_res_dict[temporal_grouping]
+        self.temporal_grouping = temporal_grouping
         self.database_date_dict = database_date_dict
         self.database_date_dict_static_only = database_date_dict_static_only
         self.len_technosphere_dbs = len_technosphere_dbs
@@ -59,14 +61,17 @@ class DynamicBiosphereBuilder:
         for id in self.node_id_collection_dict["temporalized_processes"]:
             process_col_index = self.activity_dict[id]  # get the matrix column index
 
-            ((original_db, original_code), time) = (
+            ((original_db, original_code), time) = (            #time is here an integer, with various length depending on temporal grouping, e.g. [Y] -> 2024, [M] - > 202401
                 self.activity_time_mapping_dict.reversed()[id]
             )
 
+            time_in_datetime=convert_grouping_date_string_to_datetime(self.temporal_grouping, str(time)) #now time is a datetime
+
             td_producer = TemporalDistribution(
-                date=np.array([str(time)], dtype=self.time_res), amount=np.array([1])
-            ).date  # TODO: Simplify
+                date=np.array([time_in_datetime], dtype=self.time_res), amount=np.array([1])
+            ).date  
             date = td_producer[0]
+
 
             act = bd.get_node(database=original_db, code=original_code)
 
@@ -85,6 +90,7 @@ class DynamicBiosphereBuilder:
 
                 # Add entries to dynamic bio matrix
                 for date, amount in zip(dates, values):
+                   
                     # first create a row index for the tuple((db, bioflow), date))
                     time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(
                         (exc.input, date)
@@ -128,8 +134,10 @@ class DynamicBiosphereBuilder:
                 bioflow = bd.get_activity(self.lca_obj.dicts.biosphere.reversed[idx])
                 ((_, _), time) = self.activity_time_mapping_dict.reversed()[id]
 
+                time_in_datetime=convert_grouping_date_string_to_datetime(self.temporal_grouping, str(time)) #cnow time is a datetime
+
                 td_producer = TemporalDistribution(
-                    date=np.array([str(time)], dtype=self.time_res),
+                    date=np.array([str(time_in_datetime)], dtype=self.time_res),
                     amount=np.array([1]),
                 ).date  # TODO: Simplify
                 date = td_producer[0]
