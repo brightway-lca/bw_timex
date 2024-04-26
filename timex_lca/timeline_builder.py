@@ -9,7 +9,11 @@ from typing import KeysView
 from bw_temporalis import TemporalDistribution
 from bw2calc import LCA
 from .edge_extractor import EdgeExtractor, Edge
-from .utils import extract_date_as_integer, extract_grouping_date_as_string, convert_grouping_date_string_to_datetime
+from .utils import (
+    extract_date_as_integer,
+    extract_grouping_date_as_string,
+    convert_grouping_date_string_to_datetime,
+)
 
 
 class TimelineBuilder:
@@ -81,7 +85,9 @@ class TimelineBuilder:
 
         """
         for db in self.database_date_dict_static_only.keys():
-            assert db in bd.databases, f"{db} is not in your brightway project databases."
+            assert (
+                db in bd.databases
+            ), f"{db} is not in your brightway project databases."
         return
 
     # TODO: rethink structure of build_timeline(): is it good to have all these nested functions?
@@ -185,30 +191,38 @@ class TimelineBuilder:
                 tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
                     lambda x: get_weights_for_interpolation_between_nearest_years(
                         x, dates_list, self.interpolation_type
-                    )              
+                    )
                 )
 
             else:
                 raise ValueError(
                     f"Sorry, but {self.interpolation_type} interpolation is not available yet."
                 )
-              
-            tl_df["interpolation_weights"] = tl_df.apply(add_interpolation_weights_at_intersection_to_background, axis=1) #add the weights to the timeline for processes at intersection
-                
+
+            tl_df["interpolation_weights"] = tl_df.apply(
+                add_interpolation_weights_at_intersection_to_background, axis=1
+            )  # add the weights to the timeline for processes at intersection
+
             return tl_df
-        
-        def add_interpolation_weights_at_intersection_to_background(row): 
+
+        def add_interpolation_weights_at_intersection_to_background(row):
             """
-            returns the interpolation weights to background databases only for those exchanges, where the producing process 
-            actually comes from a background database (temporal markets). 
-            
-            Only these processes are receiving inputs from the background databases. 
+            returns the interpolation weights to background databases only for those exchanges, where the producing process
+            actually comes from a background database (temporal markets).
+
+            Only these processes are receiving inputs from the background databases.
             All other process in the timeline are not directly linked to the background, so the interpolation weight info is not needed.
             """
 
-            if row["producer"] in self.node_id_collection_dict["first_level_background_node_ids_static"]:
+            if (
+                row["producer"]
+                in self.node_id_collection_dict[
+                    "first_level_background_node_ids_static"
+                ]
+            ):
                 return {
-                    self.reversed_database_date_dict[x]: v for x, v in row["interpolation_weights"].items()
+                    self.reversed_database_date_dict[x]: v
+                    for x, v in row["interpolation_weights"].items()
                 }
             else:
                 return None

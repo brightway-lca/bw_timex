@@ -61,17 +61,22 @@ class DynamicBiosphereBuilder:
         for id in self.node_id_collection_dict["temporalized_processes"]:
             process_col_index = self.activity_dict[id]  # get the matrix column index
 
-            ((original_db, original_code), time) = (            #time is here an integer, with various length depending on temporal grouping, e.g. [Y] -> 2024, [M] - > 202401
-                self.activity_time_mapping_dict.reversed()[id]
-            )
+            (
+                (original_db, original_code),
+                time,
+            ) = self.activity_time_mapping_dict.reversed()[  # time is here an integer, with various length depending on temporal grouping, e.g. [Y] -> 2024, [M] - > 202401
+                id
+            ]
 
-            time_in_datetime=convert_grouping_date_string_to_datetime(self.temporal_grouping, str(time)) #now time is a datetime
+            time_in_datetime = convert_grouping_date_string_to_datetime(
+                self.temporal_grouping, str(time)
+            )  # now time is a datetime
 
             td_producer = TemporalDistribution(
-                date=np.array([time_in_datetime], dtype=self.time_res), amount=np.array([1])
-            ).date  
+                date=np.array([time_in_datetime], dtype=self.time_res),
+                amount=np.array([1]),
+            ).date
             date = td_producer[0]
-
 
             act = bd.get_node(database=original_db, code=original_code)
 
@@ -90,7 +95,7 @@ class DynamicBiosphereBuilder:
 
                 # Add entries to dynamic bio matrix
                 for date, amount in zip(dates, values):
-                   
+
                     # first create a row index for the tuple((db, bioflow), date))
                     time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(
                         (exc.input, date)
@@ -134,7 +139,9 @@ class DynamicBiosphereBuilder:
                 bioflow = bd.get_activity(self.lca_obj.dicts.biosphere.reversed[idx])
                 ((_, _), time) = self.activity_time_mapping_dict.reversed()[id]
 
-                time_in_datetime=convert_grouping_date_string_to_datetime(self.temporal_grouping, str(time)) #cnow time is a datetime
+                time_in_datetime = convert_grouping_date_string_to_datetime(
+                    self.temporal_grouping, str(time)
+                )  # cnow time is a datetime
 
                 td_producer = TemporalDistribution(
                     date=np.array([str(time_in_datetime)], dtype=self.time_res),

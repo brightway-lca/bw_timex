@@ -74,11 +74,13 @@ class MatrixModifier:
             :param new_nodes: Set to which new node ids are added.
             :return: None, but updates the set new_nodes and adds a patch for this new edge to the bwp.Datapackage.
             """
-            
-            if row.consumer == -1: # functional unit
+
+            if row.consumer == -1:  # functional unit
                 new_producer_id = row.time_mapped_producer
                 new_nodes.add(new_producer_id)
-                self.temporalized_process_ids.add(new_producer_id) # comes from foreground, so it is a temporalized process
+                self.temporalized_process_ids.add(
+                    new_producer_id
+                )  # comes from foreground, so it is a temporalized process
                 return
 
             new_consumer_id = row.time_mapped_consumer
@@ -96,22 +98,25 @@ class MatrixModifier:
             datapackage.add_persistent_vector(
                 matrix="technosphere_matrix",
                 name=uuid.uuid4().hex,
-                data_array=np.array(
-                    [row.amount], dtype=float
-                ),
+                data_array=np.array([row.amount], dtype=float),
                 indices_array=np.array(
                     [(new_producer_id, new_consumer_id)],
                     dtype=bwp.INDICES_DTYPE,
                 ),
-                flip_array=np.array([True], dtype=bool), #Question: Why is flip-array always True?
+                flip_array=np.array(
+                    [True], dtype=bool
+                ),  # Question: Why is flip-array always True?
             )
 
             # Check if previous producer comes from background database
-            if previous_producer_node["database"] in self.database_date_dict_static_only.keys(): 
+            if (
+                previous_producer_node["database"]
+                in self.database_date_dict_static_only.keys()
+            ):
                 # Create new edges based on interpolation_weights from the row
                 for database, db_share in row.interpolation_weights.items():
                     # Get the producer activity in the corresponding background database
-                    try: 
+                    try:
                         producer_id_in_background_db = bd.get_node(
                             **{
                                 "database": database,
@@ -124,13 +129,15 @@ class MatrixModifier:
                         print(
                             f"Could not find producer in database {database} with name {previous_producer_node['name']}, product {previous_producer_node['reference product']}, location {previous_producer_node['location']}"
                         )
-                        raise SystemExit                    
-                    
+                        raise SystemExit
+
                     # Add entry between exploded producer and producer in background database ("Temporal Market")
                     datapackage.add_persistent_vector(
                         matrix="technosphere_matrix",
                         name=uuid.uuid4().hex,
-                        data_array=np.array([db_share], dtype=float), # temporal markets produce 1, so shares divide amount between dbs
+                        data_array=np.array(
+                            [db_share], dtype=float
+                        ),  # temporal markets produce 1, so shares divide amount between dbs
                         indices_array=np.array(
                             [(producer_id_in_background_db, new_producer_id)],
                             dtype=bwp.INDICES_DTYPE,
@@ -139,8 +146,10 @@ class MatrixModifier:
                     )
                     self.temporal_market_ids.add(new_producer_id)
             else:
-                self.temporalized_process_ids.add(new_producer_id) # comes from foreground, so it is a temporalized process
-                
+                self.temporalized_process_ids.add(
+                    new_producer_id
+                )  # comes from foreground, so it is a temporalized process
+
         datapackage = bwp.create_datapackage(
             sum_inter_duplicates=False
         )  # 'sum_inter_duplicates=False': If the same market is used by multiple foreground processes, the market gets created again, inputs should not be summed.
@@ -225,5 +234,5 @@ class MatrixModifier:
         Creates a list of datapackages for the technosphere and biosphere matrices.
         """
         technosphere_datapackage = self.create_technosphere_datapackage()
-        biosphere_datapackage = self.create_biosphere_datapackage() 
+        biosphere_datapackage = self.create_biosphere_datapackage()
         return [technosphere_datapackage, biosphere_datapackage]

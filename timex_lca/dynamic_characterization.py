@@ -278,8 +278,10 @@ class DynamicCharacterization:
             # all_characterized_inventory = pd.concat([all_characterized_inventory, characterized_inventory])
 
         # remove rows with zero amounts to make it more readable
-        self.characterized_inventory = self.characterized_inventory[self.characterized_inventory["amount"] != 0]
-        
+        self.characterized_inventory = self.characterized_inventory[
+            self.characterized_inventory["amount"] != 0
+        ]
+
         # add meta data and reorder
         self.characterized_inventory["activity_name"] = self.characterized_inventory[
             "activity"
@@ -307,28 +309,29 @@ class DynamicCharacterization:
 
     def add_default_characterization_functions(self):
         """
-        Add default dynamic characterization functions for CO2, CH4, N2O and other GHG, based on IPCC AR6 decay curves. 
-        
+        Add default dynamic characterization functions for CO2, CH4, N2O and other GHG, based on IPCC AR6 decay curves.
+
         Please note: Currently, only CO2, CH4 and N2O include climate-carbon feedbacks. This has not yet been added for other GHGs. Refer to https://esd.copernicus.org/articles/8/235/2017/esd-8-235-2017.html
         """
         self.characterization_functions = dict()
-        
+
         bioflows_in_lcia_method = bd.Method(self.method).load()
-        
+
         filepath = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), 'data', 'decay_multipliers.pkl'
+            os.path.dirname(os.path.abspath(__file__)), "data", "decay_multipliers.pkl"
         )
-        with open(filepath, 'rb') as f:
+        with open(filepath, "rb") as f:
             decay_multipliers = pickle.load(f)
 
         for flow in bioflows_in_lcia_method:
             node = bd.get_node(database=flow[0][0], code=flow[0][1])
 
-            if (
-                "carbon dioxide" in node["name"].lower()
-            ):
+            if "carbon dioxide" in node["name"].lower():
                 if "soil" in node.get("categories", []):
-                    self.characterization_functions[node.id] = (characterize_co2, True) # negative emission because uptake by soil
+                    self.characterization_functions[node.id] = (
+                        characterize_co2,
+                        True,
+                    )  # negative emission because uptake by soil
                 else:
                     self.characterization_functions[node.id] = (characterize_co2, False)
 
@@ -338,19 +341,24 @@ class DynamicCharacterization:
             ):
                 # TODO Check why "methane, non-fossil" has a CF of 27 instead of 29.8, currently excluded
                 self.characterization_functions[node.id] = (characterize_ch4, False)
-                
+
             elif "dinitrogen monoxide" in node["name"].lower():
-                self.characterization_functions[node.id] = (characterize_n2o, False)  
-            
+                self.characterization_functions[node.id] = (characterize_n2o, False)
+
             elif "carbon monoxide" in node["name"].lower():
                 self.characterization_functions[node.id] = (characterize_co, False)
-                            
-            else:  
+
+            else:
                 cas_number = node.get("CAS number")
                 if cas_number:
                     decay_series = decay_multipliers.get(cas_number)
                     if decay_series is not None:
-                        self.characterization_functions[node.id] = (create_generic_characterization_function(self, decay_series), False)
+                        self.characterization_functions[node.id] = (
+                            create_generic_characterization_function(
+                                self, decay_series
+                            ),
+                            False,
+                        )
 
 
 def IRF_co2(year) -> callable:
@@ -398,7 +406,7 @@ def characterize_co2(
     -----
     See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
     See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
-    
+
     Numerical values from IPCC AR6 Chapter 7
 
     See Also
@@ -459,7 +467,7 @@ def characterize_co(
 ) -> pd.DataFrame:
     """
     This is exactly the same function as for CO2, it's just scaled by the ratio of molar masses of CO and CO2. This is because CO is very short-lived (lifetime ~2 months) and we assume that it completely reacts to CO2 within the first year.
-    
+
     Based on characterize_co2 from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
 
     Calculate the cumulative or marginal radiative forcing (CRF) from CO2 for each year in a given period.
@@ -481,7 +489,7 @@ def characterize_co(
     -----
     See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
     See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
-    
+
     Numerical values from IPCC AR6 Chapter 7
 
     See Also
@@ -510,7 +518,10 @@ def characterize_co(
     ).astype("timedelta64[s]")
 
     decay_multipliers: np.ndarray = np.array(
-        [M_co2 / M_co * radiative_efficiency_kg * IRF_co2(year) for year in range(period)] # <-- Scaling from co2 to co is done here
+        [
+            M_co2 / M_co * radiative_efficiency_kg * IRF_co2(year)
+            for year in range(period)
+        ]  # <-- Scaling from co2 to co is done here
     )
 
     forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
@@ -761,6 +772,7 @@ def create_generic_characterization_function(self, decay_series) -> pd.DataFrame
         )
 
     return characterize_generic
+
 
 def import_levasseur_dcfs():
     """
