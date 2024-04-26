@@ -369,28 +369,35 @@ class TimexLCA:
 
     def dynamic_lcia(
         self,
-        metric: str | None = "radiative_forcing",
-        fixed_TH: (
+        metric: str | None = "GWP",
+        time_horizon: int | None = 100,
+        fixed_time_horizon: (
             bool | None
         ) = False,  # True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
-        TH: int | None = 100,
-        characterization_functions: dict = None,
+        characterization_function_dict: dict = None,
         cumsum: bool | None = True,
     ):
         """
         Characterize the dynamic inventory dictionaries using dynamic characterization functions.
 
-        A fixed time horizon for the impact asssessment can be set where the emission time horizon for all emissions is calculated from the functional unit (fixed_TH=True) or from the time of the emission (fixed_TH=False).
+        A fixed time horizon for the impact asssessment can be set where the emission time horizon for all emissions is calculated from the functional unit (fixed_time_horizon=True) or from the time of the emission (fixed_time_horizon=False).
 
-        Characterization functions dict of the form {biosphere_flow_database_id: characterization_function} can be given by the user. If none are given, it defaults to dynamic characterization functions for co2, ch4, n2o and co in timex_lca.dynamic_characterization. In addition, functions from the original bw_temporalis are compatible.
+        Characterization functions dict of the form {biosphere_flow_database_id: characterization_function} can be given by the user. If none are given, the default dynamic characterization functions based on IPCC AR6 meant to work with biosphere3 flows are used.
+        Functions from the original bw_temporalis can are compatible.
 
         If there is no characterization function for a biosphere flow, it will be ignored.
+
+        Returns characterized inventory dataframe.
         """
 
         if not hasattr(self, "dynamic_inventory"):
             warnings.warn(
                 "Dynamic lci not yet calculated. Call TimexLCA.calculate_dynamic_lci() first."
             )
+
+        self.metric = metric
+        self.time_horizon = time_horizon
+        self.fixed_time_horizon = fixed_time_horizon
 
         self.dynamic_characterizer = DynamicCharacterization(
             self.dynamic_inventory_df,
@@ -401,14 +408,14 @@ class TimexLCA:
             self.demand_timing_dict,
             self.temporal_grouping,
             self.method,
-            characterization_functions,
+            characterization_function_dict,
         )
 
-        (self.characterized_inventory, self.type_of_method, self.fixed_TH, self.TH) = (
+        self.characterized_inventory = (
             self.dynamic_characterizer.characterize_dynamic_inventory(
                 metric,
-                fixed_TH,
-                TH,
+                time_horizon,
+                fixed_time_horizon,
                 cumsum,
             )
         )
@@ -804,17 +811,17 @@ class TimexLCA:
         axes = sb.scatterplot(x="date", y=amount, hue="activity_label", data=plot_data)
 
         # Determine the plotting labels and titles based on the characterization method
-        if self.type_of_method == "radiative_forcing":
+        if self.metric == "radiative_forcing":
             label_legend = "Radiative forcing [W/m2]"
             title = "Radiative forcing"
-        elif self.type_of_method == "GWP":
+        elif self.metric == "GWP":
             label_legend = "GWP [kg CO2-eq]"
             title = "GWP"
 
-        if self.fixed_TH:
-            suptitle = f" \nTH of {self.TH} years starting at FU,"
+        if self.fixed_time_horizon:
+            suptitle = f" \nTH of {self.time_horizon} years starting at FU,"
         else:
-            suptitle = f" \nTH of {self.TH} years starting at each emission,"
+            suptitle = f" \nTH of {self.time_horizon} years starting at each emission,"
 
         suptitle += f" temporal resolution of inventories: {self.temporal_grouping}"
 
