@@ -370,16 +370,16 @@ class TimexLCA:
         fixed_TH: (
             bool | None
         ) = False,  # True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
-        TH: int | None = 100, #in years
-        characterization_functions: dict = None,  # {biosphere_flow_database_id: characterization_function}
+        TH: int | None = 100,
+        characterization_functions: dict = None, 
         cumsum: bool | None = True,
     ):
         """
         Characterize the dynamic inventory dictionaries using dynamic characterization functions.
         
-        Characterization functions can be given by the user. If none are given, it defaults to dynamic characterization functions for co2, ch4, n2o and co in timex_lca.dynamic_characterization. In addition, functions from the original bw_temporalis are compatible. 
+        A fixed time horizon for the impact asssessment can be set where the emission time horizon for all emissions is calculated from the functional unit (fixed_TH=True) or from the time of the emission (fixed_TH=False).
         
-        The format of the characterization functions dictionary is {biosphere_flow_database_id: characterization_function}.
+        Characterization functions dict of the form {biosphere_flow_database_id: characterization_function} can be given by the user. If none are given, it defaults to dynamic characterization functions for co2, ch4, n2o and co in timex_lca.dynamic_characterization. In addition, functions from the original bw_temporalis are compatible. 
         
         If there is no characterization function for a biosphere flow, it will be ignored.
         """
@@ -389,7 +389,7 @@ class TimexLCA:
                 "Dynamic lci not yet calculated. Call TimexLCA.calculate_dynamic_lci() first."
             )
 
-        self.dynamic_inventory_characterizer = DynamicCharacterization(
+        self.dynamic_characterizer = DynamicCharacterization(
             self.dynamic_inventory_df,
             self.dicts.activity,
             self.dicts.biosphere,
@@ -402,9 +402,9 @@ class TimexLCA:
         )
 
         (self.characterized_inventory, self.type_of_method, self.fixed_TH, self.TH) = (
-            self.dynamic_inventory_characterizer.characterize_dynamic_inventory(
+            self.dynamic_characterizer.characterize_dynamic_inventory(
                 metric,
-                fixed_TH,  # True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
+                fixed_TH,
                 TH,
                 cumsum,
             )

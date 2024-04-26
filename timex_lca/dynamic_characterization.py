@@ -4,10 +4,10 @@ import bw2data as bd
 import numpy as np
 import os
 import warnings
+import pickle
 
 # from bw_temporalis.lcia.climate import characterize_methane, characterize_co2
 from datetime import datetime, timedelta
-from timex_lca.utils import add_flows_to_characterization_function_dict
 
 
 class DynamicCharacterization:
@@ -56,7 +56,7 @@ class DynamicCharacterization:
 
         if not characterization_functions:
             warnings.warn(
-                f"No custom dynamic characterization functions provided. \nUsing default dynamic characterization functions for CO2, CH4, N2O, CO with decay functions from IPCC AR6. \nThe selected biosphere flows for these GHGs are based on the selection of the currently chosen impact category: {self.method} and their matrix ids can be looked up with .characterization_functions.keys()"
+                f"No custom dynamic characterization functions provided. Using default dynamic characterization functions based on IPCC AR6 meant to work with biosphere3 flows. The flows that are characterized are based on the selection of the initially chosen impact category: {self.method}. You can look up the mapping in the dict timex_lca.dynamic_characterizer.characterization_functions."
             )
             self.add_default_characterization_functions()
 
@@ -277,6 +277,9 @@ class DynamicCharacterization:
 
             # all_characterized_inventory = pd.concat([all_characterized_inventory, characterized_inventory])
 
+        # remove rows with zero amounts to make it more readable
+        self.characterized_inventory = self.characterized_inventory[self.characterized_inventory["amount"] != 0]
+        
         # add meta data and reorder
         self.characterized_inventory["activity_name"] = self.characterized_inventory[
             "activity"
@@ -304,62 +307,50 @@ class DynamicCharacterization:
 
     def add_default_characterization_functions(self):
         """
-        Add default dynamic characterization functions for CO2, CH4, CO, N2O based on IPCC AR6 decay curves
+        Add default dynamic characterization functions for CO2, CH4, N2O and other GHG, based on IPCC AR6 decay curves. 
+        
+        Please note: Currently, only CO2, CH4 and N2O include climate-carbon feedbacks. This has not yet been added for other GHGs. Refer to https://esd.copernicus.org/articles/8/235/2017/esd-8-235-2017.html
         """
+        self.characterization_functions = dict()
+        
         bioflows_in_lcia_method = bd.Method(self.method).load()
-
-        co2_flows = []
-        co2_flows_negative = []
-        ch4_flows = []
-        n2o_flows = []
-        co_flows = []
+        
+        filepath = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), 'data', 'decay_multipliers.pkl'
+        )
+        with open(filepath, 'rb') as f:
+            decay_multipliers = pickle.load(f)
 
         for flow in bioflows_in_lcia_method:
-            node = bd.get_node(code=(flow[0][1]))
-            id = node.id
+            node = bd.get_node(database=flow[0][0], code=flow[0][1])
 
             if (
                 "carbon dioxide" in node["name"].lower()
-                and "soil" not in node["categories"]
             ):
-                co2_flows.append(id)
+                if "soil" in node.get("categories", []):
+                    self.characterization_functions[node.id] = (characterize_co2, True) # negative emission because uptake by soil
+                else:
+                    self.characterization_functions[node.id] = (characterize_co2, False)
 
-            if (
-                "carbon dioxide" in node["name"].lower()
-                and "soil" in node["categories"]
-            ):  # negative emission because uptake by soil
-                co2_flows_negative.append(id)
-
-            if (
+            elif (
                 "methane, fossil" in node["name"].lower()
                 or "methane, from soil or biomass stock" in node["name"].lower()
             ):
                 # TODO Check why "methane, non-fossil" has a CF of 27 instead of 29.8, currently excluded
-                ch4_flows.append(id)
-
-            if "dinitrogen monoxide" in node["name"].lower():
-                n2o_flows.append(id)
-
-            if (
-                "carbon monoxide" in node["name"].lower()
-            ):  # Note: CO is not included in IPCC 2021 or EFv3.1, but is included in older LCIA methods, such as IPCC 2013 and EFv3.0
-                co_flows.append(id)
-
-        self.characterization_functions = add_flows_to_characterization_function_dict(
-            co2_flows, characterize_co2
-        )
-        self.characterization_functions = add_flows_to_characterization_function_dict(
-            co2_flows_negative, characterize_co2, negative_sign=True
-        )
-        self.characterization_functions = add_flows_to_characterization_function_dict(
-            ch4_flows, characterize_ch4
-        )
-        self.characterization_functions = add_flows_to_characterization_function_dict(
-            n2o_flows, characterize_n2o
-        )
-        self.characterization_functions = add_flows_to_characterization_function_dict(
-            co_flows, characterize_co_levasseur
-        )  # TODO add IPCC AR6 CO characterization function
+                self.characterization_functions[node.id] = (characterize_ch4, False)
+                
+            elif "dinitrogen monoxide" in node["name"].lower():
+                self.characterization_functions[node.id] = (characterize_n2o, False)  
+            
+            elif "carbon monoxide" in node["name"].lower():
+                self.characterization_functions[node.id] = (characterize_co, False)
+                            
+            else:  
+                cas_number = node.get("CAS number")
+                if cas_number:
+                    decay_series = decay_multipliers.get(cas_number)
+                    if decay_series is not None:
+                        self.characterization_functions[node.id] = (create_generic_characterization_function(self, decay_series), False)
 
 
 def IRF_co2(year) -> callable:
@@ -407,6 +398,7 @@ def characterize_co2(
     -----
     See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
     See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
+    
     Numerical values from IPCC AR6 Chapter 7
 
     See Also
@@ -435,6 +427,90 @@ def characterize_co2(
 
     decay_multipliers: np.ndarray = np.array(
         [radiative_efficiency_kg * IRF_co2(year) for year in range(period)]
+    )
+
+    forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
+
+    if (
+        negative_sign
+    ):  # flip the sign of the characterization function if it's an uptake and not release of CO2
+        forcing = -forcing
+
+    if not cumulative:
+        forcing = forcing.diff(periods=1).fillna(0)
+
+    return pd.DataFrame(
+        {
+            "date": pd.Series(data=date_characterized, dtype="datetime64[s]"),
+            "amount": forcing,
+            "flow": series.flow,
+            "activity": series.activity,
+        }
+    )
+
+
+def characterize_co(
+    series,
+    period: int | None = 100,
+    cumulative: bool | None = False,
+    negative_sign: (
+        bool | None
+    ) = False,  # flip the sign of the characterization function if it's an uptake and not release of CO2
+) -> pd.DataFrame:
+    """
+    This is exactly the same function as for CO2, it's just scaled by the ratio of molar masses of CO and CO2. This is because CO is very short-lived (lifetime ~2 months) and we assume that it completely reacts to CO2 within the first year.
+    
+    Based on characterize_co2 from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
+
+    Calculate the cumulative or marginal radiative forcing (CRF) from CO2 for each year in a given period.
+
+    If `cumulative` is True, the cumulative CRF is calculated. If `cumulative` is False, the marginal CRF is calculated.
+    Takes a single row of the TimeSeries Pandas DataFrame (corresponding to a set of (`date`/`amount`/`flow`/`activity`).
+    For each year in the given period, the CRF is calculated.
+    Units are watts/square meter/kilogram of CO2.
+
+    Returns
+    -------
+    A TimeSeries dataframe with the following columns:
+    - date: datetime64[s]
+    - amount: float
+    - flow: str
+    - activity: str
+
+    Notes
+    -----
+    See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
+    See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
+    
+    Numerical values from IPCC AR6 Chapter 7
+
+    See Also
+    --------
+    characterize_methane: The same function for CH4
+    """
+
+    # functional variables and units (from publications listed in docstring)
+    radiative_efficiency_ppb = (
+        1.33e-5  # W/m2/ppb; 2019 background co2 concentration; IPCC AR6 Table 7.15
+    )
+
+    # for conversion from ppb to kg-CO2
+    M_co2 = 44.01  # g/mol
+    M_co = 28.01
+    M_air = 28.97  # g/mol, dry air
+    m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
+
+    radiative_efficiency_kg = (
+        radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
+    )  # W/m2/kg-CO2
+
+    date_beginning: np.datetime64 = series["date"].to_numpy()
+    date_characterized: np.ndarray = date_beginning + np.arange(
+        start=0, stop=period, dtype="timedelta64[Y]"
+    ).astype("timedelta64[s]")
+
+    decay_multipliers: np.ndarray = np.array(
+        [M_co2 / M_co * radiative_efficiency_kg * IRF_co2(year) for year in range(period)] # <-- Scaling from co2 to co is done here
     )
 
     forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
@@ -627,6 +703,64 @@ def characterize_n2o(
         }
     )
 
+
+def create_generic_characterization_function(self, decay_series) -> pd.DataFrame:
+    """
+    Creates a characterization function for a generic GHG based on a decay series.
+    """
+
+    def characterize_generic(
+        series,
+        period: int = 100,
+        cumulative=False,
+        negative_sign: (
+            bool | None
+        ) = False,  # flip the sign of the characterization function if it's an uptake and not release of CO2)
+    ) -> pd.DataFrame:
+        """
+        Uses lookup generated in /dev/calculate_metrics.ipynb
+        Data originates from https://doi.org/10.1029/2019RG000691
+
+        Parameters
+        ----------
+        series : array-like
+            A single row of the dynamic inventory dataframe.
+        period : int, optional
+            Time period for calculation (number of years), by default 100
+        cumulative : bool,
+            cumulative impact
+
+        Returns
+        -------
+        A TimeSeries dataframe with the following columns:
+        - date: datetime64[s]
+        - amount: float
+        - flow: str
+        - activity: str
+
+        """
+
+        date_beginning: np.datetime64 = series["date"].to_numpy()
+        dates_characterized: np.ndarray = date_beginning + np.arange(
+            start=0, stop=period, dtype="timedelta64[Y]"
+        ).astype("timedelta64[s]")
+
+        decay_multipliers = decay_series[:period]
+
+        forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
+        if not cumulative:
+            forcing = forcing.diff(periods=1).fillna(0)
+
+        return pd.DataFrame(
+            {
+                "date": pd.Series(data=dates_characterized, dtype="datetime64[s]"),
+                "amount": forcing,
+                "flow": series.flow,
+                "activity": series.activity,
+            }
+        )
+
+    return characterize_generic
 
 def import_levasseur_dcfs():
     """
