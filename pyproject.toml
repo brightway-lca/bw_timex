@@ -1,8 +1,101 @@
 [build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "lumache"
-authors = [{name = "Graziella", email = "graziella@lumache"}]
-dynamic = ["version", "description"]
+name = "timex_lca"
+authors = [
+  { name="Timo Diepers", email="timo.diepers@ltt.rwth-aachen.de"},
+  { name="Amelie Müller"},
+  { name="Arthur Jakobs"},
+]
+maintainers = [
+  { name="Timo Diepers", email="timo.diepers@ltt.rwth-aachen.de"},
+  { name="Amelie Müller"}
+]
+
+description = "Time-explicit Life Cycle Assessment"
+keywords= ["brightway", "Life Cycle Assessment", "LCA", "time-explicit", "dynamic", "prospective"]
+readme = "README.md"
+dynamic = ["dependencies", "version"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+]
+requires-python = ">=3.10"
+
+[project.urls]
+source = "https://github.com/TimoDiepers/timex"
+homepage = "https://github.com/TimoDiepers/timex"
+tracker = "https://github.com/TimoDiepers/timex/issues"
+
+[project.optional-dependencies]
+testing = [
+    "setuptools",
+    "pytest",
+    "pytest-cov",
+]
+
+dev = [
+    "pre-commit",
+    "pylint",
+]
+
+docs = [
+  "ipython",
+  "pydata-sphinx-theme",
+  "myst-parser",
+  "sphinx-click",
+  "sphinx-design",
+  "sphinx-notfound-page",
+  "sphinx-favicon",
+  "sphinx-copybutton",
+  "sphinx-autobuild"
+]
+
+[tool.setuptools]
+license-files = ["LICENSE"]
+package-data = {timex_lca = ["*.md", "*.txt", "data/*.csv"]}
+package-dir = { "" = "."}
+packages = [
+    "timex_lca",
+]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["docs/requirements.txt"]}
+version = {attr = "timex_lca.__version__"}
+
+
+[tool.pytest.ini_options]
+addopts = "--cov timex_lca --cov-report term-missing --verbose"
+norecursedirs = [
+    "dist",
+    "build",
+    ".tox"
+]
+testpaths = ["tests/*.py"]
+
+[tool.devpi.upload]
+# Options for the devpi: PyPI server and packaging tool
+# VCS export must be deactivated since we are using setuptools-scm
+no_vcs = 1
+formats = "bdist_wheel"
+
+[tool.flake8]
+# Some sane defaults for the code style checker flake8
+max_line_length = 88
+extend_ignore = ["E203", "W503"]
+# ^  Black-compatible
+#    E203 and W503 have edge cases handled by black
+exclude = [
+    ".tox",
+    "build",
+    "dist",
+    ".eggs",
+    "docs/conf.py",
+]

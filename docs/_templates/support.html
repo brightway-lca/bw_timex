@@ -1,0 +1,9 @@
+{% if "generated" in sourcename %}
+<div class="tocsection editthispage">
+{% else %}
+<div class="tocsection supportbutton">
+{% endif %}
+    <a href=" {{ version }}/{{ pathto('../content/other/support.html', 1) }}">
+      <i class="far fa-heart"></i> {{ _("Support Brightway") }}
+    </a>
+</div>
