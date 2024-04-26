@@ -370,7 +370,7 @@ class TimexLCA:
         fixed_TH: (
             bool | None
         ) = False,  # True: Levasseur approach TH for all emissions is calculated from FU, false: TH is calculated from t emission
-        TH: int | None = 100,
+        TH: int | None = 100, #in years
         characterization_functions: dict = None,  # {biosphere_flow_database_id: characterization_function}
         cumsum: bool | None = True,
     ):
@@ -796,6 +796,9 @@ class TimexLCA:
             plot_data["activity_label"] = plot_data.apply(
                 lambda row: bd.get_activity(row["activity_name"])["name"], axis=1
             )
+        # Plotting
+        plt.figure(figsize=(14, 6))
+        axes = sb.scatterplot(x="date", y=amount, hue="activity_label", data=plot_data)
 
         # Determine the plotting labels and titles based on the characterization method
         if self.type_of_method == "radiative_forcing":
@@ -806,14 +809,11 @@ class TimexLCA:
             title = "GWP"
 
         if self.fixed_TH:
-            title += f" with TH of {self.TH} {self.temporal_grouping} starting at FU"
+            suptitle = f" \nTH of {self.TH} years starting at FU,"
         else:
-            title += f" with TH of {self.TH} {self.temporal_grouping} starting at each emission"
-
-        # Plotting
-        plt.figure(figsize=(14, 6))
-        axes = sb.scatterplot(x="date", y=amount, hue="activity_label", data=plot_data)
-
+            suptitle = f" \nTH of {self.TH} years starting at each emission,"
+        
+        suptitle += f" temporal resolution of inventories: {self.temporal_grouping}"
         
         # Determine y-axis limit flexibly
         if plot_data[amount].min() < 0:
@@ -825,11 +825,12 @@ class TimexLCA:
         axes.set_axisbelow(True)
         axes.set_ylim(bottom=ymin)
         axes.set_ylabel(label_legend)
-        axes.set_xlabel(f"Time ({self.temporal_grouping})")
+        axes.set_xlabel("Time")
 
         handles, labels = axes.get_legend_handles_labels()
         axes.legend(handles[::-1], labels[::-1])
-
+        plt.title(title, fontsize=16, y=1.05)
+        plt.suptitle(suptitle, fontsize=12, y=0.95)
         plt.grid()
         plt.show()
 

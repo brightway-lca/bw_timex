@@ -108,7 +108,6 @@ class DynamicCharacterization:
             try:
                 flow_mapping[bd.get_activity(flow).id] = flow
             except:
-                print("here")
                 raise ValueError(
                     f"Flow '{flow}' could not be mapped to a biosphere flow in your database."
                 )
