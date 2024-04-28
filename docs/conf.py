@@ -75,7 +75,7 @@ autoapi_options = [
 
 autoapi_python_class_content = 'both'
 autoapi_member_order = 'groupwise'
-autoapi_root = 'api'
+autoapi_root = 'content/api'
 autoapi_keep_files = False
 
 
