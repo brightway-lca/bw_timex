@@ -3,14 +3,15 @@
 hidden:
 maxdepth: 1
 ---
-Installation <installation>
-Tutorial <tutorial>
-Theory <theory>
-API Reference <api/index>
-Contributing <contributing>
-Code of Conduct <codeofconduct>
-License <license>
-Changelog <changelog>
+Installation <content/installation>
+Example <content/examples/index>
+Tutorial <content/tutorial>
+Theory <content/theory>
+API Reference <content/api/index>
+Contributing <content/contributing>
+Code of Conduct <content/codeofconduct>
+License <content/license>
+Changelog <content/changelog>
 ```
 > ⚠️ This is a work in progress. Please refer to the [Timex  Readme on GitHub](https://github.com/TimoDiepers/timex) for now.
 
@@ -42,4 +43,4 @@ The matrix modification steps are shown in the figure below for a very simple sy
 The user can choose to calculate static or dynamic impact assessment with this temporally-resolved LCA matrices. The time-mapped static LCIA uses static characterization with the temporally resolved LCA matrices. Thus, it will provide different static scores than the original LCIA, if there are differences in the LCIs in the background datbases. Dynamic impact assessment also takes the timing of the biosphere flows into account. Biosphere flows are assumed to occur at the same time as their emitting process, unless a `temporal distribution` is added to the biosphere exchange. In this case, the temporal profiles of the emitting process and the biosphere flow are propagated with convolution. Dynamic impact assessment is implemented for radiative forcing and GWP, with flexible time horizons (default of 100 years). Optionally, the time horizon can be fixed for the entire product system (Levasseur 2010 approach), which gives lower impact to emissions occurring later in the life cycle. 
 
 ### Questions and remarks:
-An [example notebook](notebooks/example_EV_lifecycle.ipynb) demonstrating the functionalities is provided. For suggestions of improvements or reporting of bugs, please open an issue on the Github page, send a pull request or directly contact the maintainers.
+An [example notebook](notebooks/example_setac.ipynb) demonstrating the functionalities is provided. For suggestions of improvements or reporting of bugs, please open an issue on the Github page, send a pull request or directly contact the maintainers.

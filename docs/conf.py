@@ -35,7 +35,8 @@ extensions = [
     'IPython.sphinxext.ipython_directive',
     'IPython.sphinxext.ipython_console_highlighting',
     # Markdown support
-    'myst_parser', # do not enable separately if using myst_nb, compare: https://github.com/executablebooks/MyST-NB/issues/421#issuecomment-1164427544
+    'myst_nb',
+    # 'myst_parser', # do not enable separately if using myst_nb, compare: https://github.com/executablebooks/MyST-NB/issues/421#issuecomment-1164427544
     # responsive web component support
     'sphinx_design',
     # custom 404 page
@@ -119,7 +120,7 @@ html_theme_options = {
     "navbar_persistent": ["theme-switcher"], # this is where the search button is usually placed
     "footer_start": ["copyright"],
     "footer_end": ["footer"],
-    "secondary_sidebar_items": ["page-toc"],
+    "secondary_sidebar_items": ["page-toc", "edit-this-page", "sourcelink", "support"],
     "header_links_before_dropdown": 7,
     # page elements content
     "icon_links": [
@@ -127,6 +128,12 @@ html_theme_options = {
             "name": "GitHub",
             "url": "https://github.com/TimoDiepers/timex",
             "icon": "fab fa-brands fa-github",
+        },
+        {
+            "name": "Conda",
+            "url": "https://anaconda.org/diepers/timex_lca",
+            "icon": "fa-brands fa-python",
+            "type": "fontawesome",
         },
     ],
     # various settings
@@ -147,6 +154,22 @@ html_context = {
     "doc_path": "docs",
 }
 
+# notfound Configuration ################################################
+# https://sphinx-notfound-page.readthedocs.io
+
+notfound_context = {
+    'title': 'Page Not Found',
+    'body': '''                                                                                                                                           
+        <h1>🍂 Page Not Found (404)</h1>
+        <p>
+        Oops! It looks like you've stumbled upon a page that's been recycled into the digital abyss.
+        But don't worry, we're all about sustainability here.
+        Why not take a moment to reduce, reuse, and recycle your clicks by heading back to the main page?
+        And remember, every little bit counts in the grand scheme of things.
+        </p>
+    ''',
+}
+
 ####################################################################################################
 ### Extension Configuration ########################################################################
 ####################################################################################################
@@ -156,7 +179,8 @@ html_context = {
 
 source_suffix = {
     '.rst': 'restructuredtext',
-    '.md': 'markdown'
+    '.md': 'myst-nb',
+    '.ipynb': 'myst-nb'
 }
 
 
@@ -167,6 +191,11 @@ myst_enable_extensions = [
     "dollarmath",
     "html_image",
 ]
+
+# myst-nb configuration ################################################
+# https://myst-nb.readthedocs.io/en/latest/configuration.html
+
+nb_execution_mode = 'off'
 
 # sphinx-favicon configuration #########################################
 # https://github.com/tcmetzger/sphinx-favicon
