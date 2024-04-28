@@ -1,7 +1,4 @@
-bw2data
-bw2io
 platformdirs
 requests
-constructive_geometries
 sphinx-autoapi
 myst_nb
