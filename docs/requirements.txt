@@ -4,3 +4,4 @@ platformdirs
 requests
 constructive_geometries
 sphinx-autoapi
+myst_nb
