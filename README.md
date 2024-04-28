@@ -1,6 +1,10 @@
 # timex
 *This package is still under development and some functionalities may change in the future.*
 
+![Read the Docs](https://img.shields.io/readthedocs/timex?label=documentation&link=https%3A%2F%2Ftimex.readthedocs.io%2Fen%2Flatest%2F)
+![Conda Version](https://img.shields.io/conda/v/diepers/timex_lca?label=conda&color=%2300549f&link=https%3A%2F%2Fanaconda.org%2Fdiepers%2Ftimex_lca)
+![Conda - License](https://img.shields.io/conda/l/diepers/timex_lca)
+
 This is a python package for time explicit Life Cycle Assessment, building on top of the [Brightway](https://docs.brightway.dev/en/latest) LCA framework. `timex` enables consideration of both the timing of processes & emissions (e.g., end-of-life treatment occurs 20 years after construction), as well as the changing state of the production system (e.g., increasing shares of renewable electricity in the future). Users can define temporal distributions for process and emission exchanges, which are then automatically mapped to corresponding time explicit databases. Consequently, the resulting time explicit LCI reflects the current technology status within the production system at the actual time of each process.
 
 <p align=center><img width="330" alt="image" src="https://github.com/TimoDiepers/timex/assets/90762029/319089a6-7e16-4aa6-8b68-64e1e9e6f4bb"></p>
