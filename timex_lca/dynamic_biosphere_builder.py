@@ -6,7 +6,7 @@ from bw_temporalis import TemporalDistribution
 from .remapping import TimeMappingDict
 from bw2calc import LCA
 from datetime import datetime
-from .utils import convert_grouping_date_string_to_datetime
+from .utils import convert_date_string_to_datetime
 
 
 class DynamicBiosphereBuilder:
@@ -68,7 +68,7 @@ class DynamicBiosphereBuilder:
                 id
             ]
 
-            time_in_datetime = convert_grouping_date_string_to_datetime(
+            time_in_datetime = convert_date_string_to_datetime(
                 self.temporal_grouping, str(time)
             )  # now time is a datetime
 
@@ -139,7 +139,7 @@ class DynamicBiosphereBuilder:
                 bioflow = bd.get_activity(self.lca_obj.dicts.biosphere.reversed[idx])
                 ((_, _), time) = self.activity_time_mapping_dict.reversed()[id]
 
-                time_in_datetime = convert_grouping_date_string_to_datetime(
+                time_in_datetime = convert_date_string_to_datetime(
                     self.temporal_grouping, str(time)
                 )  # cnow time is a datetime
 

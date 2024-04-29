@@ -20,7 +20,7 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
         "year": "%Y",
         "month": "%Y%m",
         "day": "%Y%m%d",
-        "hour": "%Y%m%d%M",
+        "hour": "%Y%m%d%H",
     }
 
     if time_res not in time_res_dict.keys():
@@ -36,7 +36,7 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
     return date_as_integer
 
 
-def extract_grouping_date_as_string(temporal_grouping: str, timestamp: datetime):
+def extract_date_as_string(temporal_grouping: str, timestamp: datetime):
     """
     Extracts the grouping date as a string from a datetime object, based on the chosen temporal grouping.
     e.g. for temporal grouping = 'year', and timestamp = 2023-03-29T01:00:00, it extracts the string '2023'.
@@ -45,7 +45,7 @@ def extract_grouping_date_as_string(temporal_grouping: str, timestamp: datetime)
         "year": "%Y",
         "month": "%Y%m",
         "day": "%Y%m%d",
-        "hour": "%Y%m%d%M",
+        "hour": "%Y%m%d%H",
     }
 
     if temporal_grouping not in time_res_dict.keys():
@@ -58,7 +58,7 @@ def extract_grouping_date_as_string(temporal_grouping: str, timestamp: datetime)
     return timestamp.strftime(time_res_dict[temporal_grouping])
 
 
-def convert_grouping_date_string_to_datetime(temporal_grouping, datestring):
+def convert_date_string_to_datetime(temporal_grouping, datestring):
     """
     Converts the string of a date used for grouping back to datetime object.
     e.g. for temporal grouping = 'year', and datestring = '2023', it extracts 2023-01-01
@@ -67,7 +67,7 @@ def convert_grouping_date_string_to_datetime(temporal_grouping, datestring):
         "year": "%Y",
         "month": "%Y%m",
         "day": "%Y%m%d",
-        "hour": "%Y%m%d%M",
+        "hour": "%Y%m%d%H",
     }
 
     if temporal_grouping not in time_res_dict.keys():

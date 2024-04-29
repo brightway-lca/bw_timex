@@ -11,8 +11,8 @@ from bw2calc import LCA
 from .edge_extractor import EdgeExtractor, Edge
 from .utils import (
     extract_date_as_integer,
-    extract_grouping_date_as_string,
-    convert_grouping_date_string_to_datetime,
+    extract_date_as_string,
+    convert_date_string_to_datetime,
 )
 
 
@@ -324,13 +324,6 @@ class TimelineBuilder:
                 f"Invalid value for 'temporal_grouping'. Allowed values are {valid_temporal_groupings}."
             )
 
-        # warning about day and hour not working yet
-        if self.temporal_grouping in ["day", "hour"]:
-            raise ValueError(
-                f"Sorry, but temporal grouping is not yet available for 'day' and 'hour'."
-                # TODO fix day and hour
-            )
-
         # Extract edge data into a list of dictionaries
         edges_data = [extract_edge_data(edge) for edge in self.edge_timeline]
 
@@ -349,10 +342,10 @@ class TimelineBuilder:
 
         # extract grouping time of consumer and producer: processes occuring at different times withing in teh same time window of grouping get the same grouping time
         edges_df["consumer_grouping_time"] = edges_df["consumer_date"].apply(
-            lambda x: extract_grouping_date_as_string(self.temporal_grouping, x)
+            lambda x: extract_date_as_string(self.temporal_grouping, x)
         )
         edges_df["producer_grouping_time"] = edges_df["producer_date"].apply(
-            lambda x: extract_grouping_date_as_string(self.temporal_grouping, x)
+            lambda x: extract_date_as_string(self.temporal_grouping, x)
         )
 
         # group unique pair of consumer and producer with the same grouping times
@@ -371,12 +364,12 @@ class TimelineBuilder:
 
         # convert grouping times, which was only used as intermediate variable, back to datetime
         grouped_edges["date_producer"] = grouped_edges["producer_grouping_time"].apply(
-            lambda x: convert_grouping_date_string_to_datetime(
+            lambda x: convert_date_string_to_datetime(
                 self.temporal_grouping, x
             )
         )
         grouped_edges["date_consumer"] = grouped_edges["consumer_grouping_time"].apply(
-            lambda x: convert_grouping_date_string_to_datetime(
+            lambda x: convert_date_string_to_datetime(
                 self.temporal_grouping, x
             )
         )
