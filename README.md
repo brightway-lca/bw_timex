@@ -1,7 +1,8 @@
 # timex
 
 [![Read the Docs](https://img.shields.io/readthedocs/timex?label=documentation)](https://timex.readthedocs.io/en/latest/)
-[![Conda Version](https://img.shields.io/conda/v/diepers/timex_lca?label=conda&color=%2300549f)](https://anaconda.org/diepers/timex_lca)
+[![PyPI - Version](https://img.shields.io/pypi/v/timex-lca?color=%2300549f)](https://pypi.org/project/timex-lca/)
+[![Conda Version](https://img.shields.io/conda/v/diepers/timex_lca?label=conda)](https://anaconda.org/diepers/timex_lca)
 ![Conda - License](https://img.shields.io/conda/l/diepers/timex_lca)
 
 *This package is still under development and some functionalities may change in the future.*
