@@ -1,2 +1,2 @@
-```{include} ../CHANGES.md
+```{include} ../../CHANGES.md
 ```

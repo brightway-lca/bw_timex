@@ -142,7 +142,8 @@ html_theme_options = {
     "use_edit_page_button": True,
     "navigation_with_keys": True,
     "logo": {
-        "text": "TimexLCA",
+        "image_light": "logo_light.svg",
+        "image_dark": "logo_dark.svg"
     },
 }
 
