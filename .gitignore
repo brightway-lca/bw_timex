@@ -6,7 +6,8 @@ export
 .vscode/
 conda/
 conda-out/
-docs_local
+docs_local/
+jupyter_execute/
 =======
 # Created by https://www.toptal.com/developers/gitignore/api/jupyternotebooks,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=jupyternotebooks,python
