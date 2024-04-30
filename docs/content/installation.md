@@ -1,4 +1,4 @@
-## Installation
+# Installation
 
 `timex_lca` is a Python software package. It's available via [`pip`](https://pypi.org/project/pip/) or  [`conda`](https://docs.conda.io/en/latest/) / [`mamba`](https://mamba.readthedocs.io/en/latest/).
 
@@ -6,7 +6,7 @@
 We currently recommend the installation via `conda` or `mamba`. That's what we're providing detailed instructions for below. 
 ```
 
-### Installing `timex_lca` using `conda` or `mamba`
+## Installing `timex_lca` using `conda` or `mamba`
 
 ```{admonition} Prerequisites
 :class: important
@@ -64,7 +64,7 @@ conda install -c conda-forge jupyterlab
 
 ::::
 
-### Updating `timex_lca`
+## Updating `timex_lca`
 
 `timex_lca` is being actively developed, with frequent new releases. To update timex_lca using `conda` or `mamba`, activate your environment, and run:
 
