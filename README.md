@@ -1,4 +1,9 @@
-# timex
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/_static/logo_dark_nomargins.svg" height="50">
+  <img alt="Text changing depending on mode. Light: 'So light!' Dark: 'So dark!'" src="docs/_static/logo_light_nomargins.svg" height="50">
+</picture>
+
+--------------------------------------
 
 [![Read the Docs](https://img.shields.io/readthedocs/timex?label=documentation)](https://timex.readthedocs.io/en/latest/)
 [![PyPI - Version](https://img.shields.io/pypi/v/timex-lca?color=%2300549f)](https://pypi.org/project/timex-lca/)
