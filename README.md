@@ -10,7 +10,7 @@
 [![Conda Version](https://img.shields.io/conda/v/diepers/timex_lca?label=conda)](https://anaconda.org/diepers/timex_lca)
 ![Conda - License](https://img.shields.io/conda/l/diepers/timex_lca)
 
-*This package is still under development and some functionalities may change in the future.*
+> ℹ️ *This package is still under development and some functionalities may change in the future.*
 
 This is a python package for __time-explicit Life Cycle Assessment (LCA)__, building on top of the [Brightway](https://docs.brightway.dev/en/latest) LCA framework. 
 
