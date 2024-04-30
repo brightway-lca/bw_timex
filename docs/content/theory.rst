@@ -55,7 +55,7 @@ Graph traversal
 ``timex_lca`` uses the graph traversal from `BW_temporalis`_ to propagate the temporal information along the supply chain. The graph traversal is priority-first, following the most impactful node in the graph based on the static pre-calculated LCIA score for a chosen impact category. 
 All input arguments for the graph traversal, such as maximum calculation count or cut-off, can be passed to the ``TimexLCA`` instance.
 
-By default, only the foreground system is traversed, but nodes to be skipped during traversal can be added to a ``edge_filter_function``. 
+By default, only the foreground system is traversed, but nodes to be skipped during traversal can be specified by a ``edge_filter_function``. 
 At each process, the graph traversal uses convolution to combine the temporal distributions of the consumed exchange and the process into the resoluting combined temporal distribution of the upstream producer of the exchange.
 
 Process timeline
@@ -99,8 +99,8 @@ Technosphere matrix modifications:
 
 Biosphere matrix modifications:
 
-1. First, the 'static' biosphere matrix is expanded, by adding the original biosphere flows for the new temporalized process copies. With this, static LCI scores qith inputs from the time-explicit databases can be calculated, using ``timexLCA.lci()``
-2. A 'dynamic' biosphere matrix, which next to the links to LCI from the time-explicit databases also contains the timing of emissions, is created separately with ``timexLCA.lci(build_dynamic_biosphere=True)``.  This matrix ``timexLCA.dynamic_inventory`` and the more readable dataframe ``timexLCA.dynamic_inventory_df`` contain the emissions of the system per biosphere flow including its timestamp and its emitting process.
+1. First, the 'static' biosphere matrix is expanded, by adding the original biosphere flows for the new temporalized process copies. With this, static LCI scores qith inputs from the time-explicit databases can be calculated, using ``TimexLCA.lci()``
+2. A 'dynamic' biosphere matrix, which next to the links to LCI from the time-explicit databases also contains the timing of emissions, is created separately with ``TimexLCA.lci(build_dynamic_biosphere=True)``.  This matrix ``TimexLCA.dynamic_inventory`` and the more readable dataframe ``TimexLCA.dynamic_inventory_df`` contain the emissions of the system per biosphere flow including its timestamp and its emitting process.
 
  For the simple system above, a schematic representation of the matrix modifications look like this:
 
@@ -112,17 +112,18 @@ Biosphere matrix modifications:
 
 Static or dynamic impact assessment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-``timex_lca`` allows to use conventional static impact assessment methods, which are executed using ``timexLCA.lcia()``. 
+``timex_lca`` allows to use conventional static impact assessment methods, which are executed using ``TimexLCA.lcia()``. 
 
-To take advantage of the detailed temporal information at the inventory level, dynamic LCIA for climate change is provided for the metrics 'radiative forcing' and 'global warming potential (GWP)' for all greenhouse gases in the IPCC AR6 report.
+To take advantage of the detailed temporal information at the inventory level, dynamic LCIA can be applied, uisng ``TimexLCA.dynamic_lcia()``. Users can define / import their own dynamic LCIA functions.
+Out of the box, we provide dynamic LCIA functions for the climate change metrics 'radiative forcing' and 'global warming potential (GWP)' for all greenhouse gases in the IPCC AR6 report.
 
-The time horizon, over which both metrics are evaluated, defaults to 100 years, but can be set flexibly in years.
+The time horizon ``time_horizon``, over which both metrics are evaluated, defaults to 100 years, but can be set flexibly in years.
 Additionally, both metrics can be applied with a fixed or flexible time horizon. Fixed time horizon means that the all emissions are evaluated starting from the timing of the functional unit until the end of the time horizon, meaning that later emissions are counted for shorter,
 and flexible time horizon means that each emission is evaluated starting from its own timing until the end of the time horizon.
 The former is the approach of `Levasseur et al. 2010 <https://pubs.acs.org/doi/10.1021/es9030003>`_. This behaviour is set with the boolean ``fixed_time_horizon``.
 
 
-Users can also add custom dynamic characterization functions for time-dependent impacts of (a set of) biosphere flows on other impact categories.
+
 
 .. note::  
     *Work in progress*. ``timex_lca`` *is under active development and the theory section might not reflect the latest code development. When in doubt, the source code is the most reliable source of information.* 
