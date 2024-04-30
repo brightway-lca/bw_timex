@@ -9,7 +9,7 @@
 
 This is a python package for __time explicit Life Cycle Assessment (LCA)__, building on top of the [Brightway](https://docs.brightway.dev/en/latest) LCA framework. 
 
-Time explicit LCA aims to treat time more coherently in LCA, by __streamlining dynamic LCI and LCIA with prospective LCI databases__. As such, `timex_lca` enables the consideration of both the __timing of processes and emissions__ (e.g., end-of-life treatment occurs 20 years after construction), as well as the __changing state__ of the production system (e.g., increasing shares of renewable electricity in the future). 
+Time-explicit LCA aims to treat time more coherently in LCA, by __streamlining dynamic LCI and LCIA with prospective LCI databases__. As such, `timex_lca` enables the consideration of both the __timing of processes and emissions__ (e.g., end-of-life treatment occurs 20 years after construction), as well as the __changing state__ of the production system (e.g., increasing shares of renewable electricity in the future). 
 
 Users can define the timing of process and emission exchanges as *temporal distributions*. `timex_lca` automatically propoagates the temporal information through the supply chain and sources the LCI data from the corresponding time explicit database. As the timing of each emission is recorded, `timex_lca` supports __dynamic LCIA methods__, which are provided for the climate change metrics radiative forcing and global warming potential. 
 
