@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath('.'))
 ###################################################################################################
 
 project = 'timex_lca'
-copyright = datetime.date.today().strftime("%Y") + ' Timex Developers'
+copyright = datetime.date.today().strftime("%Y") + ' timex_lca Developers'
 version: str = 'latest' # required by the version switcher
 
 ###################################################################################################
