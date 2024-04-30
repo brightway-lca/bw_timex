@@ -14,7 +14,7 @@ Here's a flow chart of how ``timex_lca`` works:
     :align: center
 
 User input 
-~~~~~~~~~~~~~~
+----------------
 
 ``timex_lca`` requires 3 inputs:
  
@@ -50,7 +50,7 @@ User input
     </script>
 
 Graph traversal
-~~~~~~~~~~~~~~~~
+----------------
 .. _`BW_temporalis`: https://github.com/brightway-lca/bw_temporalis/tree/main
 ``timex_lca`` uses the graph traversal from `BW_temporalis`_ to propagate the temporal information along the supply chain. The graph traversal is priority-first, following the most impactful node in the graph based on the static pre-calculated LCIA score for a chosen impact category. 
 All input arguments for the graph traversal, such as maximum calculation count or cut-off, can be passed to the ``TimexLCA`` instance.
@@ -59,7 +59,7 @@ By default, only the foreground system is traversed, but nodes to be skipped dur
 At each process, the graph traversal uses convolution to combine the temporal distributions of the consumed exchange and the process into the resoluting combined temporal distribution of the upstream producer of the exchange.
 
 Process timeline
-~~~~~~~~~~~~~~~~
+----------------
 The graph traversal returns a timeline that lists the time of each technosphere exchange in the temporalized foreground system. 
 Exchanges that flow from same producer to the same consumer within a certain time-window (``temporal_grouping``) are grouped together. 
 This is done to avoid countless exchanges in the timeline, as the temporal distributions at exchange level can have arbitrary fine temporal resolutions while one may not have a similar temporal resolution at the database level. 
@@ -84,23 +84,26 @@ We recommend aligning ``temporal_grouping``, which defaults to 'year', to align 
  +-------+-----------+----------+-----------------+
 
 Time mapping
-~~~~~~~~~~~~~~~~
+----------------
 Based on the timing of the processes in the timeline, ``timex_lca`` matches the processes at the intersection between foreground and background to the best available background databases.
 Available matching strategies are: closest database or linear interpolation between two closest databases based on temporal proximity. The new best-fitting background producer(s) are mapped on the same name, reference product, location as the old background producer.
 
 Modified matrices
-~~~~~~~~~~~~~~~~~~~
-``timex_lca`` now modifies the technopshere and biosphere matrices using ``datapackages``.
+------------------
+.. _`BW_processing`: https://github.com/brightway-lca/bw_processing?tab=readme-ov-file
+``timex_lca`` now modifies the technopshere and biosphere matrices using ``datapackages`` from `BW_processing`_.
 
 Technosphere matrix modifications:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-1. For each temporalized process in the timeline, a new process copy is created, which stores its timing in its ID and links to its new temporalized producers and consumers.
+1. For each temporalized process in the timeline, a new process copy is created, which links to its new temporalized producers and consumers. The timing of the processes is stored in the ``activity_time_mapping_dict``, which maps the process ids to process timing.
 2. For those processes linking to the background databases, ``timex_lca`` relinks the exchanges to the new producing processes from the best-fitting background database(s). 
 
 Biosphere matrix modifications:
-
-1. First, the 'static' biosphere matrix is expanded, by adding the original biosphere flows for the new temporalized process copies. With this, static LCI scores qith inputs from the time-explicit databases can be calculated, using ``TimexLCA.lci()``
-2. A 'dynamic' biosphere matrix, which next to the links to LCI from the time-explicit databases also contains the timing of emissions, is created separately with ``TimexLCA.lci(build_dynamic_biosphere=True)``.  This matrix ``TimexLCA.dynamic_inventory`` and the more readable dataframe ``TimexLCA.dynamic_inventory_df`` contain the emissions of the system per biosphere flow including its timestamp and its emitting process.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Depending on the user's choice, two different biosphere matrices are created: 
+1. If ``TimexLCA.lci()`` is executed, the 'static' biosphere matrix is expanded, by adding the original biosphere flows for the new temporalized process copies. With this, static LCI with inputs from the time-explicit databases can be calculated.
+2. If ``TimexLCA.lci(build_dynamic_biosphere=True)`` is executed, a 'dynamic' biosphere matrix, which next to the links to LCI from the time-explicit databases also contains the timing of emissions, is created. This matrix ``TimexLCA.dynamic_inventory`` and the more readable dataframe ``TimexLCA.dynamic_inventory_df`` contain the emissions of the system per biosphere flow including its timestamp and its emitting process.
 
  For the simple system above, a schematic representation of the matrix modifications look like this:
 
@@ -111,7 +114,7 @@ Biosphere matrix modifications:
     :class: only-light
 
 Static or dynamic impact assessment
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------------
 ``timex_lca`` allows to use conventional static impact assessment methods, which are executed using ``TimexLCA.lcia()``. 
 
 To take advantage of the detailed temporal information at the inventory level, dynamic LCIA can be applied, uisng ``TimexLCA.dynamic_lcia()``. Users can define / import their own dynamic LCIA functions.
