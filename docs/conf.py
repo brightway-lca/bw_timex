@@ -205,11 +205,11 @@ favicons = [
     {
         "rel": "icon",
         "sizes": "100x100",
-        "href": "_static/favicon-100.png",
+        "href": "favicon-100.png",
     },
     {
         "rel": "apple-touch-icon",
         "sizes": "500x500",
-        "href": "_static/favicon-500.png"
+        "href": "favicon-500.png"
     },
 ]
