@@ -33,8 +33,7 @@ You can define temporal distributions for process and emission exchanges, which 
 - [Installation Guide](https://timex.readthedocs.io/en/latest/content/installation.html)
 - [Example Notebook](https://github.com/TimoDiepers/timex/blob/main/notebooks/example_setac.ipynb)
 
-### Contributing:
-
+## Contributing:
 We welcome contributions! If you have suggestions or want to fix a bug, please:
 - [Open an Issue](https://github.com/TimoDiepers/timex/issues)
 - [Send a Pull Request](https://github.com/TimoDiepers/timex/pulls)
