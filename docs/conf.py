@@ -203,9 +203,19 @@ nb_execution_mode = 'off'
 
 favicons = [
     {
+        "rel": "icon", 
+        "href": "favicon.svg", 
+        "type": "image/svg+xml"
+        },
+    {
         "rel": "icon",
         "sizes": "100x100",
         "href": "favicon-100.png",
+    },
+    {
+        "rel": "mask-icon",
+        "href": "favicon.svg",
+        "color": "#ede6f5"
     },
     {
         "rel": "apple-touch-icon",
