@@ -215,7 +215,7 @@ favicons = [
     {
         "rel": "mask-icon",
         "href": "favicon.svg",
-        "color": "#ede6f5"
+        "color": "#222832"
     },
     {
         "rel": "apple-touch-icon",
