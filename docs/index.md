@@ -1,4 +1,4 @@
-> ⚠️ This is a work in progress. Please refer to the [Timex  Readme on GitHub](https://github.com/TimoDiepers/timex) for now.
+> ⚠️ This package is still under development and some functionalities may change in the future.
 
 # `timex_lca`
 

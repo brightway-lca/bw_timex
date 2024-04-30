@@ -1,16 +1,16 @@
 Theory
 ========
 
-Here's a flow chart of how ``timex_lca`` works:
+This section explains some of the theory behind ``timex_lca``. Check out the flow chart below for a quick overview of how it all comes together, and you'll find more detailed explanations of each step in the following subsections.
 
 .. image:: data/method_dark.svg
     :class: only-dark
-    :height: 500px
+    :height: 450px
     :align: center
 
 .. image:: data/method_light.svg
     :class: only-light
-    :height: 500px
+    :height: 450px
     :align: center
 
 User input 
@@ -20,34 +20,14 @@ User input
  
 1. a static foreground system model with
 2. temporal information using the attribute ``temporal_distribution`` on technosphere or biosphere exchanges in the foreground system modeel, and 
-3. a set of background databases, which must have a reference in time.`
+3. a set of background databases, which must have a reference in time.
 
-.. raw:: html
+.. dropdown:: ℹ️ More info on inputs
 
-    <details>
-        <summary>
-            <span style="color: white; padding: 4px; cursor: pointer;">ℹ️</span>
-            <strong style="margin-left: 8px;">More info on inputs</strong>
-        </summary>
-        <div style="background-color: #f0f7ff; padding: 10px;">
-            <ul>
-                <li>The foreground system must have exchanges linked to one of the background databases. These exchanges at the intersection between foreground and background databases will be relinked by <code>timex_lca</code>.</li>
-                <li>Temporal distributions can occur at technosphere and biosphere exchanges and can be given in various forms, see <a href="https://github.com/brightway-lca/bw_temporalis/tree/main">BW Temporalis documentation</a>, including absolute (e.g. 2024-03-18) or relative (e.g. 3 years before) nature and can have different temporal resolution (down to seconds but later aggregation supports resolutions down to hours).</li>
-                <li>Temporal distributions are optional. If none are provided, no delay between producing and consuming process is assumed and the timing of the consuming process is adopted also for the producing process.</li>
-            </ul>
-        </div>
-    </details>
+    - The foreground system must have exchanges linked to one of the background databases. These exchanges at the intersection between foreground and background databases will be relinked by `timex_lca`.
+    - Temporal distributions can occur at technosphere and biosphere exchanges and can be given in various forms, see `bw_temporalis <https://github.com/brightway-lca/bw_temporalis/tree/main>`__, including absolute (e.g. 2024-03-18) or relative (e.g. 3 years before) nature and can have different temporal resolution (down to seconds but later aggregation supports resolutions down to hours).
+    - Temporal distributions are optional. If none are provided, no delay between producing and consuming process is assumed and the timing of the consuming process is adopted also for the producing process.
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            var details = document.querySelectorAll("details");
-            details.forEach(function(detail) {
-                detail.querySelector("summary").addEventListener("click", function() {
-                    this.parentElement.classList.toggle("open");
-                });
-            });
-        });
-    </script>
 
 Graph traversal
 ----------------
@@ -67,11 +47,19 @@ We recommend aligning ``temporal_grouping``, which defaults to 'year', to align 
 
  For a simple example that consists of the following system: a process A that consumes an exchange b from a process B, which emits an emission x and both the exchange b and the emission x occur at a certain point in time 
  
- (add flowchart dummy system)
 
- the timeline would look like this:
+ .. image:: data/example_ab_dark.svg
+    :class: only-dark
+    :height: 300px
+    :align: center
 
- 
+ .. image:: data/example_ab_light.svg
+    :class: only-light
+    :height: 300px
+    :align: center
+
+ |
+ The resulting timeline looks like this:
 
  +-------+-----------+----------+-----------------+
  | time  | producer  | consumer | amount          |
@@ -90,8 +78,8 @@ Available matching strategies are: closest database or linear interpolation betw
 
 Modified matrices
 ------------------
-.. _`BW_processing`: https://github.com/brightway-lca/bw_processing?tab=readme-ov-file
-``timex_lca`` now modifies the technopshere and biosphere matrices using ``datapackages`` from `BW_processing`_.
+.. _`bw_processing`: https://github.com/brightway-lca/bw_processing?tab=readme-ov-file
+``timex_lca`` now modifies the technopshere and biosphere matrices using ``datapackages`` from `bw_processing`_.
 
 Technosphere matrix modifications:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
