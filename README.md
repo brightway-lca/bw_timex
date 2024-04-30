@@ -1,4 +1,4 @@
-# timex
+# timex_lca
 
 [![Read the Docs](https://img.shields.io/readthedocs/timex?label=documentation)](https://timex.readthedocs.io/en/latest/)
 [![PyPI - Version](https://img.shields.io/pypi/v/timex-lca?color=%2300549f)](https://pypi.org/project/timex-lca/)
@@ -7,29 +7,21 @@
 
 *This package is still under development and some functionalities may change in the future.*
 
-This is a python package for time explicit Life Cycle Assessment, building on top of the [Brightway](https://docs.brightway.dev/en/latest) LCA framework. `timex` enables consideration of both the timing of processes & emissions (e.g., end-of-life treatment occurs 20 years after construction), as well as the changing state of the production system (e.g., increasing shares of renewable electricity in the future). Users can define temporal distributions for process and emission exchanges, which are then automatically mapped to corresponding time explicit databases. Consequently, the resulting time explicit LCI reflects the current technology status within the production system at the actual time of each process.
+This is a python package for time explicit Life Cycle Assessment, building on top of the [Brightway](https://docs.brightway.dev/en/latest) LCA framework. 
 
-<p align=center><img width="330" alt="image" src="https://github.com/TimoDiepers/timex/assets/90762029/319089a6-7e16-4aa6-8b68-64e1e9e6f4bb"></p>
+Time explicit LCA aims to treat time more coherently in LCA, by streamlining dynamic LCI and LCIA with prospective LCI databases. As such, `timex_lca` enables the consideration of both the timing of processes and emissions (e.g., end-of-life treatment occurs 20 years after construction), as well as the changing state of the production system (e.g., increasing shares of renewable electricity in the future). Users can define the timing of process and emission exchanges as `temporal_distributions`, and `timex_lca` automatically sources the LCI data from the corresponding time explicit database. As the timing of each emission is known, `timex_lca` supports dynamic LCIA methods, which are provided for the climate change metrics radiative forcing and global warming potential. 
 
-### User inputs:
-Upon creation of the foreground database, the user needs to specify temporally distributed exchanges. `Temporal distributions` can occur at technosphere and biosphere exchanges, can be absolute (e.g. 2024-03-18) or relative (e.g. 3 years before) and can have flexible temporal resolution (years to days). They can also be flexibly spread over time, see `bw_temporalis Temporal distributions`. If no time of occurrence is given, it is assumed that the process or emission occurs at the same time as its consuming or emitting activity. 
+Time explicit LCA can provide more representative LCA results for use cases, such as:
+- products with variable or evolving production systems
+- long-lived products
+- products with biogenic carbon
 
-Second, the user needs to specify which background databases represents what time in a mapping dictionary. A filter function can be applied to exclude a (sub)set of databases from the graph traversal to speed up computation time with large databases.
+### Quick links:
+All documentation, including detailed description of `timex_lca`: [![Read the Docs](https://img.shields.io/readthedocs/timex?label=documentation)](https://timex.readthedocs.io/en/latest/)
+Installation instructions: [![Installation Instructions](https://img.shields.io/badge/installation-instructions-blue)](https://timex.readthedocs.io/en/latest/content/installation.html)
+Example notebook: [![Example Notebook](https://img.shields.io/badge/example-notebook-green)](https://github.com/TimoDiepers/timex/blob/main/notebooks/example_setac.ipynb)
 
-### Computation of time explicit inventory:
-When a `timexLCA` is calculated, it first calculates a static LCA of the system. Using functionalities of the [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis) package, the static impact information is then used for a priority-first graph traversal, following the largest contributions within the supply chain. During traversal, it uses convolution to propagate the temporal profiles of processes through time. 
-
-The temporal information of all technosphere exchanges in the system is stored in a timeline, containing all information to uniquely identify the time-explicit exchanges and link them to the most fitting background database(s) to be sourced from. In order to reduce complexity, technosphere exchanges from the same providing process to the same consuming process within a user-defined time window (e.g. 1 year or 1 month) are aggregated into one exchange. 
-
-Next, the temporally-resolved supply chain from the graph traversal is translated into a matrix format using `datapackages`. This allows to use all conventional matrix-based LCA functionalities later on, which is not possible with a graph-traversal only approach. Datapackages modify the static LCA technosphere and biosphere matrices, adding new time-specific processes for each process in the timeline. At the intersection between the foreground and background system, temporal markets are created that source the corresponding exchange from the most suitable background database based on temporal proximity.
-The matrix modification steps are shown in the figure below for a very simple system with temporal information, consisting of two processes, A and B, and one biosphere flow x occuring at B.
-
-<p align=center><img width="750" alt="image" src="https://github.com/TimoDiepers/timex/assets/90762029/13f20b29-84aa-4cb4-b7dc-700793330e70"></p>
-
-
-
-### Life cycle impact assessment options:
-The user can choose to calculate static or dynamic impact assessment with this temporally-resolved LCA matrices. The time-mapped static LCIA uses static characterization with the temporally resolved LCA matrices. Thus, it will provide different static scores than the original LCIA, if there are differences in the LCIs in the background datbases. Dynamic impact assessment also takes the timing of the biosphere flows into account. Biosphere flows are assumed to occur at the same time as their emitting process, unless a `temporal distribution` is added to the biosphere exchange. In this case, the temporal profiles of the emitting process and the biosphere flow are propagated with convolution. Dynamic impact assessment is implemented for radiative forcing and GWP, with flexible time horizons (default of 100 years). Optionally, the time horizon can be fixed for the entire product system (Levasseur 2010 approach), which gives lower impact to emissions occurring later in the life cycle. 
 
 ### Questions and remarks:
-An [example notebook](notebooks/example_EV_lifecycle.ipynb) demonstrating the functionalities is provided. For suggestions of improvements or reporting of bugs, please open an issue on the Github page, send a pull request or directly contact the maintainers.
+For suggestions of improvements or reporting of bugs, please open an issue on the Github page, send a pull request or directly contact the maintainers.
+
