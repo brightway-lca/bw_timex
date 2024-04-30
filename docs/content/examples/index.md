@@ -1,6 +1,6 @@
 # TimexLCA examples 
 
-Here are some examples on how you can use `timex`.
+Here are some examples on how you can use `timex_lca`.
 
 ::::{grid} 1 2 2 2 
 :gutter: 4

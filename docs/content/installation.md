@@ -44,7 +44,7 @@ conda install -c conda-forge jupyterlab
 Brightway runs on the new Apple Silicon ARM architecture. However, the super-fast linear algebra software library `pypardiso` is not compatible with the ARM processor architecture. To avoid critical errors during instruction that would break core functionality, a different version of Brightway (`brightway_nosolver`) and a a different linear algebra software library (`scikit-umfpack`) must be installed.
 ```
 
-1. Create a new Conda environment (in this example named `brightway`):
+1. Create a new Conda environment (in this example named `timex`):
 
 ```
 conda create -n timex -c conda-forge -c cmutel -c diepers brightway25_nosolver scikit-umfpack timex_lca
@@ -66,12 +66,12 @@ conda install -c conda-forge jupyterlab
 
 ## Updating `timex_lca`
 
-`timex_lca` is being actively developed, with frequent new releases. To update Brightway using `conda` or `mamba`, activate your environment, and run:
+`timex_lca` is being actively developed, with frequent new releases. To update timex_lca using `conda` or `mamba`, activate your environment, and run:
 
 ``` bash
 conda update -c diepers timex_lca
 ```
 
 ```{warning}
-Newer versions of `timex_lca` can introduce breaking changes. We recommend you create a new environment for each project, and only update `timex_lca` when you are ready to update your project.
+Newer versions of `timex_lca` can introduce breaking changes. We recommend to create a new environment for each project, and only update `timex_lca` when you are ready to update your project.
 ```
