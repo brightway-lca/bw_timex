@@ -208,13 +208,8 @@ favicons = [
         "type": "image/svg+xml"
         },
     {
-        "rel": "icon",
-        "sizes": "100x100",
-        "href": "favicon-100.png",
-    },
-    {
         "rel": "mask-icon",
-        "href": "favicon.svg",
+        "href": "favicon_mask-icon.svg",
         "color": "#222832"
     },
     {
