@@ -29,7 +29,7 @@ class DynamicCharacterization:
         characterization_function_dict: dict = None,
     ):
         """
-        Initialize the DynamicCharacterization object. and add dynamic characterization functions for CO2, CH4, CO, N2O based on IPCC AR6 decay curves in acse users doesn't provide own dynamic characterization functions
+        Initialize the DynamicCharacterization object. and add dynamic characterization functions for CO2, CH4, CO, N2O based on IPCC AR6 decay curves in case users doesn't provide own dynamic characterization functions
         """
         self.dynamic_inventory_df = dynamic_inventory_df
         self.activity_dict = activity_dict
@@ -83,6 +83,11 @@ class DynamicCharacterization:
             raise ValueError(
                 f"Metric must be either 'radiative_forcing' or 'GWP', not {metric}"
             )
+        
+        if metric == "GWP":
+            warnings.warn(
+                        "Using timex_lca's default co2 characterization function for GWP reference."
+                    )
 
         time_res_dict = {
             "year": "%Y",
@@ -154,9 +159,6 @@ class DynamicCharacterization:
 
                     row["amount"] = 1  # convert 1 kg CO2 equ.
                     radiative_forcing_co2 = characterize_co2(row, period=time_horizon)
-                    warnings.warn(
-                        "Using timex' default co2 characterization function for GWP reference."
-                    )
 
                     ghg_integral = radiative_forcing_ghg["amount"].sum()
                     co2_integral = radiative_forcing_co2["amount"].sum()
