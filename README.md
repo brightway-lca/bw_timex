@@ -14,7 +14,7 @@
 
 This is a python package for time-explicit Life Cycle Assessment that helps you assess the environmental impacts of products and processes over time. `timex_lca` builds on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
 
-## Features
+## Features:
 This package enables you to account for: 
 - **Timing of processes** throughout the supply chain (e.g., end-of-life treatment occurs 20 years after construction)
 - **Variable** and/or **evolving** supply chains & technologies (e.g., increasing shares of renewable electricity in the future)
