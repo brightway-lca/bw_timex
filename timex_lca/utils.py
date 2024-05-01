@@ -132,7 +132,7 @@ def plot_characterized_inventory_as_waterfall(
     plot_data = characterized_inventory.groupby(
         ["date", "activity_name"], as_index=False
     ).sum()
-
+    print(f"time-explicit score: {plot_data["amount"].sum():.2f}")
     plot_data["year"] = plot_data[
         "date"
     ].dt.year  # TODO make temporal resolution flexible
@@ -154,6 +154,7 @@ def plot_characterized_inventory_as_waterfall(
         static_data = pd.DataFrame(
             static_scores.items(), columns=["activity_label", "amount"]
         )
+        print(f"static score: {static_data["amount"].sum():.2f}")
         static_data["year"] = "static"
         pivoted_static_data = static_data.pivot(
             index="year", columns="activity_label", values="amount"
@@ -167,6 +168,7 @@ def plot_characterized_inventory_as_waterfall(
         prospective_data = pd.DataFrame(
             prospective_scores.items(), columns=["activity_label", "amount"]
         )
+        print(f"prospective score: {prospective_data["amount"].sum():.2f}")
         prospective_data["year"] = "prospective"
         pivoted_prospective_data = prospective_data.pivot(
             index="year", columns="activity_label", values="amount"
