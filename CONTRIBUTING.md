@@ -1,6 +1,6 @@
 # Contributing
 
-We welcome contributions! If you have any questions, you can [get in touch with the `timex_lca` developers ](mailto:timo.diepers@ltt.rwth-aachende.de)
+We welcome contributions! If you have any questions, [open a discussion](https://github.com/TimoDiepers/timex/discussions) or [get in touch directly with the `timex_lca` developers ](mailto:timo.diepers@ltt.rwth-aachende.de)
 
 
 ## Contributing to the code, examples or documentation
