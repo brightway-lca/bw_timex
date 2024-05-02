@@ -9,11 +9,21 @@ from typing import Callable, Union, List, Optional
 
 def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") -> int:
     """
-    Converts a datetime object to an integer for a given temporal resolution (time_res)
+    Converts a datetime object to an integer for a given temporal resolution `time_res`
 
-    :param dt_obj: Datetime object.
-    :time_res: time resolution to be returned: year=YYYY, month=YYYYMM, day=YYYYMMDD, hour=YYYYMMDDHH
-    :return: integer in the format of time_res
+    Parameters
+    ----------
+
+    dt_obj : Datetime object.
+        Datetime object to be converted to an integer.
+
+    time_res : str, optional
+        time resolution to be returned: year=YYYY, month=YYYYMM, day=YYYYMMDD, hour=YYYYMMDDHH
+
+    Returns
+    -------
+    date_as_integer : int
+        Datetime objectconverted to an integer in the format of time_res
 
     """
     time_res_dict = {
@@ -36,10 +46,23 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
     return date_as_integer
 
 
-def extract_date_as_string(temporal_grouping: str, timestamp: datetime):
+def extract_date_as_string(temporal_grouping: str, timestamp: datetime) -> str:
     """
     Extracts the grouping date as a string from a datetime object, based on the chosen temporal grouping.
-    e.g. for temporal grouping = 'year', and timestamp = 2023-03-29T01:00:00, it extracts the string '2023'.
+    e.g. for `temporal_grouping` = 'month', and `timestamp` = 2023-03-29T01:00:00, it extracts the string '202303'.
+
+
+    Parameters
+    ----------
+    temporal_grouping : str
+        Temporal grouping for the date string. Options are: 'year', 'month', 'day', 'hour'
+    timestamp : datetime
+        Datetime object to be converted to a string.
+    
+    Returns
+    -------
+    date_as_string
+        Date as a string in the format of the chosen temporal grouping.
     """
     time_res_dict = {
         "year": "%Y",
@@ -58,10 +81,22 @@ def extract_date_as_string(temporal_grouping: str, timestamp: datetime):
     return timestamp.strftime(time_res_dict[temporal_grouping])
 
 
-def convert_date_string_to_datetime(temporal_grouping, datestring):
+def convert_date_string_to_datetime(temporal_grouping, datestring) -> datetime:
     """
-    Converts the string of a date used for grouping back to datetime object.
-    e.g. for temporal grouping = 'year', and datestring = '2023', it extracts 2023-01-01
+    Converts the string of a date to datetime object.
+    e.g. for `temporal_grouping` = 'month', and `datestring` = '202303', it extracts 2023-03-01
+
+    Parameters
+    ----------
+    temporal_grouping : str
+        Temporal grouping for the date string. Options are: 'year', 'month', 'day', 'hour'
+    datestring : str
+        Date as a string
+    
+    Returns
+    -------
+    datetime
+        Datetime object of the date string at the chosen temporal resolution.
     """
     time_res_dict = {
         "year": "%Y",
@@ -84,22 +119,33 @@ def add_flows_to_characterization_function_dict(
     flows: Union[str, List[str]],
     func: Callable,
     characterization_function_dict: Optional[dict] = dict(),
-    negative_sign: Optional[
-        bool
-    ] = False,  # flip the sign of the characterization function if it's an uptake and not release of emission
 ) -> dict:
     """
     Add a new flow or a list of flows to the available characterization functions.
+
+    Parameters
+    ----------
+    flows : Union[str, List[str]]
+        Flow or list of flows to be added to the characterization function dictionary. 
+    func : Callable
+        Dynamic characterization function for flow.
+    characterization_function_dict : dict, optional
+        Dictionary of flows and their corresponding characterization functions. Default is an empty dictionary.
+    
+    Returns
+    -------
+    dict
+        Updated characterization function dictionary with the new flow(s) and function(s).
     """
 
     # Check if the input is a single flow (str) or a list of flows (List[str])
     if isinstance(flows, str):
         # It's a single flow, add it directly
-        characterization_function_dict[flows] = (func, negative_sign)
+        characterization_function_dict[flows] = func
     elif isinstance(flows, list):
         # It's a list of flows, iterate and add each one
         for flow in flows:
-            characterization_function_dict[flow] = (func, negative_sign)
+            characterization_function_dict[flow] = func
 
     return characterization_function_dict
 
@@ -114,6 +160,23 @@ def plot_characterized_inventory_as_waterfall(
     """
     Plot a stacked waterfall chart of characterized inventory data. As comparison, static and prospective scores can be added.
     Only works for metric GWP at the moment.
+
+    Parameters
+    ----------
+    characterized_inventory : pd.DataFrame
+        Dataframe of dynamic characterized inventory, such as TimexLCA.characterized_inventory
+    metric : str
+        Impact assessment method. Only 'GWP' is supported at the moment.
+    static_scores : dict, optional
+        Dictionary of static scores. Default is None.
+    prospective_scores : dict, optional
+        Dictionary of prospective scores. Default is None.
+    order_stacked_activities : list, optional
+        List of activities to order the stacked bars in the waterfall plot. Default is None.
+
+    Returns
+    -------
+    None but plots the waterfall chart.
 
     """
     # Check for necessary columns
