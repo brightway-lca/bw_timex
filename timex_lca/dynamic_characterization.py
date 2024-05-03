@@ -1,12 +1,11 @@
-from typing import Union, Tuple, Optional, Callable, List
 import pandas as pd
 import bw2data as bd
 import numpy as np
 import os
 import warnings
-import pickle
+import json
 
-
+from typing import Union, Tuple, Optional, Callable, List
 from datetime import datetime
 
 
@@ -342,10 +341,11 @@ class DynamicCharacterization:
         bioflows_in_lcia_method = bd.Method(self.method).load()
 
         filepath = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "data", "decay_multipliers.pkl"
+            os.path.dirname(os.path.abspath(__file__)), "data", "decay_multipliers.json"
         )
-        with open(filepath, "rb") as f:
-            decay_multipliers = pickle.load(f)
+        
+        with open(filepath) as json_file:
+            decay_multipliers = json.load(json_file)
 
         for flow in bioflows_in_lcia_method:
             node = bd.get_node(database=flow[0][0], code=flow[0][1])
@@ -378,7 +378,7 @@ class DynamicCharacterization:
                     decay_series = decay_multipliers.get(cas_number)
                     if decay_series is not None:
                         self.characterization_function_dict[node.id] = (
-                            create_generic_characterization_function(decay_series)
+                            create_generic_characterization_function(self, np.array(decay_series))
                         )
 
 
@@ -435,7 +435,7 @@ def characterize_co2(
     -----
     See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
     See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
-    Numerical values from IPCC AR6 Chapter 7
+    See also the IPCC AR6 Chapter 7 (Table 7.15) for the updated numerical values: https://www.ipcc.ch/report/ar6/wg1/downloads/report/IPCC_AR6_WGI_Chapter07.pdf
 
     See Also
     --------
@@ -509,8 +509,7 @@ def characterize_co2_uptake(
     -----
     See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
     See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
-
-    Numerical values from IPCC AR6 Chapter 7
+    See also the IPCC AR6 Chapter 7 (Table 7.15) for the updated numerical values: https://www.ipcc.ch/report/ar6/wg1/downloads/report/IPCC_AR6_WGI_Chapter07.pdf
 
     See Also
     --------
@@ -590,8 +589,7 @@ def characterize_co(
     -----
     See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
     See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
-
-    Numerical values from IPCC AR6 Chapter 7
+    See also the IPCC AR6 Chapter 7 (Table 7.15) for the updated numerical values: https://www.ipcc.ch/report/ar6/wg1/downloads/report/IPCC_AR6_WGI_Chapter07.pdf
 
     See Also
     --------
@@ -679,8 +677,7 @@ def characterize_ch4(
     -----
     See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
     See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
-
-    Numerical values from IPCC AR6 Chapter 7
+    See also the IPCC AR6 Chapter 7 (Table 7.15) for the updated numerical values: https://www.ipcc.ch/report/ar6/wg1/downloads/report/IPCC_AR6_WGI_Chapter07.pdf
 
     See Also
     --------
@@ -764,8 +761,7 @@ def characterize_n2o(
     -----
     See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
     See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
-
-    Numerical values from IPCC AR6 Chapter 7
+    See also the IPCC AR6 Chapter 7 (Table 7.15) for the updated numerical values: https://www.ipcc.ch/report/ar6/wg1/downloads/report/IPCC_AR6_WGI_Chapter07.pdf
 
     See Also
     --------
