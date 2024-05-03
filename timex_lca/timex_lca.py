@@ -172,6 +172,10 @@ class TimexLCA:
         -------
         pandas.DataFrame:
             A DataFrame containing the timeline of exchanges
+            
+        See also
+        --------
+        timex_lca.timeline_builder.TimelineBuilder: Class that builds the timeline.
 
         """
         if not edge_filter_function:
@@ -235,6 +239,11 @@ class TimexLCA:
         Returns
         -------
         None, but calls LCI calculations from bw2calc and calculates the dynamic inventory, if `build_dynamic_biosphere` is True.
+        
+        See also
+        --------
+        build_datapackage: Method to create the datapackages that contain the modifications to the technopshere and biosphere matrix using the `MatrixModifier` class.
+        calculate_dynamic_inventory: Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
 
         if not hasattr(self, "timeline"):
@@ -327,7 +336,11 @@ class TimexLCA:
         Returns
         -------
         pandas.DataFrame
-            A Dataframe with the characterized inventory for the chosen metric and parameters.
+            A Dataframe with the characterized inventory for the chosen metric and parameters. Also stores the sum as attribute `dynamic_score`.
+            
+        See also
+        --------
+        timex_lca.dynamic_characterization.DynamicCharacterization: Class that characterizes the dynamic inventory.
         """
 
         if not hasattr(self, "dynamic_inventory"):
@@ -380,7 +393,10 @@ class TimexLCA:
         -------
         list
             List of datapackages that contain the modifications to the technopshere and biosphere matrix
-
+            
+        See also
+        --------
+        timex_lca.matrix_modifier.MatrixModifier: Class that handles the technosphere and biosphere matrix modifications.
         """
         # mapping of the demand id to demand time
         self.demand_timing_dict = self.create_demand_timing_dict()
@@ -412,6 +428,10 @@ class TimexLCA:
         Returns
         -------
         None, but calculates the dynamic inventory and stores it in the attribute `dynamic_inventory` as a matrix and in `dynamic_inventory_df` as a DataFrame.
+        
+        See also
+        --------
+        timex_lca.dynamic_biosphere_builder.DynamicBiosphereBuilder: Class for creating the dynamic biosphere matrix and inventory.
         """
 
         if not hasattr(self, "lca"):
@@ -456,7 +476,7 @@ class TimexLCA:
 
     def create_dynamic_inventory_dataframe(self) -> pd.DataFrame:
         """Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the the format
-        of a pandas.DataFrame, with the right structure to later apply dynamic characterization functions
+        of a pandas.DataFrame, with the right structure to later apply dynamic characterization functions.
 
         Format needs to be:
 
@@ -534,7 +554,7 @@ class TimexLCA:
         """
         Prepare LCA input arguments in Brightway2.5 style.
 
-        ORIGINALLY FROM bw2data.compat.py
+        Adapted bw2data.compat.py
 
         The difference to the original method is that we load all available databases into the matrices instead of just the ones depending on the demand.
         We need this for the creation of the time mapping dict that creates a mapping between the producer id and the reference timing of the databases in the `database_date_dict`.
@@ -561,6 +581,10 @@ class TimexLCA:
         -------
         tuple
             Indexed demand, data objects, and remapping dictionaries
+            
+        See also
+        --------
+        bw2data.compat.prepare_lca_inputs: Original code this function is adapted from (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
 
         """
         if not projects.dataset.data.get("25"):
@@ -673,7 +697,10 @@ class TimexLCA:
         -------
         tuple
             Indexed demand, data objects, and remapping dictionaries
-
+            
+        See also
+        --------
+        bw2data.compat.prepare_lca_inputs: Original code this function is adapted from (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
         """
 
         if not projects.dataset.data.get("25"):

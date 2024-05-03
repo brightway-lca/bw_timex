@@ -431,15 +431,11 @@ def characterize_co2(
     - flow: str
     - activity: str
 
-    Notes
-    -----
-    See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
-    See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
-    See also the IPCC AR6 Chapter 7 (Table 7.15) for the updated numerical values: https://www.ipcc.ch/report/ar6/wg1/downloads/report/IPCC_AR6_WGI_Chapter07.pdf
-
-    See Also
+    See also
     --------
-    characterize_methane: The same function for CH4
+    Joos2013: Relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
+    Schivley2015: Relevant scientific publication on the numerical calculation of CRF: https://doi.org/10.1021/acs.est.5b01118
+    Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
 
     # functional variables and units (from publications listed in docstring)
@@ -505,15 +501,11 @@ def characterize_co2_uptake(
     - flow: str
     - activity: str
 
-    Notes
-    -----
-    See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
-    See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
-    See also the IPCC AR6 Chapter 7 (Table 7.15) for the updated numerical values: https://www.ipcc.ch/report/ar6/wg1/downloads/report/IPCC_AR6_WGI_Chapter07.pdf
-
-    See Also
+    See also
     --------
-    characterize_ch4: The same function for methane
+    Joos2013: Relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
+    Schivley2015: Relevant scientific publication on the numerical calculation of CRF: https://doi.org/10.1021/acs.est.5b01118
+    Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
 
     # functional variables and units (from publications listed in docstring)
@@ -585,15 +577,11 @@ def characterize_co(
     - flow: str
     - activity: str
 
-    Notes
-    -----
-    See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
-    See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
-    See also the IPCC AR6 Chapter 7 (Table 7.15) for the updated numerical values: https://www.ipcc.ch/report/ar6/wg1/downloads/report/IPCC_AR6_WGI_Chapter07.pdf
-
-    See Also
+    See also
     --------
-    characterize_ch4: The same function for CH4
+    Joos2013: Relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
+    Schivley2015: Relevant scientific publication on the numerical calculation of CRF: https://doi.org/10.1021/acs.est.5b01118
+    Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
 
     # functional variables and units (from publications listed in docstring)
@@ -673,15 +661,11 @@ def characterize_ch4(
     - flow: str
     - activity: str
 
-    Notes
-    -----
-    See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
-    See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
-    See also the IPCC AR6 Chapter 7 (Table 7.15) for the updated numerical values: https://www.ipcc.ch/report/ar6/wg1/downloads/report/IPCC_AR6_WGI_Chapter07.pdf
-
-    See Also
+    See also
     --------
-    characterize_co2: The same function for CO2
+    Joos2013: Relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
+    Schivley2015: Relevant scientific publication on the numerical calculation of CRF: https://doi.org/10.1021/acs.est.5b01118
+    Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
 
     # functional variables and units (from publications listed in docstring)
@@ -757,15 +741,11 @@ def characterize_n2o(
     - flow: str
     - activity: str
 
-    Notes
-    -----
-    See also the relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
-    See also the relevant scientific publication on the numerical calculation of CRF: http://pubs.acs.org/doi/abs/10.1021/acs.est.5b01118
-    See also the IPCC AR6 Chapter 7 (Table 7.15) for the updated numerical values: https://www.ipcc.ch/report/ar6/wg1/downloads/report/IPCC_AR6_WGI_Chapter07.pdf
-
-    See Also
+    See also
     --------
-    characterize_co2: The same function for CO2
+    Joos2013: Relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
+    Schivley2015: Relevant scientific publication on the numerical calculation of CRF: https://doi.org/10.1021/acs.est.5b01118
+    Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
 
     # functional variables and units (from publications listed in docstring)
@@ -848,6 +828,12 @@ def create_generic_characterization_function(decay_series) -> pd.DataFrame:
           amount: float (forcing at this timestep)
           flow: str
           activity: str
+          
+        See also
+        --------
+        Joos2013: Relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
+        Schivley2015: Relevant scientific publication on the numerical calculation of CRF: https://doi.org/10.1021/acs.est.5b01118
+        Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
 
         """
 
