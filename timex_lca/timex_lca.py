@@ -53,7 +53,7 @@ class TimexLCA:
 
     TimexLCA calculates:
      1) a static LCA score (`TimexLCA.static_lca.score`, same as `bw2calc.lca.score`),
-     2) a static time-explicit LCA score (`TimexLCA.score`), which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows 
+     2) a static time-explicit LCA score (`TimexLCA.score`), which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows,
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and dynamic charaterization factors. These are provided for radiative forcing and GWP but can also be user-defined.
 
     Example
@@ -126,6 +126,10 @@ class TimexLCA:
         # Create a similar dict for the biosphere flows. This is populated by the dynamic_biosphere_builder
         self.biosphere_time_mapping_dict = TimeMappingDict(start_id=0)
 
+    ########################################
+    # Main functions to be called by users #
+    ########################################
+
     def build_timeline(
         self,
         temporal_grouping: str = "year",
@@ -138,7 +142,7 @@ class TimexLCA:
     ) -> pd.DataFrame:
         """
         Creates a TimelineBuilder that does the graph traversal (similar to bw_temporalis) and extracts all edges with
-        their temporal information. Builds a `timeline DataFrame` of the exchanges.
+        their temporal information. Builds a `TimexLCA.timeline` of the exchanges.
 
         Parameters
         ----------
@@ -184,7 +188,7 @@ class TimexLCA:
         self.cutoff = cutoff
         self.max_calc = max_calc
 
-        self.add_static_activities_to_time_mapping_dict() # pre-populate the activity time mapping dict with the static activities. Doing this here because we need the temporal grouping for consistent times resolution.
+        self.add_static_activities_to_time_mapping_dict()  # pre-populate the activity time mapping dict with the static activities. Doing this here because we need the temporal grouping for consistent times resolution.
 
         # Create timeline builder that does the graph traversal (similar to bw_temporalis) and extracts all edges with their temporal information. Can later be used to build a timeline with the TimelineBuilder.build_timeline() method.
         self.timeline_builder = TimelineBuilder(
@@ -214,40 +218,14 @@ class TimexLCA:
             ]
         ]
 
-    def build_datapackage(self) -> list:
-        """
-        Creates the datapackages that contain the modifications to the technopshere and biosphere matrix using the `MatrixModifier` class.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        list
-            List of datapackages that contain the modifications to the technopshere and biosphere matrix
-
-        """
-        # mapping of the demand id to demand time
-        self.demand_timing_dict = self.create_demand_timing_dict()
-
-        # Create matrix modifier that creates the new datapackages with the exploded processes and new links to background databases.
-        self.matrix_modifier = MatrixModifier(
-            self.timeline, self.database_date_dict_static_only, self.demand_timing_dict
-        )
-        self.node_id_collection_dict["temporal_markets"] = (
-            self.matrix_modifier.temporal_market_ids
-        )
-        self.node_id_collection_dict["temporalized_processes"] = (
-            self.matrix_modifier.temporalized_process_ids
-        )
-        return self.matrix_modifier.create_datapackage()
-
     def lci(self, build_dynamic_biosphere: Optional[bool] = True) -> None:
         """
-        Calculate the time-explicit LCI.
+        Calculates the time-explicit LCI.
 
-        Building the dynamic biosphere matrix is optional. Set `build_dynamic_biosphere` to False if you only want to get a new overall score and don't care about the timing of the emissions. This saves time and memory.
+        Generates the biosphere and technosphere modifications via the `MatrixModifier` class by calling `TimexLCA.build_datapackage()`. Optionally, the dynamic biosphere matrix and dynamic inventory is calculated via
+        `TimexLCA.calculate_dynamic_inventory()`. Set `build_dynamic_biosphere` to False if you only want to get a new
+        overall score and don't care about the timing
+        of the emissions. This saves time and memory.
 
         Parameters
         ----------
@@ -291,63 +269,6 @@ class TimexLCA:
         else:
             self.lca.lci()
 
-    def calculate_dynamic_inventory(
-        self,
-    ) -> None:
-        """
-        Calculates the dynamic inventory, by first creating a dynamic biosphere matrix using the `DynamicBiosphereBuilder`
-        class and then multiplying it with the dynamic supply array. The dynamic inventory matrix is stored in the attribute `dynamic_inventory`.
-        It is also converted to a DataFrame and stored in the attribute `dynamic_inventory_df`.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None, but calculates the dynamic inventory and stores it in the attribute `dynamic_inventory` as a matrix and in `dynamic_inventory_df` as a DataFrame.
-        """
-
-        if not hasattr(self, "lca"):
-            warnings.warn(
-                "Static Timex LCA has not been run. Call TimexLCA.lci() first."
-            )
-            return
-
-        self.len_technosphere_dbs = sum(
-            [len(bd.Database(db)) for db in self.database_date_dict.keys()]
-        )
-
-        self.dynamic_biosphere_builder = DynamicBiosphereBuilder(
-            self.lca,
-            self.activity_time_mapping_dict,
-            self.biosphere_time_mapping_dict,
-            self.demand_timing_dict,
-            self.node_id_collection_dict,
-            self.temporal_grouping,
-            self.database_date_dict,
-            self.database_date_dict_static_only,
-        )
-        self.dynamic_biomatrix = (
-            self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
-        )
-
-        # Build the dynamic inventory
-        count = len(self.activity_time_mapping_dict)
-        diagonal_supply_array = sparse.spdiags(
-            [self.dynamic_supply_array], [0], count, count
-        )  # diagnolization of supply array keeps the dimension of the process, which we want to pass as additional information to the dynamic inventory dict
-        self.dynamic_inventory = self.dynamic_biomatrix @ diagonal_supply_array
-
-        self.biosphere_time_mapping_dict_reversed = {
-            v: k for k, v in self.biosphere_time_mapping_dict.items()
-        }
-
-        self.activity_time_mapping_dict_reversed = {
-            v: k for k, v in self.activity_time_mapping_dict.items()
-        }
-        self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe()
-
     def static_lcia(self) -> None:
         """
         Calculates static LCIA using time-explicit LCIs with the standard static characterization factors of the selected LCIA method using `bw2calc.lcia()`.
@@ -375,9 +296,11 @@ class TimexLCA:
         cumsum: bool | None = True,
     ) -> pd.DataFrame:
         """
-        Calculates dynamic LCIA with the `DynamicCharacterization` class using dynamic inventories and dynamic characterization functions.
+        Calculates dynamic LCIA with the `DynamicCharacterization` class using the dynamic inventory and dynamic
+        characterization functions.
 
-        Dynamic characterization functions in the form of a dictionary {biosphere_flow_database_id: characterization_function} can be given by the user.
+        Dynamic characterization functions in the form of a dictionary {biosphere_flow_database_id:
+        characterization_function} can be given by the user.
         If none are given, a set of default dynamic characterization functions based on IPCC AR6 are provided.
         These are mapped to the biosphere3 flows of the chosen static climate change impact category.
         If there is no characterization function for a biosphere flow, it will be ignored.
@@ -440,6 +363,163 @@ class TimexLCA:
         self.dynamic_score = self.characterized_inventory["amount"].sum()
 
         return self.characterized_inventory
+
+    ###############################################
+    # Other core functions for the inner workings #
+    ###############################################
+
+    def build_datapackage(self) -> list:
+        """
+        Creates the datapackages that contain the modifications to the technopshere and biosphere matrix using the `MatrixModifier` class.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        list
+            List of datapackages that contain the modifications to the technopshere and biosphere matrix
+
+        """
+        # mapping of the demand id to demand time
+        self.demand_timing_dict = self.create_demand_timing_dict()
+
+        # Create matrix modifier that creates the new datapackages with the exploded processes and new links to background databases.
+        self.matrix_modifier = MatrixModifier(
+            self.timeline, self.database_date_dict_static_only, self.demand_timing_dict
+        )
+        self.node_id_collection_dict["temporal_markets"] = (
+            self.matrix_modifier.temporal_market_ids
+        )
+        self.node_id_collection_dict["temporalized_processes"] = (
+            self.matrix_modifier.temporalized_process_ids
+        )
+        return self.matrix_modifier.create_datapackage()
+
+    def calculate_dynamic_inventory(
+        self,
+    ) -> None:
+        """
+        Calculates the dynamic inventory, by first creating a dynamic biosphere matrix using the `DynamicBiosphereBuilder`
+        class and then multiplying it with the dynamic supply array. The dynamic inventory matrix is stored in the attribute `dynamic_inventory`.
+        It is also converted to a DataFrame and stored in the attribute `dynamic_inventory_df`.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None, but calculates the dynamic inventory and stores it in the attribute `dynamic_inventory` as a matrix and in `dynamic_inventory_df` as a DataFrame.
+        """
+
+        if not hasattr(self, "lca"):
+            warnings.warn(
+                "Static Timex LCA has not been run. Call TimexLCA.lci() first."
+            )
+            return
+
+        self.len_technosphere_dbs = sum(
+            [len(bd.Database(db)) for db in self.database_date_dict.keys()]
+        )
+
+        self.dynamic_biosphere_builder = DynamicBiosphereBuilder(
+            self.lca,
+            self.activity_time_mapping_dict,
+            self.biosphere_time_mapping_dict,
+            self.demand_timing_dict,
+            self.node_id_collection_dict,
+            self.temporal_grouping,
+            self.database_date_dict,
+            self.database_date_dict_static_only,
+        )
+        self.dynamic_biomatrix = (
+            self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
+        )
+
+        # Build the dynamic inventory
+        count = len(self.activity_time_mapping_dict)
+        diagonal_supply_array = sparse.spdiags(
+            [self.dynamic_supply_array], [0], count, count
+        )  # diagnolization of supply array keeps the dimension of the process, which we want to pass as additional information to the dynamic inventory dict
+        self.dynamic_inventory = self.dynamic_biomatrix @ diagonal_supply_array
+
+        self.biosphere_time_mapping_dict_reversed = {
+            v: k for k, v in self.biosphere_time_mapping_dict.items()
+        }
+
+        self.activity_time_mapping_dict_reversed = {
+            v: k for k, v in self.activity_time_mapping_dict.items()
+        }
+        self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe()
+
+    def create_dynamic_inventory_dataframe(self) -> pd.DataFrame:
+        """Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the the format
+        of a pandas.DataFrame, with the right structure to later apply dynamic characterization functions
+
+        Format needs to be:
+
+        +------------+--------+------+----------+
+        |   date     | amount | flow | activity |
+        +============+========+======+==========+
+        |  datetime  |   33   |  1   |    2     |
+        +------------+--------+------+----------+
+        |  datetime  |   32   |  1   |    2     |
+        +------------+--------+------+----------+
+        |  datetime  |   31   |  1   |    2     |
+        +------------+--------+------+----------+
+
+        - date: datetime, e.g. '2024-01-01 00:00:00'
+        - flow: flow id
+        - activity: activity id
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        pandas.DataFrame, dynamic inventory in DataFrame format
+
+        """
+
+        dataframe_rows = []
+        for i in range(self.dynamic_inventory.shape[0]):
+            row_start = self.dynamic_inventory.indptr[i]
+            row_end = self.dynamic_inventory.indptr[i + 1]
+            for j in range(row_start, row_end):
+                row = i
+                col = self.dynamic_inventory.indices[j]
+                value = self.dynamic_inventory.data[j]
+
+                col_database_id = self.activity_dict.reversed[col]
+
+                bioflow_node, date = self.biosphere_time_mapping_dict_reversed[
+                    row
+                ]  # indices are already the same as in the matrix, as we create an entirely new biosphere instead of adding new entries (like we do with the technosphere matrix)
+                emitting_process_key, _ = self.activity_time_mapping_dict_reversed[
+                    col_database_id
+                ]
+
+                dataframe_rows.append(
+                    (
+                        date,
+                        value,
+                        bioflow_node.id,
+                        bd.get_activity(emitting_process_key).id,
+                    )
+                )
+
+        df = pd.DataFrame(
+            dataframe_rows, columns=["date", "amount", "flow", "activity"]
+        )
+
+        return df.sort_values(by=["date", "amount"], ascending=[True, False])
+
+    #############
+    # For setup #
+    #############
 
     def prepare_static_lca_inputs(
         self,
@@ -773,7 +853,7 @@ class TimexLCA:
         self.node_id_collection_dict["first_level_background_node_ids_all"] = (
             first_level_background_node_ids_all
         )
-        
+
     def add_static_activities_to_time_mapping_dict(self) -> None:
         """
         Adds all activities from the static LCA to `activity_time_mapping_dict`, an instance of `TimeMappingDict`.
@@ -803,69 +883,6 @@ class TimexLCA:
                 )  # if datetime, map to the date as integer
             else:
                 warnings.warn(f"Time of activity {key} is neither datetime nor str.")
-                
-    def create_dynamic_inventory_dataframe(self) -> pd.DataFrame:
-        """Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the the format
-        of a pandas.DataFrame, with the right structure to later apply dynamic characterization functions
-
-        Format needs to be:
-
-        +------------+--------+------+----------+
-        |   date     | amount | flow | activity |
-        +============+========+======+==========+
-        |  datetime  |   33   |  1   |    2     |
-        +------------+--------+------+----------+
-        |  datetime  |   32   |  1   |    2     |
-        +------------+--------+------+----------+
-        |  datetime  |   31   |  1   |    2     |
-        +------------+--------+------+----------+
-
-        - date: datetime, e.g. '2024-01-01 00:00:00'
-        - flow: flow id
-        - activity: activity id
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        pandas.DataFrame, dynamic inventory in DataFrame format
-
-        """
-
-        dataframe_rows = []
-        for i in range(self.dynamic_inventory.shape[0]):
-            row_start = self.dynamic_inventory.indptr[i]
-            row_end = self.dynamic_inventory.indptr[i + 1]
-            for j in range(row_start, row_end):
-                row = i
-                col = self.dynamic_inventory.indices[j]
-                value = self.dynamic_inventory.data[j]
-
-                col_database_id = self.activity_dict.reversed[col]
-
-                bioflow_node, date = self.biosphere_time_mapping_dict_reversed[
-                    row
-                ]  # indices are already the same as in the matrix, as we create an entirely new biosphere instead of adding new entries (like we do with the technosphere matrix)
-                emitting_process_key, _ = self.activity_time_mapping_dict_reversed[
-                    col_database_id
-                ]
-
-                dataframe_rows.append(
-                    (
-                        date,
-                        value,
-                        bioflow_node.id,
-                        bd.get_activity(emitting_process_key).id,
-                    )
-                )
-
-        df = pd.DataFrame(
-            dataframe_rows, columns=["date", "amount", "flow", "activity"]
-        )
-
-        return df.sort_values(by=["date", "amount"], ascending=[True, False])
 
     def create_demand_timing_dict(self) -> dict:
         """
@@ -890,6 +907,10 @@ class TimexLCA:
             row.producer: row.hash_producer for row in demand_rows.itertuples()
         }
         return self.demand_timing_dict
+
+    ######################################
+    # For creating human-friendly output #
+    ######################################
 
     def create_labelled_technosphere_dataframe(self) -> pd.DataFrame:
         """
@@ -1007,24 +1028,6 @@ class TimexLCA:
         plt.tight_layout()  # Adjust layout to make room for the rotated date labels
         plt.show()
 
-    def remap_inventory_dicts(self) -> None:
-        """
-        Give a warning if users want to use bw25's original mapping function.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None, but gives a warning
-
-        """
-        warnings.warn(
-            "bw25's original mapping function doesn't work with our new time-mapped matrix entries. The Timex mapping can be found in acvitity_time_mapping_dict and biosphere_time_mapping_dict."
-        )
-        return
-
     def plot_dynamic_characterized_inventory(
         self,
         cumsum: bool = False,
@@ -1112,6 +1115,28 @@ class TimexLCA:
         plt.suptitle(suptitle, fontsize=12, y=0.95)
         plt.grid()
         plt.show()
+
+    #########
+    # Other #
+    #########
+
+    def remap_inventory_dicts(self) -> None:
+        """
+        Give a warning if users want to use bw25's original mapping function.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None, but gives a warning
+
+        """
+        warnings.warn(
+            "bw25's original mapping function doesn't work with our new time-mapped matrix entries. The Timex mapping can be found in acvitity_time_mapping_dict and biosphere_time_mapping_dict."
+        )
+        return
 
     def __getattr__(self, name):
         """
