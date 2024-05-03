@@ -378,7 +378,7 @@ class DynamicCharacterization:
                     decay_series = decay_multipliers.get(cas_number)
                     if decay_series is not None:
                         self.characterization_function_dict[node.id] = (
-                            create_generic_characterization_function(self, np.array(decay_series))
+                            create_generic_characterization_function(np.array(decay_series))
                         )
 
 

@@ -64,7 +64,7 @@ class TimexLCA:
     >>> database_date_dict = {'my_database': datetime.strptime("2020", "%Y"),
                               'my_foreground_database':'dynamic'} #replace here with your database dates
     >>> timex_lca = TimexLCA(demand, method, database_date_dict) 
-    >>> timex_lca.build_timeline() # you can pass optional arguments here, e.g. a cutoff for the graph traversal
+    >>> timex_lca.build_timeline() # you can pass many optional arguments here, also for the graph traversal
     >>> timex_lca.lci()
     >>> timex_lca.static_lcia()
     >>> timex_lca.static_score
@@ -78,12 +78,9 @@ class TimexLCA:
         demand,
         method,
         database_date_dict: dict = None,
-        edge_filter_function: Callable = None,
-        temporal_grouping: str = "year",
-        interpolation_type: str = "linear",
     ) -> None:
         """
-        Initializes the `TimexLCA` object. Calculates a static LCA, creates time mapping dicts for activities and biosphere flows, and stores useful subsets of ids in the node_id_collection_dict.
+        Initializes the `TimexLCA` object. Calculates a static LCA, initializes time mapping dicts for activities and biosphere flows, and stores useful subsets of ids in the node_id_collection_dict.
 
         Parameters
         ----------
@@ -94,21 +91,11 @@ class TimexLCA:
                 Tuple defining the LCIA method, such as `('foo', 'bar')` or default methods, such as `("EF v3.1", "climate change", "global warming potential (GWP100)")`
         database_date_dict : dict, optional
                 Dictionary mapping database names to dates.
-        edge_filter_function : Callable, optional
-                Function to skip edges in the graph traversal. Default is to skip all edges within background databases.
-        temporal_grouping : str, optional
-                Time resolution for grouping exchanges over time in the timeline. Default is 'year', other options are 'month', 'day', 'hour'.
-        interpolation_type : str, optional
-                Type of interpolation when sourcing the new producers in the time-explicit background databases. Default is 'linear',
-                which means linear interpolation between the closest 2 databases, other options are 'closest', which selects only the closest database.
-
         """
+
         self.demand = demand
         self.method = method
         self.database_date_dict = database_date_dict
-        self.edge_filter_function = edge_filter_function
-        self.temporal_grouping = temporal_grouping
-        self.interpolation_type = interpolation_type
 
         if not self.database_date_dict:
             warnings.warn(
@@ -120,15 +107,6 @@ class TimexLCA:
         self.database_date_dict_static_only = {
             k: v for k, v in self.database_date_dict.items() if type(v) == datetime
         }
-
-        if not edge_filter_function:
-            warnings.warn(
-                "No edge filter function provided. Skipping all edges within background databases."
-            )
-            skippable = []
-            for db in self.database_date_dict_static_only.keys():
-                skippable.extend([node.id for node in bd.Database(db)])
-            self.edge_filter_function = lambda x: x in skippable
 
         # Create some collections of nodes that will be useful down the line, e.g. all nodes from the background databases that link to foregroud nodes.
         self.create_node_id_collection_dict()
@@ -145,146 +123,47 @@ class TimexLCA:
         self.activity_time_mapping_dict = TimeMappingDict(
             start_id=bd.backends.ActivityDataset.select(fn.MAX(AD.id)).scalar() + 1
         )  # making sure to use unique ids for the time mapped processes by counting up from the highest current activity id
-        self.add_static_activities_to_time_mapping_dict()
 
         # Create a similar dict for the biosphere flows. This is populated by the dynamic_biosphere_builder
         self.biosphere_time_mapping_dict = TimeMappingDict(start_id=0)
 
-    def add_static_activities_to_time_mapping_dict(self) -> None:
+    def build_timeline(
+        self,
+        temporal_grouping: str = "year",
+        interpolation_type: str = "linear",
+        edge_filter_function: Callable = None,
+        cutoff: float = 1e-9,
+        max_calc: float = 1e4,
+        *args,
+        **kwargs,
+    ) -> pd.DataFrame:
         """
-        Adds all activities from the static LCA to `activity_time_mapping_dict`, an instance of `TimeMappingDict`.
-        This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id) that is later used to uniquely identify time-resolved processes. This is the pre-population of the time mapping dict with the static activities. Further time-explicit activities (from other temporalized background databases) are added lateron by in the TimelineBuilder.
+        Creates a TimelineBuilder that does the graph traversal (similar to bw_temporalis) and extracts all edges with
+        their temporal information. Builds a `timeline DataFrame` of the exchanges.
 
         Parameters
         ----------
-        None
-
-        Returns
-        -------
-        None but adds the activities to the `activity_time_mapping_dict`
-        """
-        for id in self.static_lca.dicts.activity.keys():  # activity ids
-            key = self.static_lca.remapping_dicts["activity"][
-                id
-            ]  # ('database', 'code')
-            time = self.database_date_dict[
-                key[0]
-            ]  # datetime (or 'dynamic' for foreground processes)
-            if type(time) == str:  # if 'dynamic', just add the string
-                self.activity_time_mapping_dict.add((key, time), unique_id=id)
-            elif type(time) == datetime:
-                self.activity_time_mapping_dict.add(
-                    (key, extract_date_as_integer(time, self.temporal_grouping)),
-                    unique_id=id,
-                )  # if datetime, map to the date as integer
-            else:
-                warnings.warn(f"Time of activity {key} is neither datetime nor str.")
-
-    def create_node_id_collection_dict(self) -> None:
-        """
-        Creates a dict of collections of nodes that will be useful down the line, e.g. to determine static nodes for the graph traversal or create the dynamic biosphere matrix.
-        Available collections are:
-
-        - ``demand_database_names``: set of database names of the demand processes
-        - ``demand_dependent_database_names``: set of database names of all processes that depend on the demand processes
-        - ``demand_dependent_background_database_names``: set of database names of all processes that depend on the demand processes and are in the background databases
-        - ``demand_dependent_background_node_ids``: set of node ids of all processes that depend on the demand processes and are in the background databases
-        - ``foreground_node_ids``: set of node ids of all processes that are not in the background databases
-        - ``first_level_background_node_ids_static``: set of node ids of all processes that are in the background databases and are directly linked to the demand processes
-        - ``first_level_background_node_ids_all``: like first_level_background_node_ids_static, but includes first level background processes from other time explicit databases.
-
-        Parameters
-        ----------
-            None
-
-        Returns
-        -------
-            None, but adds the `node_id_collection_dict containing` the above-mentioned collections.
-        """
-        self.node_id_collection_dict = {}
-
-        # Original variable names preserved, set types for performance and uniqueness
-        demand_database_names = {
-            db
-            for db in self.database_date_dict.keys()
-            if db not in self.database_date_dict_static_only.keys()
-        }
-        self.node_id_collection_dict["demand_database_names"] = demand_database_names
-
-        demand_dependent_database_names = set()
-        for db in demand_database_names:
-            demand_dependent_database_names.update(bd.Database(db).find_dependents())
-        self.node_id_collection_dict["demand_dependent_database_names"] = (
-            demand_dependent_database_names
-        )
-
-        demand_dependent_background_database_names = (
-            demand_dependent_database_names & self.database_date_dict_static_only.keys()
-        )
-        self.node_id_collection_dict["demand_dependent_background_database_names"] = (
-            demand_dependent_background_database_names
-        )
-
-        demand_dependent_background_node_ids = {
-            node.id
-            for db in demand_dependent_background_database_names
-            for node in bd.Database(db)
-        }
-        self.node_id_collection_dict["demand_dependent_background_node_ids"] = (
-            demand_dependent_background_node_ids
-        )
-
-        foreground_node_ids = {
-            node.id
-            for db in self.database_date_dict.keys()
-            if db not in self.database_date_dict_static_only.keys()
-            for node in bd.Database(db)
-        }
-        self.node_id_collection_dict["foreground_node_ids"] = foreground_node_ids
-
-        first_level_background_node_ids_static = set()
-        first_level_background_node_ids_all = set()
-        for node_id in foreground_node_ids:
-            node = bd.get_node(id=node_id)
-            for exc in node.technosphere():
-                if exc.input["database"] in self.database_date_dict_static_only.keys():
-                    first_level_background_node_ids_static.add(exc.input.id)
-                    for background_db in self.database_date_dict_static_only.keys():
-                        try:
-                            other_node = bd.get_node(
-                                **{
-                                    "database": background_db,
-                                    "name": exc.input["name"],
-                                    "product": exc.input["reference product"],
-                                    "location": exc.input["location"],
-                                }
-                            )
-                            first_level_background_node_ids_all.add(other_node.id)
-                        except Exception as e:
-                            warnings.warn(
-                                f"Failed to find process in database {background_db} for name='{exc.input['name']}', reference product='{exc.input['reference product']}', location='{exc.input['location']}': {e}"
-                            )
-                            pass
-
-        self.node_id_collection_dict["first_level_background_node_ids_static"] = (
-            first_level_background_node_ids_static
-        )
-        self.node_id_collection_dict["first_level_background_node_ids_all"] = (
-            first_level_background_node_ids_all
-        )
-
-    def build_timeline(self, *args, **kwargs) -> pd.DataFrame:
-        """
-        Creates a TimelineBuilder that does the graph traversal (similar to bw_temporalis) and extracts all edges with their temporal information. Builds a `timeline DataFrame` of the exchanges via TimelineBuilder.build_timeline().
-
-        Parameters
-        ----------
+        temporal_grouping : str, optional
+            Time resolution for grouping exchanges over time in the timeline. Default is 'year', other options are
+            'month', 'day', 'hour'.
+        interpolation_type : str, optional
+            Type of interpolation when sourcing the new producers in the time-explicit background databases. Default is
+            'linear', which means linear interpolation between the closest 2 databases, other options are 'closest',
+            which selects only the closest database.
+        edge_filter_function : Callable, optional
+            Function to skip edges in the graph traversal. Default is to skip all edges within background databases.
+        cutoff: float, optional
+            The cutoff value for the graph traversal. Default is 1e-9.
+        max_calc: float, optional
+            The maximum number of calculations to be performed by the graph traversal. Default is 1e4.
         *args : iterable
-                Positional arguments for the graph traversal. for `bw_temporalis.TemporalisLCA` passed to the `EdgeExtractor` class, which inherits from `TemporalisLCA`.
-                See `bw_temporalis` documentation for more information.
+            Positional arguments for the graph traversal. for `bw_temporalis.TemporalisLCA` passed to the
+            `EdgeExtractor` class, which inherits from `TemporalisLCA`.
+            See `bw_temporalis` documentation for more information.
         **kwargs : dict
-                Additional keyword arguments for `bw_temporalis.TemporalisLCA` passed to the EdgeExtractor class, which inherits from TemporalisLCA.
-                See bw_temporalis documentation for more information.
+            Additional keyword arguments for `bw_temporalis.TemporalisLCA` passed to the EdgeExtractor class, which
+            inherits from TemporalisLCA.
+            See bw_temporalis documentation for more information.
 
         Returns
         -------
@@ -292,6 +171,21 @@ class TimexLCA:
             A DataFrame containing the timeline of exchanges
 
         """
+        if not edge_filter_function:
+            warnings.warn(
+                "No edge filter function provided. Skipping all edges within background databases."
+            )
+            skippable = []
+            for db in self.database_date_dict_static_only.keys():
+                skippable.extend([node.id for node in bd.Database(db)])
+            self.edge_filter_function = lambda x: x in skippable
+
+        self.temporal_grouping = temporal_grouping
+        self.interpolation_type = interpolation_type
+        self.cutoff = cutoff
+        self.max_calc = max_calc
+
+        self.add_static_activities_to_time_mapping_dict() # pre-populate the activity time mapping dict with the static activities. Doing this here because we need the temporal grouping for consistent times resolution.
 
         # Create timeline builder that does the graph traversal (similar to bw_temporalis) and extracts all edges with their temporal information. Can later be used to build a timeline with the TimelineBuilder.build_timeline() method.
         self.timeline_builder = TimelineBuilder(
@@ -303,6 +197,8 @@ class TimexLCA:
             self.node_id_collection_dict,
             self.temporal_grouping,
             self.interpolation_type,
+            self.cutoff,
+            self.max_calc,
             *args,
             **kwargs,
         )
@@ -786,6 +682,129 @@ class TimexLCA:
 
         return indexed_demand, data_objs, remapping_dicts
 
+    def create_node_id_collection_dict(self) -> None:
+        """
+        Creates a dict of collections of nodes that will be useful down the line, e.g. to determine static nodes for the graph traversal or create the dynamic biosphere matrix.
+        Available collections are:
+
+        - ``demand_database_names``: set of database names of the demand processes
+        - ``demand_dependent_database_names``: set of database names of all processes that depend on the demand processes
+        - ``demand_dependent_background_database_names``: set of database names of all processes that depend on the demand processes and are in the background databases
+        - ``demand_dependent_background_node_ids``: set of node ids of all processes that depend on the demand processes and are in the background databases
+        - ``foreground_node_ids``: set of node ids of all processes that are not in the background databases
+        - ``first_level_background_node_ids_static``: set of node ids of all processes that are in the background databases and are directly linked to the demand processes
+        - ``first_level_background_node_ids_all``: like first_level_background_node_ids_static, but includes first level background processes from other time explicit databases.
+
+        Parameters
+        ----------
+            None
+
+        Returns
+        -------
+            None, but adds the `node_id_collection_dict containing` the above-mentioned collections.
+        """
+        self.node_id_collection_dict = {}
+
+        # Original variable names preserved, set types for performance and uniqueness
+        demand_database_names = {
+            db
+            for db in self.database_date_dict.keys()
+            if db not in self.database_date_dict_static_only.keys()
+        }
+        self.node_id_collection_dict["demand_database_names"] = demand_database_names
+
+        demand_dependent_database_names = set()
+        for db in demand_database_names:
+            demand_dependent_database_names.update(bd.Database(db).find_dependents())
+        self.node_id_collection_dict["demand_dependent_database_names"] = (
+            demand_dependent_database_names
+        )
+
+        demand_dependent_background_database_names = (
+            demand_dependent_database_names & self.database_date_dict_static_only.keys()
+        )
+        self.node_id_collection_dict["demand_dependent_background_database_names"] = (
+            demand_dependent_background_database_names
+        )
+
+        demand_dependent_background_node_ids = {
+            node.id
+            for db in demand_dependent_background_database_names
+            for node in bd.Database(db)
+        }
+        self.node_id_collection_dict["demand_dependent_background_node_ids"] = (
+            demand_dependent_background_node_ids
+        )
+
+        foreground_node_ids = {
+            node.id
+            for db in self.database_date_dict.keys()
+            if db not in self.database_date_dict_static_only.keys()
+            for node in bd.Database(db)
+        }
+        self.node_id_collection_dict["foreground_node_ids"] = foreground_node_ids
+
+        first_level_background_node_ids_static = set()
+        first_level_background_node_ids_all = set()
+        for node_id in foreground_node_ids:
+            node = bd.get_node(id=node_id)
+            for exc in node.technosphere():
+                if exc.input["database"] in self.database_date_dict_static_only.keys():
+                    first_level_background_node_ids_static.add(exc.input.id)
+                    for background_db in self.database_date_dict_static_only.keys():
+                        try:
+                            other_node = bd.get_node(
+                                **{
+                                    "database": background_db,
+                                    "name": exc.input["name"],
+                                    "product": exc.input["reference product"],
+                                    "location": exc.input["location"],
+                                }
+                            )
+                            first_level_background_node_ids_all.add(other_node.id)
+                        except Exception as e:
+                            warnings.warn(
+                                f"Failed to find process in database {background_db} for name='{exc.input['name']}', reference product='{exc.input['reference product']}', location='{exc.input['location']}': {e}"
+                            )
+                            pass
+
+        self.node_id_collection_dict["first_level_background_node_ids_static"] = (
+            first_level_background_node_ids_static
+        )
+        self.node_id_collection_dict["first_level_background_node_ids_all"] = (
+            first_level_background_node_ids_all
+        )
+        
+    def add_static_activities_to_time_mapping_dict(self) -> None:
+        """
+        Adds all activities from the static LCA to `activity_time_mapping_dict`, an instance of `TimeMappingDict`.
+        This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id) that is later used to uniquely identify time-resolved processes. This is the pre-population of the time mapping dict with the static activities. Further time-explicit activities (from other temporalized background databases) are added lateron by in the TimelineBuilder.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None but adds the activities to the `activity_time_mapping_dict`
+        """
+        for id in self.static_lca.dicts.activity.keys():  # activity ids
+            key = self.static_lca.remapping_dicts["activity"][
+                id
+            ]  # ('database', 'code')
+            time = self.database_date_dict[
+                key[0]
+            ]  # datetime (or 'dynamic' for foreground processes)
+            if type(time) == str:  # if 'dynamic', just add the string
+                self.activity_time_mapping_dict.add((key, time), unique_id=id)
+            elif type(time) == datetime:
+                self.activity_time_mapping_dict.add(
+                    (key, extract_date_as_integer(time, self.temporal_grouping)),
+                    unique_id=id,
+                )  # if datetime, map to the date as integer
+            else:
+                warnings.warn(f"Time of activity {key} is neither datetime nor str.")
+                
     def create_dynamic_inventory_dataframe(self) -> pd.DataFrame:
         """Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the the format
         of a pandas.DataFrame, with the right structure to later apply dynamic characterization functions
