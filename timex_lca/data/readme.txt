@@ -1,1 +1,0 @@
-Dynamic_LCAcalculator retrieved from Levasseur et al 2010 (https://ciraig.org/index.php/project/dynco2-dynamic-carbon-footprinter/)

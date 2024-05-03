@@ -38,18 +38,23 @@ class TimexLCA:
     """
     Class to perform time-explicit LCA calculations.
 
-    The key point of TimexLCA is that it retrieves the LCI of processes occuring at a certain time from a database 
-    that represents the technology landscape at this point in time. As such, it combines prospective and dynamic LCA approaches.
+    A TimexLCA retrieves the LCI of processes occuring at explicit points in time and relinks their technosphere
+    exchanges to match the technology landscape at that point in time, while keeping track of the timing of the
+    resulting emissions. As such, it combines prospective and dynamic LCA approaches.
 
-    It first calculates a static LCA, which informs a priority-first graph traversal, from which the temporal relationships between 
-    exchanges and processes are derived. For processes at the interface with background databases, the timing of the exchanges determines 
-    which background database(s) to link to. This temporal relinking is achieved by using datapackages to add new processes, that represent
-    processes happening at a specific time period, to the technopshere matrix and their corresponding biosphere flows to the biosphere 
-    matrix, and then linking these to the original demand. The temporal information can also be used for dynamic LCIA chalculations.
+    TimexLCA first calculates a static LCA, which informs a priority-first graph traversal. From the graph traversal,
+    temporal relationships between exchanges and processes are derived. Based on the timing of the processes, timex_lca
+    matches the processes at the intersection between foreground and background to the best available background
+    databases. This temporal relinking is achieved by using datapackages to add new time-specific processes. The new
+    processes and their exchanges to other technosphere processes or biosphere flows extent the technopshere and
+    biosphere matrices.
+    
+    Temporal information of both processes and biosphere flows are retained, allowing for dynamic LCIA.
 
     TimexLCA calculates:
      1) a static LCA score (`TimexLCA.static_lca.score`, same as `bw2calc.lca.score`),
-     2) a static time-explicit LCA score (`TimexLCA.score`), which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows 
+     2) a static time-explicit LCA score (`TimexLCA.score`), which links LCIs to the respective background databases
+     but without additional temporal dynamics of the biosphere flows 
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and dynamic charaterization factors. These are provided for radiative forcing and GWP but can also be user-defined.
 
     Parameters
@@ -68,12 +73,6 @@ class TimexLCA:
     interpolation_type : str, optional
             Type of interpolation when sourcing the new producers in the time-explicit background databases. Default is 'linear', 
             which means linear interpolation between the closest 2 databases, other options are 'closest', which selects only the closest database.
-    *args : iterable
-            Additional positional arguments for `bw_temporalis.TemporalisLCA` passed to the `EdgeExtractor` class, which inherits from `TemporalisLCA`. 
-            See `bw_temporalis` documentation for more information.
-    **kwargs : dict
-            Additional keyword arguments for `bw_temporalis.TemporalisLCA` passed to the EdgeExtractor class, which inherits from TemporalisLCA.
-            See bw_temporalis documentation for more information.
 
     Example
     -------
@@ -82,15 +81,15 @@ class TimexLCA:
     >>> method = ("some_method_family", "some_category", "some_method")    #replace here with your method   
     >>> database_date_dict = {'my_database': datetime.strptime("2020", "%Y"),
                               'my_foreground_database':'dynamic'} #replace here with your database dates
-    >>> timex_lca = TimexLCA(demand, method, database_date_dict) # you can pass optional arguments here, incl. kwargs for the graph traversal
-    >>> timex_lca.build_timeline()
+    >>> timex_lca = TimexLCA(demand, method, database_date_dict) 
+    >>> timex_lca.build_timeline() # you can pass optional arguments here, e.g. a cutoff for the graph traversal
     >>> timex_lca.lci()
     >>> timex_lca.static_lcia()
     >>> timex_lca.static_score
     >>> timex_lca.dynamic_lcia(metric="radiative_forcing") # different metrics can be used, e.g. "GWP", "radiative_forcing"
     >>> timex_lca.dynamic_score
 
-    """""""""
+    """ """"""
 
     def __init__(
         self,
@@ -100,13 +99,11 @@ class TimexLCA:
         edge_filter_function: Callable = None,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
-        *args,
-        **kwargs,
     ) -> None:
-        """ __init__ initializes the `TimexLCA` object, and calculates a static LCA. It also initializes an instance of the `TimelineBuilder`, and stores useful subsets of ids.
+        """__init__ initializes the `TimexLCA` object, and calculates a static LCA. It also initializes an instance of the `TimelineBuilder`, and stores useful subsets of ids.
         Parameters are described in the `TimexLCA` class docstring.
- 
-        """        
+
+        """
         self.demand = demand
         self.method = method
         self.database_date_dict = database_date_dict
@@ -149,30 +146,16 @@ class TimexLCA:
         self.activity_time_mapping_dict = TimeMappingDict(
             start_id=bd.backends.ActivityDataset.select(fn.MAX(AD.id)).scalar() + 1
         )  # making sure to use unique ids for the time mapped processes by counting up from the highest current activity id
-        self.add_activities_to_time_mapping_dict()
+        self.add_static_activities_to_time_mapping_dict()
 
         # Create a similar dict for the biosphere flows. This is populated by the dynamic_biosphere_builder
         self.biosphere_time_mapping_dict = TimeMappingDict(start_id=0)
 
-        # Create timeline builder that does the graph traversal (similar to bw_temporalis) and extracts all edges with their temporal information. Can later be used to build a timeline with the TimelineBuilder.build_timeline() method.
-        self.timeline_builder = TimelineBuilder(
-            self.static_lca,
-            self.edge_filter_function,
-            self.database_date_dict,
-            self.database_date_dict_static_only,
-            self.activity_time_mapping_dict,
-            self.node_id_collection_dict,
-            self.temporal_grouping,
-            self.interpolation_type,
-            *args,
-            **kwargs,
-        )
-
-    def add_activities_to_time_mapping_dict(self) -> None:
+    def add_static_activities_to_time_mapping_dict(self) -> None:
         """
-        Adds all activities to `activity_time_mapping_dict`, an instance of `TimeMappingDict`.
-        This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id) that is later used to uniquely identify time-resolved processes.
-        
+        Adds all activities from the static LCA to `activity_time_mapping_dict`, an instance of `TimeMappingDict`.
+        This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id) that is later used to uniquely identify time-resolved processes. This is the pre-population of the time mapping dict with the static activities. Further time-explicit activities (from other temporalized background databases) are added lateron by in the TimelineBuilder.
+
         Parameters
         ----------
         None
@@ -291,19 +274,39 @@ class TimexLCA:
             first_level_background_node_ids_all
         )
 
-    def build_timeline(self) -> pd.DataFrame:
-        """Builds a `timeline DataFrame` of the exchanges using the `TimelineBuilder class.
+    def build_timeline(self, *args, **kwargs) -> pd.DataFrame:
+        """
+        Creates a TimelineBuilder that does the graph traversal (similar to bw_temporalis) and extracts all edges with their temporal information. Builds a `timeline DataFrame` of the exchanges via TimelineBuilder.build_timeline().
 
         Parameters
         ----------
-        None
-        
+        *args : iterable
+                Positional arguments for the graph traversal. for `bw_temporalis.TemporalisLCA` passed to the `EdgeExtractor` class, which inherits from `TemporalisLCA`.
+                See `bw_temporalis` documentation for more information.
+        **kwargs : dict
+                Additional keyword arguments for `bw_temporalis.TemporalisLCA` passed to the EdgeExtractor class, which inherits from TemporalisLCA.
+                See bw_temporalis documentation for more information.
+
         Returns
         -------
-        pandas.DataFrame: 
+        pandas.DataFrame:
             A DataFrame containing the timeline of exchanges
 
-        """        
+        """
+
+        # Create timeline builder that does the graph traversal (similar to bw_temporalis) and extracts all edges with their temporal information. Can later be used to build a timeline with the TimelineBuilder.build_timeline() method.
+        self.timeline_builder = TimelineBuilder(
+            self.static_lca,
+            self.edge_filter_function,
+            self.database_date_dict,
+            self.database_date_dict_static_only,
+            self.activity_time_mapping_dict,
+            self.node_id_collection_dict,
+            self.temporal_grouping,
+            self.interpolation_type,
+            *args,
+            **kwargs,
+        )
 
         self.timeline = self.timeline_builder.build_timeline()
         return self.timeline[
@@ -348,7 +351,7 @@ class TimexLCA:
 
     def lci(self, build_dynamic_biosphere: Optional[bool] = True) -> None:
         """
-        Calculate the time-explicit LCI. 
+        Calculate the time-explicit LCI.
 
         Building the dynamic biosphere matrix is optional. Set `build_dynamic_biosphere` to False if you only want to get a new overall score and don't care about the timing of the emissions. This saves time and memory.
 
@@ -396,7 +399,7 @@ class TimexLCA:
 
     def calculate_dynamic_inventory(
         self,
-     ) -> None:
+    ) -> None:
         """
         Calculates the dynamic inventory, by first creating a dynamic biosphere matrix using the `DynamicBiosphereBuilder`
         class and then multiplying it with the dynamic supply array. The dynamic inventory matrix is stored in the attribute `dynamic_inventory`.
@@ -455,14 +458,14 @@ class TimexLCA:
     def static_lcia(self) -> None:
         """
         Calculates static LCIA using time-explicit LCIs with the standard static characterization factors of the selected LCIA method using `bw2calc.lcia()`.
-        
+
         Parameters
         ----------
         None
 
         Returns
         -------
-        None, but stores the static score in the attribute `static_score`.	
+        None, but stores the static score in the attribute `static_score`.
         """
         if not hasattr(self, "lca"):
             warnings.warn("LCI not yet calculated. Call TimexLCA.lci() first.")
@@ -474,26 +477,24 @@ class TimexLCA:
         self,
         metric: str | None = "GWP",
         time_horizon: int | None = 100,
-        fixed_time_horizon: (
-            bool | None
-        ) = False, 
+        fixed_time_horizon: bool | None = False,
         characterization_function_dict: dict = None,
         cumsum: bool | None = True,
     ) -> pd.DataFrame:
         """
         Calculates dynamic LCIA with the `DynamicCharacterization` class using dynamic inventories and dynamic characterization functions.
 
-        Dynamic characterization functions in the form of a dictionary {biosphere_flow_database_id: characterization_function} can be given by the user. 
-        If none are given, a set of default dynamic characterization functions based on IPCC AR6 are provided. 
+        Dynamic characterization functions in the form of a dictionary {biosphere_flow_database_id: characterization_function} can be given by the user.
+        If none are given, a set of default dynamic characterization functions based on IPCC AR6 are provided.
         These are mapped to the biosphere3 flows of the chosen static climate change impact category.
         If there is no characterization function for a biosphere flow, it will be ignored.
 
-        Two dynamic climate change metrics are provided: "GWP" and "radiative_forcing". 
+        Two dynamic climate change metrics are provided: "GWP" and "radiative_forcing".
         The time horizon for the impact assessment can be set with the `time_horizon` parameter, defaulting to 100 years.
-        The `fixed_time_horizon` parameter determines whether the emission time horizon for all emissions is calculated from the 
-        functional unit (`fixed_time_horizon=True`) or from the time of the emission (`fixed_time_horizon=False`). 
+        The `fixed_time_horizon` parameter determines whether the emission time horizon for all emissions is calculated from the
+        functional unit (`fixed_time_horizon=True`) or from the time of the emission (`fixed_time_horizon=False`).
         The former is the implementation of the Levasseur approach(https://doi.org/10.1021/es9030003), while the latter is how conventional LCA is done.
-        
+
         Parameters
         ----------
         metric : str, optional
@@ -582,7 +583,7 @@ class TimexLCA:
             If True, remap dictionaries
         demand_database_last: bool
             If True, add the demand databases last in the list `database_names`.
-        
+
         Returns
         -------
         tuple
@@ -694,7 +695,7 @@ class TimexLCA:
             If True, remap dictionaries
         demand_database_last: bool
             If True, add the demand databases last in the list `database_names`.
-        
+
         Returns
         -------
         tuple
@@ -788,7 +789,7 @@ class TimexLCA:
         return indexed_demand, data_objs, remapping_dicts
 
     def create_dynamic_inventory_dataframe(self) -> pd.DataFrame:
-        """Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the the format 
+        """Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the the format
         of a pandas.DataFrame, with the right structure to later apply dynamic characterization functions
 
         Format needs to be:
@@ -855,7 +856,7 @@ class TimexLCA:
         Generate a dictionary that maps producer (key) to timing (value) for the demands in the product system.
         It searches the timeline for those rows that contain the functional units (demand-processes as producer and -1 as consumer) and returns the time of the demand as an integer.
         Time of demand can have flexible resolution (year=YYYY, month=YYYYMM, day=YYYYMMDD, hour=YYYYMMDDHH) defined in `temporal_grouping`.
-        
+
         Parameters
         ----------
         None
@@ -883,7 +884,7 @@ class TimexLCA:
         None
 
         Returns
-        ------- 
+        -------
         pd.DataFrame, technosphere matrix as a pandas.DataFrame with comprehensible labels instead of ids.
         """
 
@@ -936,7 +937,7 @@ class TimexLCA:
         None
 
         Returns
-        ------- 
+        -------
         pd.DataFrame, dynamic biosphere matrix as a pandas.DataFrame with comprehensible labels instead of ids.
         """
         df = pd.DataFrame(self.dynamic_biomatrix.toarray())
@@ -957,11 +958,11 @@ class TimexLCA:
     def plot_dynamic_inventory(self, bio_flows, cumulative=False) -> None:
         """
         Simple plot of dynamic inventory of a biosphere flow over time, with optional cumulative plotting.
-        
+
         Parameters
         ----------
         bio_flows : list of int
-            database ids of the biosphere flows to plot. 
+            database ids of the biosphere flows to plot.
         cumulative : bool
             if True, plot cumulative amounts over time
 
@@ -991,7 +992,7 @@ class TimexLCA:
         plt.show()
 
     def remap_inventory_dicts(self) -> None:
-        """ 
+        """
         Give a warning if users want to use bw25's original mapping function.
 
         Parameters
@@ -999,9 +1000,9 @@ class TimexLCA:
         None
 
         Returns
-        ------- 
+        -------
         None, but gives a warning
-        
+
         """
         warnings.warn(
             "bw25's original mapping function doesn't work with our new time-mapped matrix entries. The Timex mapping can be found in acvitity_time_mapping_dict and biosphere_time_mapping_dict."
@@ -1015,12 +1016,12 @@ class TimexLCA:
         sum_activities: bool = False,
     ) -> None:
         """
-        Plot the characterized inventory of the dynamic LCI in a very simple plot. 
+        Plot the characterized inventory of the dynamic LCI in a very simple plot.
         Legend and title are selcted automatically based on the chosen metric.
 
         Parameters
         ----------
-        cumsum : bool 
+        cumsum : bool
             if True, plot cumulative amounts over time
         sum_emissions_within_activity : bool
             if True, sum emissions within each activity over time
@@ -1099,8 +1100,12 @@ class TimexLCA:
     def __getattr__(self, name):
         """
         Delegate attribute access to the self.lca object if the attribute
-        is not found in the TimexLCA instance itself.
+        is not found in the TimexLCA instance itself, excluding special attributes.
         """
+        if name.startswith("__"):
+            raise AttributeError(
+                f"'{type(self).__name__}' object has no attribute '{name}'"
+            )
         if hasattr(self.lca, name):
             return getattr(self.lca, name)
         elif hasattr(self.dynamic_biosphere_builder, name):

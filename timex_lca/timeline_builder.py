@@ -28,7 +28,9 @@ class TimelineBuilder:
     :param time_mapping_dict: A dictionary to map processes to specific times.
     :param temporal_grouping: The temporal grouping to be used. Default is "year".
     :param interpolation_type: The type of interpolation to be used. Default is "linear".
-    :param kwargs: Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA. Here, things like the max_calc or cutoff values fot the graph traversal can be set.
+    :param cutoff: The cutoff value for the graph traversal. Default is 1e-9.
+    :param max_calc: The maximum number of calculations to be performed by the graph traversal. Default is 1e4.
+    :param kwargs: Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA. Here, things like the further settings for graph traversal can be set. For details, see bw_temporalis.TemporalisLCA.
     """
 
     def __init__(
@@ -41,6 +43,8 @@ class TimelineBuilder:
         node_id_collection_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
+        cutoff: float = 1e-9,
+        max_calc: float = 1e4,
         *args,
         **kwargs,
     ):
@@ -52,6 +56,8 @@ class TimelineBuilder:
         self.node_id_collection_dict = node_id_collection_dict
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
+        self.cutoff = cutoff
+        self.max_calc = max_calc
 
         # Finding indices of activities from background databases that are known to be static, i.e. have no temporal distributions connecting to them. These will be be skipped in the graph traversal.
         static_activity_db_indices = [
@@ -74,6 +80,8 @@ class TimelineBuilder:
             slca,
             *args,
             edge_filter_function=edge_filter_function,
+            cutoff=self.cutoff,
+            max_calc=self.max_calc,
             static_activity_indices=set(static_activity_matrix_indices),
             **kwargs,
         )
