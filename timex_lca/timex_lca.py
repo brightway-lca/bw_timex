@@ -141,8 +141,8 @@ class TimexLCA:
         **kwargs,
     ) -> pd.DataFrame:
         """
-        Creates a TimelineBuilder that does the graph traversal (similar to bw_temporalis) and extracts all edges with
-        their temporal information. Builds a `TimexLCA.timeline` of the exchanges.
+        Creates a `TimelineBuilder` instance that does the graph traversal (similar to bw_temporalis) and extracts all
+        edges with their temporal information. Creates the `TimexLCA.timeline` of exchanges.
 
         Parameters
         ----------
