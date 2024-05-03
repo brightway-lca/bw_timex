@@ -59,7 +59,6 @@ class TimexLCA:
 
     Example
     -------
-
     >>> demand = {('my_foreground_database', 'my_process'): 1} #replace here with your functinal unit
     >>> method = ("some_method_family", "some_category", "some_method")    #replace here with your method   
     >>> database_date_dict = {'my_database': datetime.strptime("2020", "%Y"),
