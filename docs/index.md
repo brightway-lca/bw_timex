@@ -10,7 +10,7 @@ This package enables you to account for:
 - **Variable** and/or **evolving** supply chains & technologies (e.g., increasing shares of renewable electricity in the future)
 - **Timing of emissions** (by applying dynamic characterization functions)
 
-You can define temporal distributions for process and emission exchanges, which are then *automatically* propagated through the supply chain and mapped to corresponding time-explicit databases. The resulting time-explicit LCI reflects the current technology status within the production system at the actual time of each process. Also, `timex_lca` keeps track of the timing of emissions which means that you can apply dynamic characterization functions.
+You can define temporal distributions for process and emission exchanges, which are then *automatically* propagated through the supply chain and mapped to corresponding time-explicit databases. The resulting time-explicit LCI reflects the current technology status within the production system at the actual time of each process. Also, `timex_lca` keeps track of the timing of emissions, which means that you can apply dynamic characterization functions.
 
 ## Use cases:
 `timex_lca` is ideal for cases with:
