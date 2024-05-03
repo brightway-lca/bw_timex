@@ -78,7 +78,7 @@ class DynamicCharacterization:
 
     def characterize_dynamic_inventory(
         self,
-        metric: str | None = "radiative_forcing",  # available metrics are "radiative_forcing" and "GWP" #TODO CHange to GWP
+        metric: str | None = "GWP",  # available metrics are "radiative_forcing" and "GWP", defaulting to GWP
         time_horizon: int | None = 100,
         fixed_time_horizon: (
             bool | None
