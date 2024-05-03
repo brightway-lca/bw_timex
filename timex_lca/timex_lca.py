@@ -53,8 +53,7 @@ class TimexLCA:
 
     TimexLCA calculates:
      1) a static LCA score (`TimexLCA.static_lca.score`, same as `bw2calc.lca.score`),
-     2) a static time-explicit LCA score (`TimexLCA.score`), which links LCIs to the respective background databases
-     but without additional temporal dynamics of the biosphere flows 
+     2) a static time-explicit LCA score (`TimexLCA.score`), which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows 
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and dynamic charaterization factors. These are provided for radiative forcing and GWP but can also be user-defined.
 
     Example
@@ -80,7 +79,7 @@ class TimexLCA:
         database_date_dict: dict = None,
     ) -> None:
         """
-        Initializes the `TimexLCA` object. Calculates a static LCA, initializes time mapping dicts for activities and biosphere flows, and stores useful subsets of ids in the node_id_collection_dict.
+        Instantiating a `TimexLCA` object calculates a static LCA, initializes time mapping dicts for activities and biosphere flows, and stores useful subsets of ids in the node_id_collection_dict.
 
         Parameters
         ----------
