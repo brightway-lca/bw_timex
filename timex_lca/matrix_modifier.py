@@ -9,12 +9,10 @@ from datetime import datetime
 
 class MatrixModifier:
     """
-    This class is responsible for creating a datapackage that contains matrix entries for the temporally "exploded" processes, based on a timeline dataframe (created from TimelineBuilder.build_timeline()).
+    This class is responsible for modifying the original LCA matrices to contain the time-explicit processes and to relink them to the time-explicit background databasess. 
+    
+    It does this by ccreating datapackages that contain new matrix entries all changes in the matrices, based on a timeline dataframe (created from TimelineBuilder.build_timeline()).
 
-    :param timeline: A DataFrame representing the timeline.
-    :param database_date_dict_static_only: A dictionary mapping databases to dates.
-    :param demand_timing: A dictionary representing the demand timing.
-    :param name: An optional name for the MatrixModifier instance. Default is None.
     """
 
     def __init__(
@@ -23,7 +21,26 @@ class MatrixModifier:
         database_date_dict_static_only: dict,
         demand_timing: dict,
         name: Optional[str] = None,
-    ):
+    ) -> None:
+        """
+        Initializes the MatrixModifier object.
+
+        Parameters
+        ----------
+        timeline : pd.DataFrame
+            A DataFrame of the timeline of exchanges
+        database_date_dict_static_only : dict
+            A dictionary mapping the static background databases to dates.
+        demand_timing : dict
+            A dictionary mapping the demand to its timing.
+        name : str, optional   
+            An optional name for the MatrixModifier instance. Default is None.
+        temporalized_process_ids : set
+            A set to collect the ids the "exploded" processes, instantiated empty
+        temporal_market_ids : set
+            A set to collect the ids of the "temporal markets" , instantiated empty
+        """
+
         self.timeline = timeline
         self.database_date_dict_static_only = database_date_dict_static_only
         self.demand_timing = demand_timing
@@ -36,18 +53,19 @@ class MatrixModifier:
         Creates patches to the technosphere matrix from a given timeline of grouped exchanges to add these temporal processes to the technopshere database.
         Patches are datapackages that add or overwrite datapoints in the LCA matrices before LCA calculations.
 
-        The heavy lifting of this function happens in its inner function "add_row_to_datapackage":
+        The heavy lifting of this function happens in its inner function `add_row_to_datapackage()`:
         Here, each node with a temporal distribution is "exploded", which means each occurrence of this node (e.g. steel production on 2020-01-01
         and steel production 2015-01-01) becomes a separate, time-explicit new node, by adding the respective elements to the technosphere matrix.
         For processes at the interface with background databases, the timing of the exchanges determines which background database to link to in so called "Temporal Markets".
 
+        Parameters
+        ----------
+        None
 
-        :param timeline: A timeline of edges, typically created from EdgeExtracter.create_edge_timeline()
-        :param database_date_dict_static_only: A dict of the available databases: their names (key) and temporal representativeness (value).
-        :param demand_timing: A dict of the demand ids and their timing. Can be created using create_demand_timing_dict().
-        :param datapackage: Append to this datapackage, if available. Otherwise create a new datapackage.
-        :param name: Name of this datapackage resource.
-        :return: A list of patches formatted as datapackages.
+        Returns
+        -------
+        bwp.Datapackage
+            A datapackage containing the patches for the technosphere matrix.
         """
 
         def add_row_to_datapackage(
@@ -58,21 +76,31 @@ class MatrixModifier:
             new_nodes: set,
         ) -> None:
             """
-            This adds the required technosphere matrix modifications for each time-dependent exchange (edge) as datapackage elements to a given bwp.Datapackage.
+            This adds the required technosphere matrix modifications for each time-dependent exchange (edge) as datapackage elements to a given `bwp.Datapackage`.
             Modifications include:
             1) Exploded processes: new matrix elements between exploded consumer and exploded producer, representing the temporal edge between them.
             2) Temporal markets: new matrix entries between "temporal markets" and the producers in temporally matching background databases, with shares based on interpolation.
                Processes in the background databases are matched on name, reference product and location.
             3) Diagonal entries: ones on the diagonal for new nodes.
 
-            This function also updates the set of new nodes with the ids of any new nodes created during this process.
+            This function also updates the sets of new nodes with the ids of any new nodes created during this process.
 
-            :param row: A row from the timeline DataFrame.
-            :param datapackage: The datapackage to which the new patches will be added.
-            :param database_date_dict_static_only: A dict of the available databases: their names (key) and temporal representativeness (value).
-            :param demand_timing: Dictionary of the demand ids and their timing. Can be created using create_demand_timing_dict().
-            :param new_nodes: Set to which new node ids are added.
-            :return: None, but updates the set new_nodes and adds a patch for this new edge to the bwp.Datapackage.
+            Parameters
+            ----------
+            row : pd.core.frame
+                A row of the timeline DataFrame representing an temporalized edge
+            datapackage : bwp.Datapackage
+                Append to this datapackage, if available. Otherwise create a new datapackage.
+            database_date_dict_static_only : dict
+                A dict of the available background databases: their names (key) and temporal representativeness (value).
+            demand_timing : dict
+                A dict of the demand ids and their timing. Can be created using `TimexLCA.create_demand_timing_dict()`.
+            new_nodes : set
+                Set to which new node ids are added.
+
+            Returns
+            -------
+            None but updates the set new_nodes and adds a patch for this new edge to the bwp.Datapackage.
             """
 
             if row.consumer == -1:  # functional unit
@@ -105,7 +133,7 @@ class MatrixModifier:
                 ),
                 flip_array=np.array(
                     [True], dtype=bool
-                ),  # Question: Why is flip-array always True?
+                ),  
             )
 
             # Check if previous producer comes from background database
@@ -187,9 +215,14 @@ class MatrixModifier:
 
         Temporal markets have to biosphere exchanges, as they only divide the amount of the technosphere exchange between the different databases.
 
-        :param timeline: A DataFrame representing the timeline of edges.
-        :param database_date_dict_static_only:A dict of the available databases: their names (key) and temporal representativeness (value).
-        :return: The updated datapackage with new biosphere exchanges for the new nodes.
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        bwp.Datapackage
+            An updated datapackage containing the patches for the biosphere matrix.
         """
         unique_producers = (
             self.timeline.groupby(["producer", "time_mapped_producer"])
@@ -231,8 +264,18 @@ class MatrixModifier:
 
     def create_datapackage(self) -> None:
         """
-        Creates a list of datapackages for the technosphere and biosphere matrices.
+        Creates a list of datapackages for the technosphere and biosphere matrices, by calling the respective functions.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        list
+            A list of the technosphere and biosphere datapackages.
         """
         technosphere_datapackage = self.create_technosphere_datapackage()
         biosphere_datapackage = self.create_biosphere_datapackage()
+        
         return [technosphere_datapackage, biosphere_datapackage]

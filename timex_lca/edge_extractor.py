@@ -18,13 +18,6 @@ class Edge:
     our graph traversal (either through cutoff or a filter
     function).
 
-    Attributes
-    ----------
-    distribution : TemporalDistribution
-    leaf : bool
-    consumer : int
-    producer : int
-
     """
 
     distribution: TemporalDistribution
@@ -40,32 +33,48 @@ class Edge:
 class EdgeExtractor(TemporalisLCA):
     """
     Child class of TemporalisLCA that traverses the supply chain just as the parent class but can create a timeline of edges, in addition timeline of flows or nodes.
-    The edge timeline is then used to match the timestamp of edges to that of background databases and to replace these edges with edges from these background databases using Brightway Datapackages
+    The edge timeline is then used to match the timestamp of edges to that of background databases and to replace these edges with edges from these background databases using Brightway Datapackages.
     """
 
-    def __init__(self, *args, edge_filter_function: Callable = None, **kwargs):
+    def __init__(self, *args, edge_filter_function: Callable = None, **kwargs) -> None:
         """
         Initialize the EdgeExtractor class.
 
-        :param args: Variable length argument list.
-        :param edge_filter_function: A callable that filters edges. If not provided, a function that always returns False is used.
-        :param kwargs: Arbitrary keyword arguments.
+        Parameters
+        ----------
+        *args : Variable length argument list
+        edge_filter_function : Callable, optional
+            A callable that filters edges. If not provided, a function that always returns False is used.
+        **kwargs : Arbitrary keyword arguments
+
+        Returns
+        -------
+        None
+        
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs) #use __init__ of TemporalisLCA
         if edge_filter_function:
             self.edge_ff = edge_filter_function
         else:
             self.edge_ff = lambda x: False
 
-    def build_edge_timeline(self) -> List:
+    def build_edge_timeline(self) -> list:
         """
-        Creates a timeline of the edges from the graph traversal. Starting from the edges of the functional unit node, it goes through each node using a heap, selecting the node iwth the highest impact first.
-        and propagates the TemporalDistributions of the edges from node to node through time using convolution-operators during multiplication.
+        Creates a timeline of the edges from the graph traversal. Starting from the edges of the functional unit node, it goes through each node using a heap, selecting the node with the highest impact first.
+        It, then, propagates the TemporalDistributions of the edges from node to node through time using convolution-operators during multiplication.
         It stops in case the current edge is known to have no temporal distribution (=leaf) (e.g. part of background database).
 
-        :return: A list of Edge instances with timestamps and amounts, and ids of its producing and consuming node.
-        -------------------
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        list
+            A list of Edge instances with timestamps and amounts, and ids of its producing and consuming node.
+
         """
+
         heap = []
         timeline = []
 
@@ -120,13 +129,14 @@ class EdgeExtractor(TemporalisLCA):
                 # If an edge does not have a TD, give it a td with timedelta=0 and the amount= 'edge value'
                 if isinstance(td_producer, Number):
                     td_producer = TemporalDistribution(
-                        date=np.array([0], dtype="timedelta64[Y]"),  # `M` is months
+                        date=np.array([0], dtype="timedelta64[Y]"),  
                         amount=np.array([td_producer]),
                     )
 
                 distribution = (
                     td * td_producer
                 ).simplify()  # convolution-multiplication of TemporalDistribution of consuming node (td) and consumed edge (edge) gives TD of producing node
+                
                 timeline.append(
                     Edge(
                         distribution=distribution,
@@ -165,16 +175,30 @@ class EdgeExtractor(TemporalisLCA):
         If the producer does not have a TemporalDistribution, the consumer's TemporalDistribution is returned to continue the timeline.
         If both the producer and consumer have TemporalDistributions, they are joined together.
 
-        :param td_producer: TemporalDistribution of the producer. Expected to be a datetime TemporalDistribution.
-        :param td_consumer: TemporalDistribution of the consumer. Expected to be a timedelta TemporalDistribution.
-        :return: A new TemporalDistribution that is the result of joining the producer and consumer TemporalDistributions.
-        :raises ValueError: If the dtype of `td_consumer.date` is not `datetime64[s]` or the dtype of `td_producer.date` is not `timedelta64[s]`.
+        Parameters
+        ----------
+        td_producer : TemporalDistribution
+            TemporalDistribution of the producer. Expected to be a datetime TemporalDistribution.
+        td_consumer : TemporalDistribution
+            TemporalDistribution of the consumer. Expected to be a timedelta TemporalDistribution.
+
+        Returns
+        -------
+        TemporalDistribution
+            A new TemporalDistribution that is the result of joining the producer and consumer TemporalDistributions.
+
+        Raises
+        ------
+        ValueError
+            If the dtype of `td_consumer.date` is not `datetime64[s]` or the dtype of `td_producer.date` is not `timedelta64[s]`.
+
         """
         # if an edge does not have a TD, then return the consumer_td so that the timeline continues
         if isinstance(td_consumer, TemporalDistribution) and isinstance(
             td_producer, Number
         ):
             return td_consumer
+        
         # Else, if both consumer and producer have a td (absolute and relative, respectively) join to TDs
         if isinstance(td_producer, TemporalDistribution) and isinstance(
             td_consumer, TemporalDistribution

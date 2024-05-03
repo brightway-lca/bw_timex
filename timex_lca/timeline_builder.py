@@ -18,17 +18,10 @@ from .utils import (
 
 class TimelineBuilder:
     """
-    This class is responsible for building a timeline based on the provided static LCA (slca). First, the EdgeExtractor handles the graph traversal and extracts the edges. On calling TimelineBuilder.build_timeline(), the information from the EdgeExtractor is used to build a timeline dataframe.
-    The static LCA is needed to inform the priority-first traversal of the supply chain and impact cut-off based on the LCIA score of the chosen impact category. Thus, the decision, which branch to follow is based on the static system.
-    The priority-first graph traversal is based on BW_temporalis, with EdgeExtractor being a child class of TemporalisLCA.
+    This class is responsible for building a timeline of processes based on the temporal relationship of the priority-first graph traversal.
 
-    :param slca: Static LCA.
-    :param edge_filter_function: A callable that filters edges. If not provided, a function that always returns False is used.
-    :param database_date_dict: A dictionary mapping databases to dates.
-    :param time_mapping_dict: A dictionary to map processes to specific times.
-    :param temporal_grouping: The temporal grouping to be used. Default is "year".
-    :param interpolation_type: The type of interpolation to be used. Default is "linear".
-    :param kwargs: Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA. Here, things like the max_calc or cutoff values fot the graph traversal can be set.
+    First, the `EdgeExtractor` is called and it extracts a timeline of exchanges (edge_timeline) with tempoal information.
+    Identical edges within temporal grouping (e.g. year, month, day, hour) are then grouped together and the amount of exchanges is summed up.
     """
 
     def __init__(
@@ -43,7 +36,27 @@ class TimelineBuilder:
         interpolation_type: str = "linear",
         *args,
         **kwargs,
-    ):
+    ) -> None:
+        """
+        Parameters
+        ----------
+        slca: LCA
+            A static LCA object.
+        edge_filter_function: Callable
+            A callable that filters edges. If not provided, a function that always returns False is used.
+        database_date_dict: dict
+            A dictionary mapping databases to dates.
+        time_mapping_dict: dict
+          A dictionary to map processes to specific times.
+        temporal_grouping: str, optional
+            The temporal grouping to be used. Default is "year".
+        interpolation_type: str, optional
+            The type of interpolation to be used to select the background databases. Default is "linear".
+        args:   Variable length argument list
+            Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA. Here, things like the max_calc or cutoff values fot the graph traversal can be set.
+        kwargs: Arbitrary keyword arguments
+            Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA.
+        """
         self.slca = slca
         self.edge_filter_function = edge_filter_function
         self.database_date_dict = database_date_dict
@@ -79,7 +92,7 @@ class TimelineBuilder:
         )
         self.edge_timeline = self.edge_extractor.build_edge_timeline()
 
-    def check_database_names(self):
+    def check_database_names(self) -> None:
         """
         Check that the strings of the databases exist in the databases of the brightway project.
 
@@ -102,11 +115,15 @@ class TimelineBuilder:
             - "linear": linear interpolation between the two closest databases, based on temporal distance.
             - "closest": closest database is assigned 1
 
-        :param tl: Timeline containing edge information.
-        :param database_date_dict: Mapping dictionary name of database (key) and the time of representativeness (value).
-        :param temporal_grouping: Type of temporal grouping (default is "year"). Available options are "year", "month", "day" and "hour" (TODO fix day and hour)
-        :param interpolation_type: Type of interpolation (default is "linear"). Available options are "linear" and "nearest".
-        :return: Grouped edge dataframe.
+        Parameters
+        ----------
+        None 
+            (all are already passed during instantiation)
+        
+        Returns
+        -------
+        pd.DataFrame
+            A timeline with grouped, time-explicit edges and interpolation weights to background databases.
         """
 
         def extract_edge_data(edge: Edge) -> dict:
@@ -205,13 +222,22 @@ class TimelineBuilder:
 
             return tl_df
 
-        def add_interpolation_weights_at_intersection_to_background(row):
+        def add_interpolation_weights_at_intersection_to_background(row) -> Union[dict, None]:
             """
             returns the interpolation weights to background databases only for those exchanges, where the producing process
             actually comes from a background database (temporal markets).
 
             Only these processes are receiving inputs from the background databases.
-            All other process in the timeline are not directly linked to the background, so the interpolation weight info is not needed.
+            All other process in the timeline are not directly linked to the background, so the interpolation weight info is not needed and set to None
+
+            Parameters
+            ----------
+            row : pd.Series
+                Row of the timeline dataframe
+            Returns
+            -------
+            dict
+                Dictionary with the name of databases and interpolation weights.
             """
 
             if (

@@ -11,7 +11,7 @@ from .utils import convert_date_string_to_datetime
 
 class DynamicBiosphereBuilder:
     """
-    This class is used to build a dynamic biosphere matrix, which in contrast to the normal biosphere matrix has rows for each biosphere flow at their time of emission
+    This class is used to build a dynamic biosphere matrix, which in contrast to the normal biosphere matrix has rows for each biosphere flow at their time of emission. 
     Thus, the dimensions are (bio_flows at a specific timestep) x (processes).
     """
 
@@ -25,8 +25,35 @@ class DynamicBiosphereBuilder:
         temporal_grouping: str,
         database_date_dict: dict,
         database_date_dict_static_only: dict,
-        len_technosphere_dbs: int,
-    ):
+    ) -> None:
+        """ 
+        Initializes the DynamicBiosphereBuilder object.
+
+        Parameters
+        ----------
+        lca_obj : LCA objecct
+            instance of the bw2calc LCA class, e.g. TimexLCA.lca
+        activity_time_mapping_dict : dict
+            A dictionary mapping activity to their respective timing in the format (('database', 'code'), datetime_as_integer): time_mapping_id)
+        biosphere_time_mapping_dict : dict
+            A dictionary mapping biosphere flows to their respective timing in the format (('database', 'code'), datetime_as_integer): time_mapping_id), at this point still empty.
+        demand_timing_dict : dict
+            A dictionary mapping of the demand to demand time
+        node_id_collection_dict : dict
+            A dictionary containing lists of node ids for different node subsets
+        temporal_grouping : str
+            A string indicating the temporal grouping of the processes, e.g. 'year', 'month', 'day', 'hour'
+        database_date_dict : dict
+            A dictionary mapping database names to their respective date
+        database_date_dict_static_only : dict
+            A dictionary mapping database names to their respective date, but only containing static databases, which are the background databases.
+ 
+        Returns
+        -------
+        None
+
+        """
+
         self._time_res_dict = {
             "year": "datetime64[Y]",
             "month": "datetime64[M]",
@@ -45,7 +72,6 @@ class DynamicBiosphereBuilder:
         self.temporal_grouping = temporal_grouping
         self.database_date_dict = database_date_dict
         self.database_date_dict_static_only = database_date_dict_static_only
-        self.len_technosphere_dbs = len_technosphere_dbs
         self.dynamic_supply_array = lca_obj.supply_array
         self.rows = []
         self.cols = []
@@ -54,8 +80,17 @@ class DynamicBiosphereBuilder:
     def build_dynamic_biosphere_matrix(self):
         """
         This function creates a separate biosphere matrix, with the dimenions (bio_flows at a specific timestep) x (processes).
-        Thus, every temporally resolved biosphere flow has its own row in the matrix, making it highly sparse.
+        Every temporally resolved biosphere flow has its own row in the matrix, making it highly sparse.
         The timing of the emitting process and potential additional temporal information of the bioshpere flow (e.g. delay of emission compared to timing of process) are considered.
+        
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        dynamic_biomatrix : scipy.sparse.csr_matrix
+            A sparse matrix with the dimensions (bio_flows at a specific timestep) x (processes), where every row represents a biosphere flow at a specific time.
         """
 
         for id in self.node_id_collection_dict["temporalized_processes"]:
@@ -141,7 +176,7 @@ class DynamicBiosphereBuilder:
 
                 time_in_datetime = convert_date_string_to_datetime(
                     self.temporal_grouping, str(time)
-                )  # cnow time is a datetime
+                )  # now time is a datetime
 
                 td_producer = TemporalDistribution(
                     date=np.array([str(time_in_datetime)], dtype=self.time_res),
@@ -166,12 +201,21 @@ class DynamicBiosphereBuilder:
 
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
         """
-        Adds an entry to the lists of row, col and values, which are used to construct the dynamic biosphere matrix, using build_biomatrix()
+        Adds an entry to the lists of row, col and values, which are then used to construct the dynamic biosphere matrix.
 
-        :param row: A row index of a new element to the dynamic biosphere matrix
-        :param col: A column index of a new element to the dynamic biosphere matrix
-        :param amount: The amount of the new element to the dynamic biosphere matrix
-        :return: None, but the lists of row, col and values are updated
+        Parameters
+        ----------
+        row : int
+            A row index of a new element to the dynamic biosphere matrix
+        col: int
+            A column index of a new element to the dynamic biosphere matrix
+        amount: float
+            The amount of the new element to the dynamic biosphere matrix
+
+        Returns
+        -------
+        None, but the lists of row, col and values are updated
+
         """
         self.rows.append(row)
         self.cols.append(col)

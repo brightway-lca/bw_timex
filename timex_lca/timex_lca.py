@@ -430,8 +430,7 @@ class TimexLCA:
             self.temporal_grouping,
             self.database_date_dict,
             self.database_date_dict_static_only,
-            self.len_technosphere_dbs,
-        )
+            )
         self.dynamic_biomatrix = (
             self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
         )
