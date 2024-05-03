@@ -171,7 +171,7 @@ class TimexLCA:
     def add_activities_to_time_mapping_dict(self) -> None:
         """
         Adds all activities to `activity_time_mapping_dict`, an instance of `TimeMappingDict`.
-        This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id) that is later used to uniquely identify time-resolved processes.
+        This gives a unique mapping in the form of {(('database', 'code'), datetime_as_integer): time_mapping_id} that is later used to uniquely identify time-resolved processes.
         
         Parameters
         ----------
