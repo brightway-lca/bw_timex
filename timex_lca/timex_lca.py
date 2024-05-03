@@ -57,23 +57,6 @@ class TimexLCA:
      but without additional temporal dynamics of the biosphere flows 
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and dynamic charaterization factors. These are provided for radiative forcing and GWP but can also be user-defined.
 
-    Parameters
-    ----------
-    demand : dict[object: float]
-            The demand for which the LCA will be calculated. The keys can be Brightway `Node`
-            instances, `(database, code)` tuples, or integer ids.
-    method : tuple
-            Tuple defining the LCIA method, such as `('foo', 'bar')` or default methods, such as `("EF v3.1", "climate change", "global warming potential (GWP100)")`
-    database_date_dict : dict, optional
-            Dictionary mapping database names to dates. 
-    edge_filter_function : Callable, optional
-            Function to skip edges in the graph traversal. Default is to skip all edges within background databases.
-    temporal_grouping : str, optional
-            Time resolution for grouping exchanges over time in the timeline. Default is 'year', other options are 'month', 'day', 'hour'.
-    interpolation_type : str, optional
-            Type of interpolation when sourcing the new producers in the time-explicit background databases. Default is 'linear', 
-            which means linear interpolation between the closest 2 databases, other options are 'closest', which selects only the closest database.
-
     Example
     -------
 
@@ -100,8 +83,25 @@ class TimexLCA:
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
     ) -> None:
-        """__init__ initializes the `TimexLCA` object, and calculates a static LCA. It also initializes an instance of the `TimelineBuilder`, and stores useful subsets of ids.
-        Parameters are described in the `TimexLCA` class docstring.
+        """
+        Initializes the `TimexLCA` object. Calculates a static LCA, creates time mapping dicts for activities and biosphere flows, and stores useful subsets of ids in the node_id_collection_dict.
+
+        Parameters
+        ----------
+        demand : dict[object: float]
+                The demand for which the LCA will be calculated. The keys can be Brightway `Node`
+                instances, `(database, code)` tuples, or integer ids.
+        method : tuple
+                Tuple defining the LCIA method, such as `('foo', 'bar')` or default methods, such as `("EF v3.1", "climate change", "global warming potential (GWP100)")`
+        database_date_dict : dict, optional
+                Dictionary mapping database names to dates.
+        edge_filter_function : Callable, optional
+                Function to skip edges in the graph traversal. Default is to skip all edges within background databases.
+        temporal_grouping : str, optional
+                Time resolution for grouping exchanges over time in the timeline. Default is 'year', other options are 'month', 'day', 'hour'.
+        interpolation_type : str, optional
+                Type of interpolation when sourcing the new producers in the time-explicit background databases. Default is 'linear',
+                which means linear interpolation between the closest 2 databases, other options are 'closest', which selects only the closest database.
 
         """
         self.demand = demand
@@ -433,7 +433,7 @@ class TimexLCA:
             self.temporal_grouping,
             self.database_date_dict,
             self.database_date_dict_static_only,
-            )
+        )
         self.dynamic_biomatrix = (
             self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
         )
