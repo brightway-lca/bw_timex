@@ -226,7 +226,8 @@ class TimexLCA:
         """
         Calculates the time-explicit LCI.
 
-        Generates the biosphere and technosphere modifications via the `MatrixModifier` class by calling `TimexLCA.build_datapackage()`. Optionally, the dynamic biosphere matrix and dynamic inventory is calculated via
+        Generates the biosphere and technosphere modifications via the `MatrixModifier` class by calling `TimexLCA.
+        build_datapackage()`. Optionally, the dynamic biosphere matrix and dynamic inventory is calculated via
         `TimexLCA.calculate_dynamic_inventory()`. Set `build_dynamic_biosphere` to False if you only want to get a new
         overall score and don't care about the timing
         of the emissions. This saves time and memory.

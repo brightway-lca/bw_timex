@@ -103,7 +103,7 @@ Depending on the user's choice, two different biosphere matrices are created:
 
 Static or dynamic impact assessment
 -----------------------------------
-``timex_lca`` allows to use conventional static impact assessment methods, which are executed using ``TimexLCA.lcia()``. 
+``timex_lca`` allows to use conventional static impact assessment methods, which are executed using ``TimexLCA.static_lcia()``. 
 
 To take advantage of the detailed temporal information at the inventory level, dynamic LCIA can be applied, using ``TimexLCA.dynamic_lcia()``. Users can define or import their own dynamic LCIA functions.
 Out of the box, we provide dynamic LCIA functions for the climate change metrics 'radiative forcing' and 'global warming potential (GWP)' for all greenhouse gases in the `IPCC AR6 report Chapter 7 Table 7.SM.7 <https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/>`_.
