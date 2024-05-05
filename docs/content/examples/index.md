@@ -32,7 +32,7 @@ Example of some of the dynamic characterization capabilities that come with a Ti
 ```{image} ./data/dynamic_characterization.svg
 ```
 +++
-by @TimoDiepers
+by @muelleram
 :::
 
 :::{grid-item-card} ... more is coming soon 🤗
