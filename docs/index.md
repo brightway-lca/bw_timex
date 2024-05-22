@@ -29,8 +29,8 @@ Here's a visualization of what `timex_lca` can do for you:
 
 ## Support: 
 If you have any questions or need help, do not hesitate to contact us:
-- [timo.diepers@ltt.rwth-aachen.de](mailto:timo.diepers@ltt.rwth-aachen.de)
-- [a.muller@cml.leidenuniv.nl](mailto:a.muller@cml.leidenuniv.nl)
+- Timo Diepers ([timo.diepers@ltt.rwth-aachen.de](mailto:timo.diepers@ltt.rwth-aachen.de))
+- Amelie Müller ([a.muller@cml.leidenuniv.nl](mailto:a.muller@cml.leidenuniv.nl))
 
 ```{toctree}
 ---
