@@ -3,7 +3,8 @@
 `timex_lca` is a Python software package. It's available via [`pip`](https://pypi.org/project/pip/) or  [`conda`](https://docs.conda.io/en/latest/) / [`mamba`](https://mamba.readthedocs.io/en/latest/).
 
 ```{note}
-We currently recommend the installation via `conda` or `mamba`. That's what we're providing detailed instructions for below. 
+1) We currently recommend the installation via `conda` or `mamba`. That's what we're providing detailed instructions for below. 
+2) timex_lca depends on Brightway25, and will install bw25-compatible versions of the bw packages. This means that it cannot be added to existing virtual environments that are based on Brightway2, e.g. virtual environments containing activity browser. Please install timex_lca in a separate virtual environment following the instructions below. 
 ```
 
 ## Installing `timex_lca` using `conda` or `mamba`
