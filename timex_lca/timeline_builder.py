@@ -86,18 +86,13 @@ class TimelineBuilder:
             ]
         ]
 
-        # The graph traversal needs the matrix indices, not the database / node indices.
-        static_activity_matrix_indices = [
-            self.slca.dicts.product[node_id] for node_id in static_activity_db_indices
-        ]
-
         self.edge_extractor = EdgeExtractor(
             slca,
             *args,
             edge_filter_function=edge_filter_function,
             cutoff=self.cutoff,
             max_calc=self.max_calc,
-            static_activity_indices=set(static_activity_matrix_indices),
+            static_activity_indices=set(static_activity_db_indices),
             **kwargs,
         )
         self.edge_timeline = self.edge_extractor.build_edge_timeline()
