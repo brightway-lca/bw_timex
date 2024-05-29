@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "timex_lca"
 authors = [
-  { name="Timo Diepers", email="timo.diepers@ltt.rwth-aachen.de"},
+  { name="Timo Diepers <timo.diepers@ltt.rwth-aachen.de>"},
   { name="Amelie Müller"},
   { name="Arthur Jakobs"},
 ]
 maintainers = [
-  { name="Timo Diepers", email="timo.diepers@ltt.rwth-aachen.de"},
+  { name="Timo Diepers <timo.diepers@ltt.rwth-aachen.de>"},
   { name="Amelie Müller"}
 ]
 
@@ -60,7 +60,7 @@ docs = [
 
 [tool.setuptools]
 license-files = ["LICENSE"]
-package-data = {timex_lca = ["*.md", "*.txt", "data/*.csv"]}
+package-data = {timex_lca = ["*.md", "*.txt", "data/*.json"]}
 package-dir = { "" = "."}
 packages = [
     "timex_lca",
