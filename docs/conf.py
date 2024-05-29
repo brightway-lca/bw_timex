@@ -138,12 +138,12 @@ html_theme_options = {
             "url": "https://github.com/TimoDiepers/timex",
             "icon": "fab fa-brands fa-github",
         },
-        {
-            "name": "Conda",
-            "url": "https://anaconda.org/diepers/timex_lca",
-            "icon": "fa-brands fa-python",
-            "type": "fontawesome",
-        },
+        # {
+        #     "name": "Conda",
+        #     "url": "https://anaconda.org/diepers/timex_lca",
+        #     "icon": "fa-brands fa-python",
+        #     "type": "fontawesome",
+        # },
     ],
     # various settings
     "collapse_navigation": True,
