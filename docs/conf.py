@@ -12,7 +12,8 @@ sys.path.insert(0, os.path.abspath('.'))
 ###################################################################################################
 
 project = 'timex_lca'
-copyright = datetime.date.today().strftime("%Y") + ' timex_lca Developers'
+author = 'Timo Diepers, Amelie Müller, Arthur Jakobs'
+copyright = datetime.date.today().strftime("%Y") + ' timex_lca developers'
 version: str = 'latest' # required by the version switcher
 
 ###################################################################################################
@@ -102,22 +103,30 @@ html_show_sphinx = False
 html_show_copyright = True
 
 html_css_files = [
-    "css/custom.css",
+    "custom.css",
     "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" # for https://fontawesome.com/ icons
 ]
 
 html_sidebars = {
     "**": [
-        "search-field.html",
         "sidebar-nav-bs.html",
     ],
+    "content/index": [],
+    "content/installation": [],
+    "content/theory": [],
+    "content/contributing": [],
+    "content/codeofconduct": [],
+    "content/license": [],
+    "content/chagnelog": [],
 }
 
 html_theme_options = {
     # page elements
+    "announcement": "⚠️ This package is under active development and some functionalities may change in the future.",
     "navbar_start": ["navbar-logo"],
-    "navbar_end": ["navbar-icon-links.html"],
-    "navbar_persistent": ["theme-switcher"], # this is where the search button is usually placed
+    "navbar_end": ["theme-switcher", "navbar-icon-links.html"],
+    "navbar_align": "left",
+    # "navbar_persistent": ["theme-switcher"], # this is where the search button is usually placed
     "footer_start": ["copyright"],
     "footer_end": ["footer"],
     "secondary_sidebar_items": ["page-toc", "edit-this-page", "sourcelink", "support"],

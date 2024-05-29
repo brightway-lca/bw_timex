@@ -1,8 +1,6 @@
-> ⚠️ This package is still under development and some functionalities may change in the future.
+# Time-explicit LCA with `timex_lca`
 
-# `timex_lca`
-
-[Timex_lca](https://github.com/TimoDiepers/timex) is a python package for time-explicit Life Cycle Assessment that helps you assess the environmental impacts of products and processes over time. `timex_lca` builds on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
+[timex_lca](https://github.com/TimoDiepers/timex) is a python package for time-explicit Life Cycle Assessment that helps you assess the environmental impacts of products and processes over time. `timex_lca` builds on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
 
 ## Features:
 This package enables you to account for: 
