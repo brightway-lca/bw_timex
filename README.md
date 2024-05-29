@@ -1,7 +1,7 @@
 <h1>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/_static/logo_dark_nomargins.svg" height="50">
-    <img alt="Text changing depending on mode. Light: 'So light!' Dark: 'So dark!'" src="docs/_static/logo_light_nomargins.svg" height="50">
+    <img alt="timex_lca logo" src="docs/_static/logo_light_nomargins.svg" height="50">
   </picture>
 </h1>
 
