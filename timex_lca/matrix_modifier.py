@@ -47,7 +47,24 @@ class MatrixModifier:
         self.name = name
         self.temporalized_process_ids = set()
         self.temporal_market_ids = set()
-      
+    
+    def create_datapackage(self) -> None:
+        """
+        Creates a list of datapackages for the technosphere and biosphere matrices, by calling the respective functions.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        list
+            A list of the technosphere and biosphere datapackages.
+        """
+        technosphere_datapackage = self.create_technosphere_datapackage()
+        biosphere_datapackage = self.create_biosphere_datapackage()
+        
+        return [technosphere_datapackage, biosphere_datapackage]
 
     def create_technosphere_datapackage(self) -> bwp.Datapackage:
         """
@@ -254,20 +271,3 @@ class MatrixModifier:
                 new_producer_id
             )  # comes from foreground, so it is a temporalized process
 
-    def create_datapackage(self) -> None:
-        """
-        Creates a list of datapackages for the technosphere and biosphere matrices, by calling the respective functions.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        list
-            A list of the technosphere and biosphere datapackages.
-        """
-        technosphere_datapackage = self.create_technosphere_datapackage()
-        biosphere_datapackage = self.create_biosphere_datapackage()
-        
-        return [technosphere_datapackage, biosphere_datapackage]
