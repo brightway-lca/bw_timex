@@ -11,7 +11,7 @@ class MatrixModifier:
     """
     This class is responsible for modifying the original LCA matrices to contain the time-explicit processes and to relink them to the time-explicit background databasess. 
     
-    It does this by creating datapackages that contain new matrix entries as changes to the technosphere and biosphere matrices, based on a timeline dataframe (created from TimelineBuilder.build_timeline()).
+    It does this by creating datapackages that add or change matrix entries in technosphere and biosphere matrices, based on a timeline dataframe (created from TimelineBuilder.build_timeline()).
 
     """
 
@@ -23,7 +23,7 @@ class MatrixModifier:
         name: Optional[str] = None,
     ) -> None:
         """
-        Initializes the MatrixModifier object and creates empty sets for the temporalized processes and temporal markets.
+        Initializes the MatrixModifier object and creates empty sets to collect the ids of temporalized processes and temporal markets.
 
         Parameters
         ----------
@@ -112,10 +112,10 @@ class MatrixModifier:
         Creates the modifications to the biosphere matrix in form of a datapackage. Datapackages add or overwrite datapoints in the LCA matrices before LCA calculations.
         It adds the biosphere flows to the exploded technosphere processes.
 
-        This function iterates over each unique producer and for each biosphere exchange of the original activity,
-        it creates a new biosphere exchange for the new node.
+        This function iterates over each unique producer, and for each biosphere exchange of the original activity,
+        it creates a new biosphere exchange for the new "temporalized" node.
 
-        Temporal markets have no biosphere exchanges, as they only divide the amount of the technosphere exchange between the different databases.
+        Temporal markets have no biosphere exchanges, as they only divide the amount of a technosphere exchange between the different databases.
 
         Parameters
         ----------
@@ -124,7 +124,7 @@ class MatrixModifier:
         Returns
         -------
         bwp.Datapackage
-            An updated datapackage containing the patches for the biosphere matrix.
+            A datapackage containing the modifications for the biosphere matrix.
         """
         unique_producers = (
             self.timeline.groupby(["producer", "time_mapped_producer"])
@@ -170,14 +170,14 @@ class MatrixModifier:
         new_nodes: set,
     ) -> None:
         """
-        This adds the required technosphere matrix modifications for each time-dependent exchange (edge) as datapackage elements to a given `bwp.Datapackage`.
+        This adds the modifications to the technosphere matrix for each time-dependent exchange as datapackage elements to a given `bwp.Datapackage`.
         Modifications include:
-        1) Exploded processes: new matrix elements between time-explicit consumer and time-explicit producer, representing the temporal edge between them.
-        2) Temporal markets: new matrix entries between "temporal markets" and the producers in temporally matching background databases, with shares based on interpolation.
+        1) Exploded processes: new matrix elements for time-explicit consumer and time-explicit producer, representing the temporal edge between them.
+        2) Temporal markets: new matrix entries for "temporal markets" and links to the producers in temporally matching background databases.
             Processes in the background databases are matched on name, reference product and location.
         3) Diagonal entries: ones on the diagonal for new nodes.
 
-        This function also updates the sets of new nodes with the ids of any new nodes created during this process.
+        This function also collects the ids of new nodes, temporalized nodes and temporal markets.
 
         Parameters
         ----------
@@ -190,7 +190,7 @@ class MatrixModifier:
 
         Returns
         -------
-        None but updates the set new_nodes and adds a patch for this new edge to the bwp.Datapackage.
+        None but adds elements for this edge to the bwp.Datapackage and stores the ids of new nodes, temporalized nodes and temporal markets.
         """
 
         if row.consumer == -1:  # functional unit
