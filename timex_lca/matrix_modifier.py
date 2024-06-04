@@ -11,7 +11,7 @@ class MatrixModifier:
     """
     This class is responsible for modifying the original LCA matrices to contain the time-explicit processes and to relink them to the time-explicit background databasess. 
     
-    It does this by ccreating datapackages that contain new matrix entries all changes in the matrices, based on a timeline dataframe (created from TimelineBuilder.build_timeline()).
+    It does this by creating datapackages that contain new matrix entries as changes to the technosphere and biosphere matrices, based on a timeline dataframe (created from TimelineBuilder.build_timeline()).
 
     """
 
@@ -23,7 +23,7 @@ class MatrixModifier:
         name: Optional[str] = None,
     ) -> None:
         """
-        Initializes the MatrixModifier object.
+        Initializes the MatrixModifier object and creates empty sets for the temporalized processes and temporal markets.
 
         Parameters
         ----------
@@ -35,10 +35,7 @@ class MatrixModifier:
             A dictionary mapping the demand to its timing.
         name : str, optional   
             An optional name for the MatrixModifier instance. Default is None.
-        temporalized_process_ids : set
-            A set to collect the ids the "exploded" processes, instantiated empty
-        temporal_market_ids : set
-            A set to collect the ids of the "temporal markets", instantiated empty
+ 
         """
 
         self.timeline = timeline
@@ -68,13 +65,13 @@ class MatrixModifier:
 
     def create_technosphere_datapackage(self) -> bwp.Datapackage:
         """
-        Creates patches to the technosphere matrix from a given timeline of grouped exchanges to add these temporal processes to the technopshere database.
-        Patches are datapackages that add or overwrite datapoints in the LCA matrices before LCA calculations.
-
+        Creates the modifications to the technosphere matrix in form of a datapackage. Datapackages add or overwrite datapoints in the LCA matrices before LCA calculations. 
+        The technospher datapackage add the temporalized processes from the timeline to the technosphere matrix.
+        
         The heavy lifting of this method happens in the method `add_row_to_datapackage()` that is called.
         Here, each node with a temporal distribution is "exploded", which means each occurrence of this node (e.g. steel production on 2020-01-01
-        and steel production on 2015-01-01) becomes a separate, time-explicit new node, by adding the respective elements to the technosphere matrix.
-        For processes at the interface with background databases, the timing of the exchanges determines which background database to link to in so called "Temporal Markets".
+        and steel production on 2015-01-01) becomes a separate, time-explicit new node, by adding the new elements to the technosphere matrix.
+        For processes at the intersection with background databases, the timing of the exchanges determines which background database to link to in so called "Temporal Markets".
 
         Parameters
         ----------
@@ -83,7 +80,7 @@ class MatrixModifier:
         Returns
         -------
         bwp.Datapackage
-            A datapackage containing the patches for the technosphere matrix.
+            A datapackage containing the modifications for the technosphere matrix.
         """
         datapackage = bwp.create_datapackage(
             sum_inter_duplicates=False
@@ -112,13 +109,13 @@ class MatrixModifier:
 
     def create_biosphere_datapackage(self) -> bwp.Datapackage:
         """
-        Creates list of patches formatted as datapackages for modifications to the biosphere matrix.
+        Creates the modifications to the biosphere matrix in form of a datapackage. Datapackages add or overwrite datapoints in the LCA matrices before LCA calculations.
         It adds the biosphere flows to the exploded technosphere processes.
 
         This function iterates over each unique producer and for each biosphere exchange of the original activity,
         it creates a new biosphere exchange for the new node.
 
-        Temporal markets have to biosphere exchanges, as they only divide the amount of the technosphere exchange between the different databases.
+        Temporal markets have no biosphere exchanges, as they only divide the amount of the technosphere exchange between the different databases.
 
         Parameters
         ----------
@@ -175,7 +172,7 @@ class MatrixModifier:
         """
         This adds the required technosphere matrix modifications for each time-dependent exchange (edge) as datapackage elements to a given `bwp.Datapackage`.
         Modifications include:
-        1) Exploded processes: new matrix elements between exploded consumer and exploded producer, representing the temporal edge between them.
+        1) Exploded processes: new matrix elements between time-explicit consumer and time-explicit producer, representing the temporal edge between them.
         2) Temporal markets: new matrix entries between "temporal markets" and the producers in temporally matching background databases, with shares based on interpolation.
             Processes in the background databases are matched on name, reference product and location.
         3) Diagonal entries: ones on the diagonal for new nodes.
@@ -229,7 +226,7 @@ class MatrixModifier:
             ),  
         )
 
-        # Check if previous producer comes from background database
+        # Check if previous producer comes from background database -> temporal market
         if (
             previous_producer_node["database"]
             in self.database_date_dict_static_only.keys()
@@ -266,8 +263,9 @@ class MatrixModifier:
                     flip_array=np.array([True], dtype=bool),
                 )
                 self.temporal_market_ids.add(new_producer_id)
+        
+        # comes from foreground, so it is a temporalized process
         else:
             self.temporalized_process_ids.add(
                 new_producer_id
-            )  # comes from foreground, so it is a temporalized process
-
+            ) 
