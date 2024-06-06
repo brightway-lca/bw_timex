@@ -36,30 +36,30 @@ jobs:
         py-version: ["3.10"]
 
     steps:
-      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
+      - uses: actions/checkout@v2
 
       # Set up Miniconda
       - name: Set up Miniconda
         uses: conda-incubator/setup-miniconda@v2
         with:
-          auto-update-conda: true
           python-version: ${{ matrix.py-version }}
+          miniconda-version: "latest"  # Ensure Miniconda is installed
 
-      # Create and activate the conda environment
+      # Create the conda environment
       - name: Create conda environment
-        run: |
-          conda env create -f timex-environment.yml
-          echo "conda activate timex" >> $GITHUB_ENV
+        run: conda env create -f timex-environment.yml
 
       # Install testing dependencies from pyproject.toml
       - name: Install testing dependencies
         run: |
+          source $(conda info --base)/etc/profile.d/conda.sh
           conda activate timex
           pip install .[testing]
 
       # Verify the environment
       - name: Check conda environment
         run: |
+          source $(conda info --base)/etc/profile.d/conda.sh
           conda activate timex
           conda info
           conda list
@@ -67,5 +67,7 @@ jobs:
       # Test with pytest
       - name: Test with pytest
         run: |
+          source $(conda info --base)/etc/profile.d/conda.sh
           conda activate timex
           pytest
+
