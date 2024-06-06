@@ -47,7 +47,7 @@ jobs:
 
       # Create the conda environment
       - name: Create conda environment
-        run: conda env create -f timex-environment.yml
+        run: conda env create -f timex-environment.yaml
 
       # Install testing dependencies from pyproject.toml
       - name: Install testing dependencies
