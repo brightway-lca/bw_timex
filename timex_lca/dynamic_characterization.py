@@ -6,6 +6,7 @@ import warnings
 import json
 
 from typing import Union, Tuple, Optional, Callable, List
+from collections.abc import Collection
 from datetime import datetime
 
 
@@ -338,18 +339,24 @@ class DynamicCharacterization:
         """
         self.characterization_function_dict = dict()
 
-        bioflows_in_lcia_method = bd.Method(self.method).load()
-
         filepath = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "data", "decay_multipliers.json"
         )
         
         with open(filepath) as json_file:
             decay_multipliers = json.load(json_file)
-
-        for flow in bioflows_in_lcia_method:
-            node = bd.get_node(database=flow[0][0], code=flow[0][1])
-
+            
+        method_data = bd.Method(self.method).load()
+        
+        def get_bioflow_node(identifier):
+            if isinstance(identifier, Collection) and len(identifier) == 2: # is code tuple
+                return bd.get_node(database=identifier[0], code=identifier[1])
+            else:
+                return bd.get_node(id=identifier)
+            
+        bioflow_nodes = set(get_bioflow_node(identifier) for identifier, _ in method_data)
+        
+        for node in bioflow_nodes:
             if "carbon dioxide" in node["name"].lower():
                 if "soil" in node.get("categories", []):
                     self.characterization_function_dict[node.id] = (
