@@ -1,0 +1,71 @@
+---
+# This workflow will install Python dependencies and run tests
+# across operating systems, select versions of Python, and user + dev environments
+# For more info see:
+# https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Python 🐍 CI/CD tests
+
+on:
+  push:
+    branches: [main, dev]
+    paths-ignore: # prevents workflow execution when only these types of files are modified
+      - "**.md" # wildcards prevent file in any repo dir from trigering workflow
+      - "**.bib"
+      - "**.ya?ml" # captures both .yml and .yaml
+      - "LICENSE"
+      - ".gitignore"
+  pull_request:
+    branches: [main, dev]
+    types: [opened, reopened] # excludes syncronize to avoid redundant trigger from commits on PRs
+    paths-ignore:
+      - "**.md"
+      - "**.bib"
+      - "**.ya?ml"
+      - "LICENSE"
+      - ".gitignore"
+  workflow_dispatch: # also allow manual trigger, for testing purposes
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        py-version: ["3.10"]
+
+    steps:
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
+
+      # Set up Miniconda
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: ${{ matrix.py-version }}
+
+      # Create and activate the conda environment
+      - name: Create conda environment
+        run: |
+          conda env create -f timex-environment.yml
+          echo "conda activate timex" >> $GITHUB_ENV
+
+      # Install testing dependencies from pyproject.toml
+      - name: Install testing dependencies
+        run: |
+          conda activate timex
+          pip install .[testing]
+
+      # Verify the environment
+      - name: Check conda environment
+        run: |
+          conda activate timex
+          conda info
+          conda list
+
+      # Test with pytest
+      - name: Test with pytest
+        run: |
+          conda activate timex
+          pytest
