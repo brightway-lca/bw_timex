@@ -339,20 +339,25 @@ class DynamicCharacterization:
         """
         self.characterization_function_dict = dict()
 
+        # load pre-calculated decay multipliers for GHGs (except for CO2, CH4, N2O & CO)
         filepath = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "data", "decay_multipliers.json"
         )
         
         with open(filepath) as json_file:
             decay_multipliers = json.load(json_file)
-            
+        
+        # look up which GHGs are characterized in the selected static LCA method
         method_data = bd.Method(self.method).load()
         
+        # the bioflow-identifier stored in the method data can be the database id or the tuple (database, code)
         def get_bioflow_node(identifier):
-            if isinstance(identifier, Collection) and len(identifier) == 2: # is code tuple
+            if isinstance(identifier, Collection) and len(identifier) == 2:  # is code tuple
                 return bd.get_node(database=identifier[0], code=identifier[1])
-            else:
+            elif isinstance(identifier, int):  # id is an int
                 return bd.get_node(id=identifier)
+            else:
+                raise ValueError("The flow-identifier stored in the selected method is neither an id nor the tuple (database, code). No automatic matching possible.")
             
         bioflow_nodes = set(get_bioflow_node(identifier) for identifier, _ in method_data)
         
