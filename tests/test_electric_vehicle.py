@@ -9,32 +9,32 @@ from timex_lca import TimexLCA
 from datetime import datetime
 
 
-from .fixtures.test_databases import create_electric_vehicle_dbs
+# make sure the test db is loaded
+def test_vehicle_db_fixture(vehicle_db):
+    assert len(bd.databases) == 5
+
 
 # for now, one test class, but could be set up more modularly
+@pytest.mark.usefixtures("vehicle_db")
 class TestClass_EV:
-
-    create_electric_vehicle_dbs() #moved database creation to fixtures to avoid cluttered tests, used aggregated LCIs for all excahnges in CO2-eq
     
-    bd.projects.set_current("__test_EV__")
+    @pytest.fixture(autouse=True)
+    def setup_method(self, vehicle_db):
+        self.electric_vehicle = bd.get_node(database="foreground", code="EV")
 
-    foreground = bd.Database("foreground")
-    electric_vehicle = bd.get_activity(("foreground", "EV"))
+        
+        database_date_dict = {
+            "db_2020": datetime.strptime("2020", "%Y"),
+            "db_2030": datetime.strptime("2030", "%Y"),
+            "db_2040": datetime.strptime("2040", "%Y"),
+            "foreground": "dynamic",  
+        }
 
-    
-    database_date_dict = {
-        "db_2020": datetime.strptime("2020", "%Y"),
-        "db_2030": datetime.strptime("2030", "%Y"),
-        "db_2040": datetime.strptime("2040", "%Y"),
-        "foreground": "dynamic",  
-    }
+        self.tlca = TimexLCA(demand={self.electric_vehicle.key: 1}, method=("GWP", "example"), database_date_dict = database_date_dict)
 
-    tlca = TimexLCA(demand={electric_vehicle.key: 1}, method=("GWP", "example"), database_date_dict = database_date_dict)
-
-    tlca.build_timeline()
-    tlca.lci()
-    tlca.static_lcia()
-    tlca.static_score
+        self.tlca.build_timeline()
+        self.tlca.lci()
+        self.tlca.static_lcia()
 
     
     def test_static_lca_score(self):
@@ -42,7 +42,7 @@ class TestClass_EV:
         slca.lci()
         slca.lcia()
         expected_static_score = slca.score
-
+        
         assert self.tlca.static_lca.score == expected_static_score
 
         

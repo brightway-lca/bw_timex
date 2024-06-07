@@ -15,6 +15,8 @@ on:
       - "**.ya?ml" # captures both .yml and .yaml
       - "LICENSE"
       - ".gitignore"
+      - "**.ipynb" # ignore Jupyter notebooks
+
   pull_request:
     branches: [main, dev]
     types: [opened, reopened] # excludes syncronize to avoid redundant trigger from commits on PRs
@@ -24,6 +26,7 @@ on:
       - "**.ya?ml"
       - "LICENSE"
       - ".gitignore"
+      - "**.ipynb" # ignore Jupyter notebooks
   workflow_dispatch: # also allow manual trigger, for testing purposes
 
 jobs:
@@ -32,6 +35,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest] # , windows-latest, macos-latest
+        py-version: ["3.10", "3.11", "3.12"]
         os: [ubuntu-latest, windows-latest, macos-latest]
         py-version: ["3.10"]
 
@@ -47,7 +52,7 @@ jobs:
 
       # Create the conda environment
       - name: Create conda environment
-        run: conda env create -f timex-environment.yaml
+        run: conda create -n timex -c conda-forge -c cmutel brightway25 bw_temporalis matplotlib seaborn 
 
       # Install testing dependencies from pyproject.toml
       - name: Install testing dependencies
