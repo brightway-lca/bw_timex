@@ -4,6 +4,8 @@
 name: Publish Python 🐍 distributions 📦 to PyPI and TestPyPI
 
 on:
+  release:
+    types: [created]
   push:
     branches: [main, dev]
 jobs:
