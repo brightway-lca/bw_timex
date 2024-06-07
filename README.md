@@ -6,7 +6,7 @@
 </h1>
 
 [![Read the Docs](https://img.shields.io/readthedocs/timex?label=documentation)](https://timex.readthedocs.io/en/latest/)
-[![PyPI - Version](https://img.shields.io/pypi/v/timex-lca?color=%2300549f)](https://pypi.org/project/timex-lca/)
+[![PyPI - Version](https://img.shields.io/pypi/v/bw-timex?color=%2300549f)](https://pypi.org/project/timex-lca/)
 [![Conda Version](https://img.shields.io/conda/v/diepers/bw_timex?label=conda)](https://anaconda.org/diepers/bw_timex)
 ![Conda - License](https://img.shields.io/conda/l/diepers/bw_timex)
 
