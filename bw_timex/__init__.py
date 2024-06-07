@@ -1,4 +1,4 @@
-from .bw_timex import TimexLCA
+from .timex_lca import TimexLCA
 from .matrix_modifier import MatrixModifier
 from .edge_extractor import EdgeExtractor
 from .timeline_builder import TimelineBuilder
