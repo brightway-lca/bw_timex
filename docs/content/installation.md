@@ -1,13 +1,13 @@
 # Installation
 
-`timex_lca` is a Python software package. It's available via [`pip`](https://pypi.org/project/pip/) or  [`conda`](https://docs.conda.io/en/latest/) / [`mamba`](https://mamba.readthedocs.io/en/latest/).
+`bw_timex` is a Python software package. It's available via [`pip`](https://pypi.org/project/pip/) or  [`conda`](https://docs.conda.io/en/latest/) / [`mamba`](https://mamba.readthedocs.io/en/latest/).
 
 ```{note}
 1) We currently recommend the installation via `conda` or `mamba`. That's what we're providing detailed instructions for below. 
-2) timex_lca depends on Brightway25, and will install bw25-compatible versions of the bw packages. This means that it cannot be added to existing virtual environments that are based on Brightway2, e.g. virtual environments containing activity browser. Please install timex_lca in a separate virtual environment following the instructions below. 
+2) bw_timex depends on Brightway25, and will install bw25-compatible versions of the bw packages. This means that it cannot be added to existing virtual environments that are based on Brightway2, e.g. virtual environments containing activity browser. Please install bw_timex in a separate virtual environment following the instructions below. 
 ```
 
-## Installing `timex_lca` using `conda` or `mamba`
+## Installing `bw_timex` using `conda` or `mamba`
 
 ```{admonition} Prerequisites
 :class: important
@@ -22,7 +22,7 @@
 1. Create a new Conda environment (in this example named `timex`):
 
 ```console
-conda create -n timex -c conda-forge -c cmutel -c diepers brightway25 timex_lca
+conda create -n timex -c conda-forge -c cmutel -c diepers brightway25 bw_timex
 ```
 
 2. Activate the environment:
@@ -48,7 +48,7 @@ Brightway runs on the new Apple Silicon ARM architecture. However, the super-fas
 1. Create a new Conda environment (in this example named `timex`):
 
 ```
-conda create -n timex -c conda-forge -c cmutel -c diepers brightway25_nosolver scikit-umfpack timex_lca
+conda create -n timex -c conda-forge -c cmutel -c diepers brightway25_nosolver scikit-umfpack bw_timex
 ```
 
 2. Activate the environment:
@@ -65,14 +65,14 @@ conda install -c conda-forge jupyterlab
 
 ::::
 
-## Updating `timex_lca`
+## Updating `bw_timex`
 
-`timex_lca` is being actively developed, with frequent new releases. To update timex_lca using `conda` or `mamba`, activate your environment, and run:
+`bw_timex` is being actively developed, with frequent new releases. To update bw_timex using `conda` or `mamba`, activate your environment, and run:
 
 ``` bash
-conda update -c diepers timex_lca
+conda update -c diepers bw_timex
 ```
 
 ```{warning}
-Newer versions of `timex_lca` can introduce breaking changes. We recommend to create a new environment for each project, and only update `timex_lca` when you are ready to update your project.
+Newer versions of `bw_timex` can introduce breaking changes. We recommend to create a new environment for each project, and only update `bw_timex` when you are ready to update your project.
 ```

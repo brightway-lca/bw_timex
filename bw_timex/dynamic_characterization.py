@@ -69,7 +69,7 @@ class DynamicCharacterization:
 
         if not characterization_function_dict:
             warnings.warn(
-                f"No custom dynamic characterization functions provided. Using default dynamic characterization functions based on IPCC AR6 meant to work with biosphere3 flows. The flows that are characterized are based on the selection of the initially chosen impact category: {self.method}. You can look up the mapping in the timex_lca.dynamic_characterizer.characterization_function_dict."
+                f"No custom dynamic characterization functions provided. Using default dynamic characterization functions based on IPCC AR6 meant to work with biosphere3 flows. The flows that are characterized are based on the selection of the initially chosen impact category: {self.method}. You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_function_dict."
             )
             self.add_default_characterization_functions()
 
@@ -121,7 +121,7 @@ class DynamicCharacterization:
         
         if metric == "GWP":
             warnings.warn(
-                        "Using timex_lca's default CO2 characterization function for GWP reference."
+                        "Using bw_timex's default CO2 characterization function for GWP reference."
                     )
 
         time_res_dict = {

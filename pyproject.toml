@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "timex_lca"
+name = "bw_timex"
 authors = [
   { name="Timo Diepers <timo.diepers@ltt.rwth-aachen.de>"},
   { name="Amelie Müller"},
@@ -60,19 +60,19 @@ docs = [
 
 [tool.setuptools]
 license-files = ["LICENSE"]
-package-data = {timex_lca = ["*.md", "*.txt", "data/*.json"]}
+package-data = {bw_timex = ["*.md", "*.txt", "data/*.json"]}
 package-dir = { "" = "."}
 packages = [
-    "timex_lca",
+    "bw_timex",
 ]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["docs/requirements.txt"]}
-version = {attr = "timex_lca.__version__"}
+version = {attr = "bw_timex.__version__"}
 
 
 [tool.pytest.ini_options]
-addopts = "--cov timex_lca --cov-report term-missing --verbose"
+addopts = "--cov bw_timex --cov-report term-missing --verbose"
 norecursedirs = [
     "dist",
     "build",

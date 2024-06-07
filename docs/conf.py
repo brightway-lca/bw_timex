@@ -11,9 +11,9 @@ sys.path.insert(0, os.path.abspath('.'))
 ### Project Information ###########################################################################
 ###################################################################################################
 
-project = 'timex_lca'
+project = 'bw_timex'
 author = 'Timo Diepers, Amelie Müller, Arthur Jakobs'
-copyright = datetime.date.today().strftime("%Y") + ' timex_lca developers'
+copyright = datetime.date.today().strftime("%Y") + ' bw_timex developers'
 version: str = 'latest' # required by the version switcher
 
 ###################################################################################################
@@ -48,7 +48,7 @@ extensions = [
     "sphinx_copybutton",
 ]
 
-autoapi_dirs = ['../timex_lca']
+autoapi_dirs = ['../bw_timex']
 autoapi_type = 'python'
 autoapi_ignore = [
     '*/data/*',
@@ -140,7 +140,7 @@ html_theme_options = {
         },
         # {
         #     "name": "Conda",
-        #     "url": "https://anaconda.org/diepers/timex_lca",
+        #     "url": "https://anaconda.org/diepers/bw_timex",
         #     "icon": "fa-brands fa-python",
         #     "type": "fontawesome",
         # },
@@ -151,15 +151,15 @@ html_theme_options = {
     "use_edit_page_button": True,
     "navigation_with_keys": True,
     "logo": {
-        "image_light": "logo_light.svg",
-        "image_dark": "logo_dark.svg"
+        "image_light": "bw_timex_light_rtd.svg",
+        "image_dark": "bw_timex_dark_rtd.svg"
     },
 }
 
 # required by html_theme_options: "use_edit_page_button"
 html_context = {
     "github_user": "TimoDiepers",
-    "github_repo": "timex_lca",
+    "github_repo": "bw_timex",
     "github_version": "main",
     "doc_path": "docs",
 }

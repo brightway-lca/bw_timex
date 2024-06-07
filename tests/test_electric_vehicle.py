@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import bw2calc as bc
 import bw2data as bd
-from timex_lca import TimexLCA
+from bw_timex import TimexLCA
 from datetime import datetime
 
 
@@ -46,7 +46,7 @@ class TestClass_EV:
         assert self.tlca.static_lca.score == expected_static_score
 
         
-    def test_timex_lca_score(self):
+    def test_bw_timex_score(self):
         ELECTRICITY_CONSUMPTION = 0.2  # kWh/km
         MILEAGE = 150_000  # km
         LIFETIME = 16  # years

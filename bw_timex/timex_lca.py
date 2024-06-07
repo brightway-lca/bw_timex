@@ -11,7 +11,7 @@ from scipy import sparse
 
 from datetime import datetime
 from typing import Optional, Callable
-from bw2data import (  # for prepare_timex_lca_inputs
+from bw2data import (  # for prepare_bw_timex_inputs
     Database,
     Method,
     Normalization,
@@ -43,7 +43,7 @@ class TimexLCA:
     resulting emissions. As such, it combines prospective and dynamic LCA approaches.
 
     TimexLCA first calculates a static LCA, which informs a priority-first graph traversal. From the graph traversal,
-    temporal relationships between exchanges and processes are derived. Based on the timing of the processes, timex_lca
+    temporal relationships between exchanges and processes are derived. Based on the timing of the processes, bw_timex
     matches the processes at the intersection between foreground and background to the best available background
     databases. This temporal relinking is achieved by using datapackages to add new time-specific processes. The new
     processes and their exchanges to other technosphere processes or biosphere flows extent the technopshere and
@@ -62,13 +62,13 @@ class TimexLCA:
     >>> method = ("some_method_family", "some_category", "some_method")    #replace here with your method   
     >>> database_date_dict = {'my_database': datetime.strptime("2020", "%Y"),
                               'my_foreground_database':'dynamic'} #replace here with your database dates
-    >>> timex_lca = TimexLCA(demand, method, database_date_dict) 
-    >>> timex_lca.build_timeline() # you can pass many optional arguments here, also for the graph traversal
-    >>> timex_lca.lci()
-    >>> timex_lca.static_lcia()
-    >>> timex_lca.static_score
-    >>> timex_lca.dynamic_lcia(metric="radiative_forcing") # different metrics can be used, e.g. "GWP", "radiative_forcing"
-    >>> timex_lca.dynamic_score
+    >>> bw_timex = TimexLCA(demand, method, database_date_dict) 
+    >>> bw_timex.build_timeline() # you can pass many optional arguments here, also for the graph traversal
+    >>> bw_timex.lci()
+    >>> bw_timex.static_lcia()
+    >>> bw_timex.static_score
+    >>> bw_timex.dynamic_lcia(metric="radiative_forcing") # different metrics can be used, e.g. "GWP", "radiative_forcing"
+    >>> bw_timex.dynamic_score
 
     """ """"""
 
@@ -175,7 +175,7 @@ class TimexLCA:
             
         See also
         --------
-        timex_lca.timeline_builder.TimelineBuilder: Class that builds the timeline.
+        bw_timex.timeline_builder.TimelineBuilder: Class that builds the timeline.
 
         """
         if not edge_filter_function:
@@ -257,7 +257,7 @@ class TimexLCA:
             self.build_datapackage()
         )  # this contains the matrix modifications
 
-        self.fu, self.data_objs, self.remapping = self.prepare_timex_lca_inputs(
+        self.fu, self.data_objs, self.remapping = self.prepare_bw_timex_inputs(
             demand=self.demand,
             method=self.method,
             demand_timing_dict=self.demand_timing_dict,
@@ -341,7 +341,7 @@ class TimexLCA:
             
         See also
         --------
-        timex_lca.dynamic_characterization.DynamicCharacterization: Class that characterizes the dynamic inventory.
+        bw_timex.dynamic_characterization.DynamicCharacterization: Class that characterizes the dynamic inventory.
         """
 
         if not hasattr(self, "dynamic_inventory"):
@@ -397,7 +397,7 @@ class TimexLCA:
             
         See also
         --------
-        timex_lca.matrix_modifier.MatrixModifier: Class that handles the technosphere and biosphere matrix modifications.
+        bw_timex.matrix_modifier.MatrixModifier: Class that handles the technosphere and biosphere matrix modifications.
         """
         # mapping of the demand id to demand time
         self.demand_timing_dict = self.create_demand_timing_dict()
@@ -432,7 +432,7 @@ class TimexLCA:
         
         See also
         --------
-        timex_lca.dynamic_biosphere_builder.DynamicBiosphereBuilder: Class for creating the dynamic biosphere matrix and inventory.
+        bw_timex.dynamic_biosphere_builder.DynamicBiosphereBuilder: Class for creating the dynamic biosphere matrix and inventory.
         """
 
         if not hasattr(self, "lca"):
@@ -654,7 +654,7 @@ class TimexLCA:
 
         return indexed_demand, data_objs, remapping_dicts
 
-    def prepare_timex_lca_inputs(
+    def prepare_bw_timex_inputs(
         self,
         demand=None,
         method=None,
