@@ -16,6 +16,7 @@ on:
       - "LICENSE"
       - ".gitignore"
       - "**.ipynb" # ignore Jupyter notebooks
+
   pull_request:
     branches: [main, dev]
     types: [opened, reopened] # excludes syncronize to avoid redundant trigger from commits on PRs
@@ -36,6 +37,8 @@ jobs:
       matrix:
         os: [ubuntu-latest] # , windows-latest, macos-latest
         py-version: ["3.10", "3.11", "3.12"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        py-version: ["3.10"]
 
     steps:
       - uses: actions/checkout@v2
