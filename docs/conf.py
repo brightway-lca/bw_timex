@@ -215,7 +215,13 @@ favicons = [
         "rel": "icon", 
         "href": "favicon.svg", 
         "type": "image/svg+xml"
-        },
+    },    
+    {
+        "rel": "icon", 
+        "sizes": "144x144",
+        "href": "favicon-144.png", 
+        "type": "image/png"
+    },
     {
         "rel": "mask-icon",
         "href": "favicon_mask-icon.svg",
