@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import KeysView
 
 from bw_temporalis import TemporalDistribution
+from bw2data.configuration import labels
 from bw2calc import LCA
 from .edge_extractor import EdgeExtractor, Edge
 from .utils import (
@@ -135,6 +136,11 @@ class TimelineBuilder:
         # Convert list of dictionaries to dataframe
         edges_df = pd.DataFrame(edges_data)
 
+        # adjust the sign for substitution exchanges:
+        edges_df["amount"] = edges_df["amount"] * edges_df["edge_type"].apply(
+            lambda x: self.adjust_sign_of_amount_based_on_edge_type(x)
+        )
+
         # Explode datetime and amount columns: each row with multiple dates and amounts is exploded into multiple rows with one date and one amount
         edges_df = edges_df.explode(["consumer_date", "producer_date", "amount"])
         edges_df.drop_duplicates(inplace=True)
@@ -248,6 +254,8 @@ class TimelineBuilder:
     ###################################################
     # underlying functions called by build_timeline() #
     ###################################################
+       
+
 
     def check_database_names(self) -> None:
         """
@@ -289,7 +297,37 @@ class TimelineBuilder:
             "consumer_date": consumer_date,
             "producer_date": edge.abs_td_producer.date,
             "amount": edge.abs_td_producer.amount,
+            "edge_type": edge.edge_type,
         }
+    
+    def adjust_sign_of_amount_based_on_edge_type(self, edge_type):
+        """
+        It checks if the an exchange is of type substitution or a technosphere exchange, based on bw2data labelling convention, and adjusts the amount accordingly.
+        Flips the sign of the amount value in the timeline for substitution (positive technosphere) exchanges.
+
+        Parameters
+        ----------
+        edge_type: str
+            Type of the edge, as defined in the exchange data.
+
+        Returns
+        -------
+        int
+            Multiplier for the amount value, 1 for technosphere exchanges, -1 for substitution exchanges.
+
+        """
+
+        if edge_type in labels.technosphere_negative_edge_types: # variants of technosphere lables
+            multiplicator = 1
+        elif edge_type in labels.technosphere_positive_edge_types: #variants of production AND substitution labels
+            multiplicator = 1
+            if edge_type in labels.substitution_edge_types: # overwrite variants of substitution labels
+                multiplicator = -1
+        else:
+            # Raise a warning for unrecognized edge type
+            warnings.warn(f"Unrecognized type in this edge: {edge_type}", UserWarning)
+            raise ValueError("Unrecognized edge type")
+        return multiplicator
             
     def add_column_interpolation_weights_to_timeline(self,
         tl_df: pd.DataFrame,
