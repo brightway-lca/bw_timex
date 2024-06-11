@@ -9,8 +9,8 @@ from bw_temporalis import TemporalDistribution
 @pytest.fixture
 @bw2test
 def substitution_db():
-    #bd.projects.delete_project("test_substitution")
-    bd.projects.set_current("test_substitution")
+    
+    bd.projects.set_current("__test_substitution__")
     bd.Database("bio").write(
     {
         ("bio", "CO2"): {
@@ -22,15 +22,15 @@ def substitution_db():
 
     bd.Database("db_2020").write(
         {
-            ("db_2020", "D"): {
-                "name": "d",
+            ("db_2020", "Sub"): {
+                "name": "sub",
                 "location": "somewhere",
-                "reference product": "d",
+                "reference product": "sub",
                 "exchanges": [
                     {
                         "amount": 1,
                         "type": "production",
-                        "input": ("db_2020", "D"),
+                        "input": ("db_2020", "Sub"),
                     },
                     {
                         "amount": 0.5,  
@@ -39,64 +39,28 @@ def substitution_db():
                     },
                 ]
             },
-
-            ("db_2020", "E"): {
-                "name": "e",
-                "location": "somewhere",
-                "reference product": "e",
-                "exchanges": [
-                    {
-                        "amount": 1,
-                        "type": "production",
-                        "input": ("db_2020", "E"),
-                    },
-                    {
-                        "amount": 2,  
-                        "type": "biosphere",
-                        "input": ("bio", "CO2"),
-                    },
-                ]
-            }
-        }
+    }
     )
 
     bd.Database("db_2030").write(
         {
-            ("db_2030", "D"): {
-                "name": "d",
+            ("db_2030", "Sub"): {
+                "name": "sub",
                 "location": "somewhere",
-                "reference product": "d",
+                "reference product": "sub",
                 "exchanges": [
                     {
                         "amount": 1,
                         "type": "production",
-                        "input": ("db_2030", "D"),
+                        "input": ("db_2030", "Sub"),
                     },
                     {
-                        "amount": 0.5,  
+                        "amount": 0.7,  # changed compared to db_2020
                         "type": "biosphere",
                         "input": ("bio", "CO2"),
                     },
                 ]
             },
-
-            ("db_2030", "E"): {
-                "name": "e",
-                "location": "somewhere",
-                "reference product": "e",
-                "exchanges": [
-                    {
-                        "amount": 1,
-                        "type": "production",
-                        "input": ("db_2030", "E"),
-                    },
-                    {
-                        "amount": 2,  
-                        "type": "biosphere",
-                        "input": ("bio", "CO2"),
-                    },
-                ]
-            }
         }
     )
 
@@ -117,11 +81,18 @@ def substitution_db():
                         "type": "biosphere",
                         "input": ("bio", "CO2"),
                     },
+
+                    {
+                        "amount": 0.75,
+                        "type": "substitution",
+                        "input": ("db_2020", "Sub"),
+                        "temporal_distribution": TemporalDistribution(np.array([-4], dtype="timedelta64[Y]"), np.array([1])), #occurs in 2020
+                    },
                     {
                         "amount": 5,  
-                        "type": "substitution",
+                        "type": "technosphere",
                         "input": ("foreground", "B"),
-                        "temporal_distribution": TemporalDistribution(np.array([4], dtype="timedelta64[Y]"), np.array([1])),
+                        "temporal_distribution": TemporalDistribution(np.array([4], dtype="timedelta64[Y]"), np.array([1])), #occurs in 2028
                     },
 
                 ],
@@ -140,21 +111,10 @@ def substitution_db():
 
                     {
                         "amount": 1,
-                        "type": "technosphere",
-                        "input": ("db_2020", "D"),
-                    },
-
-                    {
-                        "amount": 1,
                         "type": "substitution",
-                        "input": ("db_2020", "E"),
+                        "input": ("db_2020", "Sub"),
                     },
 
-                    {
-                        "amount": 1,  
-                        "type": "biosphere",
-                        "input": ("bio", "CO2"),
-                    },
                 ],
             },
 
@@ -166,3 +126,4 @@ def substitution_db():
             (("bio", "CO2"), 1),
         ]
     )
+
