@@ -855,7 +855,7 @@ class TimexLCA:
         first_level_background_node_ids_all = set()
         for node_id in foreground_node_ids:
             node = bd.get_node(id=node_id)
-            for exc in node.technosphere():
+            for exc in node.technosphere(include_substitution=True):
                 if exc.input["database"] in self.database_date_dict_static_only.keys():
                     first_level_background_node_ids_static.add(exc.input.id)
                     for background_db in self.database_date_dict_static_only.keys():
