@@ -48,5 +48,5 @@ class TestClass_substitution:
                                     5 * -1 * 0.5 * 0.2)  # substituted emissions from Sub bia B in 2028 from db_2020
         
         print(self.tlca.timeline)
-        assert self.tlca.static_score == pytest.approx(expected_substitution_score, rel = 0.5)
+        assert self.tlca.static_score == pytest.approx(expected_substitution_score, rel = 0.0001)
                                     
