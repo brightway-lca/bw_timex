@@ -1,0 +1,42 @@
+from pathlib import Path
+import pytest
+import bw2calc as bc
+import bw2data as bd
+from bw_timex import TimexLCA
+from datetime import datetime
+
+
+# make sure the test db is loaded
+def test_nonunitary_db_fixture(nonunitary_db):
+    assert len(bd.databases) == 3
+
+
+
+@pytest.mark.usefixtures("nonunitary_dbvehicle_db")
+class TestClass_EV:
+    
+    @pytest.fixture(autouse=True)
+    def setup_method(self):
+        self.node_a = bd.get_node(database="foreground", code="A")
+
+        
+        database_date_dict = {
+            "db_2020": datetime.strptime("2020", "%Y")    ,         
+            "foreground": "dynamic",  
+        }
+
+        self.tlca = TimexLCA(demand={self.node_a: 1}, method=("GWP", "example"), database_date_dict = database_date_dict)
+
+        self.tlca.build_timeline()
+        self.tlca.lci()
+        self.tlca.static_lcia()
+
+    
+    def test_timex_lca_score(self):
+
+ 
+        expected_score = 1 * 1.5 / 3 * 0.5
+        
+        assert self.tlca.score == expected_score
+
+
