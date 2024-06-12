@@ -35,7 +35,14 @@ class TestClass_EV:
     def test_timex_lca_score(self):
 
  
-        expected_score = 1 * 1.5 / 3 * 0.5
+        expected_score = (1 * 1.5 / 3 * 0.5 + # A -> Nonunitary  C in bd_2020
+                  1 * 4 / 7 * 0.9) # A -> B -> Nonunitary B in foreground 
+
+
+        false_score =  (1 * 1.5 / 3 * 0.5 + # A -> Nonunitary C in bd_2020
+                  1 * 4  * 0.9) # A -> B -> Nonunitary B in foreground (not scaled by production amount!)
+        
+        print(false_score) 
         
         assert self.tlca.score == expected_score
 
