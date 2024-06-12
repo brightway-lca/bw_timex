@@ -109,7 +109,7 @@ class DynamicCharacterization:
         cumsum: bool, optional
             whether to calculate the cumulative sum of the characterization results. Default is True.
         characterization_function_co2: Callable, optional
-            Characterization function for CO2. This is required for the GWP calculation. If None is given, we try using timex' default CO2 function from the (separate) dynamic_characterization package.
+            Characterization function for CO2. This is required for the GWP calculation. If None is given, we try using timex' default CO2 function from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/).
 
         Returns
         -------
@@ -129,7 +129,7 @@ class DynamicCharacterization:
                 )
             except ImportError:
                 raise ImportError(
-                    "The default CO2 characterization function could not be loaded. Please make sure the package 'dynamic_characterization' is installed or provide your own function for the dynamic characterization of CO2. This is necessary for the GWP calculations."
+                    "The default CO2 characterization function could not be loaded. Please make sure the package 'dynamic_characterization' (https://dynamic-characterization.readthedocs.io/en/latest/) is installed or provide your own function for the dynamic characterization of CO2. This is necessary for the GWP calculations."
                 )
             characterization_function_co2 = characterize_co2
             warnings.warn(
@@ -361,7 +361,7 @@ class DynamicCharacterization:
             )
         except ImportError:
             raise ImportError(
-                "The default dynamic characterization functions could not be loaded. Please make sure the package 'dynamic_characterization' is installed or provide your own functions via the characterization_function_dict."
+                "The default dynamic characterization functions could not be loaded. Please make sure the package 'dynamic_characterization' (https://dynamic-characterization.readthedocs.io/en/latest/) is installed or provide your own functions via the characterization_function_dict."
             )
 
         self.characterization_function_dict = dict()
