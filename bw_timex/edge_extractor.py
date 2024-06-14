@@ -19,7 +19,7 @@ class Edge:
     function).
 
     """
-
+    edge_type : str
     distribution: TemporalDistribution
     leaf: bool
     consumer: int
@@ -28,6 +28,7 @@ class Edge:
     td_consumer: TemporalDistribution
     abs_td_producer: TemporalDistribution = None
     abs_td_consumer: TemporalDistribution = None
+    
 
 
 class EdgeExtractor(TemporalisLCA):
@@ -53,6 +54,7 @@ class EdgeExtractor(TemporalisLCA):
         
         """
         super().__init__(*args, **kwargs) #use __init__ of TemporalisLCA
+        
         if edge_filter_function:
             self.edge_ff = edge_filter_function
         else:
@@ -92,8 +94,10 @@ class EdgeExtractor(TemporalisLCA):
                     node,
                 ),
             )
+       
             timeline.append(
                 Edge(
+                    edge_type = "production", # FU exchange always type production (?)
                     distribution=self.t0 * edge.amount,
                     leaf=False,
                     consumer=self.unique_id,
@@ -114,6 +118,9 @@ class EdgeExtractor(TemporalisLCA):
                     input_id=row_id,
                     output_id=col_id,
                 )
+
+                edge_type = exchange.data["type"] # can be technosphere, substitution, production or other string
+
                 td_producer = (  # td_producer is the TemporalDistribution of the edge
                     self._exchange_value(
                         exchange=exchange,
@@ -139,6 +146,7 @@ class EdgeExtractor(TemporalisLCA):
                 
                 timeline.append(
                     Edge(
+                        edge_type = edge_type, 
                         distribution=distribution,
                         leaf=leaf,
                         consumer=node.activity_datapackage_id,
@@ -149,7 +157,8 @@ class EdgeExtractor(TemporalisLCA):
                             td_producer, abs_td
                         ),
                         abs_td_consumer=abs_td,
-                    )
+                        
+                        )   
                 )
                 if not leaf:
                     heappush(
@@ -165,6 +174,7 @@ class EdgeExtractor(TemporalisLCA):
                         ),
                     )
         return timeline
+
 
     def join_datetime_and_timedelta_distributions(
         self, td_producer: TemporalDistribution, td_consumer: TemporalDistribution
