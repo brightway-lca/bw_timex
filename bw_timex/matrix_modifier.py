@@ -1,16 +1,16 @@
+import uuid
+from typing import Optional
+
 import bw2data as bd
 import bw_processing as bwp
-import uuid
 import numpy as np
 import pandas as pd
-from typing import Optional
-from datetime import datetime
 
 
 class MatrixModifier:
     """
-    This class is responsible for modifying the original LCA matrices to contain the time-explicit processes and to relink them to the time-explicit background databasess. 
-    
+    This class is responsible for modifying the original LCA matrices to contain the time-explicit processes and to relink them to the time-explicit background databasess.pip
+
     It does this by creating datapackages that add or change matrix entries in technosphere and biosphere matrices, based on a timeline dataframe (created from TimelineBuilder.build_timeline()).
 
     """
@@ -33,9 +33,9 @@ class MatrixModifier:
             A dictionary mapping the static background databases to dates.
         demand_timing : dict
             A dictionary mapping the demand to its timing.
-        name : str, optional   
+        name : str, optional
             An optional name for the MatrixModifier instance. Default is None.
- 
+
         """
 
         self.timeline = timeline
@@ -44,7 +44,7 @@ class MatrixModifier:
         self.name = name
         self.temporalized_process_ids = set()
         self.temporal_market_ids = set()
-    
+
     def create_datapackage(self) -> None:
         """
         Creates a list of datapackages for the technosphere and biosphere matrices, by calling the respective functions.
@@ -60,14 +60,14 @@ class MatrixModifier:
         """
         technosphere_datapackage = self.create_technosphere_datapackage()
         biosphere_datapackage = self.create_biosphere_datapackage()
-        
+
         return [technosphere_datapackage, biosphere_datapackage]
 
     def create_technosphere_datapackage(self) -> bwp.Datapackage:
         """
-        Creates the modifications to the technosphere matrix in form of a datapackage. Datapackages add or overwrite datapoints in the LCA matrices before LCA calculations. 
+        Creates the modifications to the technosphere matrix in form of a datapackage. Datapackages add or overwrite datapoints in the LCA matrices before LCA calculations.
         The technospher datapackage add the temporalized processes from the timeline to the technosphere matrix.
-        
+
         The heavy lifting of this method happens in the method `add_row_to_datapackage()` that is called.
         Here, each node with a temporal distribution is "exploded", which means each occurrence of this node (e.g. steel production on 2020-01-01
         and steel production on 2015-01-01) becomes a separate, time-explicit new node, by adding the new elements to the technosphere matrix.
@@ -95,15 +95,14 @@ class MatrixModifier:
                 new_nodes,
             )
 
-        # Adding ones on diagonal for new nodes
-        datapackage.add_persistent_vector(
-            matrix="technosphere_matrix",
-            name=uuid.uuid4().hex,
-            data_array=np.ones(len(new_nodes)),
-            indices_array=np.array(
-                [(i, i) for i in new_nodes], dtype=bwp.INDICES_DTYPE
-            ),
-        )
+        # Adding the production exchanges for new nodes
+        for node_id, production_amount in new_nodes:
+            datapackage.add_persistent_vector(
+                matrix="technosphere_matrix",
+                name=uuid.uuid4().hex,
+                data_array=np.array([production_amount], dtype=float),
+                indices_array=np.array([(node_id, node_id)], dtype=bwp.INDICES_DTYPE),
+            )
 
         return datapackage
 
@@ -163,8 +162,9 @@ class MatrixModifier:
                     flip_array=np.array([False], dtype=bool),
                 )
         return datapackage_bio
-    
-    def add_row_to_datapackage(self, 
+
+    def add_row_to_datapackage(
+        self,
         row: pd.core.frame,
         datapackage: bwp.Datapackage,
         new_nodes: set,
@@ -186,7 +186,7 @@ class MatrixModifier:
         datapackage : bwp.Datapackage
             Append to this datapackage, if available. Otherwise create a new datapackage.
         new_nodes : set
-            Set to which new node ids are added.
+            Set of tuples (node_id, production_amount) to which new node ids are added.
 
         Returns
         -------
@@ -195,17 +195,19 @@ class MatrixModifier:
 
         if row.consumer == -1:  # functional unit
             new_producer_id = row.time_mapped_producer
-            new_nodes.add(new_producer_id)
+            fu_production_amount = bd.get_node(id=row.producer).rp_exchange().amount
+            new_nodes.add((new_producer_id, fu_production_amount))
             self.temporalized_process_ids.add(
                 new_producer_id
             )  # comes from foreground, so it is a temporalized process
             return
 
         new_consumer_id = row.time_mapped_consumer
-        new_nodes.add(new_consumer_id)
-
         new_producer_id = row.time_mapped_producer
-        new_nodes.add(new_producer_id)
+
+        # Get the production amount of the producer - needed lateron for the diagonal entry,
+        # might get overwritten if its a temporal market
+        producer_production_amount = bd.get_node(id=row.producer).rp_exchange().amount
 
         previous_producer_id = row.producer
         previous_producer_node = bd.get_node(
@@ -221,9 +223,7 @@ class MatrixModifier:
                 [(new_producer_id, new_consumer_id)],
                 dtype=bwp.INDICES_DTYPE,
             ),
-            flip_array=np.array(
-                [True], dtype=bool
-            ),  
+            flip_array=np.array([True], dtype=bool),
         )
 
         # Check if previous producer comes from background database -> temporal market
@@ -263,9 +263,13 @@ class MatrixModifier:
                     flip_array=np.array([True], dtype=bool),
                 )
                 self.temporal_market_ids.add(new_producer_id)
-        
+                producer_production_amount = (
+                    1  # Shares sum up to 1, so production amount is 1
+                )
+
         # comes from foreground, so it is a temporalized process
         else:
-            self.temporalized_process_ids.add(
-                new_producer_id
-            ) 
+            self.temporalized_process_ids.add(new_producer_id)
+
+        # Add newly created producing process to new_nodes
+        new_nodes.add((new_producer_id, producer_production_amount))
