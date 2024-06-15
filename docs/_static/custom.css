@@ -37,11 +37,11 @@
 }
 
 .bd-header button.secondary-toggle {
-    margin-right: 0.35rem;
+    margin-left: 0.35rem;
     }
 
 @media (min-width: 370px) {
     .bd-header button.secondary-toggle {
-        margin-right: 1rem;
+        margin-left: 1rem;
     }
 }
