@@ -205,14 +205,32 @@ class MatrixModifier:
         new_consumer_id = row.time_mapped_consumer
         new_producer_id = row.time_mapped_producer
 
-        # Get the production amount of the producer - needed lateron for the diagonal entry,
-        # might get overwritten if its a temporal market
-        producer_production_amount = bd.get_node(id=row.producer).rp_exchange().amount
-
         previous_producer_id = row.producer
         previous_producer_node = bd.get_node(
             id=previous_producer_id
         )  # in future versions, insead of getting node, just provide list of producer ids
+
+        # Get the production amount of the previous producer - needed lateron for the diagonal entry
+        # Value might get overwritten below if its a temporal market
+        if isinstance(
+            previous_producer_node, bd.backends.iotable.proxies.IOTableActivity
+        ):
+            if len(previous_producer_node.production()) == 1:
+                producer_production_amount = list(previous_producer_node.production())[
+                    0
+                ].amount
+            else:
+                raise ValueError(
+                    "The producer activity is of type IOTableActivity, but has more than one production exchange. This is currently not supported."
+                )
+        elif isinstance(previous_producer_node, bd.backends.proxies.Activity):
+            producer_production_amount = (
+                bd.get_node(id=row.producer).rp_exchange().amount
+            )
+        else:
+            raise ValueError(
+                "Can't determine the production amount of the producer activity, as it's of an unknown type."
+            )
 
         # Add entry between exploded consumer and exploded producer (not in background database)
         datapackage.add_persistent_vector(
