@@ -11,9 +11,9 @@ import seaborn as sb
 from bw2calc import LCA
 from bw2data import (
     Database,
+    Method,
     Normalization,
     Weighting,
-    Method,
     databases,
     methods,
     normalizations,
@@ -325,7 +325,7 @@ class TimexLCA:
         metric : str, optional
             the metric for which the dynamic LCIA should be calculated. Default is "GWP". Available: "GWP" and "radiative_forcing"
         time_horizon: int, optional
-            the time horizon for the impact assessment. Default is 100.
+            the time horizon for the impact assessment. Unit is years. Default is 100.
         fixed_time_horizon: bool, optional
             Whether the emission time horizon for all emissions is calculated from the functional unit (fixed_time_horizon=True) or from the time of the emission (fixed_time_horizon=False). Default is False.
         characterization_function_dict: dict, optional
@@ -347,6 +347,17 @@ class TimexLCA:
             warnings.warn(
                 "Dynamic lci not yet calculated. Call TimexLCA.calculate_dynamic_lci() first."
             )
+
+        t0_date = pd.Timestamp(self.timeline_builder.edge_extractor.t0.date[0])
+        latest_considered_impact = t0_date + pd.DateOffset(years=time_horizon)
+        last_emission = self.dynamic_inventory_df.date.max()
+        if fixed_time_horizon and latest_considered_impact < last_emission:
+            warnings.warn(
+                "An emission occurs outside of the specified time horizon and will not be characterized. Please make sure this is intended."
+            )
+            self.dynamic_inventory_df = self.dynamic_inventory_df[
+                self.dynamic_inventory_df.date <= latest_considered_impact
+            ]
 
         self.metric = metric
         self.time_horizon = time_horizon
