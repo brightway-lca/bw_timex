@@ -1,3 +1,8 @@
 #rtd-footer-container {
     margin: 0px !important; /* Prevents unnecessary scroll bars in the navigation */
 }
+
+.logo {
+    max-width: 50vw;
+    min-width: 140px;
+}
