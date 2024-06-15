@@ -1,13 +1,13 @@
-import pandas as pd
-import bw2data as bd
-import numpy as np
+import json
 import os
 import warnings
-import json
-
-from typing import Union, Tuple, Optional, Callable, List
 from collections.abc import Collection
 from datetime import datetime
+from typing import Callable, List, Optional, Tuple, Union
+
+import bw2data as bd
+import numpy as np
+import pandas as pd
 
 
 class DynamicCharacterization:
@@ -41,9 +41,9 @@ class DynamicCharacterization:
         biosphere_dict : dict
             Dictionary mapping biosphere flow ids to their matrix index
         activity_time_mapping_dict_reversed : dict
-            Reversed `activity_time_mapping_dict`: {time_mapping_id: ((('database', 'code'), datetime_as_integer)} 
+            Reversed `activity_time_mapping_dict`: {time_mapping_id: ((('database', 'code'), datetime_as_integer)}
         biosphere_time_mapping_dict_reversed : dict
-            Reversed `biosphere_time_mapping_dict`: {time_mapping_id: ((('database', 'code'), datetime_as_integer)} 
+            Reversed `biosphere_time_mapping_dict`: {time_mapping_id: ((('database', 'code'), datetime_as_integer)}
         demand_timing_dict : dict
             A dictionary mapping the demand(s) to its timing
         temporal_grouping : str
@@ -56,7 +56,7 @@ class DynamicCharacterization:
         Returns
         -------
         None
-        
+
         """
         self.dynamic_inventory_df = dynamic_inventory_df
         self.activity_dict = activity_dict
@@ -78,11 +78,11 @@ class DynamicCharacterization:
 
     def characterize_dynamic_inventory(
         self,
-        metric: str | None = "GWP",  # available metrics are "radiative_forcing" and "GWP", defaulting to GWP
+        metric: (
+            str | None
+        ) = "GWP",  # available metrics are "radiative_forcing" and "GWP", defaulting to GWP
         time_horizon: int | None = 100,
-        fixed_time_horizon: (
-            bool | None
-        ) = False, 
+        fixed_time_horizon: bool | None = False,
         cumsum: bool | None = True,
     ) -> Tuple[pd.DataFrame, str, bool, int]:
         """
@@ -90,10 +90,10 @@ class DynamicCharacterization:
 
         Available metrics are radiative forcing [W/m2] and GWP [kg CO2eq], defaulting to `radiative_forcing`.
 
-        The `characterization_functions` are already created during __init__ and stored in the dictionary `DynamicCharacterization.characterization_function_dict`. 
+        The `characterization_functions` are already created during __init__ and stored in the dictionary `DynamicCharacterization.characterization_function_dict`.
         In this method, they are applied to each row of the timeline-DataFrame for the duration of `time_horizon`, defaulting to 100 years.
-        The `fixed_time_horizon` parameter determines whether the evaluation time horizon for all emissions is calculated from the 
-        functional unit (`fixed_time_horizon=True`), regardless of when the actual emission occurs, or from the time of the emission itself(`fixed_time_horizon=False`). 
+        The `fixed_time_horizon` parameter determines whether the evaluation time horizon for all emissions is calculated from the
+        functional unit (`fixed_time_horizon=True`), regardless of when the actual emission occurs, or from the time of the emission itself(`fixed_time_horizon=False`).
         The former is the implementation of the Levasseur approach (https://doi.org/10.1021/es9030003), while the latter is how conventional LCA is done.
         The Levasseur approach means that earlier emissions are characterized for a longer time period than later emissions.
 
@@ -118,11 +118,11 @@ class DynamicCharacterization:
             raise ValueError(
                 f"Metric must be either 'radiative_forcing' or 'GWP', not {metric}"
             )
-        
+
         if metric == "GWP":
             warnings.warn(
-                        "Using bw_timex's default CO2 characterization function for GWP reference."
-                    )
+                "Using bw_timex's default CO2 characterization function for GWP reference."
+            )
 
         time_res_dict = {
             "year": "%Y",
@@ -135,7 +135,9 @@ class DynamicCharacterization:
 
         for _, row in self.dynamic_inventory_df.iterrows():
 
-            if row.flow not in self.characterization_function_dict.keys(): #skip uncharacterized biosphere flows
+            if (
+                row.flow not in self.characterization_function_dict.keys()
+            ):  # skip uncharacterized biosphere flows
                 continue
 
             if metric == "radiative_forcing":  # radiative forcing in W/m2
@@ -146,7 +148,9 @@ class DynamicCharacterization:
                     self.characterized_inventory = pd.concat(
                         [
                             self.characterized_inventory,
-                            self.characterization_function_dict[row.flow]( #here the dynamic characterization function is called and applied to the emission of the row
+                            self.characterization_function_dict[
+                                row.flow
+                            ](  # here the dynamic characterization function is called and applied to the emission of the row
                                 row,
                                 period=time_horizon,
                             ),
@@ -155,7 +159,7 @@ class DynamicCharacterization:
 
                 else:  # fixed_time_horizon = True: Levasseur approach: time_horizon for all emissions starts at timing of FU + time_horizon
                     # e.g. an emission occuring n years before FU is characterized for time_horizon+n years
-                    timing_FU = [value for value in self.demand_timing_dict.values()]  
+                    timing_FU = [value for value in self.demand_timing_dict.values()]
                     end_TH_FU_list = [x + time_horizon for x in timing_FU]
 
                     if len(end_TH_FU_list) > 1:
@@ -188,7 +192,7 @@ class DynamicCharacterization:
                 if (
                     not fixed_time_horizon
                 ):  # fixed_time_horizon = False: conventional approach, emission is calculated from t emission for the length of time_horizon
-                    
+
                     radiative_forcing_ghg = self.characterization_function_dict[
                         row.flow
                     ](
@@ -219,9 +223,7 @@ class DynamicCharacterization:
 
                 else:  # fixed_time_horizon = True: Levasseur approach: time_horizon for all emissions starts at timing of FU + time_horizon
                     # e.g. an emission occuring n years before FU is characterized for time_horizon+n years
-                    timing_FU = [
-                        value for value in self.demand_timing_dict.values()
-                    ] 
+                    timing_FU = [value for value in self.demand_timing_dict.values()]
                     end_TH_FU_list = [x + time_horizon for x in timing_FU]
 
                     if len(end_TH_FU_list) > 1:
@@ -233,9 +235,7 @@ class DynamicCharacterization:
                         str(end_TH_FU_list[0]), time_res_dict[self.temporal_grouping]
                     )
 
-                    timing_emission = (
-                        row.date.to_pydatetime()
-                    )  
+                    timing_emission = row.date.to_pydatetime()
                     new_TH = round(
                         (end_TH_FU - timing_emission).days / 365.25
                     )  # time difference in integer years between emission timing and end of TH of FU
@@ -281,10 +281,9 @@ class DynamicCharacterization:
                     self.characterized_inventory["amount"].cumsum()
                 )  # TODO: there is also an option for cumulative results in the characterization functions themselves. Rethink where this is handled best and to avoid double cumsum
 
-           
         if self.characterized_inventory.empty:
             raise ValueError(
-                "No flows were characterized. Check if the flows in the dynamic inventory are available the dynamic characterization functions."
+                "There are no flows to characterize. Please make sure your time horizon matches the timing of emissions and make sure there are characterization functions for the flows in the dynamic inventories."
             )
 
         # remove rows with zero amounts to make it more readable
@@ -323,8 +322,8 @@ class DynamicCharacterization:
         """
         Add default dynamic characterization functions for CO2, CH4, N2O and other GHGs, based on IPCC AR6 Chapter 7 decay curves.
 
-        Please note: Currently, only CO2, CH4 and N2O include climate-carbon feedbacks. 
-        
+        Please note: Currently, only CO2, CH4 and N2O include climate-carbon feedbacks.
+
         This has not yet been added for other GHGs. Refer to https://esd.copernicus.org/articles/8/235/2017/esd-8-235-2017.html"
         "Methane, non-fossil" is currently also excluded from the default characterization functions, as it has a different static CF than fossil methane and we need to check the correct value (#TODO)
 
@@ -343,24 +342,30 @@ class DynamicCharacterization:
         filepath = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "data", "decay_multipliers.json"
         )
-        
+
         with open(filepath) as json_file:
             decay_multipliers = json.load(json_file)
-        
+
         # look up which GHGs are characterized in the selected static LCA method
         method_data = bd.Method(self.method).load()
-        
+
         # the bioflow-identifier stored in the method data can be the database id or the tuple (database, code)
         def get_bioflow_node(identifier):
-            if isinstance(identifier, Collection) and len(identifier) == 2:  # is code tuple
+            if (
+                isinstance(identifier, Collection) and len(identifier) == 2
+            ):  # is code tuple
                 return bd.get_node(database=identifier[0], code=identifier[1])
             elif isinstance(identifier, int):  # id is an int
                 return bd.get_node(id=identifier)
             else:
-                raise ValueError("The flow-identifier stored in the selected method is neither an id nor the tuple (database, code). No automatic matching possible.")
-            
-        bioflow_nodes = set(get_bioflow_node(identifier) for identifier, _ in method_data)
-        
+                raise ValueError(
+                    "The flow-identifier stored in the selected method is neither an id nor the tuple (database, code). No automatic matching possible."
+                )
+
+        bioflow_nodes = set(
+            get_bioflow_node(identifier) for identifier, _ in method_data
+        )
+
         for node in bioflow_nodes:
             if "carbon dioxide" in node["name"].lower():
                 if "soil" in node.get("categories", []):
@@ -390,7 +395,9 @@ class DynamicCharacterization:
                     decay_series = decay_multipliers.get(cas_number)
                     if decay_series is not None:
                         self.characterization_function_dict[node.id] = (
-                            create_generic_characterization_function(np.array(decay_series))
+                            create_generic_characterization_function(
+                                np.array(decay_series)
+                            )
                         )
 
 
@@ -402,7 +409,7 @@ def IRF_co2(year) -> callable:
     ----------
     year : int
         The year after emission for which the IRF is calculated.
-    
+
     Returns
     -------
     float
@@ -427,7 +434,7 @@ def characterize_co2(
 ) -> pd.DataFrame:
     """
     Calculate the cumulative or marginal radiative forcing (CRF) from CO2 for each year in a given period.
-    
+
     Based on characterize_co2 from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
 
     If `cumulative` is True, the cumulative CRF is calculated. If `cumulative` is False, the marginal CRF is calculated.
@@ -603,7 +610,7 @@ def characterize_co(
 
     # for conversion from ppb to kg-CO2
     M_co2 = 44.01  # g/mol
-    M_co = 28.01   # g/mol
+    M_co = 28.01  # g/mol
     M_air = 28.97  # g/mol, dry air
     m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
 
@@ -644,11 +651,11 @@ def characterize_ch4(
     cumulative=False,
 ) -> pd.DataFrame:
     """
-    Calculate the cumulative or marginal radiative forcing (CRF) from CH4 for each year in a given period. 
+    Calculate the cumulative or marginal radiative forcing (CRF) from CH4 for each year in a given period.
 
     Based on characterize_methane from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
-    
-    This DOES include indirect effects of CH4 on ozone and water vapor, but DOES NOT include the decay to CO2. 
+
+    This DOES include indirect effects of CH4 on ozone and water vapor, but DOES NOT include the decay to CO2.
     For more info on that, see the deprecated version of bw_temporalis.
 
     If `cumulative` is True, the cumulative CRF is calculated. If `cumulative` is False, the marginal CRF is calculated.
@@ -728,9 +735,9 @@ def characterize_n2o(
 ) -> pd.DataFrame:
     """
     Calculate the cumulative or marginal radiative forcing (CRF) from N2O for each year in a given period.
-    
+
     Based on characterize_methane from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
-   
+
     If `cumulative` is True, the cumulative CRF is calculated. If `cumulative` is False, the marginal CRF is calculated.
     Takes a single row of the TimeSeries Pandas DataFrame (corresponding to a set of (`date`/`amount`/`flow`/`activity`).
     For earch year in the given period, the CRF is calculated.
@@ -803,7 +810,7 @@ def characterize_n2o(
 def create_generic_characterization_function(decay_series) -> pd.DataFrame:
     """
     Creates a characterization function for a GHG based on a decay series, by calling the nested method `characterize_generic()`.
-    
+
     Parameters
     ----------
     decay_series : np.ndarray
@@ -840,7 +847,7 @@ def create_generic_characterization_function(decay_series) -> pd.DataFrame:
           amount: float (forcing at this timestep)
           flow: str
           activity: str
-          
+
         See also
         --------
         Joos2013: Relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
