@@ -209,7 +209,7 @@ class MatrixModifier:
         previous_producer_node = bd.get_node(
             id=previous_producer_id
         )  # in future versions, insead of getting node, just provide list of producer ids
- 
+
         # Add entry between exploded consumer and exploded producer (not in background database)
         datapackage.add_persistent_vector(
             matrix="technosphere_matrix",
@@ -262,8 +262,8 @@ class MatrixModifier:
                 producer_production_amount = (
                     1  # Shares sum up to 1, so production amount is 1
                 )
-        
-        else: # comes from foreground, so it is a temporalized process
+
+        else:  # comes from foreground, so it is a temporalized process
             self.temporalized_process_ids.add(new_producer_id)
 
             # Get the production amount of the previous producer if its not a temporal market - needed diagonal matrix entry
@@ -271,9 +271,9 @@ class MatrixModifier:
                 previous_producer_node, bd.backends.iotable.proxies.IOTableActivity
             ):
                 if len(previous_producer_node.production()) == 1:
-                    producer_production_amount = list(previous_producer_node.production())[
-                        0
-                    ].amount
+                    producer_production_amount = list(
+                        previous_producer_node.production()
+                    )[0].amount
                 else:
                     raise ValueError(
                         "The producer activity is of type IOTableActivity, but has more than one production exchange. This is currently not supported."
@@ -286,6 +286,6 @@ class MatrixModifier:
                 raise ValueError(
                     f"Can't determine the production amount of the producer activity {previous_producer_node['name']} , as it's of an unknown type."
                 )
-                
+
         # Add newly created producing process to new_nodes
         new_nodes.add((new_producer_id, producer_production_amount))
