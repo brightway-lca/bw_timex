@@ -29,8 +29,10 @@ class DynamicCharacterization:
         characterization_function_dict: dict = None,
     ):
         """
-        Initializes the DynamicCharacterization object. In case users don't provide own dynamic characterization functions, it adds dynamic characterization functions for the GHGs mentioned in the
-        IPCC AR6 Chapter 7, if these GHG are also characterized in the selected static LCA method.
+        Initializes the DynamicCharacterization object. 
+        In case users don't provide own dynamic characterization functions, it adds dynamic characterization functions from the 
+        (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/) 
+        for the GHGs mentioned in the IPCC AR6 Chapter 7, if these GHG are also characterized in the selected static LCA method.
 
         Parameters
         ----------
@@ -69,7 +71,7 @@ class DynamicCharacterization:
 
         if not characterization_function_dict:
             warnings.warn(
-                f"No custom dynamic characterization functions provided. Using default dynamic characterization functions based on IPCC AR6 meant to work with biosphere3 flows. The flows that are characterized are based on the selection of the initially chosen impact category: {self.method}. You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_function_dict."
+                f"No custom dynamic characterization functions provided. Using default dynamic characterization functions from `dynamic_characterization` meant to work with biosphere3 flows. The flows that are characterized are based on the selection of the initially chosen impact category: {self.method}. You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_function_dict."
             )
             self.add_default_characterization_functions()
 
@@ -334,7 +336,8 @@ class DynamicCharacterization:
 
     def add_default_characterization_functions(self):
         """
-        Add default dynamic characterization functions for CO2, CH4, N2O and other GHGs, based on IPCC AR6 Chapter 7 decay curves.
+        Add default dynamic characterization functions from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/) 
+        for CO2, CH4, N2O and other GHGs, based on IPCC AR6 Chapter 7 decay curves.
 
         Please note: Currently, only CO2, CH4 and N2O include climate-carbon feedbacks.
 
