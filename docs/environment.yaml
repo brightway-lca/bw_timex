@@ -1,0 +1,22 @@
+name: bw_timex_documentation
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  # core functionality
+  - python=3.11
+  - ipython
+  # sphinx
+  - sphinx=7.3.7 # core builder # https://anaconda.org/conda-forge/sphinx/files
+  # theme and extensions
+  - pydata-sphinx-theme=0.15.3 # website theme # https://anaconda.org/conda-forge/pydata-sphinx-theme/files
+  - myst-parser=3.0.1 # Markdown support # https://anaconda.org/conda-forge/myst-parser/files
+  - myst-nb=1.1.0 # Jupyter notebook support # https://anaconda.org/conda-forge/myst-nb/files
+  - sphinx-autoapi=3.0.0 # to build docs from source code instead of package import # https://anaconda.org/conda-forge/sphinx-autoapi/files
+  - sphinx-design=0.5.0 # responsive web component support # https://anaconda.org/conda-forge/sphinx-design/files
+  - sphinx-notfound-page=1.0.0 # custom 404 page # https://anaconda.org/conda-forge/sphinx-notfound-page/files
+  - graphviz=11.0.0 # for plotting dependency diagrams with sphinx-autoapi # https://anaconda.org/conda-forge/graphviz/files
+  - sphinx-favicon=1.0.1 # for custom favicons # https://anaconda.org/conda-forge/sphinx-favicon/files
+  - sphinx-copybutton=0.5.2 # for copy button in code blocks # https://anaconda.org/conda-forge/sphinx-copybutton/files
+  # build process
+  - sphinx-autobuild=2024.4.16 # live-html support # https://anaconda.org/conda-forge/sphinx-autobuild/files
