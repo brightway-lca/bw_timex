@@ -5,7 +5,7 @@
   </picture>
 </h1>
 
-[![Read the Docs](https://img.shields.io/readthedocs/timex?label=documentation)](https://timex.readthedocs.io/en/latest/)
+[![Read the Docs](https://img.shields.io/readthedocs/timex?label=documentation)](https://docs.brightway.dev/projects/bw-timex/en/latest/)
 [![PyPI - Version](https://img.shields.io/pypi/v/bw-timex?color=%2300549f)](https://pypi.org/project/timex-lca/)
 [![Conda Version](https://img.shields.io/conda/v/diepers/bw_timex?label=conda)](https://anaconda.org/diepers/bw_timex)
 ![Conda - License](https://img.shields.io/conda/l/diepers/bw_timex)
@@ -29,14 +29,14 @@ You can define temporal distributions for process and emission exchanges, which 
 - **Biogenic** carbon
 
 ## Documentation and Resources:
-- [Full Documentation](https://timex.readthedocs.io/en/latest/)
-- [Installation Guide](https://timex.readthedocs.io/en/latest/content/installation.html)
-- [Example Notebook](https://github.com/TimoDiepers/timex/blob/main/notebooks/example_setac.ipynb)
+- [Full Documentation](https://docs.brightway.dev/projects/bw-timex/en/latest/)
+- [Installation Guide](https://docs.brightway.dev/projects/bw-timex/en/latest/content/installation.html)
+- [Example Notebook](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_setac.ipynb)
 
 ## Contributing:
 We welcome contributions! If you have suggestions or want to fix a bug, please:
-- [Open an Issue](https://github.com/TimoDiepers/timex/issues)
-- [Send a Pull Request](https://github.com/TimoDiepers/timex/pulls)
+- [Open an Issue](https://github.com/brightway-lca/bw_timex/issues)
+- [Send a Pull Request](https://github.com/brightway-lca/bw_timex/pulls)
 
 ## Support: 
 If you have any questions or need help, do not hesitate to contact us:
