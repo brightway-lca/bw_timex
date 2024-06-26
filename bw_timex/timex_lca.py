@@ -32,6 +32,7 @@ from .matrix_modifier import MatrixModifier
 from .remapping import TimeMappingDict
 from .timeline_builder import TimelineBuilder
 from .utils import extract_date_as_integer
+from .SetList import SetList
 
 
 class TimexLCA:
@@ -810,16 +811,20 @@ class TimexLCA:
         - ``foreground_node_ids``: set of node ids of all processes that are not in the background databases
         - ``first_level_background_node_ids_static``: set of node ids of all processes that are in the background databases and are directly linked to the demand processes
         - ``first_level_background_node_ids_all``: like first_level_background_node_ids_static, but includes first level background processes from other time explicit databases.
-
-        Parameters
+        - ``first_level_background_node_id_dbs``: dictionary with the first_level_background_node_ids_static as keys returning their database
+        
+        It also initiates an instance of SetList which contains all mappings of equivalent activieties across time-specific databases. 
+        - ``self.interdatabase_activity_mapping``: instance of SetList
         ----------
             None
 
         Returns
         -------
-            None, but adds the `node_id_collection_dict containing` the above-mentioned collections.
+            None, but adds the `node_id_collection_dict containing` the above-mentioned collections, as well as interdatabase_activity_mapping
         """
         self.node_id_collection_dict = {}
+        self.interdatabase_activity_mapping = SetList()
+
 
         # Original variable names preserved, set types for performance and uniqueness
         demand_database_names = {
@@ -867,6 +872,8 @@ class TimexLCA:
             for exc in chain(node.technosphere(), node.substitution()):
                 if exc.input["database"] in self.database_date_dict_static_only.keys():
                     first_level_background_node_ids_static.add(exc.input.id)
+                    act_set = {(exc.input.id, exc.input["database"])}
+                    
                     for background_db in self.database_date_dict_static_only.keys():
                         try:
                             other_node = bd.get_node(
@@ -878,11 +885,14 @@ class TimexLCA:
                                 }
                             )
                             first_level_background_node_ids_all.add(other_node.id)
+                            act_set.add((other_node.id, background_db))
                         except Exception as e:
                             warnings.warn(
                                 f"Failed to find process in database {background_db} for name='{exc.input['name']}', reference product='{exc.input['reference product']}', location='{exc.input['location']}': {e}"
                             )
                             pass
+                    self.interdatabase_activity_mapping.add(act_set)
+
 
         self.node_id_collection_dict["first_level_background_node_ids_static"] = (
             first_level_background_node_ids_static
