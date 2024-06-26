@@ -2,20 +2,22 @@
     margin: 0px !important; /* Prevents unnecessary scroll bars in the navigation */
 }
 
+body {
+    width: 100vw;
+    margin-right: calc(100vw - 100%);
+    overflow-x: hidden;
+}
+
 .logo {
     max-width: 50vw;
     min-width: 130px;
 }
 
 .bd-page-width {
-    width: 100lvw;
-    overflow-x: hidden;
     margin: 0;
     }
 
 .bd-header {
-    width: 100lvw;
-    min-width: 100lvw;
     margin: 0;
     }
 
