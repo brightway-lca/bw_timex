@@ -1,3 +1,6 @@
+## v0.1.5 (2024-06-28)
+* Refactored dynamic characterization to separate package [dynamic_characterization](https://github.com/TimoDiepers/dynamic_characterization)
+
 ## v0.1.4 (2024-06-15)
 * Handled emissions occuring outside of fixed time horizon in dynamic characterization [#46](https://github.com/brightway-lca/bw_timex/issues/46)
 * Fix substitution exchanges [#53](https://github.com/brightway-lca/bw_timex/issues/53)

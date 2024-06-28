@@ -17,7 +17,7 @@ maintainers = [
 description = "Time-explicit Life Cycle Assessment"
 keywords= ["brightway", "Life Cycle Assessment", "LCA", "time-explicit", "dynamic", "prospective"]
 readme = "README.md"
-dynamic = ["dependencies", "version"]
+dynamic = ["version"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -80,7 +80,6 @@ packages = [
 ]
 
 [tool.setuptools.dynamic]
-dependencies = {file = ["docs/requirements.txt"]}
 version = {attr = "bw_timex.__version__"}
 
 [tool.pytest.ini_options]
