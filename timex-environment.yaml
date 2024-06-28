@@ -10,3 +10,4 @@ dependencies:
   - bw_temporalis
   - matplotlib
   - seaborn
+  - dynamic_characterization
