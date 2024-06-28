@@ -1,17 +1,15 @@
-import bw2data as bd
 import warnings
-import pandas as pd
-import numpy as np
-import copy
-import matplotlib.pyplot as plt
-import seaborn as sb
-from peewee import fn
-from collections import defaultdict
-from scipy import sparse
-
 from datetime import datetime
-from typing import Optional, Callable
-from bw2data import (  # for prepare_bw_timex_inputs
+from itertools import chain
+from typing import Callable, Optional
+
+import bw2data as bd
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sb
+from bw2calc import LCA
+from bw2data import (
     Database,
     Method,
     Normalization,
@@ -25,12 +23,14 @@ from bw2data import (  # for prepare_bw_timex_inputs
 from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import get_id
 from bw2data.errors import Brightway2Project
-from bw2calc import LCA
-from .timeline_builder import TimelineBuilder
-from .matrix_modifier import MatrixModifier
+from peewee import fn
+from scipy import sparse
+
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .dynamic_characterization import DynamicCharacterization
+from .matrix_modifier import MatrixModifier
 from .remapping import TimeMappingDict
+from .timeline_builder import TimelineBuilder
 from .utils import extract_date_as_integer
 
 
@@ -48,7 +48,7 @@ class TimexLCA:
     databases. This temporal relinking is achieved by using datapackages to add new time-specific processes. The new
     processes and their exchanges to other technosphere processes or biosphere flows extent the technopshere and
     biosphere matrices.
-    
+
     Temporal information of both processes and biosphere flows are retained, allowing for dynamic LCIA.
 
     TimexLCA calculates:
@@ -59,10 +59,10 @@ class TimexLCA:
     Example
     -------
     >>> demand = {('my_foreground_database', 'my_process'): 1} #replace here with your functinal unit
-    >>> method = ("some_method_family", "some_category", "some_method")    #replace here with your method   
+    >>> method = ("some_method_family", "some_category", "some_method")    #replace here with your method
     >>> database_date_dict = {'my_database': datetime.strptime("2020", "%Y"),
                               'my_foreground_database':'dynamic'} #replace here with your database dates
-    >>> bw_timex = TimexLCA(demand, method, database_date_dict) 
+    >>> bw_timex = TimexLCA(demand, method, database_date_dict)
     >>> bw_timex.build_timeline() # you can pass many optional arguments here, also for the graph traversal
     >>> bw_timex.lci()
     >>> bw_timex.static_lcia()
@@ -172,7 +172,7 @@ class TimexLCA:
         -------
         pandas.DataFrame:
             A DataFrame containing the timeline of exchanges
-            
+
         See also
         --------
         bw_timex.timeline_builder.TimelineBuilder: Class that builds the timeline.
@@ -240,7 +240,7 @@ class TimexLCA:
         Returns
         -------
         None, but calls LCI calculations from bw2calc and calculates the dynamic inventory, if `build_dynamic_biosphere` is True.
-        
+
         See also
         --------
         build_datapackage: Method to create the datapackages that contain the modifications to the technopshere and biosphere matrix using the `MatrixModifier` class.
@@ -260,7 +260,6 @@ class TimexLCA:
         self.fu, self.data_objs, self.remapping = self.prepare_bw_timex_inputs(
             demand=self.demand,
             method=self.method,
-            demand_timing_dict=self.demand_timing_dict,
         )
 
         self.lca = LCA(
@@ -326,7 +325,7 @@ class TimexLCA:
         metric : str, optional
             the metric for which the dynamic LCIA should be calculated. Default is "GWP". Available: "GWP" and "radiative_forcing"
         time_horizon: int, optional
-            the time horizon for the impact assessment. Default is 100.
+            the time horizon for the impact assessment. Unit is years. Default is 100.
         fixed_time_horizon: bool, optional
             Whether the emission time horizon for all emissions is calculated from the functional unit (fixed_time_horizon=True) or from the time of the emission (fixed_time_horizon=False). Default is False.
         characterization_function_dict: dict, optional
@@ -338,7 +337,7 @@ class TimexLCA:
         -------
         pandas.DataFrame
             A Dataframe with the characterized inventory for the chosen metric and parameters. Also stores the sum as attribute `dynamic_score`.
-            
+
         See also
         --------
         bw_timex.dynamic_characterization.DynamicCharacterization: Class that characterizes the dynamic inventory.
@@ -348,6 +347,17 @@ class TimexLCA:
             warnings.warn(
                 "Dynamic lci not yet calculated. Call TimexLCA.calculate_dynamic_lci() first."
             )
+
+        t0_date = pd.Timestamp(self.timeline_builder.edge_extractor.t0.date[0])
+        latest_considered_impact = t0_date + pd.DateOffset(years=time_horizon)
+        last_emission = self.dynamic_inventory_df.date.max()
+        if fixed_time_horizon and latest_considered_impact < last_emission:
+            warnings.warn(
+                "An emission occurs outside of the specified time horizon and will not be characterized. Please make sure this is intended."
+            )
+            self.dynamic_inventory_df = self.dynamic_inventory_df[
+                self.dynamic_inventory_df.date <= latest_considered_impact
+            ]
 
         self.metric = metric
         self.time_horizon = time_horizon
@@ -394,7 +404,7 @@ class TimexLCA:
         -------
         list
             List of datapackages that contain the modifications to the technopshere and biosphere matrix
-            
+
         See also
         --------
         bw_timex.matrix_modifier.MatrixModifier: Class that handles the technosphere and biosphere matrix modifications.
@@ -429,7 +439,7 @@ class TimexLCA:
         Returns
         -------
         None, but calculates the dynamic inventory and stores it in the attribute `dynamic_inventory` as a matrix and in `dynamic_inventory_df` as a DataFrame.
-        
+
         See also
         --------
         bw_timex.dynamic_biosphere_builder.DynamicBiosphereBuilder: Class for creating the dynamic biosphere matrix and inventory.
@@ -582,7 +592,7 @@ class TimexLCA:
         -------
         tuple
             Indexed demand, data objects, and remapping dictionaries
-            
+
         See also
         --------
         bw2data.compat.prepare_lca_inputs: Original code this function is adapted from (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
@@ -658,7 +668,6 @@ class TimexLCA:
         self,
         demand=None,
         method=None,
-        demand_timing_dict=None,
         weighting=None,
         normalization=None,
         demands=None,
@@ -698,7 +707,7 @@ class TimexLCA:
         -------
         tuple
             Indexed demand, data objects, and remapping dictionaries
-            
+
         See also
         --------
         bw2data.compat.prepare_lca_inputs: Original code this function is adapted from (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
@@ -855,7 +864,7 @@ class TimexLCA:
         first_level_background_node_ids_all = set()
         for node_id in foreground_node_ids:
             node = bd.get_node(id=node_id)
-            for exc in node.technosphere():
+            for exc in chain(node.technosphere(), node.substitution()):
                 if exc.input["database"] in self.database_date_dict_static_only.keys():
                     first_level_background_node_ids_static.add(exc.input.id)
                     for background_db in self.database_date_dict_static_only.keys():
@@ -895,19 +904,19 @@ class TimexLCA:
         -------
         None but adds the activities to the `activity_time_mapping_dict`
         """
-        for id in self.static_lca.dicts.activity.keys():  # activity ids
+        for idx in self.static_lca.dicts.activity.keys():  # activity ids
             key = self.static_lca.remapping_dicts["activity"][
-                id
+                idx
             ]  # ('database', 'code')
             time = self.database_date_dict[
                 key[0]
             ]  # datetime (or 'dynamic' for foreground processes)
             if type(time) == str:  # if 'dynamic', just add the string
-                self.activity_time_mapping_dict.add((key, time), unique_id=id)
+                self.activity_time_mapping_dict.add((key, time), unique_id=idx)
             elif type(time) == datetime:
                 self.activity_time_mapping_dict.add(
                     (key, extract_date_as_integer(time, self.temporal_grouping)),
-                    unique_id=id,
+                    unique_id=idx,
                 )  # if datetime, map to the date as integer
             else:
                 warnings.warn(f"Time of activity {key} is neither datetime nor str.")

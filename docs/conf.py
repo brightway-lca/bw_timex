@@ -1,12 +1,7 @@
 ### path setup ####################################################################################
 
-from glob import glob
 import datetime
-import os
-import sys
 
-sys.path.insert(0, os.path.abspath('..'))
-sys.path.insert(0, os.path.abspath('.'))
 ###################################################################################################
 ### Project Information ###########################################################################
 ###################################################################################################
@@ -79,7 +74,6 @@ autoapi_member_order = 'bysource'
 autoapi_root = 'content/api'
 autoapi_keep_files = False
 
-
 autosummary_generate = True
 
 master_doc = "index"
@@ -135,7 +129,7 @@ html_theme_options = {
     "icon_links": [
         {
             "name": "GitHub",
-            "url": "https://github.com/TimoDiepers/timex",
+            "url": "https://github.com/brightway-lca/bw_timex",
             "icon": "fab fa-brands fa-github",
         },
         # {
@@ -158,7 +152,7 @@ html_theme_options = {
 
 # required by html_theme_options: "use_edit_page_button"
 html_context = {
-    "github_user": "TimoDiepers",
+    "github_user": "brightway-lca",
     "github_repo": "bw_timex",
     "github_version": "main",
     "doc_path": "docs",

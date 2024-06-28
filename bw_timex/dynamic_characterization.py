@@ -29,9 +29,9 @@ class DynamicCharacterization:
         characterization_function_dict: dict = None,
     ):
         """
-        Initializes the DynamicCharacterization object. 
-        In case users don't provide own dynamic characterization functions, it adds dynamic characterization functions from the 
-        (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/) 
+        Initializes the DynamicCharacterization object.
+        In case users don't provide own dynamic characterization functions, it adds dynamic characterization functions from the
+        (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/)
         for the GHGs mentioned in the IPCC AR6 Chapter 7, if these GHG are also characterized in the selected static LCA method.
 
         Parameters
@@ -299,7 +299,7 @@ class DynamicCharacterization:
 
         if self.characterized_inventory.empty:
             raise ValueError(
-                "No flows were characterized. Check if the flows in the dynamic inventory are available the dynamic characterization functions."
+                "There are no flows to characterize. Please make sure your time horizon matches the timing of emissions and make sure there are characterization functions for the flows in the dynamic inventories."
             )
 
         # remove rows with zero amounts to make it more readable
@@ -336,7 +336,7 @@ class DynamicCharacterization:
 
     def add_default_characterization_functions(self):
         """
-        Add default dynamic characterization functions from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/) 
+        Add default dynamic characterization functions from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/)
         for CO2, CH4, N2O and other GHGs, based on IPCC AR6 Chapter 7 decay curves.
 
         Please note: Currently, only CO2, CH4 and N2O include climate-carbon feedbacks.

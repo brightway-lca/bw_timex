@@ -39,11 +39,11 @@ jobs:
         py-version: ["3.10", "3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       # Set up Miniconda
       - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.py-version }}
           miniconda-version: "latest"  # Ensure Miniconda is installed

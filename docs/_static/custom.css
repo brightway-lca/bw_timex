@@ -1,3 +1,49 @@
 #rtd-footer-container {
     margin: 0px !important; /* Prevents unnecessary scroll bars in the navigation */
 }
+
+body {
+    width: 100vw;
+    margin-right: calc(100vw - 100%);
+    overflow-x: hidden;
+}
+
+.logo {
+    max-width: 50vw;
+    min-width: 130px;
+}
+
+.bd-page-width {
+    margin: 0;
+    }
+
+.bd-header {
+    margin: 0;
+    }
+
+.bd-header button.sidebar-toggle {
+    padding-bottom: .25rem;
+    padding-top: .25rem;
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+.bd-header button.primary-toggle {
+    margin-right: 0.35rem;
+    }
+
+@media (min-width: 370px) {
+    .bd-header button.primary-toggle {
+        margin-right: 1rem;
+    }
+}
+
+.bd-header button.secondary-toggle {
+    margin-left: 0.35rem;
+    }
+
+@media (min-width: 370px) {
+    .bd-header button.secondary-toggle {
+        margin-left: 1rem;
+    }
+}
