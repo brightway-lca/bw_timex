@@ -10,4 +10,4 @@ dependencies:
   - bw_temporalis
   - matplotlib
   - seaborn
-  # - dynamic_characterization # set active once it's fully refactored
+  - dynamic_characterization
