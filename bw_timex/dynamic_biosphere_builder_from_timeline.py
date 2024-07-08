@@ -7,6 +7,7 @@ from .remapping import TimeMappingDict
 from bw2calc import LCA
 from datetime import datetime
 from .utils import convert_date_string_to_datetime
+from .SetList import SetList
 
 
 class DynamicBiosphereBuilder:
@@ -25,6 +26,8 @@ class DynamicBiosphereBuilder:
         temporal_grouping: str,
         database_date_dict: dict,
         database_date_dict_static_only: dict,
+        timeline: pd.DataFrame,
+        interdatabase_activity_mapping: SetList,
     ) -> None:
         """ 
         Initializes the DynamicBiosphereBuilder object.
@@ -62,8 +65,8 @@ class DynamicBiosphereBuilder:
         }
 
         self.lca_obj = lca_obj
-        self.technosphere_matrix = lca_obj.technosphere_matrix.tocsc()  # convert to csc as this is only used for column slicing 
-        self.activity_dict = lca_obj.dicts.activity
+        # self.technosphere_matrix = lca_obj.technosphere_matrix.tocsc()  # convert to csc as this is only used for column slicing 
+        # self.activity_dict = lca_obj.dicts.activity
         self.activity_time_mapping_dict = activity_time_mapping_dict
         self.biosphere_time_mapping_dict = biosphere_time_mapping_dict
         self.demand_timing_dict = demand_timing_dict
@@ -72,8 +75,9 @@ class DynamicBiosphereBuilder:
         self.temporal_grouping = temporal_grouping
         self.database_date_dict = database_date_dict
         self.database_date_dict_static_only = database_date_dict_static_only
-        self.dynamic_supply_array = lca_obj.supply_array
-        self.timeline = lca_obj.timeline
+        # self.dynamic_supply_array = lca_obj.supply_array
+        self.timeline = timeline
+        self.interdatabase_activity_mapping = interdatabase_activity_mapping
         self.rows = []
         self.cols = []
         self.values = []
@@ -94,16 +98,15 @@ class DynamicBiosphereBuilder:
             A sparse matrix with the dimensions (bio_flows at a specific timestep) x (processes), where every row represents a biosphere flow at a specific time.
         """
 
-        for row in tlca.timeline.itertuples():
+        for row in self.timeline.itertuples():
             id = row.time_mapped_producer
+            process_col_index = row.Index
             (
                 (original_db, original_code), 
                 time) = self.activity_time_mapping_dict.reversed()[  # time is here an integer, with various length depending on temporal grouping, e.g. [Y] -> 2024, [M] - > 202401
                 id
             ]
             if id in self.node_id_collection_dict["temporalized_processes"]:
-                process_col_index = self.activity_dict[id]  # get the matrix column index
-
 
                 time_in_datetime = convert_date_string_to_datetime(
                     self.temporal_grouping, str(time)
@@ -150,63 +153,42 @@ class DynamicBiosphereBuilder:
                     # if not db in act_time_combinations.get(original_code):  #check if act time combination already exists
                     [
                         (timed_act_id,timed_db)] = [(act, db_name) for (act, db_name) 
-                        in tlca.interdatabase_activity_mapping[(row.producer,original_db)]
+                        in self.interdatabase_activity_mapping[(row.producer,original_db)]
                         if db==db_name
                     ]
                     # t_act = bd.get_activity(timed_act_id)
                     demand[timed_act_id] = amount
-                    
-                    
-                    # process_col_index = self.activity_dict[id]  # get the matrix column index
-                    # technosphere_column = (
-                    #     self.technosphere_matrix[:, process_col_index].A.ravel()
-                    # )  # 1-d np.array
-                    # demand = dict()
-                    # for idx, amount in enumerate(technosphere_column):
-                    #     if idx == self.activity_dict[id]:  # Skip production exchange
-                    #         continue
-                    #     if amount == 0:
-                    #         continue
 
-                    #     node_id = self.activity_dict.reversed[idx]
+                self.lca_obj.redo_lci(demand)
+                
+                aggregated_inventory = self.lca_obj.inventory.sum(
+                    axis=1
+                )  # aggregated biosphere flows of background supply chain emissions. Rows are bioflows.
+                
+                for idx, amount in enumerate(aggregated_inventory.A1):
+                    bioflow = bd.get_activity(self.lca_obj.dicts.biosphere.reversed[idx])
+                    ((_, _), time) = self.activity_time_mapping_dict.reversed()[id]
 
-                    #     if (
-                    #         node_id in self.node_id_collection_dict["foreground_node_ids"]
-                    #     ):  # We only aggregate background process bioflows
-                    #         continue
+                    time_in_datetime = convert_date_string_to_datetime(
+                        self.temporal_grouping, str(time)
+                    )  # now time is a datetime
 
-                    #     # demand[bd.get_node(id=node_id)] = -amount
-                    #     demand[node_id] = -amount
+                    td_producer = TemporalDistribution(
+                        date=np.array([str(time_in_datetime)], dtype=self.time_res),
+                        amount=np.array([1]),
+                    ).date  # TODO: Simplify
+                    date = td_producer[0]
 
-                    self.lca_obj.redo_lci(demand)
-                    aggregated_inventory = self.lca_obj.inventory.sum(
-                        axis=1
-                    )  # aggregated biosphere flows of background supply chain emissions. Rows are bioflows.
+                    time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(
+                        (bioflow, date)
+                    )
 
-                    for idx, amount in enumerate(aggregated_inventory.A1):
-                        bioflow = bd.get_activity(self.lca_obj.dicts.biosphere.reversed[idx])
-                        ((_, _), time) = self.activity_time_mapping_dict.reversed()[id]
-
-                        time_in_datetime = convert_date_string_to_datetime(
-                            self.temporal_grouping, str(time)
-                        )  # now time is a datetime
-
-                        td_producer = TemporalDistribution(
-                            date=np.array([str(time_in_datetime)], dtype=self.time_res),
-                            amount=np.array([1]),
-                        ).date  # TODO: Simplify
-                        date = td_producer[0]
-
-                        time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(
-                            (bioflow, date)
-                        )
-
-                        self.add_matrix_entry_for_biosphere_flows(
-                            row=time_mapped_matrix_id, col=process_col_index, amount=amount
-                        )
+                    self.add_matrix_entry_for_biosphere_flows(
+                        row=time_mapped_matrix_id, col=process_col_index, amount=amount
+                    )
 
         # now build the dynamic biosphere matrix
-        shape = (max(self.rows) + 1, len(self.activity_time_mapping_dict))
+        shape = (max(self.rows) + 1, len(self.timeline))
         dynamic_biomatrix = sp.coo_matrix((self.values, (self.rows, self.cols)), shape)
         self.dynamic_biomatrix = dynamic_biomatrix.tocsr()
 

@@ -27,6 +27,7 @@ from peewee import fn
 from scipy import sparse
 
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
+from .dynamic_biosphere_builder_from_timeline import DynamicBiosphereBuilder as DynamicBiosphereBuilder_TL
 from .dynamic_characterization import DynamicCharacterization
 from .matrix_modifier import MatrixModifier
 from .remapping import TimeMappingDict
@@ -223,7 +224,99 @@ class TimexLCA:
             ]
         ]
 
-    def lci(self, build_dynamic_biosphere: Optional[bool] = True) -> None:
+    def lci_from_timeline(
+        self,
+        ) -> None:
+        """Generates the time explicit LCI directly from the timeline, without the matrix remapping.
+        Does not modify the technosphere as the "lci()" method does. 
+
+        Generates the dynamic biosphere matrix and calculates the dynamicinventory() of the emissions.
+
+       
+        Returns
+        -------
+        None, but calls LCI calculations from bw2calc and calculates the dynamic inventory.
+        
+        """
+        
+        if not hasattr(self, "timeline"):
+            warnings.warn(
+                "Timeline not yet built. Call TimexLCA.build_timeline() first."
+            )
+            return
+
+        # create the create the dictionary items needed (normally in build_datapackage())
+        self.demand_timing_dict = self.create_demand_timing_dict()
+        unique_producers = (
+            self.timeline.groupby(["producer", "time_mapped_producer"])
+            .count()
+            .index.values
+        )
+        
+        temporal_market_ids = set()
+        temporalized_process_ids = set()
+        # Check if previous producer comes from background database -> temporal market
+        for (producer, time_mapped_producer) in unique_producers:
+            if (
+                bd.get_activity(producer)["database"]
+                in self.database_date_dict_static_only.keys()
+            ):
+                temporal_market_ids.add(time_mapped_producer)
+            else:  # comes from foreground, so it is a temporalized process (Is this true!?, what happens to a process in FG that does not have temporal infformation? This would technically also be a market then I suppose.. )
+                temporalized_process_ids.add(time_mapped_producer)  
+
+        self.node_id_collection_dict["temporal_markets"] = temporal_market_ids
+        self.node_id_collection_dict["temporalized_processes"] = temporalized_process_ids
+
+
+        self.fu, self.data_objs, self.remapping = self.prepare_bw_timex_inputs(
+            demand=self.demand,
+            method=self.method,
+        )
+
+        self.lca = LCA(
+            self.fu,
+            data_objs=self.data_objs,
+            remapping_dicts=self.remapping,
+        )
+
+        self.dynamic_biosphere_builder = DynamicBiosphereBuilder_TL(
+            self.lca,
+            self.activity_time_mapping_dict,
+            self.biosphere_time_mapping_dict,
+            self.demand_timing_dict,
+            self.node_id_collection_dict,
+            self.temporal_grouping,
+            self.database_date_dict,
+            self.database_date_dict_static_only,
+            self.timeline,
+            self.interdatabase_activity_mapping
+        )
+        self.dynamic_biomatrix = (
+            self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
+        )
+
+        # Build the dynamic inventory
+        count = len(self.timeline)
+        diagonal_supply_array = sparse.spdiags(
+            [self.timeline.amount.values.astype(float)], [0], count, count
+        )  # diagnolization of supply array keeps the dimension of the process, which we want to pass as additional information to the dynamic inventory dict
+        self.dynamic_inventory = self.dynamic_biomatrix @ diagonal_supply_array
+
+        self.biosphere_time_mapping_dict_reversed = {
+            v: k for k, v in self.biosphere_time_mapping_dict.items()
+        }
+
+        self.activity_time_mapping_dict_reversed = {
+            v: k for k, v in self.activity_time_mapping_dict.items()
+        }
+        self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe_TL()
+
+
+    def lci(
+        self, 
+        build_dynamic_biosphere: Optional[bool] = True,
+        ) -> None:
         """
         Calculates the time-explicit LCI.
 
@@ -526,6 +619,69 @@ class TimexLCA:
                 value = self.dynamic_inventory.data[j]
 
                 col_database_id = self.activity_dict.reversed[col]
+
+                bioflow_node, date = self.biosphere_time_mapping_dict_reversed[
+                    row
+                ]  # indices are already the same as in the matrix, as we create an entirely new biosphere instead of adding new entries (like we do with the technosphere matrix)
+                emitting_process_key, _ = self.activity_time_mapping_dict_reversed[
+                    col_database_id
+                ]
+
+                dataframe_rows.append(
+                    (
+                        date,
+                        value,
+                        bioflow_node.id,
+                        bd.get_activity(emitting_process_key).id,
+                    )
+                )
+
+        df = pd.DataFrame(
+            dataframe_rows, columns=["date", "amount", "flow", "activity"]
+        )
+
+        return df.sort_values(by=["date", "amount"], ascending=[True, False])
+
+    def create_dynamic_inventory_dataframe_TL(self) -> pd.DataFrame:
+        """Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the the format
+        of a pandas.DataFrame, with the right structure to later apply dynamic characterization functions.
+
+        Format needs to be:
+
+        +------------+--------+------+----------+
+        |   date     | amount | flow | activity |
+        +============+========+======+==========+
+        |  datetime  |   33   |  1   |    2     |
+        +------------+--------+------+----------+
+        |  datetime  |   32   |  1   |    2     |
+        +------------+--------+------+----------+
+        |  datetime  |   31   |  1   |    2     |
+        +------------+--------+------+----------+
+
+        - date: datetime, e.g. '2024-01-01 00:00:00'
+        - flow: flow id
+        - activity: activity id
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        pandas.DataFrame, dynamic inventory in DataFrame format
+
+        """
+
+        dataframe_rows = []
+        for i in range(self.dynamic_inventory.shape[0]):
+            row_start = self.dynamic_inventory.indptr[i]
+            row_end = self.dynamic_inventory.indptr[i + 1]
+            for j in range(row_start, row_end):
+                row = i
+                col = self.dynamic_inventory.indices[j]
+                value = self.dynamic_inventory.data[j]
+
+                col_database_id = self.timeline.iloc[col]['time_mapped_producer']  # this only gives back tghe orginal producer, but for the name and emitting process this would sufffice I suppose 
 
                 bioflow_node, date = self.biosphere_time_mapping_dict_reversed[
                     row
