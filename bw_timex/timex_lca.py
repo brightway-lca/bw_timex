@@ -683,7 +683,7 @@ class TimexLCA:
 
                 col_database_id = self.timeline.iloc[col]['time_mapped_producer']  # this only gives back tghe orginal producer, but for the name and emitting process this would sufffice I suppose 
 
-                bioflow_node, date = self.biosphere_time_mapping_dict_reversed[
+                bioflow_id, date = self.biosphere_time_mapping_dict_reversed[
                     row
                 ]  # indices are already the same as in the matrix, as we create an entirely new biosphere instead of adding new entries (like we do with the technosphere matrix)
                 emitting_process_key, _ = self.activity_time_mapping_dict_reversed[
@@ -694,7 +694,7 @@ class TimexLCA:
                     (
                         date,
                         value,
-                        bioflow_node.id,
+                        bioflow_id,
                         bd.get_activity(emitting_process_key).id,
                     )
                 )
@@ -1060,7 +1060,10 @@ class TimexLCA:
     def add_static_activities_to_time_mapping_dict(self) -> None:
         """
         Adds all activities from the static LCA to `activity_time_mapping_dict`, an instance of `TimeMappingDict`.
-        This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id) that is later used to uniquely identify time-resolved processes. This is the pre-population of the time mapping dict with the static activities. Further time-explicit activities (from other temporalized background databases) are added lateron by in the TimelineBuilder.
+        This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id) 
+        that is later used to uniquely identify time-resolved processes. This is the pre-population of the time 
+        mapping dict with the static activities. Further time-explicit activities (from other temporalized 
+        background databases) are added lateron by in the TimelineBuilder.
 
         Parameters
         ----------
