@@ -618,21 +618,18 @@ class TimexLCA:
                 col = self.dynamic_inventory.indices[j]
                 value = self.dynamic_inventory.data[j]
 
-                col_database_id = self.activity_dict.reversed[col]
+                emitting_process_id = self.activity_dict.reversed[col]
 
-                bioflow_node, date = self.biosphere_time_mapping_dict_reversed[
+                bioflow_id, date = self.biosphere_time_mapping_dict_reversed[
                     row
                 ]  # indices are already the same as in the matrix, as we create an entirely new biosphere instead of adding new entries (like we do with the technosphere matrix)
-                emitting_process_key, _ = self.activity_time_mapping_dict_reversed[
-                    col_database_id
-                ]
 
                 dataframe_rows.append(
                     (
                         date,
                         value,
-                        bioflow_node.id,
-                        bd.get_activity(emitting_process_key).id,
+                        bioflow_id,
+                        emitting_process_id,
                     )
                 )
 
