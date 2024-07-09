@@ -681,21 +681,18 @@ class TimexLCA:
                 col = self.dynamic_inventory.indices[j]
                 value = self.dynamic_inventory.data[j]
 
-                col_database_id = self.timeline.iloc[col]['time_mapped_producer']  # this only gives back tghe orginal producer, but for the name and emitting process this would sufffice I suppose 
+                emitting_process_id = self.timeline.iloc[col]['time_mapped_producer']  # this only gives back tghe orginal producer, but for the name and emitting process this would sufffice I suppose 
 
                 bioflow_id, date = self.biosphere_time_mapping_dict_reversed[
                     row
                 ]  # indices are already the same as in the matrix, as we create an entirely new biosphere instead of adding new entries (like we do with the technosphere matrix)
-                emitting_process_key, _ = self.activity_time_mapping_dict_reversed[
-                    col_database_id
-                ]
 
                 dataframe_rows.append(
                     (
                         date,
                         value,
                         bioflow_id,
-                        bd.get_activity(emitting_process_key).id,
+                        emitting_process_id,
                     )
                 )
 
