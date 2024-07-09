@@ -145,7 +145,7 @@ class DynamicBiosphereBuilder:
         for id in self.node_id_collection_dict["temporal_markets"]:
             process_col_index = self.activity_dict[id]  # get the matrix column index
             technosphere_column = (
-                self.technosphere_matrix[:, process_col_index].A.ravel()
+                self.technosphere_matrix[:, process_col_index].toarray().ravel()
             )  # 1-d np.array
             demand = dict()
             for idx, amount in enumerate(technosphere_column):
