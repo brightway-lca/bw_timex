@@ -133,7 +133,7 @@ class DynamicBiosphereBuilder:
 
                     # first create a row index for the tuple((db, bioflow), date))
                     time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(
-                        (exc.input, date)
+                        (exc.input.id, date)
                     )
 
                     # populate lists with which sparse matrix is constructed
