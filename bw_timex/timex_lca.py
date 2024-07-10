@@ -26,14 +26,14 @@ from bw2data.errors import Brightway2Project
 from peewee import fn
 from scipy import sparse
 
+# from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
-from .dynamic_biosphere_builder_from_timeline import DynamicBiosphereBuilder as DynamicBiosphereBuilder_TL
 from .dynamic_characterization import DynamicCharacterization
 from .matrix_modifier import MatrixModifier
-from .remapping import TimeMappingDict
+from .helper_classes import TimeMappingDict
 from .timeline_builder import TimelineBuilder
 from .utils import extract_date_as_integer
-from .SetList import SetList
+from .helper_classes import SetList
 
 
 class TimexLCA:
@@ -280,7 +280,7 @@ class TimexLCA:
             remapping_dicts=self.remapping,
         )
 
-        self.dynamic_biosphere_builder = DynamicBiosphereBuilder_TL(
+        self.dynamic_biosphere_builder = DynamicBiosphereBuilder(
             self.lca,
             self.activity_time_mapping_dict,
             self.biosphere_time_mapping_dict,
@@ -290,10 +290,13 @@ class TimexLCA:
             self.database_date_dict,
             self.database_date_dict_static_only,
             self.timeline,
-            self.interdatabase_activity_mapping
+            self.interdatabase_activity_mapping,
+            from_timeline=True,
         )
         self.dynamic_biomatrix = (
-            self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
+            self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(
+                from_timeline=True
+            )
         )
 
         # Build the dynamic inventory
@@ -558,9 +561,13 @@ class TimexLCA:
             self.temporal_grouping,
             self.database_date_dict,
             self.database_date_dict_static_only,
+            self.timeline,
+            self.interdatabase_activity_mapping,
         )
         self.dynamic_biomatrix = (
-            self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix()
+            self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(
+                from_timeline=False
+            )
         )
 
         # Build the dynamic inventory
