@@ -1,3 +1,6 @@
+## v0.1.7 (2024-07-11)
+* Fixed some dependencies
+
 ## v0.1.6 (2024-07-11)
 * Performance improvements
 * Added option to calculate the dynamic LCI directly from the timeline without expanding the technosphere matrix
