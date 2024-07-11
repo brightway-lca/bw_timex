@@ -29,11 +29,10 @@ from scipy import sparse
 # from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .dynamic_characterization import DynamicCharacterization
+from .helper_classes import SetList, TimeMappingDict
 from .matrix_modifier import MatrixModifier
-from .helper_classes import TimeMappingDict
 from .timeline_builder import TimelineBuilder
 from .utils import extract_date_as_integer
-from .helper_classes import SetList
 
 
 class TimexLCA:
@@ -106,7 +105,7 @@ class TimexLCA:
 
         # Create static_only dict that excludes dynamic processes that will be exploded later. This way we only have the "background databases" that we can later link to from the dates of the timeline.
         self.database_date_dict_static_only = {
-            k: v for k, v in self.database_date_dict.items() if type(v) == datetime
+            k: v for k, v in self.database_date_dict.items() if isinstance(v, datetime)
         }
 
         # Create some collections of nodes that will be useful down the line, e.g. all nodes from the background databases that link to foregroud nodes.
@@ -225,10 +224,10 @@ class TimexLCA:
         ]
 
     def lci(
-        self, 
+        self,
         build_dynamic_biosphere: Optional[bool] = True,
         expand_technosphere: Optional[bool] = True,
-        ) -> None:
+    ) -> None:
         """
         Calculates the time-explicit LCI.
 
@@ -244,11 +243,10 @@ class TimexLCA:
         build_dynamic_biosphere: bool
             if True, build the dynamic biosphere matrix and calculate the dynamic LCI.
             Default is True.
-        expand_technosphere_matrix: bool
-            if True it calculates the technosphere modifications. If False, it calculates
-            the dynamic inventory directly from the timeline. Currently,
-            this is only possible with the dynamic inventory option. If False and
-            build_dynamic_biosphere=False, returns a warning and returns.
+        expand_technosphere: bool
+            if True, creates an expanded time-explicit technosphere and calculates the LCI from it. If False, creates no
+            new technosphere, but calculates the dynamic inventory directly from the timeline. Building from the timeline
+            currently only works if `build_dynamic_biosphere` is also True.
 
         Returns
         -------
@@ -260,49 +258,19 @@ class TimexLCA:
         calculate_dynamic_inventory: Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
 
-        if expand_technosphere==build_dynamic_biosphere==False:
-            warnings.warn(
+        if not expand_technosphere and not build_dynamic_biosphere:
+            raise ValueError(
                 "Currently it is only possible to calculate a dynamic inventory from the timeline.\
-                    Please either set build_dynamic_biosphere=True or expand_technosphere_matrix=True"
+                    Please either set build_dynamic_biosphere=True or expand_technosphere=True"
             )
-            return
-        
+
         if not hasattr(self, "timeline"):
-            warnings.warn(
+            raise ValueError(
                 "Timeline not yet built. Call TimexLCA.build_timeline() first."
             )
-            return
 
         # mapping of the demand id to demand time
         self.demand_timing_dict = self.create_demand_timing_dict()
-        
-        if expand_technosphere:
-            self.datapackage = (
-                self.build_datapackage()
-            )  # this contains the matrix modifications
-
-        else:  # create a list of temporalized processes and temporal markets
-            unique_producers = (
-                self.timeline.groupby(["producer", "time_mapped_producer"])
-                .count()
-                .index.values
-            )
-            
-            temporal_market_ids = set()
-            temporalized_process_ids = set()
-            # Check if previous producer comes from background database -> temporal market
-            for (producer, time_mapped_producer) in unique_producers:
-                if (
-                    bd.get_activity(producer)["database"]
-                    in self.database_date_dict_static_only.keys()
-                ):
-                    temporal_market_ids.add(time_mapped_producer)
-                else:  # comes from foreground, so it is a temporalized process (Is this true!?, what happens to a process in FG that does not have temporal infformation? This would technically also be a market then I suppose.. )
-                    temporalized_process_ids.add(time_mapped_producer)  
-
-            self.node_id_collection_dict["temporal_markets"] = temporal_market_ids
-            self.node_id_collection_dict["temporalized_processes"] = temporalized_process_ids
-
 
         self.fu, self.data_objs, self.remapping = self.prepare_bw_timex_inputs(
             demand=self.demand,
@@ -310,8 +278,10 @@ class TimexLCA:
         )
 
         if expand_technosphere:
-            data_obs = self.data_objs + self.datapackage  # incl matrix modificaitons
-        else:
+            self.datapackage = self.build_datapackage()
+            data_obs = self.data_objs + self.datapackage
+        else:  # setup for timeline approach
+            self.collect_temporalized_processes_from_timeline()
             data_obs = self.data_objs
 
         self.lca = LCA(
@@ -320,21 +290,17 @@ class TimexLCA:
             remapping_dicts=self.remapping,
         )
 
-        if build_dynamic_biosphere:
-            if not expand_technosphere:
-                self.calculate_dynamic_inventory(
-                    from_timeline=True
-                )
-            else:
+        if not build_dynamic_biosphere:
+            self.lca.lci()
+        else:
+            if expand_technosphere:
                 self.lca.lci(factorize=True)
-                self.calculate_dynamic_inventory(
-                    from_timeline=False
-                    )
+                self.calculate_dynamic_inventory(from_timeline=False)
                 self.lca.redo_lci(
                     self.fu
                 )  # to get back the original LCI - necessary because we do some redo_lci's in the dynamic inventory calculation
-        else:
-            self.lca.lci()
+            else:
+                self.calculate_dynamic_inventory(from_timeline=True)
 
     def static_lcia(self) -> None:
         """
@@ -467,8 +433,6 @@ class TimexLCA:
         --------
         bw_timex.matrix_modifier.MatrixModifier: Class that handles the technosphere and biosphere matrix modifications.
         """
-        
-
         # Create matrix modifier that creates the new datapackages with the exploded processes and new links to background databases.
         self.matrix_modifier = MatrixModifier(
             self.timeline, self.database_date_dict_static_only, self.demand_timing_dict
@@ -608,66 +572,6 @@ class TimexLCA:
 
         return df.sort_values(by=["date", "amount"], ascending=[True, False])
 
-    def create_dynamic_inventory_dataframe_TL(self) -> pd.DataFrame:
-        """Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the the format
-        of a pandas.DataFrame, with the right structure to later apply dynamic characterization functions.
-
-        Format needs to be:
-
-        +------------+--------+------+----------+
-        |   date     | amount | flow | activity |
-        +============+========+======+==========+
-        |  datetime  |   33   |  1   |    2     |
-        +------------+--------+------+----------+
-        |  datetime  |   32   |  1   |    2     |
-        +------------+--------+------+----------+
-        |  datetime  |   31   |  1   |    2     |
-        +------------+--------+------+----------+
-
-        - date: datetime, e.g. '2024-01-01 00:00:00'
-        - flow: flow id
-        - activity: activity id
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        pandas.DataFrame, dynamic inventory in DataFrame format
-
-        """
-
-        dataframe_rows = []
-        for i in range(self.dynamic_inventory.shape[0]):
-            row_start = self.dynamic_inventory.indptr[i]
-            row_end = self.dynamic_inventory.indptr[i + 1]
-            for j in range(row_start, row_end):
-                row = i
-                col = self.dynamic_inventory.indices[j]
-                value = self.dynamic_inventory.data[j]
-
-                emitting_process_id = self.timeline.iloc[col]['time_mapped_producer']  # this only gives back tghe orginal producer, but for the name and emitting process this would sufffice I suppose 
-
-                bioflow_id, date = self.biosphere_time_mapping_dict_reversed[
-                    row
-                ]  # indices are already the same as in the matrix, as we create an entirely new biosphere instead of adding new entries (like we do with the technosphere matrix)
-
-                dataframe_rows.append(
-                    (
-                        date,
-                        value,
-                        bioflow_id,
-                        emitting_process_id,
-                    )
-                )
-
-        df = pd.DataFrame(
-            dataframe_rows, columns=["date", "amount", "flow", "activity"]
-        )
-
-        return df.sort_values(by=["date", "amount"], ascending=[True, False])
-
     #############
     # For setup #
     #############
@@ -727,9 +631,7 @@ class TimexLCA:
         data_objs = []
         remapping_dicts = None
 
-        demand_database_names = [
-            db_label for db_label in self.database_date_dict.keys()
-        ]  # Load all databases that could lateron be linked to
+        demand_database_names = list(self.database_date_dict.keys())
 
         if demand_database_names:
             database_names = set.union(
@@ -842,9 +744,7 @@ class TimexLCA:
         data_objs = []
         remapping_dicts = None
 
-        demand_database_names = [
-            db_label for db_label in self.database_date_dict.keys()
-        ]  # Load all databases that could lateron be linked to
+        demand_database_names = list(self.database_date_dict.keys())
 
         if demand_database_names:
             database_names = set.union(
@@ -931,8 +831,8 @@ class TimexLCA:
         - ``first_level_background_node_ids_static``: set of node ids of all processes that are in the background databases and are directly linked to the demand processes
         - ``first_level_background_node_ids_all``: like first_level_background_node_ids_static, but includes first level background processes from other time explicit databases.
         - ``first_level_background_node_id_dbs``: dictionary with the first_level_background_node_ids_static as keys returning their database
-        
-        It also initiates an instance of SetList which contains all mappings of equivalent activieties across time-specific databases. 
+
+        It also initiates an instance of SetList which contains all mappings of equivalent activieties across time-specific databases.
         - ``self.interdatabase_activity_mapping``: instance of SetList
         ----------
             None
@@ -943,7 +843,6 @@ class TimexLCA:
         """
         self.node_id_collection_dict = {}
         self.interdatabase_activity_mapping = SetList()
-
 
         # Original variable names preserved, set types for performance and uniqueness
         demand_database_names = {
@@ -992,7 +891,7 @@ class TimexLCA:
                 if exc.input["database"] in self.database_date_dict_static_only.keys():
                     first_level_background_node_ids_static.add(exc.input.id)
                     act_set = {(exc.input.id, exc.input["database"])}
-                    
+
                     for background_db in self.database_date_dict_static_only.keys():
                         try:
                             other_node = bd.get_node(
@@ -1005,13 +904,11 @@ class TimexLCA:
                             )
                             first_level_background_node_ids_all.add(other_node.id)
                             act_set.add((other_node.id, background_db))
-                        except Exception as e:
+                        except KeyError as e:
                             warnings.warn(
                                 f"Failed to find process in database {background_db} for name='{exc.input['name']}', reference product='{exc.input['reference product']}', location='{exc.input['location']}': {e}"
                             )
-                            pass
                     self.interdatabase_activity_mapping.add(act_set)
-
 
         self.node_id_collection_dict["first_level_background_node_ids_static"] = (
             first_level_background_node_ids_static
@@ -1020,12 +917,48 @@ class TimexLCA:
             first_level_background_node_ids_all
         )
 
+    def collect_temporalized_processes_from_timeline(self) -> None:
+        """
+        Prepares the input for the LCA from the timeline.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None, but sets the `fu`, `data_objs`, and `remapping` attributes.
+
+        """
+        unique_producers = (
+            self.timeline.groupby(["producer", "time_mapped_producer"])
+            .count()
+            .index.values
+        )
+
+        temporal_market_ids = set()
+        temporalized_process_ids = set()
+
+        for producer, time_mapped_producer in unique_producers:
+            if (
+                bd.get_activity(producer)["database"]
+                in self.database_date_dict_static_only.keys()
+            ):
+                temporal_market_ids.add(time_mapped_producer)
+            else:
+                temporalized_process_ids.add(time_mapped_producer)
+
+        self.node_id_collection_dict["temporal_markets"] = temporal_market_ids
+        self.node_id_collection_dict["temporalized_processes"] = (
+            temporalized_process_ids
+        )
+
     def add_static_activities_to_time_mapping_dict(self) -> None:
         """
         Adds all activities from the static LCA to `activity_time_mapping_dict`, an instance of `TimeMappingDict`.
-        This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id) 
-        that is later used to uniquely identify time-resolved processes. This is the pre-population of the time 
-        mapping dict with the static activities. Further time-explicit activities (from other temporalized 
+        This gives a unique mapping in the form of (('database', 'code'), datetime_as_integer): time_mapping_id)
+        that is later used to uniquely identify time-resolved processes. This is the pre-population of the time
+        mapping dict with the static activities. Further time-explicit activities (from other temporalized
         background databases) are added lateron by in the TimelineBuilder.
 
         Parameters
@@ -1043,9 +976,9 @@ class TimexLCA:
             time = self.database_date_dict[
                 key[0]
             ]  # datetime (or 'dynamic' for foreground processes)
-            if type(time) == str:  # if 'dynamic', just add the string
+            if isinstance(time, str):  # if 'dynamic', just add the string
                 self.activity_time_mapping_dict.add((key, time), unique_id=idx)
-            elif type(time) == datetime:
+            elif isinstance(time, datetime):
                 self.activity_time_mapping_dict.add(
                     (key, extract_date_as_integer(time, self.temporal_grouping)),
                     unique_id=idx,
@@ -1305,7 +1238,6 @@ class TimexLCA:
         warnings.warn(
             "bw25's original mapping function doesn't work with our new time-mapped matrix entries. The Timex mapping can be found in acvitity_time_mapping_dict and biosphere_time_mapping_dict."
         )
-        return
 
     def __getattr__(self, name):
         """
@@ -1318,7 +1250,7 @@ class TimexLCA:
             )
         if hasattr(self.lca, name):
             return getattr(self.lca, name)
-        elif hasattr(self.dynamic_biosphere_builder, name):
+        if hasattr(self.dynamic_biosphere_builder, name):
             return getattr(self.dynamic_biosphere_builder, name)
         else:
             raise AttributeError(
