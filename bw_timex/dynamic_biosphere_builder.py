@@ -172,7 +172,7 @@ class DynamicBiosphereBuilder:
                 if from_timeline:
                     demand = self.demand_from_timeline(row, original_db)
                 else:
-                    demand = self.demand_from_technosphere(idx)
+                    demand = self.demand_from_technosphere(idx, process_col_index)
 
                 self.lca_obj.redo_lci(demand)
 
@@ -232,11 +232,10 @@ class DynamicBiosphereBuilder:
             demand[timed_act_id] = amount
         return demand
 
-    def demand_from_technosphere(self, idx):
+    def demand_from_technosphere(self, idx, process_col_index):
         """
         Returns a demand dict based on the technosphere colummn.
         """
-        process_col_index = self.activity_dict[idx]  # get the matrix column index
         technosphere_column = (
             self.technosphere_matrix[:, process_col_index].toarray().ravel()
         )  # 1-d np.array
