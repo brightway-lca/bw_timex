@@ -14,7 +14,7 @@
 
 This is a python package for time-explicit Life Cycle Assessment that helps you assess the environmental impacts of products and processes over time. `bw_timex` builds on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
 
-## Features:
+## Features
 This package enables you to account for: 
 - **Timing of processes** throughout the supply chain (e.g., end-of-life treatment occurs 20 years after construction)
 - **Variable** and/or **evolving** supply chains & technologies (e.g., increasing shares of renewable electricity in the future)
@@ -22,23 +22,23 @@ This package enables you to account for:
 
 You can define temporal distributions for process and emission exchanges, which are then *automatically* propagated through the supply chain and mapped to corresponding time-explicit databases. The resulting time-explicit LCI reflects the current technology status within the production system at the actual time of each process. Also, `bw_timex` keeps track of the timing of emissions which means that you can apply [dynamic characterization functions](https://github.com/TimoDiepers/dynamic_characterization).
 
-## Use cases:
+## Use cases
 `bw_timex` is ideal for cases with:
 - **Variable** or strongly **evolving production systems**
 - **Long-lived** products
 - **Biogenic** carbon
 
-## Documentation and Resources:
+## Documentation and Resources
 - [Full Documentation](https://docs.brightway.dev/projects/bw-timex/en/latest/)
 - [Installation Guide](https://docs.brightway.dev/projects/bw-timex/en/latest/content/installation.html)
 - [Example Notebook](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_setac.ipynb)
 
-## Contributing:
+## Contributing
 We welcome contributions! If you have suggestions or want to fix a bug, please:
 - [Open an Issue](https://github.com/brightway-lca/bw_timex/issues)
 - [Send a Pull Request](https://github.com/brightway-lca/bw_timex/pulls)
 
-## Support: 
+## Support
 If you have any questions or need help, do not hesitate to contact us:
 - Timo Diepers ([timo.diepers@ltt.rwth-aachen.de](mailto:timo.diepers@ltt.rwth-aachen.de))
 - Amelie Müller ([a.muller@cml.leidenuniv.nl](mailto:a.muller@cml.leidenuniv.nl))
