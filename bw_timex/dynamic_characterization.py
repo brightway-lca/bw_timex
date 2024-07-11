@@ -165,7 +165,7 @@ class DynamicCharacterization:
                             self.characterization_function_dict[
                                 row.flow
                             ](  # here the dynamic characterization function is called and applied to the emission of the row
-                                row,
+                                tuple(row),
                                 period=time_horizon,
                             ),
                         ]
@@ -196,7 +196,7 @@ class DynamicCharacterization:
                         [
                             self.characterized_inventory,
                             self.characterization_function_dict[row.flow](
-                                row,
+                                tuple(row),
                                 period=new_TH,
                             ),
                         ]
@@ -259,7 +259,7 @@ class DynamicCharacterization:
                     radiative_forcing_ghg = self.characterization_function_dict[
                         row.flow
                     ](
-                        row,
+                        tuple(row),
                         period=new_TH,
                     )  # indidvidual emissions are calculated for t_emission until t_FU + time_horizon
 
