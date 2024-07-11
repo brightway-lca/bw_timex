@@ -70,6 +70,8 @@ class DynamicBiosphereBuilder:
             self.technosphere_matrix = lca_obj.technosphere_matrix.tocsc()  # convert to csc as this is only used for column slicing 
             self.dynamic_supply_array = lca_obj.supply_array
             self.activity_dict = lca_obj.dicts.activity
+        else:
+            self.dynamic_supply_array = timeline.amount.values.astype(float)
         self.activity_time_mapping_dict = activity_time_mapping_dict
         self.biosphere_time_mapping_dict = biosphere_time_mapping_dict
         self.demand_timing_dict = demand_timing_dict

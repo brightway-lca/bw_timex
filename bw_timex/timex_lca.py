@@ -224,107 +224,17 @@ class TimexLCA:
             ]
         ]
 
-    def lci_from_timeline(
-        self,
-        ) -> None:
-        """Generates the time explicit LCI directly from the timeline, without the matrix remapping.
-        Does not modify the technosphere as the "lci()" method does. 
-
-        Generates the dynamic biosphere matrix and calculates the dynamicinventory() of the emissions.
-
-       
-        Returns
-        -------
-        None, but calls LCI calculations from bw2calc and calculates the dynamic inventory.
-        
-        """
-        
-        if not hasattr(self, "timeline"):
-            warnings.warn(
-                "Timeline not yet built. Call TimexLCA.build_timeline() first."
-            )
-            return
-
-        # create the create the dictionary items needed (normally in build_datapackage())
-        self.demand_timing_dict = self.create_demand_timing_dict()
-        unique_producers = (
-            self.timeline.groupby(["producer", "time_mapped_producer"])
-            .count()
-            .index.values
-        )
-        
-        temporal_market_ids = set()
-        temporalized_process_ids = set()
-        # Check if previous producer comes from background database -> temporal market
-        for (producer, time_mapped_producer) in unique_producers:
-            if (
-                bd.get_activity(producer)["database"]
-                in self.database_date_dict_static_only.keys()
-            ):
-                temporal_market_ids.add(time_mapped_producer)
-            else:  # comes from foreground, so it is a temporalized process (Is this true!?, what happens to a process in FG that does not have temporal infformation? This would technically also be a market then I suppose.. )
-                temporalized_process_ids.add(time_mapped_producer)  
-
-        self.node_id_collection_dict["temporal_markets"] = temporal_market_ids
-        self.node_id_collection_dict["temporalized_processes"] = temporalized_process_ids
-
-
-        self.fu, self.data_objs, self.remapping = self.prepare_bw_timex_inputs(
-            demand=self.demand,
-            method=self.method,
-        )
-
-        self.lca = LCA(
-            self.fu,
-            data_objs=self.data_objs,
-            remapping_dicts=self.remapping,
-        )
-
-        self.dynamic_biosphere_builder = DynamicBiosphereBuilder(
-            self.lca,
-            self.activity_time_mapping_dict,
-            self.biosphere_time_mapping_dict,
-            self.demand_timing_dict,
-            self.node_id_collection_dict,
-            self.temporal_grouping,
-            self.database_date_dict,
-            self.database_date_dict_static_only,
-            self.timeline,
-            self.interdatabase_activity_mapping,
-            from_timeline=True,
-        )
-        self.dynamic_biomatrix = (
-            self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(
-                from_timeline=True
-            )
-        )
-
-        # Build the dynamic inventory
-        count = len(self.timeline)
-        diagonal_supply_array = sparse.spdiags(
-            [self.timeline.amount.values.astype(float)], [0], count, count
-        )  # diagnolization of supply array keeps the dimension of the process, which we want to pass as additional information to the dynamic inventory dict
-        self.dynamic_inventory = self.dynamic_biomatrix @ diagonal_supply_array
-
-        self.biosphere_time_mapping_dict_reversed = {
-            v: k for k, v in self.biosphere_time_mapping_dict.items()
-        }
-
-        self.activity_time_mapping_dict_reversed = {
-            v: k for k, v in self.activity_time_mapping_dict.items()
-        }
-        self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe_TL()
-
-
     def lci(
         self, 
         build_dynamic_biosphere: Optional[bool] = True,
+        expand_technosphere: Optional[bool] = True,
         ) -> None:
         """
         Calculates the time-explicit LCI.
 
         Generates the biosphere and technosphere modifications via the `MatrixModifier` class by calling `TimexLCA.
-        build_datapackage()`. Optionally, the dynamic biosphere matrix and dynamic inventory is calculated via
+        build_datapackage() if `expand_technosphere' is True. Otherwise it generates a dynamic inventory directly from
+        from the timeline. Optionally, the dynamic biosphere matrix and dynamic inventory is calculated via
         `TimexLCA.calculate_dynamic_inventory()`. Set `build_dynamic_biosphere` to False if you only want to get a new
         overall score and don't care about the timing
         of the emissions. This saves time and memory.
@@ -332,7 +242,13 @@ class TimexLCA:
         Parameters
         ----------
         build_dynamic_biosphere: bool
-            if True, build the dynamic biosphere matrix and calculate the dynamic LCI. Default is True.
+            if True, build the dynamic biosphere matrix and calculate the dynamic LCI.
+            Default is True.
+        expand_technosphere_matrix: bool
+            if True it calculates the technosphere modifications. If False, it calculates
+            the dynamic inventory directly from the timeline. Currently,
+            this is only possible with the dynamic inventory option. If False and
+            build_dynamic_biosphere=False, returns a warning and returns.
 
         Returns
         -------
@@ -344,34 +260,79 @@ class TimexLCA:
         calculate_dynamic_inventory: Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
 
+        if expand_technosphere==build_dynamic_biosphere==False:
+            warnings.warn(
+                "Currently it is only possible to calculate a dynamic inventory from the timeline.\
+                    Please either set build_dynamic_biosphere=True or expand_technosphere_matrix=True"
+            )
+            return
+        
         if not hasattr(self, "timeline"):
             warnings.warn(
                 "Timeline not yet built. Call TimexLCA.build_timeline() first."
             )
             return
 
-        self.datapackage = (
-            self.build_datapackage()
-        )  # this contains the matrix modifications
+        # mapping of the demand id to demand time
+        self.demand_timing_dict = self.create_demand_timing_dict()
+        
+        if expand_technosphere:
+            self.datapackage = (
+                self.build_datapackage()
+            )  # this contains the matrix modifications
+
+        else:  # create a list of temporalized processes and temporal markets
+            unique_producers = (
+                self.timeline.groupby(["producer", "time_mapped_producer"])
+                .count()
+                .index.values
+            )
+            
+            temporal_market_ids = set()
+            temporalized_process_ids = set()
+            # Check if previous producer comes from background database -> temporal market
+            for (producer, time_mapped_producer) in unique_producers:
+                if (
+                    bd.get_activity(producer)["database"]
+                    in self.database_date_dict_static_only.keys()
+                ):
+                    temporal_market_ids.add(time_mapped_producer)
+                else:  # comes from foreground, so it is a temporalized process (Is this true!?, what happens to a process in FG that does not have temporal infformation? This would technically also be a market then I suppose.. )
+                    temporalized_process_ids.add(time_mapped_producer)  
+
+            self.node_id_collection_dict["temporal_markets"] = temporal_market_ids
+            self.node_id_collection_dict["temporalized_processes"] = temporalized_process_ids
+
 
         self.fu, self.data_objs, self.remapping = self.prepare_bw_timex_inputs(
             demand=self.demand,
             method=self.method,
         )
 
+        if expand_technosphere:
+            data_obs = self.data_objs + self.datapackage  # incl matrix modificaitons
+        else:
+            data_obs = self.data_objs
+
         self.lca = LCA(
             self.fu,
-            data_objs=self.data_objs
-            + self.datapackage,  # here we include the datapackage
+            data_objs=data_obs,
             remapping_dicts=self.remapping,
         )
 
         if build_dynamic_biosphere:
-            self.lca.lci(factorize=True)
-            self.calculate_dynamic_inventory()
-            self.lca.redo_lci(
-                self.fu
-            )  # to get back the original LCI - necessary because we do some redo_lci's in the dynamic inventory calculation
+            if not expand_technosphere:
+                self.calculate_dynamic_inventory(
+                    from_timeline=True
+                )
+            else:
+                self.lca.lci(factorize=True)
+                self.calculate_dynamic_inventory(
+                    from_timeline=False
+                    )
+                self.lca.redo_lci(
+                    self.fu
+                )  # to get back the original LCI - necessary because we do some redo_lci's in the dynamic inventory calculation
         else:
             self.lca.lci()
 
@@ -506,8 +467,7 @@ class TimexLCA:
         --------
         bw_timex.matrix_modifier.MatrixModifier: Class that handles the technosphere and biosphere matrix modifications.
         """
-        # mapping of the demand id to demand time
-        self.demand_timing_dict = self.create_demand_timing_dict()
+        
 
         # Create matrix modifier that creates the new datapackages with the exploded processes and new links to background databases.
         self.matrix_modifier = MatrixModifier(
@@ -523,6 +483,7 @@ class TimexLCA:
 
     def calculate_dynamic_inventory(
         self,
+        from_timeline: bool = False,
     ) -> None:
         """
         Calculates the dynamic inventory, by first creating a dynamic biosphere matrix using the `DynamicBiosphereBuilder`
@@ -563,15 +524,16 @@ class TimexLCA:
             self.database_date_dict_static_only,
             self.timeline,
             self.interdatabase_activity_mapping,
+            from_timeline=from_timeline,
         )
         self.dynamic_biomatrix = (
             self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(
-                from_timeline=False
+                from_timeline=from_timeline
             )
         )
 
         # Build the dynamic inventory
-        count = len(self.activity_time_mapping_dict)
+        count = len(self.dynamic_supply_array)
         diagonal_supply_array = sparse.spdiags(
             [self.dynamic_supply_array], [0], count, count
         )  # diagnolization of supply array keeps the dimension of the process, which we want to pass as additional information to the dynamic inventory dict
