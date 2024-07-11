@@ -214,10 +214,10 @@ class DynamicBiosphereBuilder:
         return self.dynamic_biomatrix
 
     def demand_from_timeline(self, row, original_db):
-        """Returns a deman dict directly from the timeline row
+        """
+        Returns a demand dict directly from the timeline row
         and its interpolation_weights.
         """
-
         demand = {}
         for db, amount in row.interpolation_weights.items():
             # if not db in act_time_combinations.get(original_code):  #check if act time combination already exists
@@ -232,21 +232,22 @@ class DynamicBiosphereBuilder:
             demand[timed_act_id] = amount
         return demand
 
-    def demand_from_technosphere(self, database_id):
-        process_col_index = self.activity_dict[
-            database_id
-        ]  # get the matrix column index
+    def demand_from_technosphere(self, idx):
+        """
+        Returns a demand dict based on the technosphere colummn.
+        """
+        process_col_index = self.activity_dict[idx]  # get the matrix column index
         technosphere_column = (
             self.technosphere_matrix[:, process_col_index].toarray().ravel()
         )  # 1-d np.array
         demand = {}
-        for idx, amount in enumerate(technosphere_column):
-            if idx == self.activity_dict[database_id]:  # Skip production exchange
+        for row_idx, amount in enumerate(technosphere_column):
+            if row_idx == self.activity_dict[idx]:  # Skip production exchange
                 continue
             if amount == 0:
                 continue
 
-            node_id = self.activity_dict.reversed[idx]
+            node_id = self.activity_dict.reversed[row_idx]
 
             if (
                 node_id in self.node_id_collection_dict["foreground_node_ids"]
