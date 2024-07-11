@@ -180,8 +180,8 @@ class DynamicBiosphereBuilder:
                     axis=1
                 )  # aggregated biosphere flows of background supply chain emissions. Rows are bioflows.
 
-                for idx, amount in enumerate(aggregated_inventory.A1):
-                    bioflow = self.lca_obj.dicts.biosphere.reversed[idx]
+                for row_idx, amount in enumerate(aggregated_inventory.A1):
+                    bioflow = self.lca_obj.dicts.biosphere.reversed[row_idx]
                     ((_, _), time) = self.activity_time_mapping_dict.reversed()[idx]
 
                     time_in_datetime = convert_date_string_to_datetime(
