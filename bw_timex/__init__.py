@@ -6,4 +6,4 @@ from .timeline_builder import TimelineBuilder
 from .timex_lca import TimexLCA
 from .helper_classes import SetList
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"

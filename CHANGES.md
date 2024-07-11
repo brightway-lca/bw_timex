@@ -1,3 +1,7 @@
+## v0.1.6 (2024-07-11)
+* Performance improvements
+* Added option to calculate the dynamic LCI directly from the timeline without expanding the technosphere matrix
+
 ## v0.1.5 (2024-06-28)
 * Refactored dynamic characterization to separate package [dynamic_characterization](https://github.com/TimoDiepers/dynamic_characterization)
 
