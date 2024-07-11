@@ -927,7 +927,8 @@ class TimexLCA:
 
         Returns
         -------
-        None, but sets the `fu`, `data_objs`, and `remapping` attributes.
+        None, but adds "temporal_markets" and "temporalized_processes" to the
+        node_id_colletion_dict based on the timeline.
 
         """
         unique_producers = (
