@@ -85,7 +85,6 @@ class DynamicCharacterization:
         ) = "GWP",  # available metrics are "radiative_forcing" and "GWP", defaulting to GWP
         time_horizon: int | None = 100,
         fixed_time_horizon: bool | None = False,
-        cumsum: bool | None = True,
         characterization_function_co2: Callable | None = None,
     ) -> Tuple[pd.DataFrame, str, bool, int]:
         """
@@ -108,8 +107,6 @@ class DynamicCharacterization:
             the time horizon for the dynamic characterization. Default is 100 years.
         fixed_time_horizon: bool, optional
             If True, the time horizon is calculated from the time of the functional unit (FU) instead of the time of emission. Default is False.
-        cumsum: bool, optional
-            whether to calculate the cumulative sum of the characterization results. Default is True.
         characterization_function_co2: Callable, optional
             Characterization function for CO2. This is required for the GWP calculation. If None is given, we try using timex' default CO2 function from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/).
 
@@ -165,7 +162,7 @@ class DynamicCharacterization:
                             self.characterization_function_dict[
                                 row.flow
                             ](  # here the dynamic characterization function is called and applied to the emission of the row
-                                tuple(row),
+                                row,
                                 period=time_horizon,
                             ),
                         ]
@@ -196,7 +193,7 @@ class DynamicCharacterization:
                         [
                             self.characterized_inventory,
                             self.characterization_function_dict[row.flow](
-                                tuple(row),
+                                row,
                                 period=new_TH,
                             ),
                         ]
@@ -259,7 +256,7 @@ class DynamicCharacterization:
                     radiative_forcing_ghg = self.characterization_function_dict[
                         row.flow
                     ](
-                        tuple(row),
+                        row,
                         period=new_TH,
                     )  # indidvidual emissions are calculated for t_emission until t_FU + time_horizon
 
@@ -292,11 +289,6 @@ class DynamicCharacterization:
                 )
                 self.characterized_inventory.reset_index(drop=True, inplace=True)
 
-            if cumsum and "amount" in self.characterized_inventory:
-                self.characterized_inventory["amount_sum"] = (
-                    self.characterized_inventory["amount"].cumsum()
-                )  # TODO: there is also an option for cumulative results in the characterization functions themselves. Rethink where this is handled best and to avoid double cumsum
-
         if self.characterized_inventory.empty:
             raise ValueError(
                 "There are no flows to characterize. Please make sure your time horizon matches the timing of emissions and make sure there are characterization functions for the flows in the dynamic inventories."
@@ -307,24 +299,12 @@ class DynamicCharacterization:
             self.characterized_inventory["amount"] != 0
         ]
 
-        # add meta data and reorder
-        self.characterized_inventory["activity_name"] = self.characterized_inventory[
-            "activity"
-        ].map(lambda x: self.activity_time_mapping_dict_reversed.get(x)[0])
-
-        self.characterized_inventory["flow_name"] = self.characterized_inventory[
-            "flow"
-        ].apply(lambda x: bd.get_node(id=x)["name"])
-
         self.characterized_inventory = self.characterized_inventory[
             [
                 "date",
                 "amount",
                 "flow",
-                "flow_name",
                 "activity",
-                "activity_name",
-                "amount_sum",
             ]
         ]
         self.characterized_inventory.reset_index(drop=True, inplace=True)
@@ -380,14 +360,16 @@ class DynamicCharacterization:
         # look up which GHGs are characterized in the selected static LCA method
         method_data = bd.Method(self.method).load()
 
+        biosphere_db = bd.Database(bd.config.p["biosphere_database"])
+
         # the bioflow-identifier stored in the method data can be the database id or the tuple (database, code)
         def get_bioflow_node(identifier):
             if (
                 isinstance(identifier, Collection) and len(identifier) == 2
             ):  # is code tuple
-                return bd.get_node(database=identifier[0], code=identifier[1])
+                return biosphere_db.get(database=identifier[0], code=identifier[1])
             elif isinstance(identifier, int):  # id is an int
-                return bd.get_node(id=identifier)
+                return biosphere_db.get(id=identifier)
             else:
                 raise ValueError(
                     "The flow-identifier stored in the selected method is neither an id nor the tuple (database, code). No automatic matching possible."
