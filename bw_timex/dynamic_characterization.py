@@ -360,7 +360,7 @@ class DynamicCharacterization:
         # look up which GHGs are characterized in the selected static LCA method
         method_data = bd.Method(self.method).load()
 
-        biosphere_db = bd.Database(bd.config.p["biosphere_database"])
+        biosphere_db = bd.Database(bd.config.p.get("biosphere_database", "biosphere3"))
 
         # the bioflow-identifier stored in the method data can be the database id or the tuple (database, code)
         def get_bioflow_node(identifier):
