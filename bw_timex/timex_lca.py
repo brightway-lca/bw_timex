@@ -389,10 +389,6 @@ class TimexLCA:
 
         self.dynamic_characterizer = DynamicCharacterization(
             self.dynamic_inventory_df,
-            self.dicts.activity,
-            self.dicts.biosphere,
-            self.activity_time_mapping_dict_reversed,
-            self.biosphere_time_mapping_dict_reversed,
             self.demand_timing_dict,
             self.temporal_grouping,
             self.method,

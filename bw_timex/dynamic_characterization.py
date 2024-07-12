@@ -19,10 +19,6 @@ class DynamicCharacterization:
     def __init__(
         self,
         dynamic_inventory_df: pd.DataFrame,
-        activity_dict: dict,
-        biosphere_dict: dict,
-        activity_time_mapping_dict_reversed: dict,
-        biosphere_time_mapping_dict_reversed: dict,
         demand_timing_dict: dict,
         temporal_grouping: dict,
         method: tuple,
@@ -38,14 +34,6 @@ class DynamicCharacterization:
         ----------
         dynamic_inventory_df : pd.DataFrame
             Dynamic inventory, formatted as a DataFrame, which contains the timing, id and amount of emissions and the emitting activity.
-        activity_dict : dict
-            Dictionary mapping activity ids to their matrix index
-        biosphere_dict : dict
-            Dictionary mapping biosphere flow ids to their matrix index
-        activity_time_mapping_dict_reversed : dict
-            Reversed `activity_time_mapping_dict`: {time_mapping_id: ((('database', 'code'), datetime_as_integer)}
-        biosphere_time_mapping_dict_reversed : dict
-            Reversed `biosphere_time_mapping_dict`: {time_mapping_id: ((('database', 'code'), datetime_as_integer)}
         demand_timing_dict : dict
             A dictionary mapping the demand(s) to its timing
         temporal_grouping : str
@@ -61,10 +49,6 @@ class DynamicCharacterization:
 
         """
         self.dynamic_inventory_df = dynamic_inventory_df
-        self.activity_dict = activity_dict
-        self.biosphere_dict = biosphere_dict
-        self.activity_time_mapping_dict_reversed = activity_time_mapping_dict_reversed
-        self.biosphere_time_mapping_dict_reversed = biosphere_time_mapping_dict_reversed
         self.demand_timing_dict = demand_timing_dict
         self.temporal_grouping = temporal_grouping
         self.method = method
