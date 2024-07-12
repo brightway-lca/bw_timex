@@ -1154,10 +1154,6 @@ class TimexLCA:
         -------
         none, but shows a plot
         """
-        if cumsum:
-            amount = "amount_sum"
-        else:
-            amount = "amount"
 
         if not hasattr(self, "characterized_inventory"):
             warnings.warn(
@@ -1168,8 +1164,14 @@ class TimexLCA:
         # Fetch the inventory to use in plotting, modify based on flags
         plot_data = self.characterized_inventory.copy()
 
+        if cumsum:
+            plot_data["amount_sum"] = plot_data["amount"].cumsum()
+            amount = "amount_sum"
+        else:
+            amount = "amount"
+
         if sum_emissions_within_activity:
-            plot_data = plot_data.groupby(["date", "activity_name"]).sum().reset_index()
+            plot_data = plot_data.groupby(["date", "activity"]).sum().reset_index()
             plot_data["amount_sum"] = plot_data["amount"].cumsum()
 
         if sum_activities:
@@ -1179,7 +1181,10 @@ class TimexLCA:
 
         else:
             plot_data["activity_label"] = plot_data.apply(
-                lambda row: bd.get_activity(row["activity_name"])["name"], axis=1
+                lambda row: bd.get_activity(
+                    self.activity_time_mapping_dict_reversed[row.activity][0]
+                )["name"],
+                axis=1,
             )
         # Plotting
         plt.figure(figsize=(14, 6))
