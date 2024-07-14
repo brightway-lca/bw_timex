@@ -9,7 +9,7 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/bw-timex?color=%2300549f)](https://pypi.org/project/bw-timex/)
 [![Conda Version](https://img.shields.io/conda/v/diepers/bw_timex?label=conda)](https://anaconda.org/diepers/bw_timex)
 ![Conda - License](https://img.shields.io/conda/l/diepers/bw_timex)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/binder?labpath=notebooks%2Fexample_simple_dynamic_characterization.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fexample_simple_dynamic_characterization.ipynb)
 
 > ℹ️ _This package is still under development and some functionalities may change in the future._
 
