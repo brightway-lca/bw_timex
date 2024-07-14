@@ -3,6 +3,7 @@ name: timex
 channels:
   - conda-forge
   - cmutel
+  - diepers
 dependencies:
   - brightway25 # for Linux/Windows/macOS(x64)
   # - brightway25_nosolver # switch to this if you're on a macOS ARM machine
