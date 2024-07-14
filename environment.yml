@@ -1,4 +1,4 @@
-# in your terminal, run conda: conda env create -f timex-environment.yaml
+# in your terminal, run conda: conda env create -f environment.yml
 name: timex
 channels:
   - conda-forge
@@ -6,9 +6,9 @@ channels:
   - diepers
 dependencies:
   - bw_timex
-  - brightway25 # for Linux/Windows/macOS(x64)
-  # - brightway25_nosolver # switch to this if you're on a macOS ARM machine
-  # - scikit-umfpack # also required for macOS ARM
+  # - brightway25 # for Linux/Windows/macOS(x64)
+  - brightway25_nosolver # switch to this if you're on a macOS ARM machine
+  - scikit-umfpack # also required for macOS ARM
   - bw_temporalis
   - dynamic_characterization
   - matplotlib
