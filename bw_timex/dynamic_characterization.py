@@ -126,7 +126,11 @@ class DynamicCharacterization:
 
             if metric == "GWP":  # scale radiative forcing to GWP [kg CO2 equivalent]
                 characterized_inventory_data.append(
-                    self._characterize_gwp(row, dynamic_time_horizon)
+                    self._characterize_gwp(
+                        row,
+                        original_time_horizon=time_horizon,
+                        dynamic_time_horizon=dynamic_time_horizon,
+                    )
                 )
 
         if not characterized_inventory_data:
@@ -205,7 +209,7 @@ class DynamicCharacterization:
                 isinstance(identifier, Collection) and len(identifier) == 2
             ):  # is code tuple
                 return biosphere_db.get(database=identifier[0], code=identifier[1])
-            elif isinstance(identifier, int):  # id is an int
+            if isinstance(identifier, int):  # id is an int
                 return biosphere_db.get(id=identifier)
             else:
                 raise ValueError(
@@ -303,7 +307,7 @@ class DynamicCharacterization:
             # e.g. an emission occuring n years before FU is characterized for time_horizon+n years
             if len(self.demand_timing_dict) > 1:
                 warnings.warn(
-                    f"There are multiple functional units with different timings. The earliest one will be used as a basis for the fixed time horizon in dynamic characterization."
+                    "There are multiple functional units with different timings. The earliest one will be used as a basis for the fixed time horizon in dynamic characterization."
                 )
             start_time_fu = min(self.demand_timing_dict.values())
             end_time_fu = start_time_fu + self.time_horizon
@@ -324,14 +328,16 @@ class DynamicCharacterization:
     def _characterize_radiative_forcing(self, row, time_horizon):
         return self.characterization_function_dict[row.flow](row, time_horizon)
 
-    def _characterize_gwp(self, row, time_horizon):
+    def _characterize_gwp(self, row, original_time_horizon, dynamic_time_horizon):
         radiative_forcing_ghg = self.characterization_function_dict[row.flow](
             row,
-            time_horizon,
+            dynamic_time_horizon,
         )
 
         row["amount"] = 1  # convert 1 kg CO2 equ.
-        radiative_forcing_co2 = self.characterization_function_co2(row, time_horizon)
+        radiative_forcing_co2 = self.characterization_function_co2(
+            row, original_time_horizon
+        )
 
         ghg_integral = radiative_forcing_ghg["amount"].sum()
         co2_integral = radiative_forcing_co2["amount"].sum()
