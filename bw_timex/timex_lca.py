@@ -1176,13 +1176,18 @@ class TimexLCA:
             plot_data["amount_sum"] = plot_data["amount"].cumsum()
             plot_data["activity_label"] = "All activities"
 
-        else:
-            plot_data["activity_label"] = plot_data.apply(
-                lambda row: bd.get_activity(
-                    self.activity_time_mapping_dict_reversed[row.activity][0]
-                )["name"],
-                axis=1,
-            )
+        else: # plotting activities separate
+            
+            activity_name_cache = {}
+
+            for activity in plot_data["activity"].unique():
+                if activity not in activity_name_cache:
+                    activity_name_cache[activity] = bd.get_activity(
+                        self.activity_time_mapping_dict_reversed[activity][0]
+                    )["name"]
+
+            plot_data["activity_label"] = plot_data["activity"].map(activity_name_cache)
+
         # Plotting
         plt.figure(figsize=(14, 6))
         axes = sb.scatterplot(x="date", y=amount, hue="activity_label", data=plot_data)
