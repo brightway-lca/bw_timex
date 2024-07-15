@@ -322,18 +322,16 @@ class DynamicCharacterization:
             return self.time_horizon
 
     def _characterize_radiative_forcing(self, row, time_horizon):
-        return self.characterization_function_dict[row["flow"]](row, time_horizon)
+        return self.characterization_function_dict[row.flow](row, time_horizon)
 
     def _characterize_gwp(self, row, time_horizon):
         radiative_forcing_ghg = self.characterization_function_dict[row.flow](
             row,
-            period=time_horizon,
+            time_horizon,
         )
 
         row["amount"] = 1  # convert 1 kg CO2 equ.
-        radiative_forcing_co2 = self.characterization_function_co2(
-            row, period=time_horizon
-        )
+        radiative_forcing_co2 = self.characterization_function_co2(row, time_horizon)
 
         ghg_integral = radiative_forcing_ghg["amount"].sum()
         co2_integral = radiative_forcing_co2["amount"].sum()
