@@ -326,7 +326,7 @@ class TimexLCA:
         time_horizon: int | None = 100,
         fixed_time_horizon: bool | None = False,
         characterization_function_dict: dict = None,
-        cumsum: bool | None = True,
+        characterization_function_co2: dict = None,
     ) -> pd.DataFrame:
         """
         Calculates dynamic LCIA with the `DynamicCharacterization` class using the dynamic inventory and dynamic
@@ -354,8 +354,9 @@ class TimexLCA:
             Whether the emission time horizon for all emissions is calculated from the functional unit (fixed_time_horizon=True) or from the time of the emission (fixed_time_horizon=False). Default is False.
         characterization_function_dict: dict, optional
             Dict of the form {biosphere_flow_database_id: characterization_function}. Default is None, which triggers the use of the provided dynamic characterization functions based on IPCC AR6 Chapter 7.
-        cumsum: bool, optional
-            Whether to calculate the cumulative sum of the characterization results. Default is True.
+        characterization_function_co2: Callable, optional
+            Characterization function for CO2 emissions. Necessary if GWP metrix is chosen. Default is None, which triggers the use of the provided dynamic characterization function of co2 based on IPCC AR6 Chapter 7.
+
 
         Returns
         -------
@@ -397,10 +398,10 @@ class TimexLCA:
 
         self.characterized_inventory = (
             self.dynamic_characterizer.characterize_dynamic_inventory(
-                metric,
-                time_horizon,
-                fixed_time_horizon,
-                cumsum,
+                metric=metric,
+                time_horizon=time_horizon,
+                fixed_time_horizon=fixed_time_horizon,
+                characterization_function_co2=characterization_function_co2,
             )
         )
 
