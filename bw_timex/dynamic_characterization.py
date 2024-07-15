@@ -138,6 +138,13 @@ class DynamicCharacterization:
             characterized_inventory_data
         ).explode(["amount", "date"])
 
+        self.characterized_inventory["amount"] = self.characterized_inventory[
+            "amount"
+        ].astype("float64")
+        self.characterized_inventory = self.characterized_inventory.loc[
+            self.characterized_inventory["amount"] != 0
+        ]
+
         self.characterized_inventory = (
             self.characterized_inventory[["date", "amount", "flow", "activity"]]
             .sort_values(by="date")
