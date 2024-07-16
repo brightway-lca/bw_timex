@@ -8,6 +8,7 @@ from typing import Callable, Dict, Tuple
 import bw2data as bd
 import numpy as np
 import pandas as pd
+from bw2data.utils import UnknownObject
 
 
 class DynamicCharacterization:
@@ -205,8 +206,17 @@ class DynamicCharacterization:
         def get_bioflow_node(identifier):
             if (
                 isinstance(identifier, Collection) and len(identifier) == 2
-            ):  # is code tuple
-                return biosphere_db.get(database=identifier[0], code=identifier[1])
+            ):  # is (probably) tuple of (database, code)
+                try:
+                    biosphere_node = biosphere_db.get(
+                        database=identifier[0], code=identifier[1]
+                    )
+                except UnknownObject as e:
+                    raise UnknownObject(
+                        f"Failed to set up the default characterization functions because a biosphere node was not found. Make sure the biosphere is set up correctly or provide a characterization_function_dict. Original error: {e}"
+                    )
+                return biosphere_node
+
             if isinstance(identifier, int):  # id is an int
                 return biosphere_db.get(id=identifier)
             else:
@@ -332,13 +342,13 @@ class DynamicCharacterization:
             dynamic_time_horizon,
         )
 
-        row["amount"] = 1  # reference is always 1 kg CO2
+        # calculate reference radiative forcing for 1 kg of CO2
         radiative_forcing_co2 = characterization_function_co2(
-            row, original_time_horizon
+            row._replace(amount=1), original_time_horizon
         )
 
-        ghg_integral = radiative_forcing_ghg["amount"].sum()
-        co2_integral = radiative_forcing_co2["amount"].sum()
+        ghg_integral = radiative_forcing_ghg.amount.sum()
+        co2_integral = radiative_forcing_co2.amount.sum()
         co2_equiv = ghg_integral / co2_integral
 
         return {
