@@ -138,19 +138,11 @@ class DynamicCharacterization:
                 "There are no flows to characterize. Please make sure your time horizon matches the timing of emissions and make sure there are characterization functions for the flows in the dynamic inventories."
             )
 
-        self.characterized_inventory = pd.DataFrame(
-            characterized_inventory_data
-        ).explode(["amount", "date"])
-
-        self.characterized_inventory["amount"] = self.characterized_inventory[
-            "amount"
-        ].astype("float64")
-        self.characterized_inventory = self.characterized_inventory.loc[
-            self.characterized_inventory["amount"] != 0
-        ]
-
         self.characterized_inventory = (
-            self.characterized_inventory[["date", "amount", "flow", "activity"]]
+            pd.DataFrame(characterized_inventory_data)
+            .explode(["amount", "date"])
+            .astype({"amount": "float64"})
+            .query("amount != 0")[["date", "amount", "flow", "activity"]]
             .sort_values(by="date")
             .reset_index(drop=True)
         )
