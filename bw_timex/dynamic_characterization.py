@@ -12,16 +12,13 @@ import pandas as pd
 
 class DynamicCharacterization:
     """
-    This class calculates dynamic characterization of life cycle inventories with temporal information.
+    Class for the dynamic characterization of life cycle inventories with temporal information.
 
     """
 
     def __init__(
         self,
-        dynamic_inventory_df: pd.DataFrame,
-        demand_timing_dict: Dict[str, datetime],
-        temporal_grouping: str,
-        method: Tuple[str, ...],
+        method: Tuple[str, ...] = None,
         characterization_function_dict: Dict[str, Callable] = None,
     ):
         """
@@ -32,14 +29,9 @@ class DynamicCharacterization:
 
         Parameters
         ----------
-        dynamic_inventory_df : pd.DataFrame
-            Dynamic inventory, formatted as a DataFrame, which contains the timing, id and amount of emissions and the emitting activity.
-        demand_timing_dict : dict
-            A dictionary mapping the demand(s) to its timing
-        temporal_grouping : str
-            A string indicating the temporal grouping of the processes, e.g. 'year', 'month', 'day', 'hour'
-        method : tuple
-            Tuple of the selcted the LCIA method, e.g. `("EF v3.1", "climate change", "global warming potential (GWP100)")`
+        method : tuple, optional
+            Tuple of the selcted the LCIA method, e.g. `("EF v3.1", "climate change", "global warming potential (GWP100)")`. This is
+            required for adding the default characterization functions and can be kept empty if custom ones are provided.
         characterization_function_dict : dict, optional
             A dictionary mapping biosphere flow ids to user-provided dynamic characterization functions, by default None.
 
@@ -48,25 +40,27 @@ class DynamicCharacterization:
         None
 
         """
-        self.dynamic_inventory_df = dynamic_inventory_df
-        self.demand_timing_dict = demand_timing_dict
-        self.temporal_grouping = temporal_grouping
-        self.method = method
         self.characterization_function_dict = characterization_function_dict or {}
 
         if not characterization_function_dict:
             warnings.warn(
-                f"No custom dynamic characterization functions provided. Using default dynamic characterization functions from `dynamic_characterization` meant to work with biosphere3 flows. The flows that are characterized are based on the selection of the initially chosen impact category: {self.method}. You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_function_dict."
+                "No custom dynamic characterization functions provided. Using default dynamic characterization functions from `dynamic_characterization` meant to work with biosphere3 flows. The flows that are characterized are based on the selection of the initially chosen impact category. You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_function_dict."
             )
-            self.add_default_characterization_functions()
+            if not method:
+                raise ValueError(
+                    "Please provide an LCIA method to base the default dynamic characterization functions on."
+                )
+            self.add_default_characterization_functions(method)
 
     def characterize_dynamic_inventory(
         self,
-        metric: str = "GWP",  # available are "radiative_forcing" and "GWP"
+        dynamic_inventory_df: pd.DataFrame,
+        metric: str = "radiative_forcing",
         time_horizon: int = 100,
         fixed_time_horizon: bool = False,
+        time_horizon_start: datetime = datetime.now(),
         characterization_function_co2: Callable = None,
-    ) -> Tuple[pd.DataFrame, str, bool, int]:
+    ) -> pd.DataFrame:
         """
         Characterizes the dynamic inventory, formatted as a Dataframe, by evaluating each emission (row in DataFrame) using given dynamic characterization functions.
 
@@ -81,12 +75,16 @@ class DynamicCharacterization:
 
         Parameters
         ----------
+        dynamic_inventory_df : pd.DataFrame
+            Dynamic inventory, formatted as a DataFrame, which contains the timing, id and amount of emissions and the emitting activity.
         metric : str, optional
-            the metric for which the dynamic LCIA should be calculated. Default is "GWP". Available: "GWP" and "radiative_forcing"
+            The metric for which the dynamic LCIA should be calculated. Default is "GWP". Available: "GWP" and "radiative_forcing". Default is "radiative_forcing".
         time_horizon: int, optional
-            the time horizon for the dynamic characterization. Default is 100 years.
+            Length of the time horizon for the dynamic characterization. Default is 100 years.
         fixed_time_horizon: bool, optional
             If True, the time horizon is calculated from the time of the functional unit (FU) instead of the time of emission. Default is False.
+        time_horizon_start: pd.Timestamp, optional
+            The starting timestamp of the time horizon for the dynamic characterization. Only needed for fixed time horizons. Default is datetime.now().
         characterization_function_co2: Callable, optional
             Characterization function for CO2. This is required for the GWP calculation. If None is given, we try using timex' default CO2 function from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/).
 
@@ -102,22 +100,26 @@ class DynamicCharacterization:
             )
 
         if metric == "GWP" and not characterization_function_co2:
-            self.characterization_function_co2 = self._get_default_co2_function()
-        else:
-            self.characterization_function_co2 = characterization_function_co2
+            characterization_function_co2 = self._get_default_co2_function()
 
-        self.time_horizon = time_horizon
-        self.fixed_time_horizon = fixed_time_horizon
+        self.current_metric = metric
+        self.current_time_horizon = time_horizon
+        self.current_fixed_time_horizon = fixed_time_horizon
 
         characterized_inventory_data = []
 
-        for _, row in self.dynamic_inventory_df.iterrows():
+        for row in dynamic_inventory_df.itertuples(index=False):
 
             # skip uncharacterized biosphere flows
             if row.flow not in self.characterization_function_dict.keys():
                 continue
 
-            dynamic_time_horizon = self._calculate_dynamic_time_horizon(row.date)
+            dynamic_time_horizon = self._calculate_dynamic_time_horizon(
+                emission_date=row.date,
+                time_horizon_start=time_horizon_start,
+                time_horizon=time_horizon,
+                fixed_time_horizon=fixed_time_horizon,
+            )
 
             if metric == "radiative_forcing":  # radiative forcing in W/m2
                 characterized_inventory_data.append(
@@ -130,6 +132,7 @@ class DynamicCharacterization:
                         row,
                         original_time_horizon=time_horizon,
                         dynamic_time_horizon=dynamic_time_horizon,
+                        characterization_function_co2=characterization_function_co2,
                     )
                 )
 
@@ -149,7 +152,9 @@ class DynamicCharacterization:
 
         return self.characterized_inventory
 
-    def add_default_characterization_functions(self):
+    def add_default_characterization_functions(
+        self, base_method: Tuple[str, ...]
+    ) -> None:
         """
         Add default dynamic characterization functions from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/)
         for CO2, CH4, N2O and other GHGs, based on IPCC AR6 Chapter 7 decay curves.
@@ -161,7 +166,8 @@ class DynamicCharacterization:
 
         Parameters
         ----------
-        None
+        base_method : tuple
+            Tuple of the selected the LCIA method, e.g. `("EF v3.1", "climate change", "global warming potential (GWP100)")`.
 
         Returns
         -------
@@ -191,7 +197,7 @@ class DynamicCharacterization:
             decay_multipliers = json.load(json_file)
 
         # look up which GHGs are characterized in the selected static LCA method
-        method_data = bd.Method(self.method).load()
+        method_data = bd.Method(base_method).load()
 
         biosphere_db = bd.Database(bd.config.biosphere)
 
@@ -246,7 +252,7 @@ class DynamicCharacterization:
                             )
                         )
 
-    def _get_default_co2_function(self):
+    def _get_default_co2_function(self) -> Callable:
         """
         Get the default CO2 characterization function from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/).
 
@@ -267,19 +273,18 @@ class DynamicCharacterization:
             raise ImportError(
                 "The default CO2 characterization function could not be loaded. Please make sure the package 'dynamic_characterization' (https://dynamic-characterization.readthedocs.io/en/latest/) is installed or provide your own function for the dynamic characterization of CO2. This is necessary for the GWP calculations."
             )
-        self.characterization_function_co2 = characterize_co2
         warnings.warn(
             "Using bw_timex's default CO2 characterization function for GWP reference."
         )
-
         return characterize_co2
 
-    def _get_time_format(self):
-        return {"year": "%Y", "month": "%Y%m", "day": "%Y%m%d", "hour": "%Y%m%d%H"}[
-            self.temporal_grouping
-        ]
-
-    def _calculate_dynamic_time_horizon(self, emission_date):
+    def _calculate_dynamic_time_horizon(
+        self,
+        emission_date: pd.Timestamp,
+        time_horizon_start: pd.Timestamp,
+        time_horizon: int,
+        fixed_time_horizon: bool,
+    ) -> datetime:
         """
         Calculate the dynamic time horizon for the dynamic characterization of an emission.
         Distinguishes between the Levasseur approach (fixed_time_horizon = True) and the conventional approach (fixed_time_horizon = False).
@@ -288,46 +293,47 @@ class DynamicCharacterization:
         ----------
         emission_date: pd.Timestamp
             The date of the emission
+        time_horizon_start: pd.Timestamp
+            Start timestamp of the time horizon
+        time_horizon: int
+            Length of the time horizon in years
+        fixed_time_horizon: bool
+            If True, the time horizon is calculated from the time of the functional unit (FU) instead of the time of emission
 
         Returns
         -------
-        datetime
+        datetime.datetime
             dynamic time horizon for the specific emission
         """
-        if self.fixed_time_horizon:
-            # fixed_time_horizon = True: Levasseur approach: time_horizon for all emissions starts at timing of FU + time_horizon
+        if fixed_time_horizon:
+            # Levasseur approach: time_horizon for all emissions starts at timing of FU + time_horizon
             # e.g. an emission occuring n years before FU is characterized for time_horizon+n years
-            if len(self.demand_timing_dict) > 1:
-                warnings.warn(
-                    "There are multiple functional units with different timings. The earliest one will be used as a basis for the fixed time horizon in dynamic characterization."
-                )
-            start_time_fu = min(self.demand_timing_dict.values())
-            end_time_fu = start_time_fu + self.time_horizon
-            end_time_fu_grouped = datetime.strptime(
-                str(end_time_fu), self._get_time_format()
-            )
-
+            end_time_horizon = time_horizon_start + pd.DateOffset(years=time_horizon)
             emission_datetime = emission_date.to_pydatetime()
 
-            return max(
-                0, round((end_time_fu_grouped - emission_datetime).days / 365.25)
-            )
+            return max(0, round((end_time_horizon - emission_datetime).days / 365.25))
 
         else:
-            # fixed_time_horizon = False: conventional approach, emission is calculated from t emission for the length of time horizon
-            return self.time_horizon
+            # conventional approach, emission is calculated from t emission for the length of time horizon
+            return time_horizon
 
-    def _characterize_radiative_forcing(self, row, time_horizon):
+    def _characterize_radiative_forcing(self, row, time_horizon) -> Dict:
         return self.characterization_function_dict[row.flow](row, time_horizon)
 
-    def _characterize_gwp(self, row, original_time_horizon, dynamic_time_horizon):
+    def _characterize_gwp(
+        self,
+        row,
+        original_time_horizon,
+        dynamic_time_horizon,
+        characterization_function_co2,
+    ) -> Dict:
         radiative_forcing_ghg = self.characterization_function_dict[row.flow](
             row,
             dynamic_time_horizon,
         )
 
-        row["amount"] = 1  # convert 1 kg CO2 equ.
-        radiative_forcing_co2 = self.characterization_function_co2(
+        row["amount"] = 1  # reference is always 1 kg CO2
+        radiative_forcing_co2 = characterization_function_co2(
             row, original_time_horizon
         )
 
@@ -336,8 +342,8 @@ class DynamicCharacterization:
         co2_equiv = ghg_integral / co2_integral
 
         return {
-            "date": row.date,  # start date of emission
-            "amount": co2_equiv,  # ghg emission in kg CO2-equ
+            "date": row.date,
+            "amount": co2_equiv,
             "flow": row.flow,
             "activity": row.activity,
         }
