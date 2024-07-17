@@ -19,8 +19,8 @@ class DynamicCharacterization:
 
     def __init__(
         self,
-        method: Tuple[str, ...] = None,
         characterization_function_dict: Dict[str, Callable] = None,
+        base_lcia_method: Tuple[str, ...] = None,
     ):
         """
         Initializes the DynamicCharacterization object.
@@ -30,11 +30,11 @@ class DynamicCharacterization:
 
         Parameters
         ----------
-        method : tuple, optional
-            Tuple of the selcted the LCIA method, e.g. `("EF v3.1", "climate change", "global warming potential (GWP100)")`. This is
-            required for adding the default characterization functions and can be kept empty if custom ones are provided.
         characterization_function_dict : dict, optional
             A dictionary mapping biosphere flow ids to user-provided dynamic characterization functions, by default None.
+        base_lcia_method : tuple, optional
+            Tuple of the selcted the LCIA method, e.g. `("EF v3.1", "climate change", "global warming potential (GWP100)")`. This is
+            required for adding the default characterization functions and can be kept empty if custom ones are provided.
 
         Returns
         -------
@@ -47,11 +47,11 @@ class DynamicCharacterization:
             warnings.warn(
                 "No custom dynamic characterization functions provided. Using default dynamic characterization functions from `dynamic_characterization` meant to work with biosphere3 flows. The flows that are characterized are based on the selection of the initially chosen impact category. You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_function_dict."
             )
-            if not method:
+            if not base_lcia_method:
                 raise ValueError(
                     "Please provide an LCIA method to base the default dynamic characterization functions on."
                 )
-            self.add_default_characterization_functions(method)
+            self.add_default_characterization_functions(base_lcia_method)
 
     def characterize_dynamic_inventory(
         self,
@@ -154,7 +154,7 @@ class DynamicCharacterization:
         return self.characterized_inventory
 
     def add_default_characterization_functions(
-        self, base_method: Tuple[str, ...]
+        self, base_lcia_method: Tuple[str, ...]
     ) -> None:
         """
         Add default dynamic characterization functions from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/)
@@ -167,7 +167,7 @@ class DynamicCharacterization:
 
         Parameters
         ----------
-        base_method : tuple
+        base_lcia_method : tuple
             Tuple of the selected the LCIA method, e.g. `("EF v3.1", "climate change", "global warming potential (GWP100)")`.
 
         Returns
@@ -198,7 +198,7 @@ class DynamicCharacterization:
             decay_multipliers = json.load(json_file)
 
         # look up which GHGs are characterized in the selected static LCA method
-        method_data = bd.Method(base_method).load()
+        method_data = bd.Method(base_lcia_method).load()
 
         biosphere_db = bd.Database(bd.config.biosphere)
 

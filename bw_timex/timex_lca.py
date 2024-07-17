@@ -403,8 +403,8 @@ class TimexLCA:
 
         if not hasattr(self, "dynamic_characterizer"):
             self.dynamic_characterizer = DynamicCharacterization(
-                method=self.method,
                 characterization_function_dict=characterization_function_dict,
+                base_lcia_method=self.method,
             )
 
         self.characterized_inventory = (
