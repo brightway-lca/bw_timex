@@ -326,7 +326,7 @@ class TimexLCA:
 
     def dynamic_lcia(
         self,
-        metric: str = "GWP",
+        metric: str = "radiative_forcing",
         time_horizon: int = 100,
         fixed_time_horizon: bool = False,
         time_horizon_start: datetime = None,
@@ -352,7 +352,7 @@ class TimexLCA:
         Parameters
         ----------
         metric : str, optional
-            the metric for which the dynamic LCIA should be calculated. Default is "GWP". Available: "GWP" and "radiative_forcing"
+            the metric for which the dynamic LCIA should be calculated. Default is "radiative_forcing". Available: "GWP" and "radiative_forcing"
         time_horizon: int, optional
             the time horizon for the impact assessment. Unit is years. Default is 100.
         fixed_time_horizon: bool, optional
