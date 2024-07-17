@@ -1,10 +1,10 @@
 import warnings
+from datetime import datetime
+from typing import Callable, List, Optional, Union
+
+import bw2data as bd
 import matplotlib.pyplot as plt
 import pandas as pd
-import bw2data as bd
-
-from datetime import datetime
-from typing import Callable, Union, List, Optional
 
 
 def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") -> int:
@@ -58,7 +58,7 @@ def extract_date_as_string(temporal_grouping: str, timestamp: datetime) -> str:
         Temporal grouping for the date string. Options are: 'year', 'month', 'day', 'hour'
     timestamp : datetime
         Datetime object to be converted to a string.
-    
+
     Returns
     -------
     date_as_string
@@ -92,7 +92,7 @@ def convert_date_string_to_datetime(temporal_grouping, datestring) -> datetime:
         Temporal grouping for the date string. Options are: 'year', 'month', 'day', 'hour'
     datestring : str
         Date as a string
-    
+
     Returns
     -------
     datetime
@@ -126,12 +126,12 @@ def add_flows_to_characterization_function_dict(
     Parameters
     ----------
     flows : Union[str, List[str]]
-        Flow or list of flows to be added to the characterization function dictionary. 
+        Flow or list of flows to be added to the characterization function dictionary.
     func : Callable
         Dynamic characterization function for flow.
     characterization_function_dict : dict, optional
         Dictionary of flows and their corresponding characterization functions. Default is an empty dictionary.
-    
+
     Returns
     -------
     dict
@@ -151,8 +151,7 @@ def add_flows_to_characterization_function_dict(
 
 
 def plot_characterized_inventory_as_waterfall(
-    characterized_inventory,
-    metric,
+    lca_obj,
     static_scores=None,
     prospective_scores=None,
     order_stacked_activities=None,
@@ -163,10 +162,8 @@ def plot_characterized_inventory_as_waterfall(
 
     Parameters
     ----------
-    characterized_inventory : pd.DataFrame
-        Dataframe of dynamic characterized inventory, such as TimexLCA.characterized_inventory
-    metric : str
-        Impact assessment method. Only 'GWP' is supported at the moment.
+    lca_obj : TimexLCA
+        LCA object with characterized inventory data.
     static_scores : dict, optional
         Dictionary of static scores. Default is None.
     prospective_scores : dict, optional
@@ -179,32 +176,29 @@ def plot_characterized_inventory_as_waterfall(
     None but plots the waterfall chart.
 
     """
-    # Check for necessary columns
-    if not {"date", "activity_name", "amount"}.issubset(
-        characterized_inventory.columns
-    ):
-        raise ValueError(
-            "DataFrame must contain 'date', 'activity_name', and 'amount' columns."
-        )
-    if metric != "GWP":
-        raise NotImplementedError(
-            f"Only GWP metric is supported at the moment, not {metric}."
-        )
+    if not hasattr(lca_obj, "characterized_inventory"):
+        raise ValueError("LCA object does not have characterized inventory data.")
+
+    if not hasattr(lca_obj, "activity_time_mapping_dict_reversed"):
+        raise ValueError("Make sure to pass an instance of a TimexLCA.")
 
     # Grouping and summing data
-    plot_data = characterized_inventory.groupby(
-        ["date", "activity_name"], as_index=False
+    plot_data = lca_obj.characterized_inventory.groupby(
+        ["date", "activity"], as_index=False
     ).sum()
     plot_data["year"] = plot_data[
         "date"
     ].dt.year  # TODO make temporal resolution flexible
 
     # Optimized activity label fetching
-    unique_activities = plot_data["activity_name"].unique()
+    unique_activities = plot_data["activity"].unique()
     activity_labels = {
-        activity: bd.get_activity(activity)["name"] for activity in unique_activities
+        idx: bd.get_activity(lca_obj.activity_time_mapping_dict_reversed[idx][0])[
+            "name"
+        ]
+        for idx in unique_activities
     }
-    plot_data["activity_label"] = plot_data["activity_name"].map(activity_labels)
+    plot_data["activity_label"] = plot_data["activity"].map(activity_labels)
     # Pivoting data for plotting
     pivoted_data = plot_data.pivot(
         index="year", columns="activity_label", values="amount"
