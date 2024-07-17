@@ -1,3 +1,6 @@
+## v0.1.8 (2024-07-17)
+* Moved dynamic characterization functionality completely to [dynamic_characterization](https://github.com/brightway-lca/dynamic_characterization). In the course of this, it was dynamic characterization was updated and is much faster now. See also https://github.com/brightway-lca/dynamic_characterization/pull/3
+
 ## v0.1.7 (2024-07-11)
 * Fixed some dependencies
 
@@ -6,7 +9,7 @@
 * Added option to calculate the dynamic LCI directly from the timeline without expanding the technosphere matrix
 
 ## v0.1.5 (2024-06-28)
-* Refactored dynamic characterization to separate package [dynamic_characterization](https://github.com/TimoDiepers/dynamic_characterization)
+* Refactored dynamic characterization to separate package [dynamic_characterization](https://github.com/brightway-lca/dynamic_characterization)
 
 ## v0.1.4 (2024-06-15)
 * Handled emissions occuring outside of fixed time horizon in dynamic characterization [#46](https://github.com/brightway-lca/bw_timex/issues/46)

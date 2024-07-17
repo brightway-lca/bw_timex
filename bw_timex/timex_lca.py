@@ -23,12 +23,12 @@ from bw2data import (
 from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import get_id
 from bw2data.errors import Brightway2Project
+from dynamic_characterization import characterize_dynamic_inventory
 from peewee import fn
 from scipy import sparse
 
 # from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
-from .dynamic_characterization import DynamicCharacterization
 from .helper_classes import SetList, TimeMappingDict
 from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
@@ -193,9 +193,13 @@ class TimexLCA:
         self.cutoff = cutoff
         self.max_calc = max_calc
 
-        self.add_static_activities_to_time_mapping_dict()  # pre-populate the activity time mapping dict with the static activities. Doing this here because we need the temporal grouping for consistent times resolution.
+        # pre-populate the activity time mapping dict with the static activities.
+        # Doing this here because we need the temporal grouping for consistent times resolution.
+        self.add_static_activities_to_time_mapping_dict()
 
-        # Create timeline builder that does the graph traversal (similar to bw_temporalis) and extracts all edges with their temporal information. Can later be used to build a timeline with the TimelineBuilder.build_timeline() method.
+        # Create timeline builder that does the graph traversal (similar to bw_temporalis) and extracts
+        # all edges with their temporal information. Can later be used to build a timeline with the
+        # TimelineBuilder.build_timeline() method.
         self.timeline_builder = TimelineBuilder(
             self.static_lca,
             self.edge_filter_function,
@@ -322,11 +326,12 @@ class TimexLCA:
 
     def dynamic_lcia(
         self,
-        metric: str | None = "GWP",
-        time_horizon: int | None = 100,
-        fixed_time_horizon: bool | None = False,
+        metric: str = "radiative_forcing",
+        time_horizon: int = 100,
+        fixed_time_horizon: bool = False,
+        time_horizon_start: datetime = None,
         characterization_function_dict: dict = None,
-        cumsum: bool | None = True,
+        characterization_function_co2: dict = None,
     ) -> pd.DataFrame:
         """
         Calculates dynamic LCIA with the `DynamicCharacterization` class using the dynamic inventory and dynamic
@@ -347,15 +352,18 @@ class TimexLCA:
         Parameters
         ----------
         metric : str, optional
-            the metric for which the dynamic LCIA should be calculated. Default is "GWP". Available: "GWP" and "radiative_forcing"
+            the metric for which the dynamic LCIA should be calculated. Default is "radiative_forcing". Available: "GWP" and "radiative_forcing"
         time_horizon: int, optional
             the time horizon for the impact assessment. Unit is years. Default is 100.
         fixed_time_horizon: bool, optional
             Whether the emission time horizon for all emissions is calculated from the functional unit (fixed_time_horizon=True) or from the time of the emission (fixed_time_horizon=False). Default is False.
+        time_horizon_start: pd.Timestamp, optional
+            The starting timestamp of the time horizon for the dynamic characterization. Only needed for fixed time horizons. Default is datetime.now().
         characterization_function_dict: dict, optional
             Dict of the form {biosphere_flow_database_id: characterization_function}. Default is None, which triggers the use of the provided dynamic characterization functions based on IPCC AR6 Chapter 7.
-        cumsum: bool, optional
-            Whether to calculate the cumulative sum of the characterization results. Default is True.
+        characterization_function_co2: Callable, optional
+            Characterization function for CO2 emissions. Necessary if GWP metrix is chosen. Default is None, which triggers the use of the provided dynamic characterization function of co2 based on IPCC AR6 Chapter 7.
+
 
         Returns
         -------
@@ -372,36 +380,36 @@ class TimexLCA:
                 "Dynamic lci not yet calculated. Call TimexLCA.calculate_dynamic_lci() first."
             )
 
+        # Set a default for inventory_in_time_horizon using the full dynamic_inventory_df
+        inventory_in_time_horizon = self.dynamic_inventory_df
+
+        # Calculate the latest considered impact date
         t0_date = pd.Timestamp(self.timeline_builder.edge_extractor.t0.date[0])
         latest_considered_impact = t0_date + pd.DateOffset(years=time_horizon)
-        last_emission = self.dynamic_inventory_df.date.max()
-        if fixed_time_horizon and latest_considered_impact < last_emission:
-            warnings.warn(
-                "An emission occurs outside of the specified time horizon and will not be characterized. Please make sure this is intended."
-            )
-            self.dynamic_inventory_df = self.dynamic_inventory_df[
-                self.dynamic_inventory_df.date <= latest_considered_impact
-            ]
 
-        self.metric = metric
-        self.time_horizon = time_horizon
-        self.fixed_time_horizon = fixed_time_horizon
+        # Update inventory_in_time_horizon if a fixed time horizon is used
+        if fixed_time_horizon:
+            last_emission = self.dynamic_inventory_df.date.max()
+            if latest_considered_impact < last_emission:
+                warnings.warn(
+                    "An emission occurs outside of the specified time horizon and will not be characterized. Please make sure this is intended."
+                )
+                inventory_in_time_horizon = self.dynamic_inventory_df[
+                    self.dynamic_inventory_df.date <= latest_considered_impact
+                ]
 
-        self.dynamic_characterizer = DynamicCharacterization(
-            self.dynamic_inventory_df,
-            self.demand_timing_dict,
-            self.temporal_grouping,
-            self.method,
-            characterization_function_dict,
-        )
+        if not time_horizon_start:
+            time_horizon_start = t0_date
 
-        self.characterized_inventory = (
-            self.dynamic_characterizer.characterize_dynamic_inventory(
-                metric,
-                time_horizon,
-                fixed_time_horizon,
-                cumsum,
-            )
+        self.characterized_inventory = characterize_dynamic_inventory(
+            dynamic_inventory_df=inventory_in_time_horizon,
+            metric=metric,
+            characterization_function_dict=characterization_function_dict,
+            base_lcia_method=self.method,
+            time_horizon=time_horizon,
+            fixed_time_horizon=fixed_time_horizon,
+            time_horizon_start=time_horizon_start,
+            characterization_function_co2=characterization_function_co2,
         )
 
         self.dynamic_score = self.characterized_inventory["amount"].sum()
@@ -1153,7 +1161,7 @@ class TimexLCA:
 
         if not hasattr(self, "characterized_inventory"):
             warnings.warn(
-                "Characterized inventory not yet calculated. Call TimexLCA.characterize_dynamic_lci() first."
+                "Characterized inventory not yet calculated. Call TimexLCA.dynamic_lcia() first."
             )
             return
 
@@ -1175,31 +1183,21 @@ class TimexLCA:
             plot_data["amount_sum"] = plot_data["amount"].cumsum()
             plot_data["activity_label"] = "All activities"
 
-        else:
-            plot_data["activity_label"] = plot_data.apply(
-                lambda row: bd.get_activity(
-                    self.activity_time_mapping_dict_reversed[row.activity][0]
-                )["name"],
-                axis=1,
-            )
+        else:  # plotting activities separate
+
+            activity_name_cache = {}
+
+            for activity in plot_data["activity"].unique():
+                if activity not in activity_name_cache:
+                    activity_name_cache[activity] = bd.get_activity(
+                        self.activity_time_mapping_dict_reversed[activity][0]
+                    )["name"]
+
+            plot_data["activity_label"] = plot_data["activity"].map(activity_name_cache)
+
         # Plotting
         plt.figure(figsize=(14, 6))
         axes = sb.scatterplot(x="date", y=amount, hue="activity_label", data=plot_data)
-
-        # Determine the plotting labels and titles based on the characterization method
-        if self.metric == "radiative_forcing":
-            label_legend = "Radiative forcing [W/m2]"
-            title = "Radiative forcing"
-        elif self.metric == "GWP":
-            label_legend = "GWP [kg CO2-eq]"
-            title = "GWP"
-
-        if self.fixed_time_horizon:
-            suptitle = f" \nTH of {self.time_horizon} years starting at FU,"
-        else:
-            suptitle = f" \nTH of {self.time_horizon} years starting at each emission,"
-
-        suptitle += f" temporal resolution of inventories: {self.temporal_grouping}"
 
         # Determine y-axis limit flexibly
         if plot_data[amount].min() < 0:
@@ -1207,16 +1205,12 @@ class TimexLCA:
         else:
             ymin = 0
 
-        axes.set_title(title)
         axes.set_axisbelow(True)
         axes.set_ylim(bottom=ymin)
-        axes.set_ylabel(label_legend)
         axes.set_xlabel("Time")
 
         handles, labels = axes.get_legend_handles_labels()
         axes.legend(handles[::-1], labels[::-1])
-        plt.title(title, fontsize=16, y=1.05)
-        plt.suptitle(suptitle, fontsize=12, y=0.95)
         plt.grid()
         plt.show()
 
