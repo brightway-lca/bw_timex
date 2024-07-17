@@ -335,19 +335,20 @@ class TimexLCA:
     ) -> pd.DataFrame:
         """
         Calculates dynamic LCIA with the `DynamicCharacterization` class using the dynamic inventory and dynamic
-        characterization functions.
+        characterization functions. Dynamic characterization is handled by the separate package 
+        `dynamic_characterization` (https://dynamic-characterization.readthedocs.io/en/latest/).
 
         Dynamic characterization functions in the form of a dictionary {biosphere_flow_database_id:
         characterization_function} can be given by the user.
-        If none are given, a set of default dynamic characterization functions based on IPCC AR6 are provided.
-        These are mapped to the biosphere3 flows of the chosen static climate change impact category.
-        If there is no characterization function for a biosphere flow, it will be ignored.
+        If none are given, a set of default dynamic characterization functions based on IPCC AR6 are provided from
+        `dynamic_characterization` package. These are mapped to the biosphere3 flows of the chosen static climate 
+        change impact category. If there is no characterization function for a biosphere flow, it will be ignored.
 
         Two dynamic climate change metrics are provided: "GWP" and "radiative_forcing".
         The time horizon for the impact assessment can be set with the `time_horizon` parameter, defaulting to 100 years.
         The `fixed_time_horizon` parameter determines whether the emission time horizon for all emissions is calculated from the
         functional unit (`fixed_time_horizon=True`) or from the time of the emission (`fixed_time_horizon=False`).
-        The former is the implementation of the Levasseur approach(https://doi.org/10.1021/es9030003), while the latter is how conventional LCA is done.
+        The former is the implementation of the Levasseur approach (see https://doi.org/10.1021/es9030003), while the latter is how conventional LCA is done.
 
         Parameters
         ----------
@@ -372,7 +373,7 @@ class TimexLCA:
 
         See also
         --------
-        bw_timex.dynamic_characterization.DynamicCharacterization: Class that characterizes the dynamic inventory.
+        dynamic_charaterization: Package handling the dynamic characterization: https://dynamic-characterization.readthedocs.io/en/latest/
         """
 
         if not hasattr(self, "dynamic_inventory"):
