@@ -23,12 +23,12 @@ from bw2data import (
 from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import get_id
 from bw2data.errors import Brightway2Project
+from dynamic_characterization import characterize_dynamic_inventory
 from peewee import fn
 from scipy import sparse
 
 # from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
-from .dynamic_characterization import DynamicCharacterization
 from .helper_classes import SetList, TimeMappingDict
 from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
@@ -193,12 +193,12 @@ class TimexLCA:
         self.cutoff = cutoff
         self.max_calc = max_calc
 
-        # pre-populate the activity time mapping dict with the static activities. 
+        # pre-populate the activity time mapping dict with the static activities.
         # Doing this here because we need the temporal grouping for consistent times resolution.
-        self.add_static_activities_to_time_mapping_dict()  
+        self.add_static_activities_to_time_mapping_dict()
 
-        # Create timeline builder that does the graph traversal (similar to bw_temporalis) and extracts 
-        # all edges with their temporal information. Can later be used to build a timeline with the 
+        # Create timeline builder that does the graph traversal (similar to bw_temporalis) and extracts
+        # all edges with their temporal information. Can later be used to build a timeline with the
         # TimelineBuilder.build_timeline() method.
         self.timeline_builder = TimelineBuilder(
             self.static_lca,
@@ -401,21 +401,15 @@ class TimexLCA:
         if not time_horizon_start:
             time_horizon_start = t0_date
 
-        if not hasattr(self, "dynamic_characterizer"):
-            self.dynamic_characterizer = DynamicCharacterization(
-                characterization_function_dict=characterization_function_dict,
-                base_lcia_method=self.method,
-            )
-
-        self.characterized_inventory = (
-            self.dynamic_characterizer.characterize_dynamic_inventory(
-                dynamic_inventory_df=inventory_in_time_horizon,
-                metric=metric,
-                time_horizon=time_horizon,
-                fixed_time_horizon=fixed_time_horizon,
-                time_horizon_start=time_horizon_start,
-                characterization_function_co2=characterization_function_co2,
-            )
+        self.characterized_inventory = characterize_dynamic_inventory(
+            dynamic_inventory_df=inventory_in_time_horizon,
+            metric=metric,
+            characterization_function_dict=characterization_function_dict,
+            base_lcia_method=self.method,
+            time_horizon=time_horizon,
+            fixed_time_horizon=fixed_time_horizon,
+            time_horizon_start=time_horizon_start,
+            characterization_function_co2=characterization_function_co2,
         )
 
         self.dynamic_score = self.characterized_inventory["amount"].sum()
@@ -1189,8 +1183,8 @@ class TimexLCA:
             plot_data["amount_sum"] = plot_data["amount"].cumsum()
             plot_data["activity_label"] = "All activities"
 
-        else: # plotting activities separate
-            
+        else:  # plotting activities separate
+
             activity_name_cache = {}
 
             for activity in plot_data["activity"].unique():
@@ -1205,35 +1199,18 @@ class TimexLCA:
         plt.figure(figsize=(14, 6))
         axes = sb.scatterplot(x="date", y=amount, hue="activity_label", data=plot_data)
 
-        # Determine the plotting labels and titles based on the characterization method
-        if self.dynamic_characterizer.current_metric == "radiative_forcing":
-            label_legend = "Radiative forcing [W/m2]"
-            title = "Radiative forcing"
-        elif self.dynamic_characterizer.current_metric == "GWP":
-            label_legend = "GWP [kg CO2-eq]"
-            title = "GWP"
-
-        if self.dynamic_characterizer.current_fixed_time_horizon:
-            suptitle = f" \nTH of {self.dynamic_characterizer.current_time_horizon} years starting at FU,"
-        else:
-            suptitle = f" \nTH of {self.dynamic_characterizer.current_time_horizon} years starting at each emission,"
-
         # Determine y-axis limit flexibly
         if plot_data[amount].min() < 0:
             ymin = plot_data[amount].min() * 1.1
         else:
             ymin = 0
 
-        axes.set_title(title)
         axes.set_axisbelow(True)
         axes.set_ylim(bottom=ymin)
-        axes.set_ylabel(label_legend)
         axes.set_xlabel("Time")
 
         handles, labels = axes.get_legend_handles_labels()
         axes.legend(handles[::-1], labels[::-1])
-        plt.title(title, fontsize=16, y=1.05)
-        plt.suptitle(suptitle, fontsize=12, y=0.95)
         plt.grid()
         plt.show()
 

@@ -1,5 +1,4 @@
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
-from .dynamic_characterization import DynamicCharacterization
 from .edge_extractor import EdgeExtractor
 from .helper_classes import SetList
 from .matrix_modifier import MatrixModifier
