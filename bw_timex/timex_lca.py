@@ -35,6 +35,7 @@ from .timeline_builder import TimelineBuilder
 from .utils import extract_date_as_integer
 
 
+
 class TimexLCA:
     """
     Class to perform time-explicit LCA calculations.
@@ -110,7 +111,7 @@ class TimexLCA:
 
         # Create some collections of nodes that will be useful down the line, e.g. all nodes from the background databases that link to foregroud nodes.
         self.create_node_id_collection_dict()
-
+       
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all background databases in the LCA. We need all the IDs for the time mapping dict.
         fu, data_objs, remapping = self.prepare_static_lca_inputs(
             demand=self.demand, method=self.method
@@ -889,30 +890,39 @@ class TimexLCA:
 
         first_level_background_node_ids_static = set()
         first_level_background_node_ids_all = set()
-        for node_id in foreground_node_ids:
+        
+        count = 0
+        for node_id in foreground_node_ids: #why do we iterate over all foreground nodes, shouldn't it be sufficient to only iterate over those in the supply chain of the FU?
             node = bd.get_node(id=node_id)
             for exc in chain(node.technosphere(), node.substitution()):
                 if exc.input["database"] in self.database_date_dict_static_only.keys():
                     first_level_background_node_ids_static.add(exc.input.id)
                     act_set = {(exc.input.id, exc.input["database"])}
+                    count += 1 
+        
+        # print("iterations of first loop", count)
+        # print("first_level_background_node_ids_static", len(first_level_background_node_ids_static))
 
-                    for background_db in self.database_date_dict_static_only.keys():
-                        try:
-                            other_node = bd.get_node(
-                                **{
-                                    "database": background_db,
-                                    "name": exc.input["name"],
-                                    "product": exc.input["reference product"],
-                                    "location": exc.input["location"],
-                                }
-                            )
-                            first_level_background_node_ids_all.add(other_node.id)
-                            act_set.add((other_node.id, background_db))
-                        except KeyError as e:
-                            warnings.warn(
-                                f"Failed to find process in database {background_db} for name='{exc.input['name']}', reference product='{exc.input['reference product']}', location='{exc.input['location']}': {e}"
-                            )
-                    self.interdatabase_activity_mapping.add(act_set)
+        for background_node_id in first_level_background_node_ids_static: # look up new nodes
+            background_node = bd.get_node(id=background_node_id)                  
+            for background_db in self.database_date_dict_static_only.keys():
+                try:
+                    other_node = bd.get_node(
+                        **{
+                            "database": background_db,
+                            "name": background_node["name"],
+                            "product": background_node["reference product"],
+                            "location": background_node["location"],
+                        }
+                    )
+                    
+                    first_level_background_node_ids_all.add(other_node.id)
+                    act_set.add((other_node.id, background_db))
+                except KeyError as e:
+                    warnings.warn(
+                        f"Failed to find process in database {background_db} for name='{exc.input['name']}', reference product='{exc.input['reference product']}', location='{exc.input['location']}': {e}"
+                    )
+            self.interdatabase_activity_mapping.add(act_set)
 
         self.node_id_collection_dict["first_level_background_node_ids_static"] = (
             first_level_background_node_ids_static
