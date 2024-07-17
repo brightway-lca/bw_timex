@@ -37,7 +37,7 @@ dependencies = [
     "scipy",
     "tqdm",
     "bw_temporalis>=1.1",
-    "dynamic_characterization>=0.0.3",
+    "dynamic_characterization>=0.0.4",
     "matplotlib",
     "seaborn",
 ]
