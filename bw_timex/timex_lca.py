@@ -891,39 +891,33 @@ class TimexLCA:
         first_level_background_node_ids_static = set()
         first_level_background_node_ids_all = set()
         
-        count = 0
+    
         for node_id in foreground_node_ids: #why do we iterate over all foreground nodes, shouldn't it be sufficient to only iterate over those in the supply chain of the FU?
             node = bd.get_node(id=node_id)
             for exc in chain(node.technosphere(), node.substitution()):
                 if exc.input["database"] in self.database_date_dict_static_only.keys():
-                    first_level_background_node_ids_static.add(exc.input.id)
-                    act_set = {(exc.input.id, exc.input["database"])}
-                    count += 1 
-        
-        # print("iterations of first loop", count)
-        # print("first_level_background_node_ids_static", len(first_level_background_node_ids_static))
-
-        for background_node_id in first_level_background_node_ids_static: # look up new nodes
-            background_node = bd.get_node(id=background_node_id)                  
-            for background_db in self.database_date_dict_static_only.keys():
-                try:
-                    other_node = bd.get_node(
-                        **{
-                            "database": background_db,
-                            "name": background_node["name"],
-                            "product": background_node["reference product"],
-                            "location": background_node["location"],
-                        }
-                    )
-                    
-                    first_level_background_node_ids_all.add(other_node.id)
-                    act_set.add((other_node.id, background_db))
-                except KeyError as e:
-                    warnings.warn(
-                        f"Failed to find process in database {background_db} for name='{exc.input['name']}', reference product='{exc.input['reference product']}', location='{exc.input['location']}': {e}"
-                    )
-            self.interdatabase_activity_mapping.add(act_set)
-
+                    act_set= set()
+                    if exc.input.id not in first_level_background_node_ids_static: # only call get_node if the node has not already been queried
+                        for background_db in self.database_date_dict_static_only.keys():
+                            try:
+                                other_node = bd.get_node(
+                                    **{
+                                        "database": background_db,
+                                        "name": exc.input["name"],
+                                        "product": exc.input["reference product"],
+                                        "location": exc.input["location"],
+                                    }
+                                )
+                                first_level_background_node_ids_all.add(other_node.id)
+                                act_set.add((other_node.id, background_db)) #add nodes for all available background databases
+                                            
+                            except KeyError as e:
+                                    warnings.warn(
+                                    f"Failed to find process in database {background_db} for name='{exc.input['name']}', reference product='{exc.input['reference product']}', location='{exc.input['location']}': {e}"
+                                    )
+                    first_level_background_node_ids_static.add(exc.input.id)                    
+                    self.interdatabase_activity_mapping.add(act_set)
+                                  
         self.node_id_collection_dict["first_level_background_node_ids_static"] = (
             first_level_background_node_ids_static
         )
