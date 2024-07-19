@@ -68,6 +68,9 @@ class SetList:
     ) -> int:
         return len(self.list)
 
+    def __repr__(self):
+        return f"SetList({self.list})"
+
 
 class TimeMappingDict(dict):
     """
