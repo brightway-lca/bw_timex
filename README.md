@@ -43,3 +43,4 @@ We welcome contributions! If you have suggestions or want to fix a bug, please:
 If you have any questions or need help, do not hesitate to contact us:
 - Timo Diepers ([timo.diepers@ltt.rwth-aachen.de](mailto:timo.diepers@ltt.rwth-aachen.de))
 - Amelie Müller ([a.muller@cml.leidenuniv.nl](mailto:a.muller@cml.leidenuniv.nl))
+- Arthur Jakobs ([artos.jakobs@psi.ch](mailto:artos.jakobs@psi.ch))
