@@ -62,8 +62,8 @@ class TimexLCA:
     >>> demand = {('my_foreground_database', 'my_process'): 1}
     >>> method = ("some_method_family", "some_category", "some_method")
     >>> database_date_dict = {
-            'my_background_database': datetime.strptime("2020", "%Y"),
-            'my_background_database': datetime.strptime("2030", "%Y"),
+            'my_background_database_one': datetime.strptime("2020", "%Y"),
+            'my_background_database_two': datetime.strptime("2030", "%Y"),
             'my_foreground_database':'dynamic'
         }
     >>> bw_timex = TimexLCA(demand, method, database_date_dict)
