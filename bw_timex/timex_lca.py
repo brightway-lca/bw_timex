@@ -54,29 +54,32 @@ class TimexLCA:
 
     TimexLCA calculates:
      1) a static LCA score (`TimexLCA.static_lca.score`, same as `bw2calc.lca.score`),
-     2) a static time-explicit LCA score (`TimexLCA.score`), which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows,
+     2) a static time-explicit LCA score (`TimexLCA.static_score`), which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows,
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and dynamic charaterization factors. These are provided for radiative forcing and GWP but can also be user-defined.
 
     Example
     -------
-    >>> demand = {('my_foreground_database', 'my_process'): 1} #replace here with your functinal unit
-    >>> method = ("some_method_family", "some_category", "some_method")    #replace here with your method
-    >>> database_date_dict = {'my_database': datetime.strptime("2020", "%Y"),
-                              'my_foreground_database':'dynamic'} #replace here with your database dates
+    >>> demand = {('my_foreground_database', 'my_process'): 1}
+    >>> method = ("some_method_family", "some_category", "some_method")
+    >>> database_date_dict = {
+            'my_background_database': datetime.strptime("2020", "%Y"),
+            'my_background_database': datetime.strptime("2030", "%Y"),
+            'my_foreground_database':'dynamic'
+        }
     >>> bw_timex = TimexLCA(demand, method, database_date_dict)
     >>> bw_timex.build_timeline() # you can pass many optional arguments here, also for the graph traversal
     >>> bw_timex.lci()
     >>> bw_timex.static_lcia()
-    >>> bw_timex.static_score
+    >>> print(bw_timex.static_score)
     >>> bw_timex.dynamic_lcia(metric="radiative_forcing") # different metrics can be used, e.g. "GWP", "radiative_forcing"
-    >>> bw_timex.dynamic_score
+    >>> print(bw_timex.dynamic_score)
 
     """ """"""
 
     def __init__(
         self,
-        demand,
-        method,
+        demand: dict,
+        method: tuple,
         database_date_dict: dict = None,
     ) -> None:
         """
