@@ -15,24 +15,25 @@ version: str = 'latest' # required by the version switcher
 ### Project Configuration #########################################################################
 ###################################################################################################
 
-needs_sphinx = '7.0.0'
+needs_sphinx = '7.3.0'
 
 extensions = [
     # core extensions
-    'autoapi.extension',
-    'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
-    'sphinx.ext.viewcode',
+    'sphinx.ext.viewcode',    
     'sphinx.ext.intersphinx',
     'sphinx.ext.extlinks',
     'sphinx.ext.inheritance_diagram',
-    'sphinx.ext.napoleon',
+    'sphinx.ext.autosummary',
     # iPython extensions
     'IPython.sphinxext.ipython_directive',
     'IPython.sphinxext.ipython_console_highlighting',
     # Markdown support
-    'myst_nb',
     # 'myst_parser', # do not enable separately if using myst_nb, compare: https://github.com/executablebooks/MyST-NB/issues/421#issuecomment-1164427544
+    # Jupyter Notebook support
+    'myst_nb',
+    # API documentation support
+    'autoapi.extension',
     # responsive web component support
     'sphinx_design',
     # custom 404 page
@@ -74,7 +75,7 @@ autoapi_member_order = 'bysource'
 autoapi_root = 'content/api'
 autoapi_keep_files = False
 
-autosummary_generate = True
+graphviz_output_format = 'svg' # https://pydata-sphinx-theme.readthedocs.io/en/stable/examples/graphviz.html#inheritance-diagram
 
 master_doc = "index"
 
