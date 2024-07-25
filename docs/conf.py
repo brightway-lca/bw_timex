@@ -25,6 +25,7 @@ extensions = [
     'sphinx.ext.extlinks',
     'sphinx.ext.inheritance_diagram',
     'sphinx.ext.autosummary',
+    'sphinx.ext.napoleon',
     # iPython extensions
     'IPython.sphinxext.ipython_directive',
     'IPython.sphinxext.ipython_console_highlighting',
@@ -33,7 +34,7 @@ extensions = [
     # Jupyter Notebook support
     'myst_nb',
     # API documentation support
-    'autoapi.extension',
+    'autoapi',
     # responsive web component support
     'sphinx_design',
     # custom 404 page
