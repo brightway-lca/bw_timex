@@ -173,8 +173,7 @@ class MatrixModifier:
         This adds the modifications to the technosphere matrix for each time-dependent exchange as datapackage elements to a given `bwp.Datapackage`.
         Modifications include:
         1) Exploded processes: new matrix elements for time-explicit consumer and time-explicit producer, representing the temporal edge between them.
-        2) Temporal markets: new matrix entries for "temporal markets" and links to the producers in temporally matching background databases.
-            Processes in the background databases are matched on name, reference product and location.
+        2) Temporal markets: new matrix entries for "temporal markets" and links to the producers in temporally matching background databases. Processes in the background databases are matched on name, reference product and location.
         3) Diagonal entries: ones on the diagonal for new nodes.
 
         This function also collects the ids of new nodes, temporalized nodes and temporal markets.

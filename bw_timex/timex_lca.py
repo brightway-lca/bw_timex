@@ -55,29 +55,32 @@ class TimexLCA:
 
     TimexLCA calculates:
      1) a static LCA score (`TimexLCA.static_lca.score`, same as `bw2calc.lca.score`),
-     2) a static time-explicit LCA score (`TimexLCA.score`), which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows,
+     2) a static time-explicit LCA score (`TimexLCA.static_score`), which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows,
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and dynamic charaterization factors. These are provided for radiative forcing and GWP but can also be user-defined.
 
     Example
     -------
-    >>> demand = {('my_foreground_database', 'my_process'): 1} #replace here with your functinal unit
-    >>> method = ("some_method_family", "some_category", "some_method")    #replace here with your method
-    >>> database_date_dict = {'my_database': datetime.strptime("2020", "%Y"),
-                              'my_foreground_database':'dynamic'} #replace here with your database dates
+    >>> demand = {('my_foreground_database', 'my_process'): 1}
+    >>> method = ("some_method_family", "some_category", "some_method")
+    >>> database_date_dict = {
+            'my_background_database_one': datetime.strptime("2020", "%Y"),
+            'my_background_database_two': datetime.strptime("2030", "%Y"),
+            'my_foreground_database':'dynamic'
+        }
     >>> bw_timex = TimexLCA(demand, method, database_date_dict)
     >>> bw_timex.build_timeline() # you can pass many optional arguments here, also for the graph traversal
     >>> bw_timex.lci()
     >>> bw_timex.static_lcia()
-    >>> bw_timex.static_score
+    >>> print(bw_timex.static_score)
     >>> bw_timex.dynamic_lcia(metric="radiative_forcing") # different metrics can be used, e.g. "GWP", "radiative_forcing"
-    >>> bw_timex.dynamic_score
+    >>> print(bw_timex.dynamic_score)
 
     """ """"""
 
     def __init__(
         self,
-        demand,
-        method,
+        demand: dict,
+        method: tuple,
         database_date_dict: dict = None,
     ) -> None:
         """
@@ -180,7 +183,7 @@ class TimexLCA:
         bw_timex.timeline_builder.TimelineBuilder: Class that builds the timeline.
 
         """
-        if not edge_filter_function:
+        if edge_filter_function is None:
             warnings.warn(
                 "No edge filter function provided. Skipping all edges within background databases."
             )
@@ -188,6 +191,8 @@ class TimexLCA:
             for db in self.database_date_dict_static_only.keys():
                 skippable.extend([node.id for node in bd.Database(db)])
             self.edge_filter_function = lambda x: x in skippable
+        else:
+            self.edge_filter_function = edge_filter_function
 
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
@@ -336,19 +341,20 @@ class TimexLCA:
     ) -> pd.DataFrame:
         """
         Calculates dynamic LCIA with the `DynamicCharacterization` class using the dynamic inventory and dynamic
-        characterization functions.
+        characterization functions. Dynamic characterization is handled by the separate package 
+        `dynamic_characterization` (https://dynamic-characterization.readthedocs.io/en/latest/).
 
         Dynamic characterization functions in the form of a dictionary {biosphere_flow_database_id:
         characterization_function} can be given by the user.
-        If none are given, a set of default dynamic characterization functions based on IPCC AR6 are provided.
-        These are mapped to the biosphere3 flows of the chosen static climate change impact category.
-        If there is no characterization function for a biosphere flow, it will be ignored.
+        If none are given, a set of default dynamic characterization functions based on IPCC AR6 are provided from
+        `dynamic_characterization` package. These are mapped to the biosphere3 flows of the chosen static climate 
+        change impact category. If there is no characterization function for a biosphere flow, it will be ignored.
 
         Two dynamic climate change metrics are provided: "GWP" and "radiative_forcing".
         The time horizon for the impact assessment can be set with the `time_horizon` parameter, defaulting to 100 years.
         The `fixed_time_horizon` parameter determines whether the emission time horizon for all emissions is calculated from the
         functional unit (`fixed_time_horizon=True`) or from the time of the emission (`fixed_time_horizon=False`).
-        The former is the implementation of the Levasseur approach(https://doi.org/10.1021/es9030003), while the latter is how conventional LCA is done.
+        The former is the implementation of the Levasseur approach (see https://doi.org/10.1021/es9030003), while the latter is how conventional LCA is done.
 
         Parameters
         ----------
@@ -373,7 +379,7 @@ class TimexLCA:
 
         See also
         --------
-        bw_timex.dynamic_characterization.DynamicCharacterization: Class that characterizes the dynamic inventory.
+        dynamic_charaterization: Package handling the dynamic characterization: https://dynamic-characterization.readthedocs.io/en/latest/
         """
 
         if not hasattr(self, "dynamic_inventory"):

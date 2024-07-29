@@ -9,7 +9,7 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/bw-timex?color=%2300549f)](https://pypi.org/project/bw-timex/)
 [![Conda Version](https://img.shields.io/conda/v/diepers/bw_timex?label=conda)](https://anaconda.org/diepers/bw_timex)
 ![Conda - License](https://img.shields.io/conda/l/diepers/bw_timex)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fexample_simple_dynamic_characterization.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fexample_electric_vehicle_standalone.ipynb)
 
 > ℹ️ _This package is still under development and some functionalities may change in the future._
 
@@ -32,7 +32,7 @@ You can define temporal distributions for process and emission exchanges, which 
 ## Documentation and Resources
 - [Full Documentation](https://docs.brightway.dev/projects/bw-timex/en/latest/)
 - [Installation Guide](https://docs.brightway.dev/projects/bw-timex/en/latest/content/installation.html)
-- [Example Notebook](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_setac.ipynb)
+- [Example Notebook](https://docs.brightway.dev/projects/bw-timex/en/latest/content/examples/example_ev.html)
 
 ## Contributing
 We welcome contributions! If you have suggestions or want to fix a bug, please:
@@ -43,3 +43,4 @@ We welcome contributions! If you have suggestions or want to fix a bug, please:
 If you have any questions or need help, do not hesitate to contact us:
 - Timo Diepers ([timo.diepers@ltt.rwth-aachen.de](mailto:timo.diepers@ltt.rwth-aachen.de))
 - Amelie Müller ([a.muller@cml.leidenuniv.nl](mailto:a.muller@cml.leidenuniv.nl))
+- Arthur Jakobs ([artos.jakobs@psi.ch](mailto:artos.jakobs@psi.ch))
