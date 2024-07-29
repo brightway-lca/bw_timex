@@ -20,7 +20,7 @@ class TimelineBuilder:
     """
     This class is responsible for building a timeline of processes based on the temporal relationship of the priority-first graph traversal.
 
-    First, the `EdgeExtractor` is called and it extracts a timeline of exchanges (edge_timeline) with tempoal information.
+    First, the `EdgeExtractor` is called and it extracts a timeline of exchanges (edge_timeline) with temporal information.
     Identical edges within temporal grouping (e.g. year, month, day, hour) are then grouped together and the amount of exchanges is summed up.
     """
 
@@ -379,13 +379,13 @@ class TimelineBuilder:
         if self.interpolation_type == "linear":
             tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
                 lambda x: self.get_weights_for_interpolation_between_nearest_years(
-                    x, dates_list, self.interpolation_type
+                    x, dates_list, interpolation_type
                 )
             )
 
         else:
             raise ValueError(
-                f"Sorry, but {self.interpolation_type} interpolation is not available yet."
+                f"Sorry, but {interpolation_type} interpolation is not available yet."
             )
 
         tl_df["interpolation_weights"] = tl_df.apply(
