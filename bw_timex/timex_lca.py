@@ -182,7 +182,7 @@ class TimexLCA:
         bw_timex.timeline_builder.TimelineBuilder: Class that builds the timeline.
 
         """
-        if not edge_filter_function:
+        if edge_filter_function is None:
             warnings.warn(
                 "No edge filter function provided. Skipping all edges within background databases."
             )
@@ -190,6 +190,8 @@ class TimexLCA:
             for db in self.database_date_dict_static_only.keys():
                 skippable.extend([node.id for node in bd.Database(db)])
             self.edge_filter_function = lambda x: x in skippable
+        else:
+            self.edge_filter_function = edge_filter_function
 
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
