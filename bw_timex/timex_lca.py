@@ -289,9 +289,11 @@ class TimexLCA:
         if expand_technosphere:
             self.datapackage = self.build_datapackage()
             data_obs = self.data_objs + self.datapackage
+            self.expanded_technosphere = True  # set flag for later static lcia useage
         else:  # setup for timeline approach
             self.collect_temporalized_processes_from_timeline()
             data_obs = self.data_objs
+            self.expanded_technosphere = False  # set flag for later lcia usage
 
         self.lca = LCA(
             self.fu,
@@ -326,6 +328,9 @@ class TimexLCA:
         if not hasattr(self, "lca"):
             warnings.warn("LCI not yet calculated. Call TimexLCA.lci() first.")
             return
+        if not self.expanded_technosphere:
+            warnings.warn("Currently the static lcia score can only be calculated if the expanded matrix has been built\
+                          Please call TimexLCA.lci(expand_technosphere=True) first.")
         self.lca.lcia()
         self.static_score = self.lca.score
 
