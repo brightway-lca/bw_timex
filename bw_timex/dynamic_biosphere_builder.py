@@ -92,6 +92,7 @@ class DynamicBiosphereBuilder:
         self.rows = []
         self.cols = []
         self.values = []
+        self.unique_rows_cols = set()   # To keep track of (row, col) pairs
 
     def build_dynamic_biosphere_matrix(
         self,
@@ -260,6 +261,7 @@ class DynamicBiosphereBuilder:
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
         """
         Adds an entry to the lists of row, col and values, which are then used to construct the dynamic biosphere matrix.
+        Only unqiue entries are added, i.e. if the same row and col index already exists, the value is not added again. 
 
         Parameters
         ----------
@@ -275,6 +277,12 @@ class DynamicBiosphereBuilder:
         None, but the lists of row, col and values are updated
 
         """
-        self.rows.append(row)
-        self.cols.append(col)
-        self.values.append(amount)
+
+        if (row, col) not in self.unique_rows_cols:
+            self.rows.append(row)
+            self.cols.append(col)
+            self.values.append(amount)
+
+            self.unique_rows_cols.add((row, col))
+
+
