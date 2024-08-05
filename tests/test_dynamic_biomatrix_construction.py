@@ -29,7 +29,7 @@ class TestClass_dynamic_biomatrix:
             database_date_dict=database_date_dict,
         )
 
-        self.tlca.build_timeline()
+        self.tlca.build_timeline(starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"))
         self.tlca.lci(expand_technosphere=True, build_dynamic_biosphere=True)
         self.tlca.static_lcia()
 
