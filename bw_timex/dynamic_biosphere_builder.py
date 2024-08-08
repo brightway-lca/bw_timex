@@ -176,7 +176,6 @@ class DynamicBiosphereBuilder:
                         dates = td_producer  # datetime array, same time as producer
                         values = [exc["amount"]]
 
-                    print(process_col_index, idx, dates, values)
                     # Add entries to dynamic bio matrix
                     for date, amount in zip(dates, values):
 
