@@ -103,6 +103,15 @@ class DynamicBiosphereBuilder:
         Every temporally resolved biosphere flow has its own row in the matrix, making it highly sparse.
         The timing of the emitting process and potential additional temporal information of the bioshpere flow (e.g. delay of emission compared to timing of process) are considered.
 
+        Absolute Temporal Distributions for biosphere exchanges are dealt with as a look up function:
+        If an activity happens at timestamp X then and the biosphere exchange has an absolute temporal 
+        distribution (ATD), it looks up the amount from from the ATD correspnding to timestamp X. 
+        E.g.: X = 2024, TD=(data=[2020,2021,2022,2023,2024,.....,2120 ], amount=[3,4,4,5,6,......,3]),
+        it will look up the value 6 corresponding 2024. If timestamp X does not exist it find the nearest 
+        timestamp available (if two timestamps are equally close, it will take the first in order of
+        apearance (see numpy.argmin() for this behabiour). 
+
+
         Parameters
         ----------
         from_timeline
@@ -144,17 +153,30 @@ class DynamicBiosphereBuilder:
 
                 for exc in act.biosphere():
                     if exc.get("temporal_distribution"):
-                        td_dates = exc["temporal_distribution"].date  # time_delta
+                        td_dates = exc["temporal_distribution"].date 
                         td_values = exc["temporal_distribution"].amount
-                        dates = (
-                            td_producer + td_dates
-                        )  # we can add a datetime of length 1 to a timedelta of length N without problems
-                        values = exc["amount"] * td_values
+                        if type(td_dates[0])==np.datetime64:  # If the biosphere flows have an absolute TD, this means we have to look up the biosphere flow for the activity time (td_producer)
+                            dates = td_producer  # datetime array, same time as producer
+                            values = [
+                                exc["amount"] * td_values[
+                                    np.argmin(
+                                        np.abs(
+                                            td_dates.astype(self.time_res)-td_producer.astype(self.time_res)
+                                        )
+                                    )
+                                ]
+                              ]  # look up the value correponding to the absolute producer time
+                        else:
+                            dates = (
+                                td_producer + td_dates
+                            )  # we can add a datetime of length 1 to a timedelta of length N without problems
+                            values = exc["amount"] * td_values
 
                     else:  # exchange has no TD
                         dates = td_producer  # datetime array, same time as producer
                         values = [exc["amount"]]
 
+                    print(process_col_index, idx, dates, values)
                     # Add entries to dynamic bio matrix
                     for date, amount in zip(dates, values):
 
