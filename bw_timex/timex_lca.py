@@ -52,6 +52,15 @@ class TimexLCA:
 
     Temporal information of both processes and biosphere flows are retained, allowing for dynamic LCIA.
 
+    Currently absolute Temporal Distributions for biosphere exchanges are dealt with as a look up function:
+    If an activity happens at timestamp X then and the biosphere exchange has an absolute temporal 
+    distribution (ATD), it looks up the amount from from the ATD correspnding to timestamp X. 
+    E.g.: X = 2024, TD=(data=[2020,2021,2022,2023,2024,.....,2120 ], amount=[3,4,4,5,6,......,3]),
+    it will look up the value 6 corresponding 2024. If timestamp X does not exist it find the nearest 
+    timestamp available (if two timestamps are equally close, it will take the first in order of
+    apearance (see numpy.argmin() for this behabiour). 
+
+
     TimexLCA calculates:
      1) a static LCA score (`TimexLCA.static_lca.score`, same as `bw2calc.lca.score`),
      2) a static time-explicit LCA score (`TimexLCA.static_score`), which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows,
@@ -525,9 +534,9 @@ class TimexLCA:
         self.activity_time_mapping_dict_reversed = {
             v: k for k, v in self.activity_time_mapping_dict.items()
         }
-        self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe()
+        self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(from_timeline)
 
-    def create_dynamic_inventory_dataframe(self) -> pd.DataFrame:
+    def create_dynamic_inventory_dataframe(self, from_timeline=False) -> pd.DataFrame:
         """Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the the format
         of a pandas.DataFrame, with the right structure to later apply dynamic characterization functions.
 
@@ -565,8 +574,11 @@ class TimexLCA:
                 row = i
                 col = self.dynamic_inventory.indices[j]
                 value = self.dynamic_inventory.data[j]
-
-                emitting_process_id = self.activity_dict.reversed[col]
+                
+                if from_timeline:
+                    emitting_process_id = self.timeline.iloc[col]['time_mapped_producer']
+                else:
+                    emitting_process_id = self.activity_dict.reversed[col]
 
                 bioflow_id, date = self.biosphere_time_mapping_dict_reversed[
                     row
