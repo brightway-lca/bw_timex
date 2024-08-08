@@ -34,7 +34,9 @@ class TestClass_substitution:
             database_date_dict=database_date_dict,
         )
 
-        self.tlca.build_timeline()
+        self.tlca.build_timeline(
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d")
+        )
         self.tlca.lci()
         self.tlca.static_lcia()
 
