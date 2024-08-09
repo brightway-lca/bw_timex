@@ -1,3 +1,6 @@
+## v0.1.9 (2024-08-09)
+* Allow absolute temporal distributions (https://github.com/brightway-lca/bw_timex/pull/81)
+
 ## v0.1.8 (2024-07-17)
 * Moved dynamic characterization functionality completely to [dynamic_characterization](https://github.com/brightway-lca/dynamic_characterization). In the course of this, it was dynamic characterization was updated and is much faster now. See also https://github.com/brightway-lca/dynamic_characterization/pull/3
 
