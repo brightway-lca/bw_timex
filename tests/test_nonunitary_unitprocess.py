@@ -2,6 +2,7 @@ from datetime import datetime
 
 import bw2data as bd
 import pytest
+import math
 
 from bw_timex import TimexLCA
 
@@ -47,4 +48,4 @@ class TestClass_EV:
 
         print(false_score)
 
-        assert self.tlca.score == expected_score
+        assert math.isclose(self.tlca.score, expected_score, rel_tol=1e-9)

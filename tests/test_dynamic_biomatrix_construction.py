@@ -36,7 +36,7 @@ class TestClass_dynamic_biomatrix:
     def test_identical_time_mapped_producers_exist_in_timeline(self):
         
         duplicates = self.tlca.timeline["time_mapped_producer"].duplicated().any()
-        assert duplicates, f"No duplicates found in column {"time_mapped_producer"}"
+        assert duplicates, "No duplicates found in column time_mapped_producer"
       
     def test_dynamic_biomatrix_for_multiple_identical_time_mapped_producers_in_timeline(self):
 
