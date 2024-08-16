@@ -6,7 +6,7 @@ Here are some examples on how you can use `bw_timex`.
 :gutter: 4
 
 :::{grid-item-card} 🚗⚡ Life Cycle of an Electric Car 
-:link: ./example_ev.html
+:link: ./example_electric_vehicle_premise.html
 :link-type: url
 :class-body: sphinx-design-class-body-examples
 :text-align: left
