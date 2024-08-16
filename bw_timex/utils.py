@@ -267,7 +267,7 @@ def plot_characterized_inventory_as_waterfall(
         ax.axvline(x=len(combined_df) - 1.5, color="black", linestyle="--", lw=1)
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles[::-1], labels[::-1])  # Reversing the order for the legend
+    ax.legend(handles[::-1], labels[::-1], loc="upper center", fontsize="small")  # Reversing the order for the legend
     ax.set_axisbelow(True)
     plt.grid(True)
     plt.show()
