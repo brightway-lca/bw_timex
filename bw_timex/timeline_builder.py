@@ -97,7 +97,6 @@ class TimelineBuilder:
         )
         self.edge_timeline = self.edge_extractor.build_edge_timeline()
 
-
     def build_timeline(self) -> pd.DataFrame:
         """
         Create a dataframe with grouped, time-explicit edges and, for each grouped edge, interpolate to the database with the closest time of representativeness.
@@ -140,6 +139,10 @@ class TimelineBuilder:
         edges_df["amount"] = edges_df["amount"] * edges_df["edge_type"].apply(
             lambda x: self.adjust_sign_of_amount_based_on_edge_type(x)
         )
+
+        edges_df["leaf_flip_sign"] = edges_df.apply(lambda row: self.flip_sign_for_leaves_with_negative_production_amount(row["producer"], row["leaf"]), axis=1)
+
+        edges_df["amount"] = edges_df.apply(lambda row: -row["amount"] if row["leaf_flip_sign"] else row["amount"], axis=1)
 
         # Explode datetime and amount columns: each row with multiple dates and amounts is exploded into multiple rows with one date and one amount
         edges_df = edges_df.explode(["consumer_date", "producer_date", "amount"])
@@ -199,7 +202,7 @@ class TimelineBuilder:
             self.activity_time_mapping_dict.add(
                 (("temporalized", bd.get_node(id=row.producer)["code"]), row.hash_producer)
             )
-            
+
         def _get_time_mapping_key(node_id: int, node_hash: int) -> tuple:
             try:
                 return self.activity_time_mapping_dict[(("temporalized", bd.get_node(id=node_id)["code"]), node_hash)]
@@ -252,12 +255,10 @@ class TimelineBuilder:
         ]
 
         return grouped_edges
-    
+
     ###################################################
     # underlying functions called by build_timeline() #
     ###################################################
-       
-
 
     def check_database_names(self) -> None:
         """
@@ -269,7 +270,7 @@ class TimelineBuilder:
                 db in bd.databases
             ), f"{db} is not in your brightway project databases."
         return
-    
+
     def extract_edge_data(self, edge: Edge) -> dict:
         """
         Stores the attributes of an Edge instance in a dictionary.
@@ -291,7 +292,7 @@ class TimelineBuilder:
             ).T.flatten()
         except AttributeError:
             consumer_date = None
-        
+
         return {
             "producer": edge.producer,
             "consumer": edge.consumer,
@@ -301,7 +302,7 @@ class TimelineBuilder:
             "amount": edge.abs_td_producer.amount,
             "edge_type": edge.edge_type,
         }
-    
+
     def adjust_sign_of_amount_based_on_edge_type(self, edge_type):
         """
         It checks if the an exchange is of type substitution or a technosphere exchange, based on bw2data labelling convention, and adjusts the amount accordingly.
@@ -330,7 +331,29 @@ class TimelineBuilder:
             warnings.warn(f"Unrecognized type in this edge: {edge_type}", UserWarning)
             raise ValueError("Unrecognized edge type")
         return multiplicator
-            
+
+    def flip_sign_for_leaves_with_negative_production_amount(
+        self, producer: int, leaf: bool
+    ):
+        """
+        Returns true if the producer is a leaf and the production amount is negative.
+
+        Parameters
+        ----------
+        producer: int
+            Id of the producer node.
+        leaf: bool
+            True if the producer is a leaf node.
+
+        Returns
+        -------
+        bool
+            True if the producer is a leaf and the production amount is negative.
+        """
+        if not leaf:
+            return None
+        return bd.get_node(id=producer).rp_exchange().amount < 0
+
     def add_column_interpolation_weights_to_timeline(self,
         tl_df: pd.DataFrame,
         interpolation_type: str = "linear",
@@ -395,7 +418,7 @@ class TimelineBuilder:
         )  # add the weights to the timeline for processes at intersection
 
         return tl_df
-    
+
     def find_closest_date(self, target: datetime, dates: KeysView[datetime]) -> dict:
         """
         Find the closest date to the target in the dates list.
@@ -424,7 +447,7 @@ class TimelineBuilder:
         closest = min(dates, key=lambda date: abs(target - date))
 
         return {closest: 1}
-    
+
     def get_weights_for_interpolation_between_nearest_years(self, 
         reference_date: datetime,
         dates_list: KeysView[datetime],
@@ -496,7 +519,7 @@ class TimelineBuilder:
                 f"Sorry, but {interpolation_type} interpolation is not available yet."
             )
         return {closest_lower: 1 - weight, closest_higher: weight}
-    
+
     def add_interpolation_weights_at_intersection_to_background(self, row) -> Union[dict, None]:
         """
         returns the interpolation weights to background databases only for those exchanges, where the producing process
@@ -527,7 +550,7 @@ class TimelineBuilder:
             }
         else:
             return None
-   
+
     def get_consumer_name(self, id: int) -> str:
         """
         Returns the name of consumer node.
