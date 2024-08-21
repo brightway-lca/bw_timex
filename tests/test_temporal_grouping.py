@@ -2,14 +2,16 @@
 Testing if the temporal grouping options (year, month, day and hour) work correctly.
 """
 
+from datetime import datetime
 from pathlib import Path
-import pytest
+
 import bw2calc as bc
 import bw2data as bd
-from bw_timex import TimexLCA
-from datetime import datetime
-from bw_temporalis import TemporalDistribution
 import numpy as np
+import pytest
+from bw_temporalis import TemporalDistribution
+
+from bw_timex import TimexLCA
 
 
 # make sure the test db is loaded

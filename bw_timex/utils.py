@@ -1,15 +1,14 @@
 import warnings
+from datetime import datetime
+from typing import Callable, List, Optional, Union
+
 import bw2data as bd
 import matplotlib.pyplot as plt
 import pandas as pd
-
-from datetime import datetime
-from typing import Callable, List, Optional, Union
-from bw2data.errors import MultipleResults, UnknownObject
 from bw2data import databases
 from bw2data.backends import ActivityDataset as AD
+from bw2data.errors import MultipleResults, UnknownObject
 from bw2data.subclass_mapping import NODE_PROCESS_CLASS_MAPPING
-
 
 time_res_to_int_dict = {
     "year": "%Y",
@@ -17,6 +16,7 @@ time_res_to_int_dict = {
     "day": "%Y%m%d",
     "hour": "%Y%m%d%H",
 }
+
 
 def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") -> int:
     """
@@ -147,16 +147,17 @@ def add_flows_to_characterization_function_dict(
 
     return characterization_function_dict
 
+
 def resolve_temporalized_node_name(code: str) -> str:
     """
     Getting the name of a node based on the code only.
     Works for non-unique codes if the name is the same across all databases.
-    
+
     Parameters
     ----------
     code: str
         Code of the node to resolve.
-        
+
     Returns
     -------
     str
@@ -172,6 +173,7 @@ def resolve_temporalized_node_name(code: str) -> str:
     elif not qs:
         raise UnknownObject
     return names.pop()
+
 
 def plot_characterized_inventory_as_waterfall(
     lca_obj,
@@ -223,7 +225,9 @@ def plot_characterized_inventory_as_waterfall(
     # Optimized activity label fetching
     unique_activities = plot_data["activity"].unique()
     activity_labels = {
-        idx: resolve_temporalized_node_name(lca_obj.activity_time_mapping_dict_reversed[idx][0][1])
+        idx: resolve_temporalized_node_name(
+            lca_obj.activity_time_mapping_dict_reversed[idx][0][1]
+        )
         for idx in unique_activities
     }
     plot_data["activity_label"] = plot_data["activity"].map(activity_labels)
@@ -296,7 +300,9 @@ def plot_characterized_inventory_as_waterfall(
         ax.axvline(x=len(combined_df) - 1.5, color="black", linestyle="--", lw=1)
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles[::-1], labels[::-1], loc="upper center", fontsize="small")  # Reversing the order for the legend
+    ax.legend(
+        handles[::-1], labels[::-1], loc="upper center", fontsize="small"
+    )  # Reversing the order for the legend
     ax.set_axisbelow(True)
     plt.grid(True)
     plt.show()

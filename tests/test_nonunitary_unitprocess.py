@@ -1,8 +1,8 @@
+import math
 from datetime import datetime
 
 import bw2data as bd
 import pytest
-import math
 
 from bw_timex import TimexLCA
 

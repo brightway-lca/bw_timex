@@ -1,13 +1,13 @@
-import pytest
 import math
-import pandas as pd
+from datetime import datetime
+
 import bw2data as bd
 import numpy as np
-import bw2data as bd
-
-from datetime import datetime
+import pandas as pd
+import pytest
 from bw2data.tests import bw2test
 from bw_temporalis import TemporalDistribution
+
 from bw_timex import TimexLCA
 
 

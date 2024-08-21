@@ -1,7 +1,6 @@
-import pytest
 import bw2data as bd
 import numpy as np
-
+import pytest
 from bw2data.tests import bw2test
 from bw_temporalis import TemporalDistribution
 
@@ -26,22 +25,22 @@ def nonunitary_db():
                 "reference product": "c",
                 "exchanges": [
                     {
-                        "amount": 3, #produces a non unitary (not 1) amount
+                        "amount": 3,  # produces a non unitary (not 1) amount
                         "type": "production",
                         "input": ("db_2020", "C"),
                     },
                     {
-                        "amount": 0.5,  
+                        "amount": 0.5,
                         "type": "biosphere",
                         "input": ("bio", "CO2"),
                     },
-                ]
+                ],
             },
-    }
+        }
     )
 
     bd.Database("foreground").write(
-        { 
+        {
             ("foreground", "A"): {
                 "name": "a",
                 "location": "somewhere",
@@ -62,26 +61,25 @@ def nonunitary_db():
                         "type": "technosphere",
                         "input": ("foreground", "B"),
                     },
-                ]
+                ],
             },
-
             ("foreground", "B"): {
                 "name": "b",
                 "location": "somewhere",
                 "reference product": "b",
                 "exchanges": [
                     {
-                        "amount": 7, #produces a non unitary (not 1) amount
+                        "amount": 7,  # produces a non unitary (not 1) amount
                         "type": "production",
                         "input": ("foreground", "B"),
                     },
                     {
-                        "amount": 0.9,  
+                        "amount": 0.9,
                         "type": "biosphere",
                         "input": ("bio", "CO2"),
                     },
-                ]
-            }
+                ],
+            },
         }
     )
 

@@ -1,13 +1,13 @@
 import warnings
+from datetime import datetime
+from itertools import chain
+from typing import Callable, Optional
+
 import bw2data as bd
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sb
-
-from datetime import datetime
-from itertools import chain
-from typing import Callable, Optional
 from bw2calc import LCA
 from bw2data import (
     Database,
@@ -52,12 +52,12 @@ class TimexLCA:
     Temporal information of both processes and biosphere flows are retained, allowing for dynamic LCIA.
 
     Currently absolute Temporal Distributions for biosphere exchanges are dealt with as a look up function:
-    If an activity happens at timestamp X then and the biosphere exchange has an absolute temporal 
-    distribution (ATD), it looks up the amount from from the ATD correspnding to timestamp X. 
+    If an activity happens at timestamp X then and the biosphere exchange has an absolute temporal
+    distribution (ATD), it looks up the amount from from the ATD correspnding to timestamp X.
     E.g.: X = 2024, TD=(data=[2020,2021,2022,2023,2024,.....,2120 ], amount=[3,4,4,5,6,......,3]),
-    it will look up the value 6 corresponding 2024. If timestamp X does not exist it find the nearest 
+    it will look up the value 6 corresponding 2024. If timestamp X does not exist it find the nearest
     timestamp available (if two timestamps are equally close, it will take the first in order of
-    apearance (see numpy.argmin() for this behabiour). 
+    apearance (see numpy.argmin() for this behabiour).
 
 
     TimexLCA calculates:
@@ -337,8 +337,10 @@ class TimexLCA:
             raise AttributeError("LCI not yet calculated. Call TimexLCA.lci() first.")
             return
         if not self.expanded_technosphere:
-            raise ValueError("Currently the static lcia score can only be calculated if the expanded matrix has been built\
-                             Please call TimexLCA.lci(expand_technosphere=True) first.")
+            raise ValueError(
+                "Currently the static lcia score can only be calculated if the expanded matrix has been built\
+                             Please call TimexLCA.lci(expand_technosphere=True) first."
+            )
         self.lca.lcia()
         self.static_score = self.lca.score
 
@@ -353,13 +355,13 @@ class TimexLCA:
     ) -> pd.DataFrame:
         """
         Calculates dynamic LCIA with the `DynamicCharacterization` class using the dynamic inventory and dynamic
-        characterization functions. Dynamic characterization is handled by the separate package 
+        characterization functions. Dynamic characterization is handled by the separate package
         `dynamic_characterization` (https://dynamic-characterization.readthedocs.io/en/latest/).
 
         Dynamic characterization functions in the form of a dictionary {biosphere_flow_database_id:
         characterization_function} can be given by the user.
         If none are given, a set of default dynamic characterization functions based on IPCC AR6 are provided from
-        `dynamic_characterization` package. These are mapped to the biosphere3 flows of the chosen static climate 
+        `dynamic_characterization` package. These are mapped to the biosphere3 flows of the chosen static climate
         change impact category. If there is no characterization function for a biosphere flow, it will be ignored.
 
         Two dynamic climate change metrics are provided: "GWP" and "radiative_forcing".
@@ -533,7 +535,9 @@ class TimexLCA:
         self.activity_time_mapping_dict_reversed = {
             v: k for k, v in self.activity_time_mapping_dict.items()
         }
-        self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(from_timeline)
+        self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(
+            from_timeline
+        )
 
     def create_dynamic_inventory_dataframe(self, from_timeline=False) -> pd.DataFrame:
         """Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the the format
@@ -573,9 +577,11 @@ class TimexLCA:
                 row = i
                 col = self.dynamic_inventory.indices[j]
                 value = self.dynamic_inventory.data[j]
-                
+
                 if from_timeline:
-                    emitting_process_id = self.timeline.iloc[col]['time_mapped_producer']
+                    emitting_process_id = self.timeline.iloc[col][
+                        "time_mapped_producer"
+                    ]
                 else:
                     emitting_process_id = self.activity_dict.reversed[col]
 
@@ -594,7 +600,7 @@ class TimexLCA:
         df = pd.DataFrame(
             dataframe_rows, columns=["date", "amount", "flow", "activity"]
         )
-        
+
         df.date = df.date.astype("datetime64[s]")
 
         return df.sort_values(by=["date", "amount"], ascending=[True, False])
@@ -834,8 +840,7 @@ class TimexLCA:
             indexed_demand = {
                 self.activity_time_mapping_dict[
                     (
-                        ("temporalized",
-                        bd.get_node(id=bd.get_id(k))["code"]),
+                        ("temporalized", bd.get_node(id=bd.get_id(k))["code"]),
                         self.demand_timing_dict[bd.get_id(k)],
                     )
                 ]: v

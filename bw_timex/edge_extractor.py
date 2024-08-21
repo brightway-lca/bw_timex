@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from heapq import heappop, heappush
-from typing import Callable, List
 from numbers import Number
+from typing import Callable, List
+
 import numpy as np
-from bw_temporalis import TemporalisLCA, TemporalDistribution
+from bw_temporalis import TemporalDistribution, TemporalisLCA
 
 datetime_type = np.dtype("datetime64[s]")
 timedelta_type = np.dtype("timedelta64[s]")
@@ -19,7 +20,8 @@ class Edge:
     function).
 
     """
-    edge_type : str
+
+    edge_type: str
     distribution: TemporalDistribution
     leaf: bool
     consumer: int
@@ -28,7 +30,6 @@ class Edge:
     td_consumer: TemporalDistribution
     abs_td_producer: TemporalDistribution = None
     abs_td_consumer: TemporalDistribution = None
-    
 
 
 class EdgeExtractor(TemporalisLCA):
@@ -51,10 +52,10 @@ class EdgeExtractor(TemporalisLCA):
         Returns
         -------
         None
-        
+
         """
-        super().__init__(*args, **kwargs) #use __init__ of TemporalisLCA
-        
+        super().__init__(*args, **kwargs)  # use __init__ of TemporalisLCA
+
         if edge_filter_function:
             self.edge_ff = edge_filter_function
         else:
@@ -94,10 +95,10 @@ class EdgeExtractor(TemporalisLCA):
                     node,
                 ),
             )
-       
+
             timeline.append(
                 Edge(
-                    edge_type = "production", # FU exchange always type production (?)
+                    edge_type="production",  # FU exchange always type production (?)
                     distribution=self.t0 * edge.amount,
                     leaf=False,
                     consumer=self.unique_id,
@@ -119,7 +120,9 @@ class EdgeExtractor(TemporalisLCA):
                     output_id=col_id,
                 )
 
-                edge_type = exchange.data["type"] # can be technosphere, substitution, production or other string
+                edge_type = exchange.data[
+                    "type"
+                ]  # can be technosphere, substitution, production or other string
 
                 td_producer = (  # td_producer is the TemporalDistribution of the edge
                     self._exchange_value(
@@ -136,17 +139,17 @@ class EdgeExtractor(TemporalisLCA):
                 # If an edge does not have a TD, give it a td with timedelta=0 and the amount= 'edge value'
                 if isinstance(td_producer, Number):
                     td_producer = TemporalDistribution(
-                        date=np.array([0], dtype="timedelta64[Y]"),  
+                        date=np.array([0], dtype="timedelta64[Y]"),
                         amount=np.array([td_producer]),
                     )
 
                 distribution = (
                     td * td_producer
                 ).simplify()  # convolution-multiplication of TemporalDistribution of consuming node (td) and consumed edge (edge) gives TD of producing node
-                
+
                 timeline.append(
                     Edge(
-                        edge_type = edge_type, 
+                        edge_type=edge_type,
                         distribution=distribution,
                         leaf=leaf,
                         consumer=node.activity_datapackage_id,
@@ -157,8 +160,7 @@ class EdgeExtractor(TemporalisLCA):
                             td_producer, abs_td
                         ),
                         abs_td_consumer=abs_td,
-                        
-                        )   
+                    )
                 )
                 if not leaf:
                     heappush(
@@ -174,7 +176,6 @@ class EdgeExtractor(TemporalisLCA):
                         ),
                     )
         return timeline
-
 
     def join_datetime_and_timedelta_distributions(
         self, td_producer: TemporalDistribution, td_consumer: TemporalDistribution
@@ -208,7 +209,7 @@ class EdgeExtractor(TemporalisLCA):
             td_producer, Number
         ):
             return td_consumer
-        
+
         # Else, if both consumer and producer have a td (absolute and relative, respectively) join to TDs
         if isinstance(td_producer, TemporalDistribution) and isinstance(
             td_consumer, TemporalDistribution

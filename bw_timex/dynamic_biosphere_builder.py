@@ -92,7 +92,7 @@ class DynamicBiosphereBuilder:
         self.rows = []
         self.cols = []
         self.values = []
-        self.unique_rows_cols = set()   # To keep track of (row, col) pairs
+        self.unique_rows_cols = set()  # To keep track of (row, col) pairs
 
     def build_dynamic_biosphere_matrix(
         self,
@@ -104,12 +104,12 @@ class DynamicBiosphereBuilder:
         The timing of the emitting process and potential additional temporal information of the bioshpere flow (e.g. delay of emission compared to timing of process) are considered.
 
         Absolute Temporal Distributions for biosphere exchanges are dealt with as a look up function:
-        If an activity happens at timestamp X then and the biosphere exchange has an absolute temporal 
-        distribution (ATD), it looks up the amount from from the ATD correspnding to timestamp X. 
+        If an activity happens at timestamp X then and the biosphere exchange has an absolute temporal
+        distribution (ATD), it looks up the amount from from the ATD correspnding to timestamp X.
         E.g.: X = 2024, TD=(data=[2020,2021,2022,2023,2024,.....,2120 ], amount=[3,4,4,5,6,......,3]),
-        it will look up the value 6 corresponding 2024. If timestamp X does not exist it find the nearest 
+        it will look up the value 6 corresponding 2024. If timestamp X does not exist it find the nearest
         timestamp available (if two timestamps are equally close, it will take the first in order of
-        apearance (see numpy.argmin() for this behabiour). 
+        apearance (see numpy.argmin() for this behabiour).
 
 
         Parameters
@@ -137,7 +137,7 @@ class DynamicBiosphereBuilder:
             ) = self.activity_time_mapping_dict.reversed()[  # time is here an integer, with various length depending on temporal grouping, e.g. [Y] -> 2024, [M] - > 202401
                 idx
             ]
-                
+
             if idx in self.node_id_collection_dict["temporalized_processes"]:
 
                 time_in_datetime = convert_date_string_to_datetime(
@@ -157,19 +157,23 @@ class DynamicBiosphereBuilder:
 
                 for exc in act.biosphere():
                     if exc.get("temporal_distribution"):
-                        td_dates = exc["temporal_distribution"].date 
+                        td_dates = exc["temporal_distribution"].date
                         td_values = exc["temporal_distribution"].amount
-                        if type(td_dates[0])==np.datetime64:  # If the biosphere flows have an absolute TD, this means we have to look up the biosphere flow for the activity time (td_producer)
+                        if (
+                            type(td_dates[0]) == np.datetime64
+                        ):  # If the biosphere flows have an absolute TD, this means we have to look up the biosphere flow for the activity time (td_producer)
                             dates = td_producer  # datetime array, same time as producer
                             values = [
-                                exc["amount"] * td_values[
+                                exc["amount"]
+                                * td_values[
                                     np.argmin(
                                         np.abs(
-                                            td_dates.astype(self.time_res)-td_producer.astype(self.time_res)
+                                            td_dates.astype(self.time_res)
+                                            - td_producer.astype(self.time_res)
                                         )
                                     )
                                 ]
-                              ]  # look up the value correponding to the absolute producer time
+                            ]  # look up the value correponding to the absolute producer time
                         else:
                             dates = (
                                 td_producer + td_dates
@@ -201,7 +205,7 @@ class DynamicBiosphereBuilder:
                 ) = self.activity_time_mapping_dict.reversed()[  # time is here an integer, with various length depending on temporal grouping, e.g. [Y] -> 2024, [M] - > 202401
                     idx
                 ]
-                
+
                 if from_timeline:
                     demand = self.demand_from_timeline(row, original_db)
                 else:
@@ -233,7 +237,9 @@ class DynamicBiosphereBuilder:
                         )
 
                         self.add_matrix_entry_for_biosphere_flows(
-                            row=time_mapped_matrix_id, col=process_col_index, amount=amount
+                            row=time_mapped_matrix_id,
+                            col=process_col_index,
+                            amount=amount,
                         )
 
         # now build the dynamic biosphere matrix
@@ -294,7 +300,7 @@ class DynamicBiosphereBuilder:
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
         """
         Adds an entry to the lists of row, col and values, which are then used to construct the dynamic biosphere matrix.
-        Only unqiue entries are added, i.e. if the same row and col index already exists, the value is not added again. 
+        Only unqiue entries are added, i.e. if the same row and col index already exists, the value is not added again.
 
         Parameters
         ----------
@@ -317,5 +323,3 @@ class DynamicBiosphereBuilder:
             self.values.append(amount)
 
             self.unique_rows_cols.add((row, col))
-
-
