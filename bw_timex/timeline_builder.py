@@ -30,7 +30,7 @@ class TimelineBuilder:
         edge_filter_function: Callable,
         database_date_dict: dict,
         database_date_dict_static_only: dict,
-        time_mapping_dict: dict,
+        activity_time_mapping_dict: dict,
         node_id_collection_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
@@ -48,7 +48,7 @@ class TimelineBuilder:
             A callable that filters edges. If not provided, a function that always returns False is used.
         database_date_dict: dict
             A dictionary mapping databases to dates.
-        time_mapping_dict: dict
+        activity_time_mapping_dict: dict
           A dictionary to map processes to specific times.
         temporal_grouping: str, optional
             The temporal grouping to be used. Default is "year".
@@ -67,7 +67,7 @@ class TimelineBuilder:
         self.edge_filter_function = edge_filter_function
         self.database_date_dict = database_date_dict
         self.database_date_dict_static_only = database_date_dict_static_only
-        self.time_mapping_dict = time_mapping_dict
+        self.activity_time_mapping_dict = activity_time_mapping_dict
         self.node_id_collection_dict = node_id_collection_dict
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
@@ -196,23 +196,25 @@ class TimelineBuilder:
 
         # add new processes to time mapping dict
         for row in grouped_edges.itertuples():
-            self.time_mapping_dict.add(
-                (bd.get_node(id=row.producer).key, row.hash_producer)
+            self.activity_time_mapping_dict.add(
+                (("temporalized", bd.get_node(id=row.producer)["code"]), row.hash_producer)
             )
+            
+        def _get_time_mapping_key(node_id: int, node_hash: int) -> tuple:
+            try:
+                return self.activity_time_mapping_dict[(("temporalized", bd.get_node(id=node_id)["code"]), node_hash)]
+            except:
+                return self.activity_time_mapping_dict[((bd.get_node(id=node_id).key), node_hash)]
 
         # store the ids from the time_mapping_dict in dataframe
         grouped_edges["time_mapped_producer"] = grouped_edges.apply(
-            lambda row: self.time_mapping_dict[
-                (bd.get_node(id=row.producer).key, row.hash_producer)
-            ],
+            lambda row: _get_time_mapping_key(row.producer, row.hash_producer),
             axis=1,
         )
 
         grouped_edges["time_mapped_consumer"] = grouped_edges.apply(
             lambda row: (
-                self.time_mapping_dict[
-                    (bd.get_node(id=row.consumer).key, row.hash_consumer)
-                ]
+                _get_time_mapping_key(row.consumer, row.hash_consumer)
                 if row.consumer != -1
                 else -1
             ),
