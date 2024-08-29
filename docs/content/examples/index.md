@@ -64,6 +64,6 @@ hidden:
 maxdepth: 1
 ---
 self
-example_electric_vehicle_premise
+example_ev
 example_simple_dynamic_characterization
 ```
