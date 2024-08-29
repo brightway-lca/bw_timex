@@ -76,6 +76,7 @@ autoapi_options = [
 autoapi_python_class_content = 'both'
 autoapi_member_order = 'bysource'
 autoapi_root = 'content/api'
+autoapi_template_dir = '_templates/autoapi_templates/'
 autoapi_keep_files = False
 
 graphviz_output_format = 'svg' # https://pydata-sphinx-theme.readthedocs.io/en/stable/examples/graphviz.html#inheritance-diagram
@@ -124,15 +125,20 @@ html_theme_options = {
     "navbar_start": ["navbar-logo"],
     "navbar_end": ["theme-switcher", "navbar-icon-links.html"],
     "navbar_align": "left",
-    # "navbar_persistent": ["theme-switcher"], # this is where the search button is usually placed
+    # "navbar_persistent": [], # this is where the search button is usually placed
     "footer_start": ["copyright"],
     "footer_end": ["footer"],
     "secondary_sidebar_items": ["page-toc", "edit-this-page", "sourcelink", "support"],
-    "header_links_before_dropdown": 7,
+    "header_links_before_dropdown": 5,
     # page elements content
     "icon_links": [
         {
-            "name": "GitHub",
+            "name": "Launch interactive Demo on Binder",
+            "url": "https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fexample_electric_vehicle_standalone.ipynb",
+            "icon": "fa-solid fa-rocket",
+        },
+        {
+            "name": "Open this Repo on GitHub",
             "url": "https://github.com/brightway-lca/bw_timex",
             "icon": "fab fa-brands fa-github",
         },
@@ -143,9 +149,9 @@ html_theme_options = {
         #     "type": "fontawesome",
         # },
     ],
-    # various settings
+    # various settings  
     "collapse_navigation": True,
-    "show_prev_next": False,
+    # "show_prev_next": False,
     "use_edit_page_button": True,
     "navigation_with_keys": True,
     "logo": {
