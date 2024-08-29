@@ -125,7 +125,7 @@ html_theme_options = {
     "navbar_start": ["navbar-logo"],
     "navbar_end": ["theme-switcher", "navbar-icon-links.html"],
     "navbar_align": "left",
-    # "navbar_persistent": [], # this is where the search button is usually placed
+    # "navbar_persistent": ["theme-switcher"], # this is where the search button is usually placed
     "footer_start": ["copyright"],
     "footer_end": ["footer"],
     "secondary_sidebar_items": ["page-toc", "edit-this-page", "sourcelink", "support"],

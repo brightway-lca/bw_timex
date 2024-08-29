@@ -1,4 +1,4 @@
-# TimexLCA examples 
+# TimexLCA Examples 
 
 Here are some examples on how you can use `bw_timex`.
 
@@ -64,6 +64,6 @@ hidden:
 maxdepth: 1
 ---
 self
-example_ev
+example_electric_vehicle_premise
 example_simple_dynamic_characterization
 ```
