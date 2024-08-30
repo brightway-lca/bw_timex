@@ -37,8 +37,9 @@ hidden:
 maxdepth: 1
 ---
 Installation <content/installation>
-Examples <content/examples/index>
+Getting Started <content/getting_started/index>
 Theory <content/theory>
+Examples <content/examples/index>
 API <content/api/index>
 Contributing <content/contributing>
 Code of Conduct <content/codeofconduct>
