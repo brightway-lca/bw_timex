@@ -122,7 +122,7 @@ html_theme_options = {
     "announcement": "⚠️ This package is under active development and some functionalities may change in the future.",
     "navbar_start": ["navbar-logo"],
     "navbar_end": ["theme-switcher", "navbar-icon-links.html"],
-    "navbar_align": "left",
+    "navbar_align": "content",
     # "navbar_persistent": ["theme-switcher"], # this is where the search button is usually placed
     "footer_start": ["copyright"],
     "footer_end": ["footer"],
