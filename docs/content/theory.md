@@ -46,11 +46,13 @@ following subsections.
 
 `bw_timex` uses the graph traversal from
 [bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main)
-to propagate the temporal information along the supply chain. The graph
-traversal is priority-first, following the most impactful node in the
-graph based on the static pre-calculated LCIA score for a chosen impact
-category. All input arguments for the graph traversal, such as maximum
-calculation count or cut-off, can be passed to the `TimexLCA` instance.
+to propagate the temporal information along the supply chain. An in-depth
+description of how this works is available in the [brightway-docs](https://docs.brightway.dev/en/latest/content/theory/graph_traversal.html). In short,
+it is a priority-first supply chain graph traversal, following the most
+impactful node in the graph based on the static pre-calculated LCIA score
+for a chosen impact category. Several input arguments for the graph traversal,
+such as maximum calculation count or cut-off, can be passed to the `TimexLCA`
+instance.
 
 By default, only the foreground system is traversed, but nodes to be
 skipped during traversal can be specified by a `edge_filter_function`.
@@ -86,16 +88,16 @@ to the temporal resolution of the available databases.
 > :height: 300px
 > :align: center
 > ```
-> | 
+>
+> |
 >
 > The resulting timeline looks like this:
 >
-> | time | producer | consumer | amount          |
-> |------|----------|----------|-----------------|
-> | 0    | A        | n/a      | 1               |
-> | 0    | B        | A        | 2 \* 0.2 = 0.4  |
-> | 1    | B        | A        | 2 \* 0.8 = 1.6  |
-
+> | time | producer | consumer | amount         |
+> | ---- | -------- | -------- | -------------- |
+> | 0    | A        | n/a      | 1              |
+> | 0    | B        | A        | 2 \* 0.2 = 0.4 |
+> | 1    | B        | A        | 2 \* 0.8 = 1.6 |
 
 ## Time mapping
 
