@@ -47,3 +47,16 @@ body {
         margin-left: 1rem;
     }
 }
+
+div.admonition.admonition-launch > .admonition-title {
+    background-color: var(--pst-color-secondary-bg);
+}
+
+div.admonition.admonition-launch {
+    border-color: var(--pst-color-secondary-highlight);
+}
+
+div.admonition.admonition-launch > .admonition-title::after {
+    content: "\f135";
+    color: var(--pst-color-text-base);
+}
