@@ -15,7 +15,7 @@ This section will help you quickly getting started with your time-explicit LCA p
 ```
 <br />
 
-In the following sections, we'll take a look at the steps 1-4. If you want to get more details on how things work, check out our [Theory Section](../theory.md).
+In the following sections, we'll walk through the steps 1-4. If you want the full details right away, you can skip to our [Theory Section](../theory.md).
 
 ```{admonition} You want more interaction?
 :class: admonition-launch
@@ -28,8 +28,8 @@ In the following sections, we'll take a look at the steps 1-4. If you want to ge
 hidden:
 maxdepth: 1
 ---
-Step 1 - Adding temporal information <data_preparation>
-Step 2 - Building the process timeline <timeline>
+Step 1 - Adding temporal information <adding_temporal_information>
+Step 2 - Building the process timeline <build_process_timeline>
 Step 3 - Calculating the time-explicit LCI <time_explicit_lci>
 Step 4 - Dynamic impact assessment <dynamic_lcia>
 ```
