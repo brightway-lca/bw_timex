@@ -60,3 +60,16 @@ div.admonition.admonition-launch > .admonition-title::after {
     content: "\f135";
     color: var(--pst-color-text-base);
 }
+
+div.admonition.admonition-example > .admonition-title {
+    background-color: var(--pst-color-secondary-bg);
+}
+
+div.admonition.admonition-example {
+    border-color: var(--pst-color-secondary-highlight);
+}
+
+div.admonition.admonition-example > .admonition-title::after {
+    content: "\f518";
+    color: var(--pst-color-text-base);
+}
