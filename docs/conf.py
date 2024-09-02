@@ -91,9 +91,11 @@ mermaid_init_js = """
                 startOnLoad: true,
                 theme: 'base',
                 themeVariables: {
-                    primaryTextColor: '#ced6dd', // Dark mode text color
-                    lineColor: '#ced6dd', // Dark mode line color
-                    tertiaryColor: '#312922' // Dark mode tertiary color
+                    edgeLabelBackground: 'transparent',
+                    defaultLinkColor: '#ced6dd',
+                    titleColor: '#ced6dd',
+                    nodeTextColor: '#ced6dd',
+                    lineColor: '#ced6dd',
                 }
             });
         } else {
@@ -101,9 +103,11 @@ mermaid_init_js = """
                 startOnLoad: true,
                 theme: 'base',
                 themeVariables: {
-                    primaryTextColor: '#222832', // Light mode text color
-                    lineColor: '#222832', // Light mode line color
-                    tertiaryColor: '#DDD7CD' // Light mode tertiary color
+                    edgeLabelBackground: 'transparent',
+                    defaultLinkColor: '#222832',
+                    titleColor: '#222832',
+                    nodeTextColor: '#222832',
+                    lineColor: '#222832',
                 }
             });
         }
