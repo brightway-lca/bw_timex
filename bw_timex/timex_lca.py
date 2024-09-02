@@ -1122,6 +1122,39 @@ class TimexLCA:
 
         return df
 
+    def create_labelled_dynamic_inventory_dataframe(self) -> pd.DataFrame:
+        """
+        Returns the dynamic_inventory_df with comprehensible labels for flows and activities instead of ids.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        pd.DataFrame, dynamic inventory matrix as a pandas.DataFrame with comprehensible labels instead of ids.
+        """
+
+        if not hasattr(self, "dynamic_inventory_df"):
+            warnings.warn(
+                "Dynamic inventory not yet calculated. Call TimexLCA.lci(build_dynamic_biosphere=True) first."
+            )
+
+        df = self.dynamic_inventory_df.copy()
+        df["flow"] = df["flow"].apply(lambda x: bd.get_node(id=x)["name"])
+        
+        activity_name_cache = {}
+
+        for activity in df["activity"].unique():
+            if activity not in activity_name_cache:
+                activity_name_cache[activity] = resolve_temporalized_node_name(
+                    self.activity_time_mapping_dict_reversed[activity][0][1]
+                )
+
+        df["activity"] = df["activity"].map(activity_name_cache)
+        
+        return df
+
     def plot_dynamic_inventory(self, bio_flows, cumulative=False) -> None:
         """
         Simple plot of dynamic inventory of a biosphere flow over time, with optional cumulative plotting.
