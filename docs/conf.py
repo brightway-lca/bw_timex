@@ -33,6 +33,8 @@ extensions = [
     # 'myst_parser', # do not enable separately if using myst_nb, compare: https://github.com/executablebooks/MyST-NB/issues/421#issuecomment-1164427544
     # Jupyter Notebook support
     'myst_nb',
+    # mermaid support
+    'sphinxcontrib.mermaid',
     # API documentation support
     'autoapi',
     # responsive web component support
@@ -78,6 +80,51 @@ autoapi_template_dir = '_templates/autoapi_templates/'
 autoapi_keep_files = False
 
 graphviz_output_format = 'svg' # https://pydata-sphinx-theme.readthedocs.io/en/stable/examples/graphviz.html#inheritance-diagram
+
+# Inject custom JavaScript to handle theme switching
+mermaid_init_js = """
+    function initializeMermaidBasedOnTheme() {
+        const theme = document.documentElement.dataset.theme;
+
+        if (theme === 'dark') {
+            mermaid.initialize({
+                startOnLoad: true,
+                theme: 'base',
+                themeVariables: {
+                    primaryTextColor: '#ced6dd', // Dark mode text color
+                    lineColor: '#ced6dd', // Dark mode line color
+                    tertiaryColor: '#312922' // Dark mode tertiary color
+                }
+            });
+        } else {
+            mermaid.initialize({
+                startOnLoad: true,
+                theme: 'base',
+                themeVariables: {
+                    primaryTextColor: '#222832', // Light mode text color
+                    lineColor: '#222832', // Light mode line color
+                    tertiaryColor: '#DDD7CD' // Light mode tertiary color
+                }
+            });
+        }
+
+        // Re-render all Mermaid diagrams
+        mermaid.contentLoaded();
+    }
+
+    // Observer to detect changes to the data-theme attribute
+    const themeObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme') {
+            initializeMermaidBasedOnTheme();
+            }
+        });
+    });
+
+    themeObserver.observe(document.documentElement, { attributes: true });
+
+    initializeMermaidBasedOnTheme();
+"""
 
 master_doc = "index"
 
