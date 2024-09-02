@@ -5,6 +5,9 @@ from typing import Callable, List, Optional, Union
 import bw2data as bd
 import matplotlib.pyplot as plt
 import pandas as pd
+from bw2data.backends.schema import ExchangeDataset
+from bw2data.backends.proxies import Exchange
+from bw2data.errors import MultipleResults, UnknownObject
 
 
 def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") -> int:
@@ -271,3 +274,29 @@ def plot_characterized_inventory_as_waterfall(
     ax.set_axisbelow(True)
     plt.grid(True)
     plt.show()
+
+def get_exchange(**kwargs) -> Exchange:
+    """
+    Get an exchange from the database.
+    """
+    mapping = {
+        "input_code": ExchangeDataset.input_code,
+        "input_database": ExchangeDataset.input_database,
+        "output_code": ExchangeDataset.output_code,
+        "output_database": ExchangeDataset.output_database,
+    }
+    qs = ExchangeDataset.select()
+    for key, value in kwargs.items():
+        try:
+            qs = qs.where(mapping[key] == value)
+        except KeyError:
+            continue
+    
+    candidates = [Exchange(obj) for obj in qs]
+    if len(candidates) > 1:
+        raise MultipleResults(
+            "Found {} results for the given search. Please be more specific or double-check your system model for duplicates.".format(len(candidates))
+        )
+    elif not candidates:
+        raise UnknownObject
+    return candidates[0]
