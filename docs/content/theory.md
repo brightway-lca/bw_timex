@@ -1,33 +1,28 @@
 # Theory
 
-This section explains some of the theory behind `bw_timex`. Check out
-the flow chart below for a quick overview of how it all comes together,
-and you\'ll find more detailed explanations of each step in the
-following subsections.
+This section explains some of the theory behind time-explicit LCAs with `bw_timex`. In contrast to the [Getting Started section](getting_started/index.md), we explain a bit more of what`s going on in the background here. If this is still to vague for you, you can always check out our [API reference](api/index).
 
-```{image} data/method_light.svg
-:class: only-light
-:height: 450px
-:align: center
-```
+## Terminology
+LCA terminology can be confusing sometimes. Here's an attempt of visualizing what we mean with "time-explicit LCA". Essentially, it combines dynamic LCA, where processes are spread out over time, with prospective LCA, where processes change over time:
 
-```{image} data/method_dark.svg
+```{image} data/dynamic_prospective_timeexplicit_dark.svg
 :class: only-dark
-:height: 450px
-:align: center
+```
+```{image} data/dynamic_prospective_timeexplicit_light.svg
+:class: only-light
 ```
 
-## User input
+## Data requirements
 
-`bw_timex` requires 3 inputs:
+For a time-explicit LCA, 3 inputs are required:
 
 1.  a static foreground system model with
 2.  temporal information using the attribute `temporal_distribution` on
-    technosphere or biosphere exchanges in the foreground system modeel,
+    technosphere or biosphere exchanges in the foreground system model,
     and
 3.  a set of background databases, which must have a reference in time.
 
-```{dropdown} ℹ️ More info on inputs
+```{note}
 -   The foreground system must have exchanges linked to one of the
     background databases. These exchanges at the intersection between
     foreground and background databases will be relinked by `bw_timex`.
@@ -61,7 +56,7 @@ temporal distributions of the process and the exchange it consumes into
 the resoluting combined temporal distribution of the upstream producer
 of the exchange.
 
-## Process timeline
+## Building the process timeline
 
 The graph traversal returns a timeline that lists the time of each
 technosphere exchange in the temporalized foreground system. Exchanges
@@ -73,31 +68,30 @@ resolutions down to seconds while one may not have a similar temporal
 resolution for the databases. We recommend aligning `temporal_grouping`
 to the temporal resolution of the available databases.
 
-> Let\'s consider the following system: a process A that consumes an
-> exchange b from a process B, which emits an emission X and both the
-> exchange b and the emission X occur at a certain point in time.
->
-> ```{image} data/example_ab_light.svg
-> :class: only-light
-> :height: 300px
-> :align: center
-> ```
->
-> ```{image} data/example_ab_dark.svg
-> :class: only-dark
-> :height: 300px
-> :align: center
-> ```
->
-> |
->
-> The resulting timeline looks like this:
->
-> | time | producer | consumer | amount         |
-> | ---- | -------- | -------- | -------------- |
-> | 0    | A        | n/a      | 1              |
-> | 0    | B        | A        | 2 \* 0.2 = 0.4 |
-> | 1    | B        | A        | 2 \* 0.8 = 1.6 |
+```{admonition} Example
+:class admonition-example
+
+Let's consider the following system: a process A that consumes an
+exchange b from a process B, which emits an emission X and both the
+exchange b and the emission X occur at a certain point in time.
+~~~{image} data/example_ab_light.svg
+:class: only-light
+:height: 300px
+:align: center
+~~~
+~~~{image} data/example_ab_dark.svg
+:class: only-dark
+:height: 300px
+:align: center
+~~~
+
+The resulting timeline looks like this:
+| time | producer | consumer | amount         |
+| ---- | -------- | -------- | -------------- |
+| 0    | A        | n/a      | 1              |
+| 0    | B        | A        | 2 \* 0.2 = 0.4 |
+| 1    | B        | A        | 2 \* 0.8 = 1.6 |
+```
 
 ## Time mapping
 
@@ -109,13 +103,13 @@ databases based on temporal proximity. The new best-fitting background
 producer(s) are mapped on the same name, reference product and location
 as the old background producer.
 
-## Modified matrices
+## Modifying the matrices
 
 `bw_timex` now modifies the technopshere and biosphere matrices using
 `datapackages` from
 [bw_processing](https://github.com/brightway-lca/bw_processing?tab=readme-ov-file).
 
-### Technosphere matrix modifications:
+### Technosphere matrix modifications
 
 1.  For each temporalized process in the timeline, a new process copy is
     created, which links to its new temporalized producers and
@@ -126,7 +120,7 @@ as the old background producer.
     relinks the exchanges to the new producing processes from the
     best-fitting background database(s).
 
-### Biosphere matrix modifications:
+### Biosphere matrix modifications
 
 Depending on the user\'s choice, two different biosphere matrices are
 created:
@@ -145,20 +139,21 @@ created:
     `TimexLCA.dynamic_inventory_df` contain the emissions of the system
     per biosphere flow including its timestamp and its emitting process.
 
-> For the simple system above, a schematic representation of the matrix
-> modifications looks like this:
->
-> ```{image} data/matrix_light.svg
-> :class: only-light
-> :height: 300px
-> :align: center
-> ```
->
-> ```{image} data/matrix_dark.svg
-> :class: only-dark
-> :height: 300px
-> :align: center
-> ```
+```{admonition} Example
+:class: admonition-example
+For the simple system above, a schematic representation of the matrix
+modifications looks like this:
+~~~{image} data/matrix_light.svg
+:class: only-light
+:height: 300px
+:align: center
+~~~
+~~~{image} data/matrix_dark.svg
+:class: only-dark
+:height: 300px
+:align: center
+~~~
+```
 
 ## Static or dynamic impact assessment
 
@@ -183,9 +178,3 @@ horizon means that each emission is evaluated starting from its own
 timing until the end of the time horizon. The former is the approach of
 [Levasseur et al. 2010](https://pubs.acs.org/doi/10.1021/es9030003).
 This behaviour is set with the boolean `fixed_time_horizon`.
-
-```{note}
-*Work in progress*. `bw_timex` *is under active development and the
-theory section might not reflect the latest code development. When in
-doubt, the source code is the most reliable source of information.*
-```

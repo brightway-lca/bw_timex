@@ -1,6 +1,6 @@
 # Time-explicit LCA with `bw_timex`
 
-[bw_timex](https://github.com/brightway-lca/bw_timex) is a python package for time-explicit Life Cycle Assessment that helps you assess the environmental impacts of products and processes over time. `bw_timex` builds on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
+`bw_timex` is a python package for [time-explicit Life Cycle Assessment](content/theory.md#terminology) that helps you assess the environmental impacts of products and processes over time. `bw_timex` builds on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
 
 ## Features
 This package enables you to account for:
@@ -15,15 +15,6 @@ You can define temporal distributions for process and emission exchanges, which 
 - **Variable** or strongly **evolving production systems**
 - **Long-lived** products
 - **Biogenic** carbon
-
-Here's a visualization of what `bw_timex` can do for you:
-
-```{image} content/data/timex_dark.svg
-:class: only-dark
-```
-```{image} content/data/timex_light.svg
-:class: only-light
-```
 
 ## Support
 If you have any questions or need help, do not hesitate to contact us:
