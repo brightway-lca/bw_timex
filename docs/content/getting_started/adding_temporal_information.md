@@ -136,7 +136,7 @@ Now it's time to add this information to our modeled production system in bright
 ```python
 import numpy as np
 from bw_temporalis import TemporalDistribution
-from bw_timex.utils import get_exchange
+from bw_timex.utils import add_temporal_distribution_to_exchange
 
 # Starting with the exchange between A and B
 # First, create a TemporalDistribution with the time information from above
@@ -145,31 +145,32 @@ td_b_to_a = TemporalDistribution(
     amount=np.array([0.3, 0.5, 0.2]),
 )
 
-# Now, we have to get hold of the exchange-object we want to add temporal 
-# information to. If we don't have the exchange-object at hand, we can use 
-# the utility function get_exchange to help us
-b_to_a = get_exchange(
+# Now add the temporal distribution to the corresponding exchange. In 
+# principle, you just have to do the following:
+# exchange_object["temporal_distribution"] = TemporalDistribution 
+# We currently don't have the exchange-object at hand here, but we can 
+# use the utility function add_temporal_distribution_to_exchange to help.
+add_temporal_distribution_to_exchange(
+    temporal_distribution=td_b_to_a, 
     input_code="B", 
     input_database="background"
     output_code="A"
     output_database="foreground"
 )
 
-# Finally, add the TemporalDistribution as a new attribute to our exchange
-b_to_a["temporal_distribution"] = td_b_to_a
-
-# And don't forget to save it :)
-b_to_a.save()
-
-
 # Now we do the same for our other temporalized exchange between A and CO2
 td_a_to_co2 = TemporalDistribution(
     date=np.array([0, 1], dtype="timedelta64[Y]"),
     amount=np.array([0.6, 0.4]),
 )
-a_to_co2 = get_exchange(input_code="CO2", output_code="A")
-a_to_co2["temporal_distribution"] = td_a_to_co2
-a_to_co2.save()
+
+# We actually only have to define enough fields to uniquely identify the 
+# exchange here
+add_temporal_distribution_to_exchange(
+    temporal_distribution=td_a_to_co2, 
+    input_code="CO2", 
+    output_code="A"
+)
 ```
 
 ## Prospective data

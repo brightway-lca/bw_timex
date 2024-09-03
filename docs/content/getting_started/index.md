@@ -31,5 +31,5 @@ maxdepth: 1
 Step 1 - Adding temporal information <adding_temporal_information>
 Step 2 - Building the process timeline <build_process_timeline>
 Step 3 - Calculating the time-explicit LCI <time_explicit_lci>
-Step 4 - Dynamic impact assessment <dynamic_lcia>
+Step 4 - Impact assessment <lcia>
 ```
