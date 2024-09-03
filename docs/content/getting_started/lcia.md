@@ -38,7 +38,7 @@ tlca.dynamic_lcia(
 )
 ```
 
-This creates the (dynamic) characterized inventory:
+This returns the (dynamic) characterized inventory:
 
 | date       | amount         | flow | activity |
 |------------|----------------|------|----------|
