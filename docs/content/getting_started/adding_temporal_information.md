@@ -27,16 +27,155 @@ style background fill:none, stroke:none;
 style foreground fill:none, stroke:none;
 style biosphere fill:none, stroke:none;
 ```
-Let's set this up in brightway
+:::{dropdown} Here's the code to set this up with brightway - nothing new here, though
 
+```python
+import bw2data as bd
+
+bd.projects.set_current("getting_started_with_timex")
+
+bd.Database("biosphere").write(
+    {
+        ("biosphere", "CO2"): {
+            "type": "emission",
+            "name": "CO2",
+        },
+    }
+)
+
+bd.Database("background").write(
+    {
+        ("background", "B"): {
+            "name": "B",
+            "location": "somewhere",
+            "reference product": "B",
+            "exchanges": [
+                {
+                    "amount": 1,
+                    "type": "production",
+                    "input": ("background", "B"),
+                },
+                {
+                    "amount": 11,
+                    "type": "biosphere",
+                    "input": ("biosphere", "CO2"),
+                },
+            ],
+        },
+    }
+)
+
+bd.Database("foreground").write(
+    {
+        ("foreground", "A"): {
+            "name": "A",
+            "location": "somewhere",
+            "reference product": "A",
+            "exchanges": [
+                {
+                    "amount": 1,
+                    "type": "production",
+                    "input": ("foreground", "A"),
+                },
+                {
+                    "amount": 3,
+                    "type": "technosphere",
+                    "input": ("background", "B"),
+                },
+                {
+                    "amount": 5,
+                    "type": "biosphere",
+                    "input": ("biosphere", "CO2"),
+                }
+            ],
+        },
+    }
+)
+
+bd.Method(("our", "method")).write(
+    [
+        (("biosphere", "CO2"), 1),
+    ]
+)
+```
+:::
 
 Now, if you want to consider time in your LCA, you need to somehow add temporal information. For time-explicit LCA, we consider two kinds of temporal information, that will be discussed in the following.
 
-## Temporal Distributions
+## Temporal distributions
+To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attributes to the respective exchanges. To carry the temporal information, we use the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class is a *container for a series of amount spread over time*, so it tells you what share of an exchange happens at what point in time. So, let's include this information in out production system - visually at first:
+```{mermaid}
+:caption: Temporalized example production system
+flowchart LR
+subgraph background[" "]
+    B_2020(Process B):::bg
+end
+
+subgraph foreground[" "]
+    A(Process A):::fg
+end
+
+subgraph biosphere[" "]
+    CO2:::b
+end
+
+    B_2020-->|"amounts: [30%,50%,20%] * 3 kg\n dates:[-2,0,+4]" years|A
+    A-.->|"amounts: [60%, 40%] * 5 kg\n dates: [0,+1]" years|CO2
+    B_2020-.->|"amounts: [100%] * 11 kg\n dates:[0]" years|CO2
+
+    classDef bg color:#222832, fill:#3fb1c5, stroke:none;
+    classDef fg color:#222832, fill:#3fb1c5, stroke:none;
+    classDef b color:#222832, fill:#9c5ffd, stroke:none;
+    style foreground fill:none, stroke:none;
+    style background fill:none, stroke:none;
+    style biosphere fill:none, stroke:none;
+
+```
+
+Now it's time to add this information to our modeled production system in brightway:
+```python
+import numpy as np
+from bw_temporalis import TemporalDistribution
+from bw_timex.utils import get_exchange
+
+# Starting with the exchange between A and B
+# First, create a TemporalDistribution with the time information from above
+td_b_to_a = TemporalDistribution(
+    date=np.array([-2, 0, 4], dtype="timedelta64[Y]"),
+    amount=np.array([0.3, 0.5, 0.2]),
+)
+
+# Now, we have to get hold of the exchange-object we want to add temporal 
+# information to. If we don't have the exchange-object at hand, we can use 
+# the utility function get_exchange to help us
+b_to_a = get_exchange(
+    input_code="B", 
+    input_database="background"
+    output_code="A"
+    output_database="foreground"
+)
+
+# Finally, add the TemporalDistribution as a new attribute to our exchange
+b_to_a["temporal_distribution"] = td_b_to_a
+
+# And don't forget to save it :)
+b_to_a.save()
 
 
+# Now we do the same for our other temporalized exchange between A and CO2
+td_a_to_co2 = TemporalDistribution(
+    date=np.array([0, 1], dtype="timedelta64[Y]"),
+    amount=np.array([0.6, 0.4]),
+)
+a_to_co2 = get_exchange(input_code="CO2", output_code="A")
+a_to_co2["temporal_distribution"] = td_a_to_co2
+a_to_co2.save()
+```
 
-Alright, continuing
+## Prospective data
+
+The other kind of temporal data we can add is some prospective information on how our processes change over time. So, for our simple example, let's say our background process B somehow evolves, so that it emitts less CO2 in the future. To make it precise, we assume that the original process we modeled above represents the process state in the year 2020, emitting 11 kg CO2, which reduces to 7 kg CO2 by 2030:
+
 
 ```{mermaid}
 :caption: Temporalized example production system
@@ -53,11 +192,10 @@ end
 subgraph biosphere[" "]
     CO2:::b
 end
-
-    B_2020-->|"amounts: [30%,70%] * 3 kg\n dates:[-2,-1]" years|A
+    B_2020-->|"amounts: [30%,50%,20%] * 3 kg\n dates:[-2,0,+4]" years|A
     A-.->|"amounts: [60%, 40%] * 5 kg\n dates: [0,+1]" years|CO2
-    B_2020-.->|"amounts: [100%] * 11 kg\n dates:[0]" years|CO2
-    B_2030-.->|"amounts: [100%] * 7 kg\n dates:[0]" years|CO2
+    B_2020-.->|"amounts: [100%] * <span style='color:#9c5ffd'><b>11 kg</b></span>\n dates:[0]" years|CO2
+    B_2030-.->|"amounts: [100%] * <span style='color:#9c5ffd'><b>7 kg</b></span>\n dates:[0]" years|CO2
 
     classDef bg color:#222832, fill:#3fb1c5, stroke:none;
     classDef fg color:#222832, fill:#3fb1c5, stroke:none;
@@ -67,4 +205,48 @@ end
     style biosphere fill:none, stroke:none;
 
 ```
-asdf
+:::{dropdown} Again, here's the code in case you're interested
+
+```python
+bd.Database("background_2030").write(
+    {
+        ("background_2030", "B"): {
+            "name": "B",
+            "location": "somewhere",
+            "reference product": "B",
+            "exchanges": [
+                {
+                    "amount": 1,
+                    "type": "production",
+                    "input": ("background_2030", "B"),
+                },
+                {
+                    "amount": 7,
+                    "type": "biosphere",
+                    "input": ("biosphere", "CO2"),
+                },
+            ],
+        },
+    }
+)
+````
+:::
+
+So, as you can see, the prospective processes can reside within your normal brightway databases. To hand them to `bw_timex`, we just need to define a dictionary that maps the prospective database names to the point in time that they represent:
+
+```python
+from datetime import datetime
+
+# Note: The foreground does not represent a specific point in time, but should 
+# later be dynamically distributed over time
+database_date_dict = {
+    "background": datetime.strptime("2020", "%Y"),
+    "background_2030": datetime.strptime("2030", "%Y"),
+    "foreground": "dynamic",
+}
+```
+
+:::{note}
+You can use whatever data source you want for this prospective data. A nice package from the Brightway cosmos that can help you is [premise](https://premise.readthedocs.io/en/latest/introduction.html).
+:::
+

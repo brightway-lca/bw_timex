@@ -1,6 +1,6 @@
 # Getting Started
 
-This section will help you quickly getting started with your time-explicit LCA project. We're keeping it simple here - no deep dives into how things work in the background, no exploring of all the features and options bw_timex has. Just a quick walkthrough of the different steps of a `TimexLCA`. Here's a rundown:
+This section will help you quickly getting started with your time-explicit LCA project. We're keeping it simple here - no deep dives into how things work in the background, no exploring of all the features and options `bw_timex` has. Just a quick walkthrough of the different steps of a `TimexLCA`. Here's a rundown:
 
 ```{image} ../data/method_small_steps_light.svg
 :class: only-light
@@ -15,7 +15,7 @@ This section will help you quickly getting started with your time-explicit LCA p
 ```
 <br />
 
-In the following sections, we'll walk through the steps 1-4. If you want the full details right away, you can skip to our [Theory Section](../theory.md).
+In the following sections, we'll walk through the steps 1-4, considering a very simple dummy system. If you directly want to look at a more complex example, take a look at our [example collection](../examples/index.md). If you're interested in the full details on how `bw_timex` works, you can also skip to our [Theory Section](../theory.md).
 
 ```{admonition} You want more interaction?
 :class: admonition-launch
