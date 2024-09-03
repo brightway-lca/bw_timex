@@ -27,7 +27,9 @@ style background fill:none, stroke:none;
 style foreground fill:none, stroke:none;
 style biosphere fill:none, stroke:none;
 ```
-:::{dropdown} Here's the code to set this up with brightway - nothing new here, though
+
+:::{dropdown} <span style="font-weight: normal; font-style: italic;">Here's the code to set this up with brightway - but this is not essential here</style>
+:icon: codescan
 
 ```python
 import bw2data as bd
@@ -103,7 +105,7 @@ bd.Method(("our", "method")).write(
 Now, if you want to consider time in your LCA, you need to somehow add temporal information. For time-explicit LCA, we consider two kinds of temporal information, that will be discussed in the following.
 
 ## Temporal distributions
-To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attributes to the respective exchanges. To carry the temporal information, we use the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class is a *container for a series of amount spread over time*, so it tells you what share of an exchange happens at what point in time. So, let's include this information in out production system - visually at first:
+To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges. To carry the temporal information, we use the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class is a *container for a series of amount spread over time*, so it tells you what share of an exchange happens at what point in time. So, let's include this information in out production system - visually at first:
 ```{mermaid}
 :caption: Temporalized example production system
 flowchart LR
@@ -206,7 +208,9 @@ end
     style biosphere fill:none, stroke:none;
 
 ```
-:::{dropdown} Again, here's the code in case you're interested
+
+:::{dropdown} <span style="font-weight: normal; font-style: italic;">Again, here's the code in case you're interested</span>
+:icon: codescan
 
 ```python
 bd.Database("background_2030").write(
@@ -230,7 +234,7 @@ bd.Database("background_2030").write(
         },
     }
 )
-````
+```
 :::
 
 So, as you can see, the prospective processes can reside within your normal brightway databases. To hand them to `bw_timex`, we just need to define a dictionary that maps the prospective database names to the point in time that they represent:
