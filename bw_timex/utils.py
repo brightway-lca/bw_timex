@@ -8,6 +8,7 @@ import pandas as pd
 from bw2data.backends.schema import ExchangeDataset
 from bw2data.backends.proxies import Exchange
 from bw2data.errors import MultipleResults, UnknownObject
+from bw_temporalis import TemporalDistribution
 
 
 def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") -> int:
@@ -300,3 +301,8 @@ def get_exchange(**kwargs) -> Exchange:
     elif not candidates:
         raise UnknownObject
     return candidates[0]
+
+def add_temporal_distribution_to_exchange(temporal_distribution: TemporalDistribution, **kwargs):
+    exchange = get_exchange(**kwargs)
+    exchange["temporal_distribution"] = temporal_distribution
+    exchange.save()
