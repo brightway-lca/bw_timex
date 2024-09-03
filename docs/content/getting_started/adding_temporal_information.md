@@ -155,8 +155,8 @@ td_b_to_a = TemporalDistribution(
 add_temporal_distribution_to_exchange(
     temporal_distribution=td_b_to_a, 
     input_code="B", 
-    input_database="background"
-    output_code="A"
+    input_database="background",
+    output_code="A",
     output_database="foreground"
 )
 
