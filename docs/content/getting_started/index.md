@@ -20,7 +20,7 @@ In the following sections, we'll walk through the steps 1-4, considering a very 
 ```{admonition} You want more interaction?
 :class: admonition-launch
 
-[Launch this tutorial on Binder!](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fexample_electric_vehicle_standalone.ipynb) In this interactive environment, you can directly run the bw_timex code yourself whilst following along.
+[Launch this tutorial on Binder!](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb) In this interactive environment, you can directly run the bw_timex code yourself whilst following along.
 ```
 
 ```{toctree}
