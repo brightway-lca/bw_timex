@@ -68,30 +68,49 @@ resolutions down to seconds while one may not have a similar temporal
 resolution for the databases. We recommend aligning `temporal_grouping`
 to the temporal resolution of the available databases.
 
-```{admonition} Example
+````{admonition} Example
 :class admonition-example
 
 Let's consider the following system: a process A that consumes an
 exchange b from a process B, which emits an emission X and both the
 exchange b and the emission X occur at a certain point in time.
-~~~{image} data/example_ab_light.svg
-:class: only-light
-:height: 300px
-:align: center
-~~~
-~~~{image} data/example_ab_dark.svg
-:class: only-dark
-:height: 300px
-:align: center
-~~~
+```{mermaid}
+flowchart LR
+subgraph background[" "]
+    B_2020(Process B \n 2020):::bg
+    B_2030(Process B \n 2030):::bg
+end
+
+subgraph foreground[" "]
+    A(Process A):::fg
+end
+
+subgraph biosphere[" "]
+    CO2:::b
+end
+
+B_2020-->|"amounts: [30%,50%,20%] * 3 kg\n dates:[-2,0,+4]" years|A
+A-.->|"amounts: [60%, 40%] * 5 kg\n dates: [0,+1]" years|CO2
+B_2020-.->|"amounts: [100%] * <span style='color:#9c5ffd'><b>11 kg</b></span>\n dates:[0]" years|CO2
+B_2030-.->|"amounts: [100%] * <span style='color:#9c5ffd'><b>7 kg</b></span>\n dates:[0]" years|CO2
+
+classDef bg color:#222832, fill:#3fb1c5, stroke:none;
+classDef fg color:#222832, fill:#3fb1c5, stroke:none;
+classDef b color:#222832, fill:#9c5ffd, stroke:none;
+style foreground fill:none, stroke:none;
+style background fill:none, stroke:none;
+style biosphere fill:none, stroke:none;
+
+```
 
 The resulting timeline looks like this:
-| time | producer | consumer | amount         |
-| ---- | -------- | -------- | -------------- |
-| 0    | A        | n/a      | 1              |
-| 0    | B        | A        | 2 \* 0.2 = 0.4 |
-| 1    | B        | A        | 2 \* 0.8 = 1.6 |
-```
+| date_producer | producer_name | date_consumer | consumer_name | amount | interpolation_weights                          |
+|---------------|---------------|---------------|---------------|--------|------------------------------------------------|
+| 2022-01-01    | B             | 2024-01-01    | A             | 0.9    | {'background': 0.8, 'background_2030': 0.2}    |
+| 2024-01-01    | B             | 2024-01-01    | A             | 1.5    | {'background': 0.6, 'background_2030': 0.4}    |
+| 2024-01-01    | A             | 2024-01-01    | -1            | 1.0    | None                                           |
+| 2028-01-01    | B             | 2024-01-01    | A             | 0.6    | {'background': 0.2, 'background_2030': 0.8}    |
+````
 
 ## Time mapping
 
@@ -148,9 +167,8 @@ modifications looks like this:
 :height: 300px
 :align: center
 ~~~
-~~~{image} data/matrix_dark.svg
+~~~{image} data/matrix_stuff_dark.svg
 :class: only-dark
-:height: 300px
 :align: center
 ~~~
 ```
