@@ -32,9 +32,23 @@ def wastes_db():
 
     node_co2 = biosphere.get("CO2")
 
-    fu = foreground.new_node("fu", name="fu", unit="unit")
-    fu["reference product"] = "fu"
-    fu.save()
+    fu1 = foreground.new_node("fu1", name="fu1", unit="unit")
+    fu1["reference product"] = "fu1"
+    fu1.save()
+
+    fu2 = foreground.new_node("fu2", name="fu2", unit="unit")
+    fu2["reference product"] = "fu2"
+    fu2.save()
+
+    fu3 = foreground.new_node("fu3", name="fu3", unit="unit")
+    fu3["reference product"] = "fu3"
+    fu3.save()
+
+    some_intermediate_process = foreground.new_node(
+        "some_intermediate_process", name="some_intermediate_process", unit="unit"
+    )
+    some_intermediate_process["reference product"] = "some_intermediate_process"
+    some_intermediate_process.save()
 
     used_car = foreground.new_node("used_car", name="used_car", unit="unit")
     used_car["reference product"] = "used_car"
@@ -46,8 +60,21 @@ def wastes_db():
     car_treatment_2020["reference product"] = "car_treatment"
     car_treatment_2020.save()
 
-    fu.new_edge(input=fu, amount=1, type="production").save()
-    fu.new_edge(input=used_car, amount=-1, type="technosphere").save()
+    fu1.new_edge(input=fu1, amount=1, type="production").save()
+    fu1.new_edge(input=used_car, amount=-1, type="technosphere").save()
+
+    fu2.new_edge(input=fu2, amount=1, type="production").save()
+    fu2.new_edge(input=some_intermediate_process, amount=-1, type="technosphere").save()
+
+    fu3.new_edge(input=fu3, amount=1, type="production").save()
+    fu3.new_edge(input=car_treatment_2020, amount=-1, type="technosphere").save()
+
+    some_intermediate_process.new_edge(
+        input=some_intermediate_process, amount=1, type="production"
+    ).save()
+    some_intermediate_process.new_edge(
+        input=car_treatment_2020, amount=-3, type="technosphere"
+    ).save()
 
     used_car.new_edge(input=used_car, amount=-1, type="production").save()
     used_car.new_edge(input=car_treatment_2020, amount=-3, type="technosphere").save()
@@ -64,13 +91,43 @@ def wastes_db():
     )
 
 
-def test_signs(wastes_db):
+def test_signs_fu_to_car_to_treatment(wastes_db):
     method = ("GWP", "example")
     database_date_dict = {
         "background_2020": datetime.strptime("2020", "%Y"),
         "foreground": "dynamic",
     }
-    fu = ("foreground", "fu")
+    fu = ("foreground", "fu1")
+    tlca = TimexLCA({fu: 1}, method, database_date_dict)
+    tlca.build_timeline()
+    tlca.lci()
+    tlca.static_lcia()
+
+    assert math.isclose(tlca.static_lca.score, tlca.static_score, rel_tol=1e-9)
+
+
+def test_signs_fu_to_intermediate_to_treatment(wastes_db):
+    method = ("GWP", "example")
+    database_date_dict = {
+        "background_2020": datetime.strptime("2020", "%Y"),
+        "foreground": "dynamic",
+    }
+    fu = ("foreground", "fu2")
+    tlca = TimexLCA({fu: 1}, method, database_date_dict)
+    tlca.build_timeline()
+    tlca.lci()
+    tlca.static_lcia()
+
+    assert math.isclose(tlca.static_lca.score, tlca.static_score, rel_tol=1e-9)
+
+
+def test_signs_fu_to_treatment(wastes_db):
+    method = ("GWP", "example")
+    database_date_dict = {
+        "background_2020": datetime.strptime("2020", "%Y"),
+        "foreground": "dynamic",
+    }
+    fu = ("foreground", "fu3")
     tlca = TimexLCA({fu: 1}, method, database_date_dict)
     tlca.build_timeline()
     tlca.lci()
