@@ -142,7 +142,7 @@ class TimelineBuilder:
 
         edges_df["leaf_flip_sign"] = edges_df.apply(
             lambda row: self.flip_sign_for_leaves_with_negative_production_amount(
-                row["producer"], row["leaf"]
+                row["producer"], row["consumer"], row["leaf"]
             ),
             axis=1,
         )
@@ -351,7 +351,7 @@ class TimelineBuilder:
         return multiplicator
 
     def flip_sign_for_leaves_with_negative_production_amount(
-        self, producer: int, leaf: bool
+        self, producer: int, consumer: int, leaf: bool
     ):
         """
         Returns true if the producer is a leaf and the production amount is negative.
@@ -370,7 +370,10 @@ class TimelineBuilder:
         """
         if not leaf:
             return None
-        return bd.get_node(id=producer).rp_exchange().amount < 0
+        return (
+            bd.get_node(id=producer).rp_exchange().amount < 0
+            and bd.get_node(id=consumer).rp_exchange().amount < 0
+        )
 
     def add_column_interpolation_weights_to_timeline(
         self,
