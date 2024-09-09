@@ -9,7 +9,7 @@ import pandas as pd
 
 class MatrixModifier:
     """
-    This class is responsible for modifying the original LCA matrices to contain the time-explicit processes and to relink them to the time-explicit background databasess.
+    This class is responsible for modifying the original LCA matrices to contain the time-explicit processes and to relink them to the time-explicit background databases.
 
     It does this by creating datapackages that add or change matrix entries in technosphere and biosphere matrices, based on a timeline dataframe (created from TimelineBuilder.build_timeline()).
 
