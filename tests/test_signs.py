@@ -45,10 +45,13 @@ def wastes_db():
     fu3["reference product"] = "fu3"
     fu3.save()
     
-    
     fu4 = foreground.new_node("fu4", name="fu4", unit="unit")
     fu4["reference product"] = "fu4"
     fu4.save()
+    
+    fu5 = foreground.new_node("fu5", name="fu5", unit="unit")
+    fu5["reference product"] = "fu5"
+    fu5.save()
 
     some_waste_producing_intermediate_process = foreground.new_node(
         "some_waste_producing_intermediate_process", name="some_waste_producing_intermediate_process", unit="unit"
@@ -56,6 +59,12 @@ def wastes_db():
     some_waste_producing_intermediate_process["reference product"] = "some_waste_producing_intermediate_process"
     some_waste_producing_intermediate_process.save()
 
+    foreground_waste_treatment_process = foreground.new_node(
+        "other_waste_producing_intermediate_process", name="other_waste_producing_intermediate_process", unit="unit"
+    )
+    foreground_waste_treatment_process["reference product"] = "other_waste_producing_intermediate_process"
+    foreground_waste_treatment_process.save()
+    
     some_normal_intermediate_process = foreground.new_node(
         "some_normal_intermediate_process", name="some_normal_intermediate_process", unit="unit"
     )
@@ -90,6 +99,9 @@ def wastes_db():
     
     fu4.new_edge(input=fu4, amount=1, type="production").save()
     fu4.new_edge(input=some_normal_intermediate_process, amount=-1, type="technosphere").save()
+    
+    fu5.new_edge(input=fu5, amount=1, type="production").save()
+    fu5.new_edge(input=foreground_waste_treatment_process, amount=1, type="technosphere").save()
 
     some_waste_producing_intermediate_process.new_edge(
         input=some_waste_producing_intermediate_process, amount=1, type="production"
@@ -98,12 +110,19 @@ def wastes_db():
         input=car_treatment_2020, amount=-3, type="technosphere"
     ).save()
     
+    foreground_waste_treatment_process.new_edge(
+        input=foreground_waste_treatment_process, amount=-1, type="production"
+    ).save()
+    foreground_waste_treatment_process.new_edge(
+        input=some_waste_producing_intermediate_process, amount=4, type="technosphere"
+    ).save()
+    
     some_normal_intermediate_process.new_edge(
         input=some_normal_intermediate_process, amount=1, type="production"
     ).save()
     some_normal_intermediate_process.new_edge(
         input=some_other_background_process, amount=3, type="technosphere"
-    ).save()
+    ).save() 
 
     used_car.new_edge(input=used_car, amount=-1, type="production").save()
     used_car.new_edge(input=car_treatment_2020, amount=-3, type="technosphere").save()
@@ -176,6 +195,18 @@ def test_signs_fu_to_normal_intermediate_to_normal_background(wastes_db):
         "foreground": "dynamic",
     }
     fu = ("foreground", "fu4")
+    tlca = TimexLCA({fu: 1}, method, database_date_dict)
+    tlca.build_timeline()
+    tlca.lci()
+    tlca.static_lcia()
+        
+def test_signs_fu_with_unusual_positives_and_negatives(wastes_db):
+    method = ("GWP", "example")
+    database_date_dict = {
+        "background_2020": datetime.strptime("2020", "%Y"),
+        "foreground": "dynamic",
+    }
+    fu = ("foreground", "fu5")
     tlca = TimexLCA({fu: 1}, method, database_date_dict)
     tlca.build_timeline()
     tlca.lci()
