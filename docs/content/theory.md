@@ -162,7 +162,7 @@ created:
 :class: admonition-example
 For the simple system above, a schematic representation of the matrix
 modifications looks like this:
-~~~{image} data/matrix_light.svg
+~~~{image} data/matrix_stuff_light.svg
 :class: only-light
 :height: 300px
 :align: center
