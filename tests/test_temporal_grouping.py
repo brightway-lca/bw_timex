@@ -47,7 +47,7 @@ class TestClass_Grouping:
 
         expected_score = 1 / 3 * 15 + 1 / 6 * 15 + 1 / 6 * 10 + 1 / 3 * 10
 
-        assert self.tlca.score == expected_score
+        assert self.tlca.static_score == expected_score
 
     def test_daily_resolution_score(self):
 
