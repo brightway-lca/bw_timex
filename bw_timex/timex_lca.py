@@ -337,8 +337,10 @@ class TimexLCA:
         if not hasattr(self, "lca"):
             raise AttributeError("LCI not yet calculated. Call TimexLCA.lci() first.")
         if not self.expanded_technosphere:
-            raise ValueError("Currently the static lcia score can only be calculated if the expanded matrix has been built\
-                             Please call TimexLCA.lci(expand_technosphere=True) first.")
+            raise ValueError(
+                "Currently the static lcia score can only be calculated if the expanded matrix has been built\
+                             Please call TimexLCA.lci(expand_technosphere=True) first."
+            )
         self.lca.lcia()
 
     def dynamic_lcia(
@@ -352,13 +354,13 @@ class TimexLCA:
     ) -> pd.DataFrame:
         """
         Calculates dynamic LCIA with the `DynamicCharacterization` class using the dynamic inventory and dynamic
-        characterization functions. Dynamic characterization is handled by the separate package 
+        characterization functions. Dynamic characterization is handled by the separate package
         `dynamic_characterization` (https://dynamic-characterization.readthedocs.io/en/latest/).
 
         Dynamic characterization functions in the form of a dictionary {biosphere_flow_database_id:
         characterization_function} can be given by the user.
         If none are given, a set of default dynamic characterization functions based on IPCC AR6 are provided from
-        `dynamic_characterization` package. These are mapped to the biosphere3 flows of the chosen static climate 
+        `dynamic_characterization` package. These are mapped to the biosphere3 flows of the chosen static climate
         change impact category. If there is no characterization function for a biosphere flow, it will be ignored.
 
         Two dynamic climate change metrics are provided: "GWP" and "radiative_forcing".
@@ -440,7 +442,7 @@ class TimexLCA:
     def base_score(self) -> float:
         """
         Score of the base LCA, i.e., the "normal" LCA without time-explicit information.
-        Same as when using bw2calc.LCA.score"
+        Same as when using bw2calc.LCA.score
         """
         return self.base_lca.score
 
@@ -452,7 +454,7 @@ class TimexLCA:
         if not hasattr(self, "lca"):
             raise AttributeError("LCI not yet calculated. Call TimexLCA.lci() first.")
         return self.lca.score
-    
+
     @property
     def dynamic_score(self) -> float:
         """
@@ -562,7 +564,9 @@ class TimexLCA:
         self.activity_time_mapping_dict_reversed = {
             v: k for k, v in self.activity_time_mapping_dict.items()
         }
-        self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(from_timeline)
+        self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(
+            from_timeline
+        )
 
     def create_dynamic_inventory_dataframe(self, from_timeline=False) -> pd.DataFrame:
         """Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the the format
@@ -602,9 +606,11 @@ class TimexLCA:
                 row = i
                 col = self.dynamic_inventory.indices[j]
                 value = self.dynamic_inventory.data[j]
-                
+
                 if from_timeline:
-                    emitting_process_id = self.timeline.iloc[col]['time_mapped_producer']
+                    emitting_process_id = self.timeline.iloc[col][
+                        "time_mapped_producer"
+                    ]
                 else:
                     emitting_process_id = self.lca.activity_dict.reversed[col]
 
@@ -1026,9 +1032,7 @@ class TimexLCA:
         None but adds the activities to the `activity_time_mapping_dict`
         """
         for idx in self.base_lca.dicts.activity.keys():  # activity ids
-            key = self.base_lca.remapping_dicts["activity"][
-                idx
-            ]  # ('database', 'code')
+            key = self.base_lca.remapping_dicts["activity"][idx]  # ('database', 'code')
             time = self.database_date_dict[
                 key[0]
             ]  # datetime (or 'dynamic' for foreground processes)
