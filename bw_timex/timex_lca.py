@@ -1263,21 +1263,3 @@ class TimexLCA:
         warnings.warn(
             "bw25's original mapping function doesn't work with our new time-mapped matrix entries. The Timex mapping can be found in acvitity_time_mapping_dict and biosphere_time_mapping_dict."
         )
-
-    def __getattr__(self, name):
-        """
-        Delegate attribute access to the self.lca object if the attribute
-        is not found in the TimexLCA instance itself, excluding special attributes.
-        """
-        if name.startswith("__"):
-            raise AttributeError(
-                f"'{type(self).__name__}' object has no attribute '{name}'"
-            )
-        if hasattr(self.lca, name):
-            return getattr(self.lca, name)
-        if hasattr(self.dynamic_biosphere_builder, name):
-            return getattr(self.dynamic_biosphere_builder, name)
-        else:
-            raise AttributeError(
-                f"'TimexLCA' object and its 'lca'- and dynamic_biosphere_builder- attributes have no attribute '{name}'"
-            )
