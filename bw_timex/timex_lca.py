@@ -521,9 +521,9 @@ class TimexLCA:
         )
 
         # Build the dynamic inventory
-        count = len(self.dynamic_supply_array)
+        count = len(self.dynamic_biosphere_builder.dynamic_supply_array)
         diagonal_supply_array = sparse.spdiags(
-            [self.dynamic_supply_array], [0], count, count
+            [self.dynamic_biosphere_builder.dynamic_supply_array], [0], count, count
         )  # diagnolization of supply array keeps the dimension of the process, which we want to pass as additional information to the dynamic inventory dict
         self.dynamic_inventory = self.dynamic_biomatrix @ diagonal_supply_array
 
@@ -578,7 +578,7 @@ class TimexLCA:
                 if from_timeline:
                     emitting_process_id = self.timeline.iloc[col]['time_mapped_producer']
                 else:
-                    emitting_process_id = self.activity_dict.reversed[col]
+                    emitting_process_id = self.lca.activity_dict.reversed[col]
 
                 bioflow_id, date = self.biosphere_time_mapping_dict_reversed[
                     row
