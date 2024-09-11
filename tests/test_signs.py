@@ -156,7 +156,7 @@ def test_signs_fu_to_car_to_treatment(wastes_db):
     tlca.lci()
     tlca.static_lcia()
 
-    assert math.isclose(tlca.static_lca.score, tlca.static_score, rel_tol=1e-9)
+    assert math.isclose(tlca.base_lca.score, tlca.static_score, rel_tol=1e-9)
 
 
 def test_signs_fu_to_intermediate_to_treatment(wastes_db):
@@ -171,7 +171,7 @@ def test_signs_fu_to_intermediate_to_treatment(wastes_db):
     tlca.lci()
     tlca.static_lcia()
 
-    assert math.isclose(tlca.static_lca.score, tlca.static_score, rel_tol=1e-9)
+    assert math.isclose(tlca.base_lca.score, tlca.static_score, rel_tol=1e-9)
 
 
 def test_signs_fu_to_treatment(wastes_db):
@@ -186,7 +186,7 @@ def test_signs_fu_to_treatment(wastes_db):
     tlca.lci()
     tlca.static_lcia()
 
-    assert math.isclose(tlca.static_lca.score, tlca.static_score, rel_tol=1e-9)
+    assert math.isclose(tlca.base_lca.score, tlca.static_score, rel_tol=1e-9)
     
 def test_signs_fu_to_normal_intermediate_to_normal_background(wastes_db):
     method = ("GWP", "example")
@@ -212,4 +212,4 @@ def test_signs_fu_with_unusual_positives_and_negatives(wastes_db):
     tlca.lci()
     tlca.static_lcia()
 
-    assert math.isclose(tlca.static_lca.score, tlca.static_score, rel_tol=1e-9)
+    assert math.isclose(tlca.base_lca.score, tlca.static_score, rel_tol=1e-9)

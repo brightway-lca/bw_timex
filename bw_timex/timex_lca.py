@@ -61,7 +61,7 @@ class TimexLCA:
 
 
     TimexLCA calculates:
-     1) a static LCA score (`TimexLCA.static_lca.score`, same as `bw2calc.lca.score`),
+     1) a static LCA score (`TimexLCA.base_lca.score`, same as `bw2calc.lca.score`),
      2) a static time-explicit LCA score (`TimexLCA.static_score`), which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows,
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and dynamic charaterization factors. These are provided for radiative forcing and GWP but can also be user-defined.
 
@@ -123,12 +123,12 @@ class TimexLCA:
         self.create_node_id_collection_dict()
 
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all background databases in the LCA. We need all the IDs for the time mapping dict.
-        fu, data_objs, remapping = self.prepare_static_lca_inputs(
+        fu, data_objs, remapping = self.prepare_base_lca_inputs(
             demand=self.demand, method=self.method
         )
-        self.static_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
-        self.static_lca.lci()
-        self.static_lca.lcia()
+        self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
+        self.base_lca.lci()
+        self.base_lca.lcia()
 
         # Create a time mapping dict that maps each activity to a activity_time_mapping_id in the format (('database', 'code'), datetime_as_integer): time_mapping_id)
         self.activity_time_mapping_dict = TimeMappingDict(
@@ -214,7 +214,7 @@ class TimexLCA:
         # all edges with their temporal information. Can later be used to build a timeline with the
         # TimelineBuilder.build_timeline() method.
         self.timeline_builder = TimelineBuilder(
-            self.static_lca,
+            self.base_lca,
             self.edge_filter_function,
             self.database_date_dict,
             self.database_date_dict_static_only,
@@ -609,7 +609,7 @@ class TimexLCA:
     # For setup #
     #############
 
-    def prepare_static_lca_inputs(
+    def prepare_base_lca_inputs(
         self,
         demand=None,
         method=None,
@@ -1003,8 +1003,8 @@ class TimexLCA:
         -------
         None but adds the activities to the `activity_time_mapping_dict`
         """
-        for idx in self.static_lca.dicts.activity.keys():  # activity ids
-            key = self.static_lca.remapping_dicts["activity"][
+        for idx in self.base_lca.dicts.activity.keys():  # activity ids
+            key = self.base_lca.remapping_dicts["activity"][
                 idx
             ]  # ('database', 'code')
             time = self.database_date_dict[

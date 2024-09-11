@@ -44,13 +44,13 @@ class TestClass_EV:
         self.tlca.lci()
         self.tlca.static_lcia()
 
-    def test_static_lca_score(self):
+    def test_base_lca_score(self):
         slca = bc.LCA({self.electric_vehicle.key: 1}, method=("GWP", "example"))
         slca.lci()
         slca.lcia()
         expected_static_score = slca.score
 
-        assert self.tlca.static_lca.score == expected_static_score
+        assert self.tlca.base_lca.score == expected_static_score
 
     def test_bw_timex_score(self):
         ELECTRICITY_CONSUMPTION = 0.2  # kWh/km

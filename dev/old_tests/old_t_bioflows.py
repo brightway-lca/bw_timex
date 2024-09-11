@@ -43,8 +43,8 @@ class TestBioflows(unittest.TestCase):
         mlca.lci()
         mlca.lcia()
         self.assertTrue(
-            math.isclose(mlca.score, mlca.static_lca.score, rel_tol=1e-2),
-            f"Total scores didn't match up. Medusa LCA score is {mlca.score}, static LCA score is {mlca.static_lca.score}",
+            math.isclose(mlca.score, mlca.base_lca.score, rel_tol=1e-2),
+            f"Total scores didn't match up. Medusa LCA score is {mlca.score}, static LCA score is {mlca.base_lca.score}",
         )
 
         mlca.build_dynamic_biosphere()
