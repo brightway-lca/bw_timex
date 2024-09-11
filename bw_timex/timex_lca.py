@@ -148,7 +148,7 @@ class TimexLCA:
         interpolation_type: str = "linear",
         edge_filter_function: Callable = None,
         cutoff: float = 1e-9,
-        max_calc: float = 1e4,
+        max_calc: int = 2000,
         *args,
         **kwargs,
     ) -> pd.DataFrame:

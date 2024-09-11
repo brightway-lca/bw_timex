@@ -35,7 +35,7 @@ class TimelineBuilder:
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
         cutoff: float = 1e-9,
-        max_calc: float = 1e4,
+        max_calc: int = 2000,
         *args,
         **kwargs,
     ) -> None:
