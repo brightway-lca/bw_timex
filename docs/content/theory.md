@@ -37,11 +37,63 @@ For a time-explicit LCA, 3 inputs are required:
     the consuming process is adopted also for the producing process.
 ```
 
-## Graph traversal
+## Temporal distributions and graph traversal
+To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges. To carry the temporal information, we use the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class is a *container for a series of amount spread over time*, so it tells you what share of an exchange happens at what point in time. If two consecutive edges in the supply chain graph carry a `TemporalDistribution`, they are [convoluted](https://en.wikipedia.org/wiki/Convolution).
 
-`bw_timex` uses the graph traversal from
-[bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main)
-to propagate the temporal information along the supply chain. An in-depth
+````{admonition} Example: Convolution
+:class: admonition-example
+
+Let's say we have two temporal distributions. The first dates 30% of some amount two years into the future, and 70% of that amount four years into the future:
+
+```python
+import numpy as np
+from bw_temporalis import TemporalDistribution
+
+two_and_four_years_ahead = TemporalDistribution(
+    date=np.array([2, 4], dtype="timedelta64[Y]"), 
+    amount=np.array([0.3, 0.7])
+)
+
+two_and_four_years_ahead.graph(resolution="Y")
+```
+~~~{image} data/td_two_and_four_years_ahead.svg
+:align: center
+~~~
+
+</br>
+
+The other distribution spreads an amount over the following 4 months, with decreasing shares:
+```python
+spread_over_four_months = TemporalDistribution(
+    date=np.array([0, 1, 2, 3], dtype="timedelta64[M]"), 
+    amount=np.array([0.4, 0.3, 0.2, 0.1])
+)
+
+spread_over_four_months.graph(resolution="M")
+```
+~~~{image} data/td_spread_over_four_months.svg
+:align: center
+~~~
+
+</br>
+
+Now let's see what happens when we convolute these temporal distributions:
+```python
+convoluted_distribution = two_and_four_years_ahead * spread_over_four_months
+
+convoluted_distribution.graph(resolution="M")
+```
+~~~{image} data/td_convoluted.svg
+:align: center
+~~~
+
+</br>
+
+Note how both the dates and the amounts get scaled.
+````
+
+To convolute all the temporal information from the supply chain graph, `bw_timex` uses the graph traversal from
+[bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main). An in-depth
 description of how this works is available in the [brightway-docs](https://docs.brightway.dev/en/latest/content/theory/graph_traversal.html). In short,
 it is a priority-first supply chain graph traversal, following the most
 impactful node in the graph based on the static pre-calculated LCIA score
@@ -68,8 +120,8 @@ resolutions down to seconds while one may not have a similar temporal
 resolution for the databases. We recommend aligning `temporal_grouping`
 to the temporal resolution of the available databases.
 
-````{admonition} Example
-:class admonition-example
+````{admonition} Example: Timeline
+:class: admonition-example
 
 Let's consider the following system: a process A that consumes an
 exchange b from a process B, which emits an emission X and both the
@@ -158,13 +210,12 @@ created:
     `TimexLCA.dynamic_inventory_df` contain the emissions of the system
     per biosphere flow including its timestamp and its emitting process.
 
-```{admonition} Example
+```{admonition} Example: Matrix modifications
 :class: admonition-example
 For the simple system above, a schematic representation of the matrix
 modifications looks like this:
 ~~~{image} data/matrix_stuff_light.svg
 :class: only-light
-:height: 300px
 :align: center
 ~~~
 ~~~{image} data/matrix_stuff_dark.svg
