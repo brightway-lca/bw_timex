@@ -336,12 +336,10 @@ class TimexLCA:
         """
         if not hasattr(self, "lca"):
             raise AttributeError("LCI not yet calculated. Call TimexLCA.lci() first.")
-            return
         if not self.expanded_technosphere:
             raise ValueError("Currently the static lcia score can only be calculated if the expanded matrix has been built\
                              Please call TimexLCA.lci(expand_technosphere=True) first.")
         self.lca.lcia()
-        self.static_score = self.lca.score
 
     def dynamic_lcia(
         self,
@@ -388,7 +386,7 @@ class TimexLCA:
         Returns
         -------
         pandas.DataFrame
-            A Dataframe with the characterized inventory for the chosen metric and parameters. Also stores the sum as attribute `dynamic_score`.
+            A Dataframe with the characterized inventory for the chosen metric and parameters.
 
         See also
         --------
@@ -432,9 +430,39 @@ class TimexLCA:
             characterization_function_co2=characterization_function_co2,
         )
 
-        self.dynamic_score = self.characterized_inventory["amount"].sum()
-
         return self.characterized_inventory
+
+    ###################
+    # Core properties #
+    ###################
+
+    @property
+    def base_score(self) -> float:
+        """
+        Score of the base LCA, i.e., the "normal" LCA without time-explicit information.
+        Same as when using bw2calc.LCA.score"
+        """
+        return self.base_lca.score
+
+    @property
+    def static_score(self) -> float:
+        """
+        Score resulting from the static LCIA of the time-explicit inventory.
+        """
+        if not hasattr(self, "lca"):
+            raise AttributeError("LCI not yet calculated. Call TimexLCA.lci() first.")
+        return self.lca.score
+    
+    @property
+    def dynamic_score(self) -> float:
+        """
+        Score resulting from the dynamic LCIA of the time-explicit inventory.
+        """
+        if not hasattr(self, "characterized_inventory"):
+            raise AttributeError(
+                "Characterized inventory not yet calculated. Call TimexLCA.dynamic_lcia() first."
+            )
+        return self.characterized_inventory["amount"].sum()
 
     ###############################################
     # Other core functions for the inner workings #
