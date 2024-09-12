@@ -4,7 +4,7 @@
 
 ```{note}
 1) We recommend installation via `conda` or `mamba`.
-2) bw_timex depends on Brightway25, and will install bw25-compatible versions of the bw packages. This means that it cannot be added to existing virtual environments that are based on Brightway2, e.g., environments containing [Activity Browser](https://github.com/LCA-ActivityBrowser/activity-browser). Please install bw_timex in a separate environment following the instructions below. 
+2) bw_timex depends on Brightway25, and will install bw25-compatible versions of the bw packages. This means that it cannot be added to existing virtual environments that are based on Brightway2, e.g., environments containing [Activity Browser](https://github.com/LCA-ActivityBrowser/activity-browser). Please install bw_timex in a separate environment following the instructions below.
 ```
 
 ## Installing `bw_timex` using `conda` or `mamba`

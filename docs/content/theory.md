@@ -50,7 +50,7 @@ import numpy as np
 from bw_temporalis import TemporalDistribution
 
 two_and_four_years_ahead = TemporalDistribution(
-    date=np.array([2, 4], dtype="timedelta64[Y]"), 
+    date=np.array([2, 4], dtype="timedelta64[Y]"),
     amount=np.array([0.3, 0.7])
 )
 
@@ -65,7 +65,7 @@ two_and_four_years_ahead.graph(resolution="Y")
 The other distribution spreads an amount over the following 4 months, with decreasing shares:
 ```python
 spread_over_four_months = TemporalDistribution(
-    date=np.array([0, 1, 2, 3], dtype="timedelta64[M]"), 
+    date=np.array([0, 1, 2, 3], dtype="timedelta64[M]"),
     amount=np.array([0.4, 0.3, 0.2, 0.1])
 )
 

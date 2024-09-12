@@ -1174,7 +1174,7 @@ class TimexLCA:
 
         df = self.dynamic_inventory_df.copy()
         df["flow"] = df["flow"].apply(lambda x: bd.get_node(id=x)["name"])
-        
+
         activity_name_cache = {}
 
         for activity in df["activity"].unique():
@@ -1184,7 +1184,7 @@ class TimexLCA:
                 )
 
         df["activity"] = df["activity"].map(activity_name_cache)
-        
+
         return df
 
     def plot_dynamic_inventory(self, bio_flows, cumulative=False) -> None:
