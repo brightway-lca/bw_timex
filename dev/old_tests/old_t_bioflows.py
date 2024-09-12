@@ -4,12 +4,14 @@ Testing the results of the static LCA and the MedusaLCA to see if the new interp
 
 import math
 import unittest
-import bw2data as bd
+from datetime import datetime
+
 import bw2calc as bc
+import bw2data as bd
 import numpy as np
+
 from bw_timex import MedusaLCA
 from tests.databases import db_abc_loopA_with_biosphere_tds_CO2_and_CH4
-from datetime import datetime
 
 
 class TestBioflows(unittest.TestCase):

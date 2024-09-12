@@ -12,7 +12,7 @@ If you want to contribute to the development our code with a new feature, want t
 Something is not working as expected? You have two options:
 
 ### 🥈 Report an error
-Please open a new issue in the `bw_timex` [repository](https://github.com/TimoDiepers/timex/issues), describing the error and where you found it. 
+Please open a new issue in the `bw_timex` [repository](https://github.com/TimoDiepers/timex/issues), describing the error and where you found it.
 A member of the bw_timex developer community will then take care of the issue, but it may take some time for your issue to be resolved.
 
 ### 🥇  Fix an error yourself

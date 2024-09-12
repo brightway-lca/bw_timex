@@ -1004,9 +1004,7 @@ class TimexLCA:
         None but adds the activities to the `activity_time_mapping_dict`
         """
         for idx in self.base_lca.dicts.activity.keys():  # activity ids
-            key = self.base_lca.remapping_dicts["activity"][
-                idx
-            ]  # ('database', 'code')
+            key = self.base_lca.remapping_dicts["activity"][idx]  # ('database', 'code')
             time = self.database_date_dict[
                 key[0]
             ]  # datetime (or 'dynamic' for foreground processes)

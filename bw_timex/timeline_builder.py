@@ -368,7 +368,7 @@ class TimelineBuilder:
         dates_list = [
             date
             for date in self.database_date_dict_static_only.values()
-            if type(date) == datetime
+            if isinstance(date, datetime)
         ]
         if "date_producer" not in list(tl_df.columns):
             raise ValueError("The timeline does not contain dates.")
@@ -377,7 +377,7 @@ class TimelineBuilder:
         self.reversed_database_date_dict = {
             v: k
             for k, v in self.database_date_dict_static_only.items()
-            if type(v) == datetime
+            if isinstance(v, datetime)
         }
 
         if self.interpolation_type == "nearest":
@@ -535,7 +535,7 @@ class TimelineBuilder:
             }
         return None
 
-    def get_consumer_name(self, id: int) -> str:
+    def get_consumer_name(self, idx: int) -> str:
         """
         Returns the name of consumer node.
         If consuming node is the functional unit, returns -1.
@@ -551,6 +551,6 @@ class TimelineBuilder:
             Name of the node or -1
         """
         try:
-            return bd.get_node(id=id)["name"]
+            return bd.get_node(id=idx)["name"]
         except:
             return "-1"  # functional unit

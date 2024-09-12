@@ -1,11 +1,11 @@
-# TimexLCA examples 
+# TimexLCA examples
 
 Here are some examples on how you can use `bw_timex`.
 
-::::{grid} 1 2 2 2 
+::::{grid} 1 2 2 2
 :gutter: 4
 
-:::{grid-item-card} 🚗⚡ Life Cycle of an Electric Car 
+:::{grid-item-card} 🚗⚡ Life Cycle of an Electric Car
 :link: ./example_electric_vehicle_premise.html
 :link-type: url
 :class-body: sphinx-design-class-body-examples
@@ -60,7 +60,7 @@ by @You?
 
 ```{toctree}
 ---
-hidden: 
+hidden:
 maxdepth: 1
 ---
 self

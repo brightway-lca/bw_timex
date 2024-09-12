@@ -12,7 +12,7 @@ sphinx:
    configuration: docs/conf.py
 
 submodules:
-   include: all 
+   include: all
 
 build:
    os: "ubuntu-lts-latest" # https://docs.readthedocs.io/en/stable/config-file/v2.html#build-os

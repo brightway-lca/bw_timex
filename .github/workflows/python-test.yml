@@ -50,7 +50,7 @@ jobs:
 
       # Create the conda environment
       - name: Create conda environment
-        run: conda create -n timex -c conda-forge -c cmutel -c diepers brightway25 bw_temporalis dynamic_characterization matplotlib seaborn 
+        run: conda create -n timex -c conda-forge -c cmutel -c diepers brightway25 bw_temporalis dynamic_characterization matplotlib seaborn
 
       # Install testing dependencies from pyproject.toml
       - name: Install testing dependencies
@@ -73,4 +73,3 @@ jobs:
           source $(conda info --base)/etc/profile.d/conda.sh
           conda activate timex
           pytest
-
