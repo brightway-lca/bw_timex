@@ -165,7 +165,7 @@ html_sidebars = {
     "content/contributing": [],
     "content/codeofconduct": [],
     "content/license": [],
-    "content/chagnelog": [],
+    "content/changelog": [],
 }
 
 html_theme_options = {
