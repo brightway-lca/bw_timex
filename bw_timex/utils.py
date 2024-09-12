@@ -5,10 +5,11 @@ from typing import Callable, List, Optional, Union
 import bw2data as bd
 import matplotlib.pyplot as plt
 import pandas as pd
-from bw2data import databases
 from bw2data.backends import ActivityDataset as AD
+from bw2data.backends.proxies import Exchange
+from bw2data.backends.schema import ExchangeDataset
 from bw2data.errors import MultipleResults, UnknownObject
-from bw2data.subclass_mapping import NODE_PROCESS_CLASS_MAPPING
+from bw_temporalis import TemporalDistribution
 
 time_res_to_int_dict = {
     "year": "%Y",
@@ -307,6 +308,7 @@ def plot_characterized_inventory_as_waterfall(
     plt.grid(True)
     plt.show()
 
+
 def get_exchange(**kwargs) -> Exchange:
     """
     Get an exchange from the database.
@@ -323,17 +325,22 @@ def get_exchange(**kwargs) -> Exchange:
             qs = qs.where(mapping[key] == value)
         except KeyError:
             continue
-    
+
     candidates = [Exchange(obj) for obj in qs]
     if len(candidates) > 1:
         raise MultipleResults(
-            "Found {} results for the given search. Please be more specific or double-check your system model for duplicates.".format(len(candidates))
+            "Found {} results for the given search. Please be more specific or double-check your system model for duplicates.".format(
+                len(candidates)
+            )
         )
     elif not candidates:
         raise UnknownObject
     return candidates[0]
 
-def add_temporal_distribution_to_exchange(temporal_distribution: TemporalDistribution, **kwargs):
+
+def add_temporal_distribution_to_exchange(
+    temporal_distribution: TemporalDistribution, **kwargs
+):
     exchange = get_exchange(**kwargs)
     exchange["temporal_distribution"] = temporal_distribution
     exchange.save()
