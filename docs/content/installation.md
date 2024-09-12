@@ -3,8 +3,8 @@
 `bw_timex` is a Python software package. It's available via [`pip`](https://pypi.org/project/pip/) or  [`conda`](https://docs.conda.io/en/latest/) / [`mamba`](https://mamba.readthedocs.io/en/latest/).
 
 ```{note}
-1) We currently recommend the installation via `conda` or `mamba`. That's what we're providing detailed instructions for below. 
-2) bw_timex depends on Brightway25, and will install bw25-compatible versions of the bw packages. This means that it cannot be added to existing virtual environments that are based on Brightway2, e.g. virtual environments containing activity browser. Please install bw_timex in a separate virtual environment following the instructions below. 
+1) We currently recommend the installation via `conda` or `mamba`. That's what we're providing detailed instructions for below.
+2) bw_timex depends on Brightway25, and will install bw25-compatible versions of the bw packages. This means that it cannot be added to existing virtual environments that are based on Brightway2, e.g. virtual environments containing activity browser. Please install bw_timex in a separate virtual environment following the instructions below.
 ```
 
 ## Installing `bw_timex` using `conda` or `mamba`

@@ -1,20 +1,20 @@
-import bw2data as bd
 import warnings
-import pandas as pd
-import numpy as np
-from typing import Union, Tuple, Optional, Callable
 from datetime import datetime, timedelta
-from typing import KeysView
+from typing import Callable, KeysView, Union
 
-from bw_temporalis import TemporalDistribution
-from bw2data.configuration import labels
+import bw2data as bd
+import numpy as np
+import pandas as pd
 from bw2calc import LCA
-from .edge_extractor import EdgeExtractor, Edge
+from bw2data.configuration import labels
+
+from .edge_extractor import Edge, EdgeExtractor
 from .utils import (
+    convert_date_string_to_datetime,
     extract_date_as_integer,
     extract_date_as_string,
-    convert_date_string_to_datetime,
 )
+
 
 class TimelineBuilder:
     """
@@ -30,7 +30,7 @@ class TimelineBuilder:
         edge_filter_function: Callable,
         database_date_dict: dict,
         database_date_dict_static_only: dict,
-        time_mapping_dict: dict,
+        activity_time_mapping_dict: dict,
         node_id_collection_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
@@ -48,15 +48,15 @@ class TimelineBuilder:
             A callable that filters edges. If not provided, a function that always returns False is used.
         database_date_dict: dict
             A dictionary mapping databases to dates.
-        time_mapping_dict: dict
+        activity_time_mapping_dict: dict
           A dictionary to map processes to specific times.
         temporal_grouping: str, optional
             The temporal grouping to be used. Default is "year".
         interpolation_type: str, optional
             The type of interpolation to be used to select the background databases. Default is "linear".
-        cutoff: 
+        cutoff:
             The cutoff value for the graph traversal. Default is 1e-9.
-        max_calc: 
+        max_calc:
             The maximum number of calculations to be performed by the graph traversal. Default is 1e4.
         args:   Variable length argument list
             Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA. Here, things like the further settings for graph traversal can be set. For details, see bw_temporalis.TemporalisLCA.
@@ -67,7 +67,7 @@ class TimelineBuilder:
         self.edge_filter_function = edge_filter_function
         self.database_date_dict = database_date_dict
         self.database_date_dict_static_only = database_date_dict_static_only
-        self.time_mapping_dict = time_mapping_dict
+        self.activity_time_mapping_dict = activity_time_mapping_dict
         self.node_id_collection_dict = node_id_collection_dict
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
@@ -97,7 +97,6 @@ class TimelineBuilder:
         )
         self.edge_timeline = self.edge_extractor.build_edge_timeline()
 
-
     def build_timeline(self) -> pd.DataFrame:
         """
         Create a dataframe with grouped, time-explicit edges and, for each grouped edge, interpolate to the database with the closest time of representativeness.
@@ -111,9 +110,9 @@ class TimelineBuilder:
 
         Parameters
         ----------
-        None 
+        None
             (all are already passed during instantiation)
-        
+
         Returns
         -------
         pd.DataFrame
@@ -175,14 +174,10 @@ class TimelineBuilder:
 
         # convert grouping times, which was only used as intermediate variable, back to datetime
         grouped_edges["date_producer"] = grouped_edges["producer_grouping_time"].apply(
-            lambda x: convert_date_string_to_datetime(
-                self.temporal_grouping, x
-            )
+            lambda x: convert_date_string_to_datetime(self.temporal_grouping, x)
         )
         grouped_edges["date_consumer"] = grouped_edges["consumer_grouping_time"].apply(
-            lambda x: convert_date_string_to_datetime(
-                self.temporal_grouping, x
-            )
+            lambda x: convert_date_string_to_datetime(self.temporal_grouping, x)
         )
 
         # add dates as integers as hashes to the dataframe
@@ -196,23 +191,32 @@ class TimelineBuilder:
 
         # add new processes to time mapping dict
         for row in grouped_edges.itertuples():
-            self.time_mapping_dict.add(
-                (bd.get_node(id=row.producer).key, row.hash_producer)
+            self.activity_time_mapping_dict.add(
+                (
+                    ("temporalized", bd.get_node(id=row.producer)["code"]),
+                    row.hash_producer,
+                )
             )
+
+        def _get_time_mapping_key(node_id: int, node_hash: int) -> tuple:
+            try:
+                return self.activity_time_mapping_dict[
+                    (("temporalized", bd.get_node(id=node_id)["code"]), node_hash)
+                ]
+            except:
+                return self.activity_time_mapping_dict[
+                    ((bd.get_node(id=node_id).key), node_hash)
+                ]
 
         # store the ids from the time_mapping_dict in dataframe
         grouped_edges["time_mapped_producer"] = grouped_edges.apply(
-            lambda row: self.time_mapping_dict[
-                (bd.get_node(id=row.producer).key, row.hash_producer)
-            ],
+            lambda row: _get_time_mapping_key(row.producer, row.hash_producer),
             axis=1,
         )
 
         grouped_edges["time_mapped_consumer"] = grouped_edges.apply(
             lambda row: (
-                self.time_mapping_dict[
-                    (bd.get_node(id=row.consumer).key, row.hash_consumer)
-                ]
+                _get_time_mapping_key(row.consumer, row.hash_consumer)
                 if row.consumer != -1
                 else -1
             ),
@@ -229,7 +233,9 @@ class TimelineBuilder:
         grouped_edges["producer_name"] = grouped_edges.producer.apply(
             lambda x: bd.get_node(id=x)["name"]
         )
-        grouped_edges["consumer_name"] = grouped_edges.consumer.apply(self.get_consumer_name)
+        grouped_edges["consumer_name"] = grouped_edges.consumer.apply(
+            self.get_consumer_name
+        )
 
         # Reorder columns
         grouped_edges = grouped_edges[
@@ -250,12 +256,10 @@ class TimelineBuilder:
         ]
 
         return grouped_edges
-    
+
     ###################################################
     # underlying functions called by build_timeline() #
     ###################################################
-       
-
 
     def check_database_names(self) -> None:
         """
@@ -266,15 +270,14 @@ class TimelineBuilder:
             assert (
                 db in bd.databases
             ), f"{db} is not in your brightway project databases."
-        return
-    
+
     def extract_edge_data(self, edge: Edge) -> dict:
         """
         Stores the attributes of an Edge instance in a dictionary.
 
         Parameters
         ----------
-        edge: Edge 
+        edge: Edge
             Edge instance
 
         Returns
@@ -289,17 +292,16 @@ class TimelineBuilder:
             ).T.flatten()
         except AttributeError:
             consumer_date = None
-        
+
         return {
             "producer": edge.producer,
             "consumer": edge.consumer,
-            "leaf": edge.leaf,
             "consumer_date": consumer_date,
             "producer_date": edge.abs_td_producer.date,
             "amount": edge.abs_td_producer.amount,
             "edge_type": edge.edge_type,
         }
-    
+
     def adjust_sign_of_amount_based_on_edge_type(self, edge_type):
         """
         It checks if the an exchange is of type substitution or a technosphere exchange, based on bw2data labelling convention, and adjusts the amount accordingly.
@@ -317,19 +319,26 @@ class TimelineBuilder:
 
         """
 
-        if edge_type in labels.technosphere_negative_edge_types: # variants of technosphere lables
+        if (
+            edge_type in labels.technosphere_negative_edge_types
+        ):  # variants of technosphere lables
             multiplicator = 1
-        elif edge_type in labels.technosphere_positive_edge_types: #variants of production AND substitution labels
+        elif (
+            edge_type in labels.technosphere_positive_edge_types
+        ):  # variants of production AND substitution labels
             multiplicator = 1
-            if edge_type in labels.substitution_edge_types: # overwrite variants of substitution labels
+            if (
+                edge_type in labels.substitution_edge_types
+            ):  # overwrite variants of substitution labels
                 multiplicator = -1
         else:
             # Raise a warning for unrecognized edge type
             warnings.warn(f"Unrecognized type in this edge: {edge_type}", UserWarning)
             raise ValueError("Unrecognized edge type")
         return multiplicator
-            
-    def add_column_interpolation_weights_to_timeline(self,
+
+    def add_column_interpolation_weights_to_timeline(
+        self,
         tl_df: pd.DataFrame,
         interpolation_type: str = "linear",
     ) -> pd.DataFrame:
@@ -338,10 +347,10 @@ class TimelineBuilder:
 
         Parameters
         ----------
-        tl_df: pd.DataFrame 
+        tl_df: pd.DataFrame
             Timeline as a dataframe.
         interpolation_type: str, optional
-            Type of interpolation between the nearest lower and higher dates. Available options: "linear" and "nearest", defaulting to "linear". 
+            Type of interpolation between the nearest lower and higher dates. Available options: "linear" and "nearest", defaulting to "linear".
 
         Returns
         -------
@@ -359,7 +368,7 @@ class TimelineBuilder:
         dates_list = [
             date
             for date in self.database_date_dict_static_only.values()
-            if type(date) == datetime
+            if isinstance(date, datetime)
         ]
         if "date_producer" not in list(tl_df.columns):
             raise ValueError("The timeline does not contain dates.")
@@ -368,7 +377,7 @@ class TimelineBuilder:
         self.reversed_database_date_dict = {
             v: k
             for k, v in self.database_date_dict_static_only.items()
-            if type(v) == datetime
+            if isinstance(v, datetime)
         }
 
         if self.interpolation_type == "nearest":
@@ -393,7 +402,7 @@ class TimelineBuilder:
         )  # add the weights to the timeline for processes at intersection
 
         return tl_df
-    
+
     def find_closest_date(self, target: datetime, dates: KeysView[datetime]) -> dict:
         """
         Find the closest date to the target in the dates list.
@@ -422,8 +431,9 @@ class TimelineBuilder:
         closest = min(dates, key=lambda date: abs(target - date))
 
         return {closest: 1}
-    
-    def get_weights_for_interpolation_between_nearest_years(self, 
+
+    def get_weights_for_interpolation_between_nearest_years(
+        self,
         reference_date: datetime,
         dates_list: KeysView[datetime],
         interpolation_type: str = "linear",
@@ -494,8 +504,10 @@ class TimelineBuilder:
                 f"Sorry, but {interpolation_type} interpolation is not available yet."
             )
         return {closest_lower: 1 - weight, closest_higher: weight}
-    
-    def add_interpolation_weights_at_intersection_to_background(self, row) -> Union[dict, None]:
+
+    def add_interpolation_weights_at_intersection_to_background(
+        self, row
+    ) -> Union[dict, None]:
         """
         returns the interpolation weights to background databases only for those exchanges, where the producing process
         actually comes from a background database (temporal markets).
@@ -515,18 +527,15 @@ class TimelineBuilder:
 
         if (
             row["producer"]
-            in self.node_id_collection_dict[
-                "first_level_background_node_ids_static"
-            ]
+            in self.node_id_collection_dict["first_level_background_node_ids_static"]
         ):
             return {
                 self.reversed_database_date_dict[x]: v
                 for x, v in row["interpolation_weights"].items()
             }
-        else:
-            return None
-   
-    def get_consumer_name(self, id: int) -> str:
+        return None
+
+    def get_consumer_name(self, idx: int) -> str:
         """
         Returns the name of consumer node.
         If consuming node is the functional unit, returns -1.
@@ -542,6 +551,6 @@ class TimelineBuilder:
             Name of the node or -1
         """
         try:
-            return bd.get_node(id=id)["name"]
+            return bd.get_node(id=idx)["name"]
         except:
             return "-1"  # functional unit

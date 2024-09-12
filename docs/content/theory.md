@@ -86,7 +86,7 @@ to the temporal resolution of the available databases.
 > :height: 300px
 > :align: center
 > ```
-> | 
+> |
 >
 > The resulting timeline looks like this:
 >

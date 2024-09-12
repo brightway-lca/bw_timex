@@ -5,6 +5,17 @@ from typing import Callable, List, Optional, Union
 import bw2data as bd
 import matplotlib.pyplot as plt
 import pandas as pd
+from bw2data import databases
+from bw2data.backends import ActivityDataset as AD
+from bw2data.errors import MultipleResults, UnknownObject
+from bw2data.subclass_mapping import NODE_PROCESS_CLASS_MAPPING
+
+time_res_to_int_dict = {
+    "year": "%Y",
+    "month": "%Y%m",
+    "day": "%Y%m%d",
+    "hour": "%Y%m%d%H",
+}
 
 
 def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") -> int:
@@ -26,21 +37,14 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
         Datetime objectconverted to an integer in the format of time_res
 
     """
-    time_res_dict = {
-        "year": "%Y",
-        "month": "%Y%m",
-        "day": "%Y%m%d",
-        "hour": "%Y%m%d%H",
-    }
-
-    if time_res not in time_res_dict.keys():
+    if time_res not in time_res_to_int_dict.keys():
         warnings.warn(
             'time_res: {} is not a valid option. Please choose from: {} defaulting to "year"'.format(
-                time_res, time_res_dict.keys()
+                time_res, time_res_to_int_dict.keys()
             ),
             category=Warning,
         )
-    formatted_date = dt_obj.strftime(time_res_dict[time_res])
+    formatted_date = dt_obj.strftime(time_res_to_int_dict[time_res])
     date_as_integer = int(formatted_date)
 
     return date_as_integer
@@ -64,21 +68,15 @@ def extract_date_as_string(temporal_grouping: str, timestamp: datetime) -> str:
     date_as_string
         Date as a string in the format of the chosen temporal grouping.
     """
-    time_res_dict = {
-        "year": "%Y",
-        "month": "%Y%m",
-        "day": "%Y%m%d",
-        "hour": "%Y%m%d%H",
-    }
 
-    if temporal_grouping not in time_res_dict.keys():
+    if temporal_grouping not in time_res_to_int_dict.keys():
         warnings.warn(
             'temporal_grouping: {} is not a valid option. Please choose from: {} defaulting to "year"'.format(
-                temporal_grouping, time_res_dict.keys()
+                temporal_grouping, time_res_to_int_dict.keys()
             ),
             category=Warning,
         )
-    return timestamp.strftime(time_res_dict[temporal_grouping])
+    return timestamp.strftime(time_res_to_int_dict[temporal_grouping])
 
 
 def convert_date_string_to_datetime(temporal_grouping, datestring) -> datetime:
@@ -150,6 +148,33 @@ def add_flows_to_characterization_function_dict(
     return characterization_function_dict
 
 
+def resolve_temporalized_node_name(code: str) -> str:
+    """
+    Getting the name of a node based on the code only.
+    Works for non-unique codes if the name is the same across all databases.
+
+    Parameters
+    ----------
+    code: str
+        Code of the node to resolve.
+
+    Returns
+    -------
+    str
+        Name of the node.
+    """
+    qs = AD.select().where(AD.code == code)
+    names = set([obj.name for obj in qs])
+    if len(qs) > 1:
+        if len(names) > 1:
+            raise ValueError(
+                "Found multiple names for the given code: {}".format(names)
+            )
+    elif not qs:
+        raise UnknownObject
+    return names.pop()
+
+
 def plot_characterized_inventory_as_waterfall(
     lca_obj,
     static_scores=None,
@@ -182,23 +207,31 @@ def plot_characterized_inventory_as_waterfall(
     if not hasattr(lca_obj, "activity_time_mapping_dict_reversed"):
         raise ValueError("Make sure to pass an instance of a TimexLCA.")
 
+    time_res_dict = {
+        "year": "%Y",
+        "month": "%Y-%m",
+        "day": "%Y-%m-%d",
+        "hour": "%Y-%m-%d %H",
+    }
+
     # Grouping and summing data
     plot_data = lca_obj.characterized_inventory.groupby(
         ["date", "activity"], as_index=False
     ).sum()
-    plot_data["year"] = plot_data[
-        "date"
-    ].dt.year  # TODO make temporal resolution flexible
+    plot_data["year"] = plot_data["date"].dt.strftime(
+        time_res_dict[lca_obj.temporal_grouping]
+    )  # TODO make temporal resolution flexible
 
     # Optimized activity label fetching
     unique_activities = plot_data["activity"].unique()
     activity_labels = {
-        idx: bd.get_activity(lca_obj.activity_time_mapping_dict_reversed[idx][0])[
-            "name"
-        ]
+        idx: resolve_temporalized_node_name(
+            lca_obj.activity_time_mapping_dict_reversed[idx][0][1]
+        )
         for idx in unique_activities
     }
     plot_data["activity_label"] = plot_data["activity"].map(activity_labels)
+
     # Pivoting data for plotting
     pivoted_data = plot_data.pivot(
         index="year", columns="activity_label", values="amount"
@@ -267,7 +300,9 @@ def plot_characterized_inventory_as_waterfall(
         ax.axvline(x=len(combined_df) - 1.5, color="black", linestyle="--", lw=1)
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles[::-1], labels[::-1])  # Reversing the order for the legend
+    ax.legend(
+        handles[::-1], labels[::-1], loc="upper center", fontsize="small"
+    )  # Reversing the order for the legend
     ax.set_axisbelow(True)
     plt.grid(True)
     plt.show()

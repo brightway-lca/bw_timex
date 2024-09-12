@@ -27,12 +27,11 @@ from dynamic_characterization import characterize_dynamic_inventory
 from peewee import fn
 from scipy import sparse
 
-# from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import SetList, TimeMappingDict
 from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
-from .utils import extract_date_as_integer
+from .utils import extract_date_as_integer, resolve_temporalized_node_name
 
 
 class TimexLCA:
@@ -53,12 +52,12 @@ class TimexLCA:
     Temporal information of both processes and biosphere flows are retained, allowing for dynamic LCIA.
 
     Currently absolute Temporal Distributions for biosphere exchanges are dealt with as a look up function:
-    If an activity happens at timestamp X then and the biosphere exchange has an absolute temporal 
-    distribution (ATD), it looks up the amount from from the ATD correspnding to timestamp X. 
+    If an activity happens at timestamp X then and the biosphere exchange has an absolute temporal
+    distribution (ATD), it looks up the amount from from the ATD correspnding to timestamp X.
     E.g.: X = 2024, TD=(data=[2020,2021,2022,2023,2024,.....,2120 ], amount=[3,4,4,5,6,......,3]),
-    it will look up the value 6 corresponding 2024. If timestamp X does not exist it find the nearest 
+    it will look up the value 6 corresponding 2024. If timestamp X does not exist it find the nearest
     timestamp available (if two timestamps are equally close, it will take the first in order of
-    apearance (see numpy.argmin() for this behabiour). 
+    apearance (see numpy.argmin() for this behabiour).
 
 
     TimexLCA calculates:
@@ -617,7 +616,6 @@ class TimexLCA:
                 bioflow_id, date = self.biosphere_time_mapping_dict_reversed[
                     row
                 ]  # indices are already the same as in the matrix, as we create an entirely new biosphere instead of adding new entries (like we do with the technosphere matrix)
-
                 dataframe_rows.append(
                     (
                         date,
@@ -630,6 +628,8 @@ class TimexLCA:
         df = pd.DataFrame(
             dataframe_rows, columns=["date", "amount", "flow", "activity"]
         )
+
+        df.date = df.date.astype("datetime64[s]")
 
         return df.sort_values(by=["date", "amount"], ascending=[True, False])
 
@@ -868,7 +868,7 @@ class TimexLCA:
             indexed_demand = {
                 self.activity_time_mapping_dict[
                     (
-                        bd.get_node(id=bd.get_id(k)).key,
+                        ("temporalized", bd.get_node(id=bd.get_id(k))["code"]),
                         self.demand_timing_dict[bd.get_id(k)],
                     )
                 ]: v
@@ -1244,9 +1244,9 @@ class TimexLCA:
 
             for activity in plot_data["activity"].unique():
                 if activity not in activity_name_cache:
-                    activity_name_cache[activity] = bd.get_activity(
-                        self.activity_time_mapping_dict_reversed[activity][0]
-                    )["name"]
+                    activity_name_cache[activity] = resolve_temporalized_node_name(
+                        self.activity_time_mapping_dict_reversed[activity][0][1]
+                    )
 
             plot_data["activity_label"] = plot_data["activity"].map(activity_name_cache)
 

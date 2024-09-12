@@ -2,12 +2,14 @@
 Testing the results of the static LCA and the timexLCA for a simple test case of electric vehicle to see if the new interpolated amounts are correct.
 """
 
+from datetime import datetime
 from pathlib import Path
-import pytest
+
 import bw2calc as bc
 import bw2data as bd
+import pytest
+
 from bw_timex import TimexLCA
-from datetime import datetime
 
 
 # make sure the test db is loaded
