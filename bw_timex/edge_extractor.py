@@ -131,7 +131,7 @@ class EdgeExtractor(TemporalisLCA):
                         col_id=col_id,
                         matrix_label="technosphere_matrix",
                     )
-                    / node.reference_product_production_amount
+                    / abs(node.reference_product_production_amount)
                 )
                 producer = self.nodes[edge.producer_unique_id]
                 leaf = self.edge_ff(row_id)

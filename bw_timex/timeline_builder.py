@@ -140,18 +140,6 @@ class TimelineBuilder:
             lambda x: self.adjust_sign_of_amount_based_on_edge_type(x)
         )
 
-        edges_df["leaf_flip_sign"] = edges_df.apply(
-            lambda row: self.flip_sign_for_leaves_with_negative_production_amount(
-                row["producer"], row["consumer"], row["leaf"]
-            ),
-            axis=1,
-        )
-
-        edges_df["amount"] = edges_df.apply(
-            lambda row: -row["amount"] if row["leaf_flip_sign"] else row["amount"],
-            axis=1,
-        )
-
         # Explode datetime and amount columns: each row with multiple dates and amounts is exploded into multiple rows with one date and one amount
         edges_df = edges_df.explode(["consumer_date", "producer_date", "amount"])
         edges_df.drop_duplicates(inplace=True)
@@ -308,7 +296,6 @@ class TimelineBuilder:
         return {
             "producer": edge.producer,
             "consumer": edge.consumer,
-            "leaf": edge.leaf,
             "consumer_date": consumer_date,
             "producer_date": edge.abs_td_producer.date,
             "amount": edge.abs_td_producer.amount,
@@ -349,31 +336,6 @@ class TimelineBuilder:
             warnings.warn(f"Unrecognized type in this edge: {edge_type}", UserWarning)
             raise ValueError("Unrecognized edge type")
         return multiplicator
-
-    def flip_sign_for_leaves_with_negative_production_amount(
-        self, producer: int, consumer: int, leaf: bool
-    ):
-        """
-        Returns true if the producer is a leaf and the production amount is negative.
-
-        Parameters
-        ----------
-        producer: int
-            Id of the producer node.
-        leaf: bool
-            True if the producer is a leaf node.
-
-        Returns
-        -------
-        bool
-            True if the producer is a leaf and the production amount is negative.
-        """
-        if not leaf:
-            return None
-        return (
-            bd.get_node(id=producer).rp_exchange().amount < 0
-            and bd.get_node(id=consumer).rp_exchange().amount < 0
-        )
 
     def add_column_interpolation_weights_to_timeline(
         self,
