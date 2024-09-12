@@ -81,6 +81,55 @@ autoapi_keep_files = False
 
 graphviz_output_format = 'svg' # https://pydata-sphinx-theme.readthedocs.io/en/stable/examples/graphviz.html#inheritance-diagram
 
+# Inject custom JavaScript to handle theme switching
+mermaid_init_js = """
+    function initializeMermaidBasedOnTheme() {
+        const theme = document.documentElement.dataset.theme;
+
+        if (theme === 'dark') {
+            mermaid.initialize({
+                startOnLoad: true,
+                theme: 'base',
+                themeVariables: {
+                    edgeLabelBackground: 'transparent',
+                    defaultLinkColor: '#ced6dd',
+                    titleColor: '#ced6dd',
+                    nodeTextColor: '#ced6dd',
+                    lineColor: '#ced6dd',
+                }
+            });
+        } else {
+            mermaid.initialize({
+                startOnLoad: true,
+                theme: 'base',
+                themeVariables: {
+                    edgeLabelBackground: 'transparent',
+                    defaultLinkColor: '#222832',
+                    titleColor: '#222832',
+                    nodeTextColor: '#222832',
+                    lineColor: '#222832',
+                }
+            });
+        }
+
+        // Re-render all Mermaid diagrams
+        mermaid.contentLoaded();
+    }
+
+    // Observer to detect changes to the data-theme attribute
+    const themeObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme') {
+            initializeMermaidBasedOnTheme();
+            }
+        });
+    });
+
+    themeObserver.observe(document.documentElement, { attributes: true });
+
+    initializeMermaidBasedOnTheme();
+"""
+
 master_doc = "index"
 
 root_doc = 'index'
@@ -116,7 +165,7 @@ html_sidebars = {
     "content/contributing": [],
     "content/codeofconduct": [],
     "content/license": [],
-    "content/chagnelog": [],
+    "content/changelog": [],
 }
 
 html_theme_options = {
@@ -124,7 +173,7 @@ html_theme_options = {
     "announcement": "⚠️ This package is under active development and some functionalities may change in the future.",
     "navbar_start": ["navbar-logo"],
     "navbar_end": ["theme-switcher", "navbar-icon-links.html"],
-    "navbar_align": "left",
+    "navbar_align": "content",
     # "navbar_persistent": ["theme-switcher"], # this is where the search button is usually placed
     "footer_start": ["copyright"],
     "footer_end": ["footer"],
@@ -134,7 +183,7 @@ html_theme_options = {
     "icon_links": [
         {
             "name": "Launch interactive Demo on Binder",
-            "url": "https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fexample_electric_vehicle_standalone.ipynb",
+            "url": "https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb",
             "icon": "fa-solid fa-rocket",
         },
         {

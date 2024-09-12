@@ -306,3 +306,34 @@ def plot_characterized_inventory_as_waterfall(
     ax.set_axisbelow(True)
     plt.grid(True)
     plt.show()
+
+def get_exchange(**kwargs) -> Exchange:
+    """
+    Get an exchange from the database.
+    """
+    mapping = {
+        "input_code": ExchangeDataset.input_code,
+        "input_database": ExchangeDataset.input_database,
+        "output_code": ExchangeDataset.output_code,
+        "output_database": ExchangeDataset.output_database,
+    }
+    qs = ExchangeDataset.select()
+    for key, value in kwargs.items():
+        try:
+            qs = qs.where(mapping[key] == value)
+        except KeyError:
+            continue
+    
+    candidates = [Exchange(obj) for obj in qs]
+    if len(candidates) > 1:
+        raise MultipleResults(
+            "Found {} results for the given search. Please be more specific or double-check your system model for duplicates.".format(len(candidates))
+        )
+    elif not candidates:
+        raise UnknownObject
+    return candidates[0]
+
+def add_temporal_distribution_to_exchange(temporal_distribution: TemporalDistribution, **kwargs):
+    exchange = get_exchange(**kwargs)
+    exchange["temporal_distribution"] = temporal_distribution
+    exchange.save()
