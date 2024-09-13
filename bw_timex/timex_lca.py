@@ -431,6 +431,9 @@ class TimexLCA:
                 "Dynamic lci not yet calculated. Call TimexLCA.calculate_dynamic_lci() first."
             )
 
+        self.current_metric = metric
+        self.current_time_horizon = time_horizon
+
         # Set a default for inventory_in_time_horizon using the full dynamic_inventory_df
         inventory_in_time_horizon = self.dynamic_inventory_df
 
@@ -1317,6 +1320,11 @@ class TimexLCA:
             )
             return
 
+        metric_ylabels = {
+            "radiative_forcing": "radiative forcing [W/m²]",
+            "GWP": f"GWP{self.current_time_horizon} [kg CO₂-eq]",
+        }
+
         # Fetch the inventory to use in plotting, modify based on flags
         plot_data = self.characterized_inventory.copy()
 
@@ -1359,7 +1367,8 @@ class TimexLCA:
 
         axes.set_axisbelow(True)
         axes.set_ylim(bottom=ymin)
-        axes.set_xlabel("Time")
+        axes.set_ylabel(metric_ylabels[self.current_metric])
+        axes.set_xlabel("time")
 
         handles, labels = axes.get_legend_handles_labels()
         axes.legend(handles[::-1], labels[::-1])
