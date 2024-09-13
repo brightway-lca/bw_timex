@@ -150,7 +150,7 @@ td_b_to_a = TemporalDistribution(
 # Now add the temporal distribution to the corresponding exchange. In
 # principle, you just have to do the following:
 # exchange_object["temporal_distribution"] = TemporalDistribution
-# We currently don't have the exchange-object at hand here, but we can
+# We currently don't have the exchange_object at hand here, but we can
 # use the utility function add_temporal_distribution_to_exchange to help.
 add_temporal_distribution_to_exchange(
     temporal_distribution=td_b_to_a,
@@ -175,9 +175,9 @@ add_temporal_distribution_to_exchange(
 )
 ```
 
-## Prospective data
+## Time-specific process data
 
-The other kind of temporal data we can add is some prospective information on how our processes change over time. So, for our simple example, let's say our background process B somehow evolves, so that it emitts less CO2 in the future. To make it precise, we assume that the original process we modeled above represents the process state in the year 2020, emitting 11 kg CO2, which reduces to 7 kg CO2 by 2030:
+While the temporal information above tells us when the processes occurs, we also need information on how our processes change over time. So, for our simple example, let's say our background process B somehow evolves, so that it emits less CO2 in the future. To make it precise, we assume that the original process we modeled above represents the process state in the year 2020, emitting 11 kg CO2, which reduces to 7 kg CO2 by 2030:
 
 
 ```{mermaid}
