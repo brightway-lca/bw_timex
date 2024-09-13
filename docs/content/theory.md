@@ -38,7 +38,7 @@ For a time-explicit LCA, 3 inputs are required:
 ```
 
 ## Temporal distributions and graph traversal
-To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges. To carry the temporal information, we use the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class is a *container for a series of amount spread over time*, so it tells you what share of an exchange happens at what point in time. If two consecutive edges in the supply chain graph carry a `TemporalDistribution`, they are [convoluted](https://en.wikipedia.org/wiki/Convolution).
+To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges, using the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class is a *container for a series of amount spread over time*, so it tells you what share of an exchange happens at what point in time. If two consecutive edges in the supply chain graph carry a `TemporalDistribution`, they are [convoluted](https://en.wikipedia.org/wiki/Convolution), combining the two temporal profiles.
 
 ````{admonition} Example: Convolution
 :class: admonition-example
@@ -123,9 +123,8 @@ to the temporal resolution of the available databases.
 ````{admonition} Example: Timeline
 :class: admonition-example
 
-Let's consider the following system: a process A that consumes an
-exchange b from a process B, which emits an emission X and both the
-exchange b and the emission X occur at a certain point in time.
+Let's consider the following system: a process A consumes an
+exchange b from a process B. Both A and B emit CO2. The emission of CO2 from B decreases in the future. All exchanges occur at a certain point in time, relative to process A, which takes place "now" (2024).
 ```{mermaid}
 flowchart LR
 subgraph background[" "]
@@ -222,12 +221,14 @@ modifications looks like this:
 :class: only-dark
 :align: center
 ~~~
+
+The inventory information from the time-explicit databases is inserted into the matrices. For each specific point in time that product b is demanded, temporal markets are created, distributing the demand for b between the time-explicit databases. The dynamic biosphere matrix is created, containing the timing of emissions. You can see that the CO2 emission at process A occurs both in 2024 and 2025, based on the temporal distribution on this biosphere exchange.
 ```
 
 ## Static or dynamic impact assessment
 
-`bw_timex` allows to use conventional static impact assessment methods,
-which are executed using `TimexLCA.static_lcia()`.
+`bw_timex` allows to use conventional static impact assessment methods (LCIA),
+which are executed using `TimexLCA.static_lcia()`. Conventional LCIA methods have one characterization factor per substance, regardless of the timing of emission.
 
 To take advantage of the detailed temporal information at the inventory
 level, dynamic LCIA can be applied, using `TimexLCA.dynamic_lcia()`.
@@ -237,7 +238,7 @@ box, we provide dynamic LCIA functions for the climate change metrics
 greenhouse gases in the [IPCC AR6 report Chapter 7 Table
 7.SM.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/).
 
-The time horizon `time_horizon`, over which both metrics are evaluated,
+The `time_horizon`, over which both metrics are evaluated,
 defaults to 100 years, but can be set flexibly in years. Additionally,
 both metrics can be applied with a fixed or flexible time horizon. Fixed
 time horizon means that the all emissions are evaluated starting from
