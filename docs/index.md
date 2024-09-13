@@ -36,4 +36,5 @@ Contributing <content/contributing>
 Code of Conduct <content/codeofconduct>
 License <content/license>
 Changelog <content/changelog>
+Funding <content/funding>
 ```

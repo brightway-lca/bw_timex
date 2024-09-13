@@ -6,80 +6,80 @@ import datetime
 ### Project Information ###########################################################################
 ###################################################################################################
 
-project = 'bw_timex'
-author = 'Timo Diepers, Amelie Müller, Arthur Jakobs'
-copyright = datetime.date.today().strftime("%Y") + ' bw_timex developers'
-version: str = 'latest' # required by the version switcher
+project = "bw_timex"
+author = "Timo Diepers, Amelie Müller, Arthur Jakobs"
+copyright = datetime.date.today().strftime("%Y") + " bw_timex developers"
+version: str = "latest"  # required by the version switcher
 
 ###################################################################################################
 ### Project Configuration #########################################################################
 ###################################################################################################
 
-needs_sphinx = '7.3.0'
+needs_sphinx = "7.3.0"
 
 extensions = [
     # core extensions
-    'sphinx.ext.mathjax',
-    'sphinx.ext.viewcode',    
-    'sphinx.ext.intersphinx',
-    'sphinx.ext.extlinks',
-    'sphinx.ext.inheritance_diagram',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.napoleon',
+    "sphinx.ext.mathjax",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.extlinks",
+    "sphinx.ext.inheritance_diagram",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.napoleon",
     # iPython extensions
-    'IPython.sphinxext.ipython_directive',
-    'IPython.sphinxext.ipython_console_highlighting',
+    "IPython.sphinxext.ipython_directive",
+    "IPython.sphinxext.ipython_console_highlighting",
     # Markdown support
     # 'myst_parser', # do not enable separately if using myst_nb, compare: https://github.com/executablebooks/MyST-NB/issues/421#issuecomment-1164427544
     # Jupyter Notebook support
-    'myst_nb',
+    "myst_nb",
     # mermaid support
-    'sphinxcontrib.mermaid',
+    "sphinxcontrib.mermaid",
     # API documentation support
-    'autoapi',
+    "autoapi",
     # responsive web component support
-    'sphinx_design',
+    "sphinx_design",
     # custom 404 page
-    'notfound.extension',
+    "notfound.extension",
     # custom favicons
-    'sphinx_favicon',
+    "sphinx_favicon",
     # copy button on code blocks
     "sphinx_copybutton",
 ]
 
-autoapi_dirs = ['../bw_timex']
-autoapi_type = 'python'
+autoapi_dirs = ["../bw_timex"]
+autoapi_type = "python"
 autoapi_ignore = [
-    '*/data/*',
-    '*tests/*',
-    '*tests.py',
-    '*validation.py',
-    '*version.py',
-    '*.rst',
-    '*.yml',
-    '*.md',
-    '*.json',
-    '*.data'
+    "*/data/*",
+    "*tests/*",
+    "*tests.py",
+    "*validation.py",
+    "*version.py",
+    "*.rst",
+    "*.yml",
+    "*.md",
+    "*.json",
+    "*.data",
 ]
 
 autoapi_options = [
-    'members',
-    'undoc-members',
-    'private-members',
-    'show-inheritance',
-    'show-module-summary',
+    "members",
+    "undoc-members",
+    "private-members",
+    "show-inheritance",
+    "show-module-summary",
     #'special-members',
     #'imported-members',
-    'show-inheritance-diagram'
+    "show-inheritance-diagram",
 ]
 
-autoapi_python_class_content = 'both'
-autoapi_member_order = 'bysource'
-autoapi_root = 'content/api'
-autoapi_template_dir = '_templates/autoapi_templates/'
+autoapi_python_class_content = "both"
+autoapi_member_order = "bysource"
+autoapi_root = "content/api"
+autoapi_template_dir = "_templates/autoapi_templates/"
 autoapi_keep_files = False
 
-graphviz_output_format = 'svg' # https://pydata-sphinx-theme.readthedocs.io/en/stable/examples/graphviz.html#inheritance-diagram
+graphviz_output_format = "svg"  # https://pydata-sphinx-theme.readthedocs.io/en/stable/examples/graphviz.html#inheritance-diagram
 
 # Inject custom JavaScript to handle theme switching
 mermaid_init_js = """
@@ -132,14 +132,14 @@ mermaid_init_js = """
 
 master_doc = "index"
 
-root_doc = 'index'
-html_static_path = ['_static']
-templates_path = ['_templates']
-exclude_patterns = ['_build']
+root_doc = "index"
+html_static_path = ["_static"]
+templates_path = ["_templates"]
+exclude_patterns = ["_build"]
 html_theme = "pydata_sphinx_theme"
 
 suppress_warnings = [
-    "myst.header" # suppress warnings of the kind "WARNING: Non-consecutive header level increase; H1 to H3"
+    "myst.header"  # suppress warnings of the kind "WARNING: Non-consecutive header level increase; H1 to H3"
 ]
 
 
@@ -152,7 +152,7 @@ html_show_copyright = True
 
 html_css_files = [
     "custom.css",
-    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" # for https://fontawesome.com/ icons
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css",  # for https://fontawesome.com/ icons
 ]
 
 html_sidebars = {
@@ -166,6 +166,7 @@ html_sidebars = {
     "content/codeofconduct": [],
     "content/license": [],
     "content/changelog": [],
+    "content/funding": [],
 }
 
 html_theme_options = {
@@ -198,14 +199,14 @@ html_theme_options = {
         #     "type": "fontawesome",
         # },
     ],
-    # various settings  
+    # various settings
     "collapse_navigation": True,
     # "show_prev_next": False,
     "use_edit_page_button": True,
     "navigation_with_keys": True,
     "logo": {
         "image_light": "bw_timex_light_rtd.svg",
-        "image_dark": "bw_timex_dark_rtd.svg"
+        "image_dark": "bw_timex_dark_rtd.svg",
     },
 }
 
@@ -221,8 +222,8 @@ html_context = {
 # https://sphinx-notfound-page.readthedocs.io
 
 notfound_context = {
-    'title': 'Page Not Found',
-    'body': '''                                                                                                                                           
+    "title": "Page Not Found",
+    "body": """                                                                                                                                           
         <h1>🍂 Page Not Found (404)</h1>
         <p>
         Oops! It looks like you've stumbled upon a page that's been recycled into the digital abyss.
@@ -230,7 +231,7 @@ notfound_context = {
         Why not take a moment to reduce, reuse, and recycle your clicks by heading back to the main page?
         And remember, every little bit counts in the grand scheme of things.
         </p>
-    ''',
+    """,
 }
 
 ####################################################################################################
@@ -240,11 +241,7 @@ notfound_context = {
 # myst_parser Configuration ############################################
 # https://myst-parser.readthedocs.io/en/latest/configuration.html
 
-source_suffix = {
-    '.rst': 'restructuredtext',
-    '.md': 'myst-nb',
-    '.ipynb': 'myst-nb'
-}
+source_suffix = {".rst": "restructuredtext", ".md": "myst-nb", ".ipynb": "myst-nb"}
 
 
 myst_enable_extensions = [
@@ -258,31 +255,14 @@ myst_enable_extensions = [
 # myst-nb configuration ################################################
 # https://myst-nb.readthedocs.io/en/latest/configuration.html
 
-nb_execution_mode = 'off'
+nb_execution_mode = "off"
 
 # sphinx-favicon configuration #########################################
 # https://github.com/tcmetzger/sphinx-favicon
 
 favicons = [
-    {
-        "rel": "icon", 
-        "href": "favicon.svg", 
-        "type": "image/svg+xml"
-    },    
-    {
-        "rel": "icon", 
-        "sizes": "144x144",
-        "href": "favicon-144.png", 
-        "type": "image/png"
-    },
-    {
-        "rel": "mask-icon",
-        "href": "favicon_mask-icon.svg",
-        "color": "#222832"
-    },
-    {
-        "rel": "apple-touch-icon",
-        "sizes": "500x500",
-        "href": "favicon-500.png"
-    },
+    {"rel": "icon", "href": "favicon.svg", "type": "image/svg+xml"},
+    {"rel": "icon", "sizes": "144x144", "href": "favicon-144.png", "type": "image/png"},
+    {"rel": "mask-icon", "href": "favicon_mask-icon.svg", "color": "#222832"},
+    {"rel": "apple-touch-icon", "sizes": "500x500", "href": "favicon-500.png"},
 ]
