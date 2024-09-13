@@ -1142,10 +1142,10 @@ class TimexLCA:
         of ids.
         """
 
-        df = pd.DataFrame(self.technosphere_matrix.toarray())
+        df = pd.DataFrame(self.lca.technosphere_matrix.toarray())
         df.rename(  # from matrix id to activity id
-            index=self.dicts.activity.reversed,
-            columns=self.dicts.activity.reversed,
+            index=self.lca.dicts.activity.reversed,
+            columns=self.lca.dicts.activity.reversed,
             inplace=True,
         )
         df.rename(  # from activity id to ((database, code), time)
@@ -1169,14 +1169,16 @@ class TimexLCA:
         ids.
         """
 
-        df = pd.DataFrame(self.biosphere_matrix.toarray())
+        df = pd.DataFrame(self.lca.biosphere_matrix.toarray())
         df.rename(  # from matrix id to activity id
-            index=self.dicts.biosphere.reversed,
-            columns=self.dicts.activity.reversed,
+            index=self.lca.dicts.biosphere.reversed,
+            columns=self.lca.dicts.activity.reversed,
             inplace=True,
         )
         df.rename(
-            index=self.remapping_dicts["biosphere"],  # from activity id to bioflow name
+            index=self.lca.remapping_dicts[
+                "biosphere"
+            ],  # from activity id to bioflow name
             columns=self.activity_time_mapping_dict.reversed(),  # act id to ((database, code), time)
             inplace=True,
         )
@@ -1200,7 +1202,7 @@ class TimexLCA:
         df = pd.DataFrame(self.dynamic_biomatrix.toarray())
         df.rename(  # from matrix id to activity id
             index=self.biosphere_time_mapping_dict_reversed,
-            columns=self.dicts.activity.reversed,
+            columns=self.lca.dicts.activity.reversed,
             inplace=True,
         )
         df.rename(  # from activity id to ((database, code), time)
