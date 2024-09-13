@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* Fixed functions for creating labelled matrix representations
+* Added labels and units to the yaxis in `TimexLCA.plot_dynamic_characterized_inventory()`
 
 ## [0.2.0] - 2024-09-13
 * Added utility function [`utils.add_temporal_distribution_to_exchange()`](https://github.com/brightway-lca/bw_timex/blob/a85349bdc43d98be559a7ce17d0b686098decec6/bw_timex/utils.py#L341) for easier temporalization of existing models
