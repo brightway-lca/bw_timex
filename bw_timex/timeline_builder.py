@@ -74,7 +74,8 @@ class TimelineBuilder:
         self.cutoff = cutoff
         self.max_calc = max_calc
 
-        # Finding indices of activities from background databases that are known to be static, i.e. have no temporal distributions connecting to them. These will be be skipped in the graph traversal.
+        # Finding indices of activities from background databases that are known to be static, i.e. have no temporal distributions connecting to them.
+        # These will be be skipped in the graph traversal.
         static_activity_db_indices = [
             node_id
             for node_id in self.node_id_collection_dict[

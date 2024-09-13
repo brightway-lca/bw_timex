@@ -15,7 +15,7 @@ print(tlca.static_score)
 ```
 
 ## Dynamic LCIA
-The inventory calculated by a `TimexLCA` retains temporal information. That means that in addition to knowing which process emitts what substance, we also know the timing of each emission. This allows for more advanced, dynamic characterization using characterization functions instead of just factors. In `bw_timex`, users can either use their own curstom functions or use some existing ones, e.g., from the package [`dynamic_characterization`](https://dynamic-characterization.readthedocs.io/en/latest/). We'll do the latter here. 
+The inventory calculated by a `TimexLCA` retains temporal information. That means that in addition to knowing which process emitts what substance, we also know the timing of each emission. This allows for more advanced, dynamic characterization using characterization functions instead of just factors. In `bw_timex`, users can either use their own curstom functions or use some existing ones, e.g., from the package [`dynamic_characterization`](https://dynamic-characterization.readthedocs.io/en/latest/). We'll do the latter here.
 
 First, we need to define which characterization function we want to apply to which biosphere flow:
 
@@ -92,8 +92,3 @@ tlca.plot_dynamic_characterized_inventory()
 <br />
 
 For most of the functions we used here, there are numerous optional arguments and settings you can tweak. We explore some of them in our other [Examples](../examples/index.md), but when in doubt: Our code is pretty well documented and there are [docstrings](../api/index) everywhere - so please use them ☀️
-
-
-
-
-

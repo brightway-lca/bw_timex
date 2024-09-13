@@ -147,14 +147,14 @@ td_b_to_a = TemporalDistribution(
     amount=np.array([0.3, 0.5, 0.2]),
 )
 
-# Now add the temporal distribution to the corresponding exchange. In 
+# Now add the temporal distribution to the corresponding exchange. In
 # principle, you just have to do the following:
-# exchange_object["temporal_distribution"] = TemporalDistribution 
-# We currently don't have the exchange-object at hand here, but we can 
+# exchange_object["temporal_distribution"] = TemporalDistribution
+# We currently don't have the exchange-object at hand here, but we can
 # use the utility function add_temporal_distribution_to_exchange to help.
 add_temporal_distribution_to_exchange(
-    temporal_distribution=td_b_to_a, 
-    input_code="B", 
+    temporal_distribution=td_b_to_a,
+    input_code="B",
     input_database="background",
     output_code="A",
     output_database="foreground"
@@ -166,11 +166,11 @@ td_a_to_co2 = TemporalDistribution(
     amount=np.array([0.6, 0.4]),
 )
 
-# We actually only have to define enough fields to uniquely identify the 
+# We actually only have to define enough fields to uniquely identify the
 # exchange here
 add_temporal_distribution_to_exchange(
-    temporal_distribution=td_a_to_co2, 
-    input_code="CO2", 
+    temporal_distribution=td_a_to_co2,
+    input_code="CO2",
     output_code="A"
 )
 ```
@@ -242,7 +242,7 @@ So, as you can see, the prospective processes can reside within your normal brig
 ```python
 from datetime import datetime
 
-# Note: The foreground does not represent a specific point in time, but should 
+# Note: The foreground does not represent a specific point in time, but should
 # later be dynamically distributed over time
 database_date_dict = {
     "background": datetime.strptime("2020", "%Y"),
@@ -254,4 +254,3 @@ database_date_dict = {
 :::{note}
 You can use whatever data source you want for this prospective data. A nice package from the Brightway cosmos that can help you is [premise](https://premise.readthedocs.io/en/latest/introduction.html).
 :::
-
