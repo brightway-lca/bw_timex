@@ -11,7 +11,7 @@
 ![Conda - License](https://img.shields.io/conda/l/diepers/bw_timex)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb)
 
-This is a python package for time-explicit Life Cycle Assessment that helps you assess the environmental impacts of products and processes over time. `bw_timex` builds on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
+This is a python package for [time-explicit Life Cycle Assessment](content/theory.md#terminology) that helps you assess the environmental impacts of products and processes over time. `bw_timex` builds on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
 
 ## ✨ Features
 This package enables you to account for:
@@ -27,7 +27,7 @@ You can define temporal distributions for process and emission exchanges, which 
 - **Long-lived** products
 - **Biogenic** carbon
 
-## 👨‍💻 Getting Started
+## 👩‍💻 Getting Started
 - [Installation Guide](https://docs.brightway.dev/projects/bw-timex/en/latest/content/installation.html)
 - [Getting Started Tutorial](https://docs.brightway.dev/projects/bw-timex/en/latest/content/getting_started/index.html)
 - [Example Collection](https://docs.brightway.dev/projects/bw-timex/en/latest/content/examples/index.html)
