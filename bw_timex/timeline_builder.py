@@ -18,10 +18,11 @@ from .utils import (
 
 class TimelineBuilder:
     """
-    This class is responsible for building a timeline of processes based on the temporal relationship of the priority-first graph traversal.
+    Class for building a process timeline based on the temporal distributions of their exchanges.
 
-    First, the `EdgeExtractor` is called and it extracts a timeline of exchanges (edge_timeline) with temporal information.
-    Identical edges within temporal grouping (e.g. year, month, day, hour) are then grouped together and the amount of exchanges is summed up.
+    First, the `EdgeExtractor` does a priority-first graph traversal and extracts a timeline of
+    exchanges (edge_timeline) with temporal information. Identical edges within temporal grouping
+    (e.g. year, month, day, hour) are then grouped and the amount of exchanges is summed up.
     """
 
     def __init__(

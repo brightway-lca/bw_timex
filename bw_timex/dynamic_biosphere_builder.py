@@ -11,8 +11,7 @@ from .utils import convert_date_string_to_datetime
 
 class DynamicBiosphereBuilder:
     """
-    Class for building a dynamic biosphere matrix with dimensions
-    (biosphere flow at a specific point in time) x (processes)
+    Class for building a dynamic biosphere matrix with dimensions (biosphere flow at a specific point in time) x (processes)
     """
 
     def __init__(
