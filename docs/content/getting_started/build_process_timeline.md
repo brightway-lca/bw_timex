@@ -12,7 +12,7 @@ tlca = TimexLCA(
 )
 ```
 
-Using our new `tlca` object, we can now build the timeline of processes that leads to our functional unit, "A". If not specified otherwise, it's assumed that the demand occurs in the current year, which is 2024 at the time of writing this. Actually building the timeline is now very simple on the user-side:
+Using our new `tlca` object, we can now build the timeline of processes that leads to our functional unit, "A". If not specified otherwise, it's assumed that the demand occurs in the current year, which is 2024 at the time of writing. Building the timeline is very simple:
 ```python
 tlca.build_timeline()
 ```
