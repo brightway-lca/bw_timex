@@ -10,7 +10,7 @@ This package enables you to account for:
 
 You can define temporal distributions for process and emission exchanges, which are then *automatically* propagated through the supply chain and mapped to corresponding time-explicit databases. The resulting time-explicit LCI reflects the current technology status within the production system at the actual time of each process. Also, `bw_timex` keeps track of the timing of emissions, which means that you can apply dynamic characterization functions.
 
-## 💡 Use cases
+## 💡 Use Cases
 `bw_timex` is ideal for cases with:
 - **Variable** or strongly **evolving production systems**
 - **Long-lived** products
