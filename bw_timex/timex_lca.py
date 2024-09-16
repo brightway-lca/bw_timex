@@ -390,7 +390,8 @@ class TimexLCA:
         defaulting to 100 years. The `fixed_time_horizon` parameter determines whether the emission
         time horizon for all emissions is calculated from the functional unit
         (`fixed_time_horizon=True`) or from the time of the emission (`fixed_time_horizon=False`).
-        The former is the implementation of the Levasseur approach (see https://doi.org/10.1021/es9030003), while the latter is how conventional LCA is done.
+        The former is the implementation of the Levasseur approach
+        (see https://doi.org/10.1021/es9030003), while the latter is how conventional LCA is done.
 
         Parameters
         ----------
@@ -524,7 +525,6 @@ class TimexLCA:
         --------
         bw_timex.matrix_modifier.MatrixModifier: Class that handles the technosphere and biosphere matrix modifications.
         """
-        # Create matrix modifier that creates the new datapackages with the exploded processes and new links to background databases.
         self.matrix_modifier = MatrixModifier(
             self.timeline, self.database_date_dict_static_only, self.demand_timing_dict
         )
@@ -1182,7 +1182,7 @@ class TimexLCA:
             index=self.lca.remapping_dicts[
                 "biosphere"
             ],  # from activity id to bioflow name
-            columns=self.activity_time_mapping_dict.reversed(),  # act id to ((database, code), time)
+            columns=self.activity_time_mapping_dict.reversed(),  # id to ((database, code), time)
             inplace=True,
         )
 
@@ -1374,26 +1374,3 @@ class TimexLCA:
         axes.legend(handles[::-1], labels[::-1])
         plt.grid(True)
         plt.show()
-
-    #########
-    # Other #
-    #########
-
-    def remap_inventory_dicts(self) -> None:
-        """
-        Give a warning if users want to use bw25's original mapping function.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None, but gives a warning
-
-        """
-        warnings.warn(
-            "bw25's original mapping function doesn't work with our new time-mapped matrix entries.\
-                The Timex mapping can be found in acvitity_time_mapping_dict and \
-                biosphere_time_mapping_dict."
-        )
