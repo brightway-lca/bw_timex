@@ -14,7 +14,7 @@ LCA terminology can be confusing sometimes. Here's an attempt of visualizing wha
 
 ## Data requirements
 
-For a time-explicit LCA, 3 inputs are required:
+For a time-explicit LCA, three inputs are required:
 
 1.  a static foreground system model with
 2.  temporal information using the attribute `temporal_distribution` on
