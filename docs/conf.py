@@ -171,7 +171,7 @@ html_sidebars = {
 
 html_theme_options = {
     # page elements
-    "announcement": "⚠️ This package is under active development and some functionalities may change in the future.",
+    # "announcement": "⚠️ placeholder",
     "navbar_start": ["navbar-logo"],
     "navbar_end": ["theme-switcher", "navbar-icon-links.html"],
     "navbar_align": "content",
