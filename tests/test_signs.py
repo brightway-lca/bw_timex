@@ -220,6 +220,8 @@ def test_signs_fu_to_normal_intermediate_to_normal_background(wastes_db):
     tlca.lci()
     tlca.static_lcia()
 
+    assert math.isclose(tlca.base_lca.score, tlca.static_score, rel_tol=1e-9)
+
 
 def test_signs_fu_with_unusual_positives_and_negatives(wastes_db):
     method = ("GWP", "example")
