@@ -31,7 +31,11 @@ from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import SetList, TimeMappingDict
 from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
-from .utils import extract_date_as_integer, resolve_temporalized_node_name
+from .utils import (
+    extract_date_as_integer,
+    resolve_temporalized_node_name,
+    round_datetime_to_nearest_year,
+)
 
 
 class TimexLCA:
@@ -385,7 +389,7 @@ class TimexLCA:
         of the chosen static climate change impact category. If there is no characterization
         function for a biosphere flow, it will be ignored.
 
-        Two dynamic climate change metrics are provided: "GWP" and "radiative_forcing".
+        Two dynamic climate change metrics are supported: "GWP" and "radiative_forcing".
         The time horizon for the impact assessment can be set with the `time_horizon` parameter,
         defaulting to 100 years. The `fixed_time_horizon` parameter determines whether the emission
         time horizon for all emissions is calculated from the functional unit
@@ -437,6 +441,18 @@ class TimexLCA:
 
         # Set a default for inventory_in_time_horizon using the full dynamic_inventory_df
         inventory_in_time_horizon = self.dynamic_inventory_df
+
+        # Round dates to nearest year and sum up emissions for each year
+        inventory_in_time_horizon.date = inventory_in_time_horizon.date.apply(
+            round_datetime_to_nearest_year
+        )
+        inventory_in_time_horizon = (
+            inventory_in_time_horizon.groupby(
+                inventory_in_time_horizon.columns.tolist()
+            )
+            .sum()
+            .reset_index()
+        )
 
         # Calculate the latest considered impact date
         t0_date = pd.Timestamp(self.timeline_builder.edge_extractor.t0.date[0])

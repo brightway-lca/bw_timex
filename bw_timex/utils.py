@@ -114,6 +114,27 @@ def convert_date_string_to_datetime(temporal_grouping, datestring) -> datetime:
     return datetime.strptime(datestring, time_res_dict[temporal_grouping])
 
 
+def round_datetime_to_nearest_year(date: datetime) -> datetime:
+    """
+    Round a datetime object to the nearest year.
+
+    Returns
+    -------
+    datetime
+        datetime object rounded to nearest year.
+    """
+    year = date.year
+    start_of_year = pd.Timestamp(f"{year}-01-01")
+    start_of_next_year = pd.Timestamp(f"{year+1}-01-01")
+
+    mid_year = start_of_year + (start_of_next_year - start_of_year) / 2
+
+    if date < mid_year:
+        return start_of_year
+    else:
+        return start_of_next_year
+
+
 def add_flows_to_characterization_function_dict(
     flows: Union[str, List[str]],
     func: Callable,
