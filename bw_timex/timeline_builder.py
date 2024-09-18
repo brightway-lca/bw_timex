@@ -27,7 +27,7 @@ class TimelineBuilder:
 
     def __init__(
         self,
-        slca: LCA,
+        base_lca: LCA,
         starting_datetime: datetime,
         edge_filter_function: Callable,
         database_date_dict: dict,
@@ -44,7 +44,7 @@ class TimelineBuilder:
         """
         Parameters
         ----------
-        slca: LCA
+        base_lca: LCA
             A static LCA object.
         starting_datetime: datetime | str, optional
             Point in time when the demand occurs.
@@ -61,13 +61,13 @@ class TimelineBuilder:
         cutoff:
             The cutoff value for the graph traversal. Default is 1e-9.
         max_calc:
-            The maximum number of calculations to be performed by the graph traversal. Default is 1e4.
+            The maximum number of calculations to be performed by the graph traversal. Default is 2000.
         args:   Variable length argument list
             Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA. Here, things like the further settings for graph traversal can be set. For details, see bw_temporalis.TemporalisLCA.
         kwargs: Arbitrary keyword arguments
             Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA.
         """
-        self.slca = slca
+        self.base_lca = base_lca
         self.starting_datetime = starting_datetime
         self.edge_filter_function = edge_filter_function
         self.database_date_dict = database_date_dict
@@ -93,7 +93,7 @@ class TimelineBuilder:
         ]
 
         self.edge_extractor = EdgeExtractor(
-            slca,
+            base_lca,
             starting_datetime=self.starting_datetime,
             *args,
             edge_filter_function=edge_filter_function,
