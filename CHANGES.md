@@ -6,8 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-* Added optional `starting_datetime` argument to `TimexLCA.build_timeline` (https://github.com/brightway-lca/bw_timex/pull/93)
-* Allow multiple calls of `build_timeline` using the same `TimexLCA` object, e.g., using different `starting_datetime`s (https://github.com/brightway-lca/bw_timex/pull/94)
+
+## [0.2.2] - 2024-09-18
+* Added optional `starting_datetime` argument to `TimexLCA.build_timeline` explicitly. Before, it was buried in *args, which were passed to the underlying graph traversal (https://github.com/brightway-lca/bw_timex/pull/93)
+* Allow multiple calls of `build_timeline` using the same `TimexLCA` object, e.g., using different `starting_datetime` (https://github.com/brightway-lca/bw_timex/pull/94)
 * Fixed unintuitive rounding down of timestamps in dynamic characterization. 2024-12-31 would have been rounded to 2024, whereas 2025 makes more sense here. Now we round to the nearest year (https://github.com/brightway-lca/bw_timex/commit/21fa55bbcafee196447840c6518b5fee49fb6660)
 
 ## [0.2.1] - 2024-09-16
