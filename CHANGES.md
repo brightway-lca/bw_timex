@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* Added optional `starting_datetime` argument to `TimexLCA.build_timeline` (#93)
+* Allow multiple calls of `build_timeline` using the same `TimexLCA` object, e.g., using different `starting_datetime`s (#94)
+* Fixed unintuitive rounding down of timestamps in dynamic characterization. 2024-12-31 would have been rounded to 2024, whereas 2025 makes more sense here. Now we round to the nearest year (21fa55b)
 
 ## [0.2.1] - 2024-09-16
 * Added labels and units to the yaxis in `TimexLCA.plot_dynamic_characterized_inventory()`
