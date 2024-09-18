@@ -163,6 +163,7 @@ class TimexLCA:
 
     def build_timeline(
         self,
+        starting_datetime: datetime | str = "now",
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
         edge_filter_function: Callable = None,
@@ -178,6 +179,9 @@ class TimexLCA:
 
         Parameters
         ----------
+        starting_datetime: datetime | str, optional
+            Point in time when the demand occurs. This is the initial starting point of the 
+            timeline. Something like `"now"` or `"2023-01-01"`. Default is `"now"`.
         temporal_grouping : str, optional
             Time resolution for grouping exchanges over time in the timeline. Default is 'year',
             other options are 'month', 'day', 'hour'.
@@ -223,6 +227,7 @@ class TimexLCA:
         else:
             self.edge_filter_function = edge_filter_function
 
+        self.starting_datetime = starting_datetime
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
         self.cutoff = cutoff
@@ -237,6 +242,7 @@ class TimexLCA:
         # with the TimelineBuilder.build_timeline() method.
         self.timeline_builder = TimelineBuilder(
             self.base_lca,
+            self.starting_datetime,
             self.edge_filter_function,
             self.database_date_dict,
             self.database_date_dict_static_only,
