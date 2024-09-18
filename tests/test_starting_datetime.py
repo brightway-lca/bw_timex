@@ -7,6 +7,7 @@ from bw2data.tests import bw2test
 
 from bw_timex import TimexLCA
 
+
 @pytest.fixture
 @bw2test
 def ab_db():
@@ -91,6 +92,7 @@ def ab_db():
         ]
     )
 
+
 def test_starting_datetime(ab_db):
     method = ("GWP", "example")
     database_date_dict = {
@@ -100,12 +102,12 @@ def test_starting_datetime(ab_db):
     }
     fu = ("foreground", "A")
     tlca = TimexLCA({fu: 1}, method, database_date_dict)
-    
+
     tlca.build_timeline(starting_datetime="2020-01-01")
     tlca.lci()
     tlca.static_lcia()
     assert math.isclose(tlca.static_score, 15, rel_tol=1e-9)
-    
+
     tlca.build_timeline(starting_datetime="2030-01-01")
     tlca.lci()
     tlca.static_lcia()
