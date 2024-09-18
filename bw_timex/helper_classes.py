@@ -110,7 +110,7 @@ class TimeMappingDict(dict):
         )  # check_id that is different from the start id for the reversed dict
 
     def add(self, process_time_tuple, unique_id=None):
-        """ "
+        """
         Adds a new process_time_tuple to the `TimeMappingDict` object.
 
         Parameters
@@ -142,7 +142,8 @@ class TimeMappingDict(dict):
         return self._current_id - 1
 
     def reversed(self):
-        """return a reversed version of dict, update if necessary
+        """
+        Returns a reversed version of dict, updates it only if necessary
 
         Parameters
         ----------
@@ -154,7 +155,7 @@ class TimeMappingDict(dict):
             A reversed dictionary of the `TimeMappingDict` object.
         """
 
-        if self._check_id != self._current_id:
+        if self._check_id != self._current_id:  # if the dict has been updated
             self.reversed_dict = {v: k for k, v in self.items()}
             self._check_id = self._current_id
         return self.reversed_dict
