@@ -6,9 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-* Added optional `starting_datetime` argument to `TimexLCA.build_timeline` (#93)
-* Allow multiple calls of `build_timeline` using the same `TimexLCA` object, e.g., using different `starting_datetime`s (#94)
-* Fixed unintuitive rounding down of timestamps in dynamic characterization. 2024-12-31 would have been rounded to 2024, whereas 2025 makes more sense here. Now we round to the nearest year (21fa55b)
+* Added optional `starting_datetime` argument to `TimexLCA.build_timeline` (https://github.com/brightway-lca/bw_timex/pull/93)
+* Allow multiple calls of `build_timeline` using the same `TimexLCA` object, e.g., using different `starting_datetime`s (https://github.com/brightway-lca/bw_timex/pull/94)
+* Fixed unintuitive rounding down of timestamps in dynamic characterization. 2024-12-31 would have been rounded to 2024, whereas 2025 makes more sense here. Now we round to the nearest year (https://github.com/brightway-lca/bw_timex/commit/21fa55bbcafee196447840c6518b5fee49fb6660)
 
 ## [0.2.1] - 2024-09-16
 * Added labels and units to the yaxis in `TimexLCA.plot_dynamic_characterized_inventory()`
@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     * `TimexLCA.base_score` := `TimexLCA.static_lca.score` (no time-explicit information)
     * `TimexLCA.static_score` := `TimexLCA.lca.score` (time-explicit LCI w/ static characterization)
     * `TimexLCA.dynamic_score` := `TimexLCA.characterized_inventory["amount"].sum()` (time-explicit LCI w/ dynamic characterization, summed overall score)
-* Fixed amounts for negative production amounts [#83](https://github.com/brightway-lca/bw_timex/pull/83)
+* Fixed amounts for negative production amounts (https://github.com/brightway-lca/bw_timex/pull/83)
 
 ## [0.1.9] - 2024-08-09
 * Allow absolute temporal distributions (https://github.com/brightway-lca/bw_timex/pull/81)
