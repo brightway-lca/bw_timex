@@ -15,7 +15,7 @@ def test_process_at_base_database_time(process_at_base_database_time_db):
     }
     fu = ("foreground", "fu")
     tlca = TimexLCA({fu: 1}, method, database_date_dict)
-    tlca.build_timeline()
+    tlca.build_timeline(starting_datetime="2024-01-01")
     tlca.lci()
 
     expected_inventory = pd.DataFrame(

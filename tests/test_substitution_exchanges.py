@@ -34,9 +34,7 @@ class TestClass_substitution:
             database_date_dict=database_date_dict,
         )
 
-        self.tlca.build_timeline(
-            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d")
-        )
+        self.tlca.build_timeline(starting_datetime="2024-01-01")
         self.tlca.lci()
         self.tlca.static_lcia()
 
@@ -54,7 +52,6 @@ class TestClass_substitution:
             * 0.2
         )  # substituted emissions from Sub bia B in 2028 from db_2020
 
-        print(self.tlca.timeline)
         assert self.tlca.static_score == pytest.approx(
             expected_substitution_score, rel=0.0001
         )
