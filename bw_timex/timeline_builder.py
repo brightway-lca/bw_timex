@@ -28,6 +28,7 @@ class TimelineBuilder:
     def __init__(
         self,
         slca: LCA,
+        starting_datetime: datetime,
         edge_filter_function: Callable,
         database_date_dict: dict,
         database_date_dict_static_only: dict,
@@ -45,6 +46,8 @@ class TimelineBuilder:
         ----------
         slca: LCA
             A static LCA object.
+        starting_datetime: datetime | str, optional
+            Point in time when the demand occurs.
         edge_filter_function: Callable
             A callable that filters edges. If not provided, a function that always returns False is used.
         database_date_dict: dict
@@ -65,6 +68,7 @@ class TimelineBuilder:
             Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA.
         """
         self.slca = slca
+        self.starting_datetime = starting_datetime
         self.edge_filter_function = edge_filter_function
         self.database_date_dict = database_date_dict
         self.database_date_dict_static_only = database_date_dict_static_only
@@ -90,6 +94,7 @@ class TimelineBuilder:
 
         self.edge_extractor = EdgeExtractor(
             slca,
+            starting_datetime=self.starting_datetime,
             *args,
             edge_filter_function=edge_filter_function,
             cutoff=self.cutoff,

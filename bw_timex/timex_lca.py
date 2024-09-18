@@ -31,7 +31,11 @@ from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import SetList, TimeMappingDict
 from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
-from .utils import extract_date_as_integer, resolve_temporalized_node_name
+from .utils import (
+    extract_date_as_integer,
+    resolve_temporalized_node_name,
+    round_datetime_to_nearest_year,
+)
 
 
 class TimexLCA:
@@ -144,21 +148,13 @@ class TimexLCA:
         self.base_lca.lci()
         self.base_lca.lcia()
 
-        # Create a time mapping dict that maps each activity to a activity_time_mapping_id in the
-        # format (('database', 'code'), datetime_as_integer): time_mapping_id)
-        self.activity_time_mapping_dict = TimeMappingDict(
-            start_id=bd.backends.ActivityDataset.select(fn.MAX(AD.id)).scalar() + 1
-        )  # making sure we get unique ids by counting up from the highest current activity id
-
-        # Create a similar dict for the biosphere flows. Populated by the dynamic_biosphere_builder
-        self.biosphere_time_mapping_dict = TimeMappingDict(start_id=0)
-
     ########################################
     # Main functions to be called by users #
     ########################################
 
     def build_timeline(
         self,
+        starting_datetime: datetime | str = "now",
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
         edge_filter_function: Callable = None,
@@ -174,6 +170,9 @@ class TimexLCA:
 
         Parameters
         ----------
+        starting_datetime: datetime | str, optional
+            Point in time when the demand occurs. This is the initial starting point of the
+            timeline. Something like `"now"` or `"2023-01-01"`. Default is `"now"`.
         temporal_grouping : str, optional
             Time resolution for grouping exchanges over time in the timeline. Default is 'year',
             other options are 'month', 'day', 'hour'.
@@ -219,10 +218,17 @@ class TimexLCA:
         else:
             self.edge_filter_function = edge_filter_function
 
+        self.starting_datetime = starting_datetime
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
         self.cutoff = cutoff
         self.max_calc = max_calc
+
+        # Create a time mapping dict that maps each activity to a activity_time_mapping_id in the
+        # format (('database', 'code'), datetime_as_integer): time_mapping_id)
+        self.activity_time_mapping_dict = TimeMappingDict(
+            start_id=bd.backends.ActivityDataset.select(fn.MAX(AD.id)).scalar() + 1
+        )  # making sure we get unique ids by counting up from the highest current activity id
 
         # pre-populate the activity time mapping dict with the static activities.
         # Doing this here because we need the temporal grouping for consistent times resolution.
@@ -233,6 +239,7 @@ class TimexLCA:
         # with the TimelineBuilder.build_timeline() method.
         self.timeline_builder = TimelineBuilder(
             self.base_lca,
+            self.starting_datetime,
             self.edge_filter_function,
             self.database_date_dict,
             self.database_date_dict_static_only,
@@ -385,7 +392,7 @@ class TimexLCA:
         of the chosen static climate change impact category. If there is no characterization
         function for a biosphere flow, it will be ignored.
 
-        Two dynamic climate change metrics are provided: "GWP" and "radiative_forcing".
+        Two dynamic climate change metrics are supported: "GWP" and "radiative_forcing".
         The time horizon for the impact assessment can be set with the `time_horizon` parameter,
         defaulting to 100 years. The `fixed_time_horizon` parameter determines whether the emission
         time horizon for all emissions is calculated from the functional unit
@@ -437,6 +444,18 @@ class TimexLCA:
 
         # Set a default for inventory_in_time_horizon using the full dynamic_inventory_df
         inventory_in_time_horizon = self.dynamic_inventory_df
+
+        # Round dates to nearest year and sum up emissions for each year
+        inventory_in_time_horizon.date = inventory_in_time_horizon.date.apply(
+            round_datetime_to_nearest_year
+        )
+        inventory_in_time_horizon = (
+            inventory_in_time_horizon.groupby(
+                inventory_in_time_horizon.columns.tolist()
+            )
+            .sum()
+            .reset_index()
+        )
 
         # Calculate the latest considered impact date
         t0_date = pd.Timestamp(self.timeline_builder.edge_extractor.t0.date[0])
@@ -569,6 +588,8 @@ class TimexLCA:
         self.len_technosphere_dbs = sum(
             [len(bd.Database(db)) for db in self.database_date_dict.keys()]
         )
+
+        self.biosphere_time_mapping_dict = TimeMappingDict(start_id=0)
 
         self.dynamic_biosphere_builder = DynamicBiosphereBuilder(
             self.lca,
