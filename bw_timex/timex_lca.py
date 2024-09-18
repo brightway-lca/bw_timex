@@ -1011,8 +1011,7 @@ class TimexLCA:
 
         foreground_node_ids = {
             node.id
-            for db in self.database_date_dict.keys()
-            if db not in self.database_date_dict_static_only.keys()
+            for db in self.node_id_collection_dict["demand_database_names"]
             for node in bd.Database(db)
         }
         self.node_id_collection_dict["foreground_node_ids"] = foreground_node_ids
@@ -1022,7 +1021,12 @@ class TimexLCA:
         for node_id in foreground_node_ids:
             node = bd.get_node(id=node_id)
             for exc in chain(node.technosphere(), node.substitution()):
-                if exc.input["database"] in self.database_date_dict_static_only.keys():
+                if (
+                    exc.input["database"]
+                    in self.node_id_collection_dict[
+                        "demand_dependent_background_database_names"
+                    ]
+                ):
                     first_level_background_node_ids_static.add(exc.input.id)
                     act_set = {(exc.input.id, exc.input["database"])}
 
