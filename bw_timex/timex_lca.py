@@ -42,9 +42,9 @@ class TimexLCA:
     """
     Class to perform time-explicit LCA calculations.
 
-    A TimexLCA retrieves the LCI of processes occuring at explicit points in time and relinks their
-    technosphere exchanges to match the technology landscape at that point in time, while keeping
-    track of the timing of the resulting emissions. As such, it combines prospective and dynamic LCA
+    A TimexLCA contains the LCI of processes occuring at explicit points in time. It tracks the timing of processes, 
+    relinks their technosphere and biosphere exchanges to match the technology landscape at that point in time, 
+    and also keeps track of the timing of the resulting emissions. As such, it combines prospective and dynamic LCA
     approaches.
 
     TimexLCA first calculates a static LCA, which informs a priority-first graph traversal. From the
@@ -55,22 +55,22 @@ class TimexLCA:
     exchanges to other technosphere processes or biosphere flows extent the technopshere and
     biosphere matrices.
 
-    Temporal information of both processes and biosphere flows are retained, allowing for dynamic
+    Temporal information of both processes and biosphere flows is retained, allowing for dynamic
     LCIA.
 
-    Currently absolute Temporal Distributions for biosphere exchanges are dealt with as a look up
+    Currently, Absolute Temporal Distributions (ATD) for biosphere exchanges are dealt with as a look up
     function: If an activity happens at timestamp X then and the biosphere exchange has an absolute
-    temporal distribution (ATD), it looks up the amount from from the ATD correspnding to timestamp
+    temporal distribution (ATD), it looks up the amount from the ATD corresponding to timestamp
     X. E.g.: X=2024, TD=(data=[2020,2021,2022,2023,2024,.....,2120 ], amount=[3,4,4,5,6,......,3]),
     it will look up the value 6 corresponding 2024. If timestamp X does not exist it find the
     nearest timestamp available (if two timestamps are equally close, it will take the first in
-    order of apearance (see numpy.argmin() for this behabiour).
+    order of appearance (see numpy.argmin() for this behaviour).
 
 
     TimexLCA calculates:
      1) a static "base" LCA score (`TimexLCA.base_score`, same as `bw2calc.lca.score`),
      2) a static time-explicit LCA score (`TimexLCA.static_score`), which links LCIs to the
-        respective background databases, but without temporal dynamics of the biosphere flows,
+        respective background databases, but without dynamic characterization of the time-explicit inventory
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and
         dynamic charaterization. These are provided for radiative forcing and GWP but can also be
         user-defined.
@@ -82,15 +82,16 @@ class TimexLCA:
     >>> database_date_dict = {
             'my_background_database_one': datetime.strptime("2020", "%Y"),
             'my_background_database_two': datetime.strptime("2030", "%Y"),
+            'my_background_database_three': datetime.strptime("2040", "%Y"),
             'my_foreground_database':'dynamic'
         }
-    >>> bw_timex = TimexLCA(demand, method, database_date_dict)
-    >>> bw_timex.build_timeline() # has many optional arguments
-    >>> bw_timex.lci()
-    >>> bw_timex.static_lcia()
-    >>> print(bw_timex.static_score)
-    >>> bw_timex.dynamic_lcia(metric="radiative_forcing") # also available: "GWP"
-    >>> print(bw_timex.dynamic_score)
+    >>> tlca = TimexLCA(demand, method, database_date_dict)
+    >>> tlca.build_timeline() # has many optional arguments
+    >>> tlca.lci()
+    >>> tlca.static_lcia()
+    >>> print(tlca.static_score)
+    >>> tlca.dynamic_lcia(metric="radiative_forcing") # also available: "GWP"
+    >>> print(tlca.dynamic_score)
 
     """ """"""
 
