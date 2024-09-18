@@ -129,6 +129,10 @@ class TimeMappingDict(dict):
             return self[process_time_tuple]
 
         if unique_id is not None:
+            if unique_id in self.values():
+                raise ValueError(
+                    f"Unique ID {unique_id} is already assigned to another process_time_tuple."
+                )
             self[process_time_tuple] = unique_id
             return unique_id
 
