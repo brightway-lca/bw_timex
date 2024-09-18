@@ -79,9 +79,9 @@ class TimelineBuilder:
         self.cutoff = cutoff
         self.max_calc = max_calc
 
-        # Finding indices of activities from background databases that are known to be static, i.e. have no temporal distributions connecting to them.
+        # Finding indices of activities from the connected background databases that are known to be static, i.e. have no temporal distributions connecting to them.
         # These will be be skipped in the graph traversal.
-        static_activity_db_indices = [
+        static_background_activity_indices = [
             node_id
             for node_id in self.node_id_collection_dict[
                 "demand_dependent_background_node_ids"
@@ -99,7 +99,7 @@ class TimelineBuilder:
             edge_filter_function=edge_filter_function,
             cutoff=self.cutoff,
             max_calc=self.max_calc,
-            static_activity_indices=set(static_activity_db_indices),
+            static_activity_indices=set(static_background_activity_indices),
             **kwargs,
         )
         self.edge_timeline = self.edge_extractor.build_edge_timeline()
@@ -108,7 +108,7 @@ class TimelineBuilder:
         """
         Create a dataframe with grouped, time-explicit edges and, for each grouped edge, interpolate to the database with the closest time of representativeness.
 
-        Edges from same producer to same consumer that occur at different times within the same time window (temporal_grouping) are grouped together. Possible temporal groupings are "year", "month", "day" and "hour".
+        It uses the edge_timeline, an output from the graph traversal in EdgeExtractor. Edges from same producer to same consumer that occur at different times within the same time window (temporal_grouping) are grouped together. Possible temporal groupings are "year", "month", "day" and "hour".
 
         For edges between forground and background system, the column "interpolation weights" assigns the ratio [0-1] of the edge's amount to be taken from the database with the closest time of representativeness. If a process is in the foreground system only, the interpolation weight is set to None.
         Available interpolation types are:
@@ -157,7 +157,7 @@ class TimelineBuilder:
             edges_df["consumer"] == -1, "producer_date"
         ]
 
-        # extract grouping time of consumer and producer: processes occuring at different times withing in the same time window of grouping get the same grouping time
+        # extract grouping time of consumer and producer: processes occuring at different times within in the same time window of grouping get the same grouping time
         edges_df["consumer_grouping_time"] = edges_df["consumer_date"].apply(
             lambda x: extract_date_as_string(x, self.temporal_grouping)
         )
@@ -196,7 +196,7 @@ class TimelineBuilder:
             lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
         )
 
-        # add new processes to time mapping dict
+        # add new processes to activity time mapping dict
         for row in grouped_edges.itertuples():
             self.activity_time_mapping_dict.add(
                 (
@@ -205,25 +205,15 @@ class TimelineBuilder:
                 )
             )
 
-        def _get_time_mapping_key(node_id: int, node_hash: int) -> tuple:
-            try:
-                return self.activity_time_mapping_dict[
-                    (("temporalized", bd.get_node(id=node_id)["code"]), node_hash)
-                ]
-            except:
-                return self.activity_time_mapping_dict[
-                    ((bd.get_node(id=node_id).key), node_hash)
-                ]
-
         # store the ids from the time_mapping_dict in dataframe
         grouped_edges["time_mapped_producer"] = grouped_edges.apply(
-            lambda row: _get_time_mapping_key(row.producer, row.hash_producer),
+            lambda row: self.get_time_mapping_key(row.producer, row.hash_producer),
             axis=1,
         )
 
         grouped_edges["time_mapped_consumer"] = grouped_edges.apply(
             lambda row: (
-                _get_time_mapping_key(row.consumer, row.hash_consumer)
+                self.get_time_mapping_key(row.consumer, row.hash_consumer)
                 if row.consumer != -1
                 else -1
             ),
@@ -343,6 +333,32 @@ class TimelineBuilder:
             warnings.warn(f"Unrecognized type in this edge: {edge_type}", UserWarning)
             raise ValueError("Unrecognized edge type")
         return multiplicator
+
+    def get_time_mapping_key(self, node_id: int, node_hash: int) -> int:
+        """
+        Returns the time_mapping_id (key) from the activity_time_mapping_dict for a given node.
+
+        Parameters
+        ----------
+        node_id: int
+            database id of the node.
+        node_hash: int
+            datetime_as_integer of the node.
+
+        Returns
+        -------
+        int
+            time_mapping_id (key) of the corresponding time-mapped activity.
+
+        """
+        try:
+            return self.activity_time_mapping_dict[
+                (("temporalized", bd.get_node(id=node_id)["code"]), node_hash)
+            ]
+        except:
+            return self.activity_time_mapping_dict[
+                ((bd.get_node(id=node_id).key), node_hash)
+            ]
 
     def add_column_interpolation_weights_to_timeline(
         self,

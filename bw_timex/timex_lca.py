@@ -167,18 +167,18 @@ class TimexLCA:
         """
         Creates a `TimelineBuilder` instance that does the graph traversal (similar to
         bw_temporalis) and extracts all edges with their temporal information. Creates the
-        `TimexLCA.timeline` of exchanges.
+        `TimexLCA.timeline` of technosphere exchanges.
 
         Parameters
         ----------
         starting_datetime: datetime | str, optional
-            Point in time when the demand occurs. This is the initial starting point of the
+            Point in time when the demand occurs. This is the initial starting point of the graph traversal and the
             timeline. Something like `"now"` or `"2023-01-01"`. Default is `"now"`.
         temporal_grouping : str, optional
             Time resolution for grouping exchanges over time in the timeline. Default is 'year',
             other options are 'month', 'day', 'hour'.
         interpolation_type : str, optional
-            Type of interpolation when sourcing the new producers in the time-explicit background
+            Type of interpolation when sourcing the new producers in the time-mapped background
             databases. Default is 'linear', which means linear interpolation between the closest 2
             databases, other options are 'closest', which selects only the closest database.
         edge_filter_function : Callable, optional
@@ -188,20 +188,20 @@ class TimexLCA:
             The cutoff value for the graph traversal. Default is 1e-9.
         max_calc: float, optional
             The maximum number of calculations to be performed by the graph traversal. Default is
-            1e4.
+            2000.
         *args : iterable
-            Positional arguments for the graph traversal. for `bw_temporalis.TemporalisLCA` passed
+            Positional arguments for the graph traversal, for `bw_temporalis.TemporalisLCA` passed
             to the `EdgeExtractor` class, which inherits from `TemporalisLCA`. See `bw_temporalis`
             documentation for more information.
         **kwargs : dict
-            Additional keyword arguments for `bw_temporalis.TemporalisLCA` passed to the
-            EdgeExtractor class, which inherits from TemporalisLCA. See bw_temporalis documentation
-            for more information.
+            Additional keyword arguments for the graph traversal, for `bw_temporalis.TemporalisLCA`
+            passed to the EdgeExtractor class, which inherits from TemporalisLCA. See bw_temporalis
+            documentation for more information.
 
         Returns
         -------
         pandas.DataFrame:
-            A DataFrame containing the timeline of exchanges
+            A DataFrame containing the timeline of technosphere exchanges
 
         See also
         --------
@@ -210,7 +210,7 @@ class TimexLCA:
         """
         if edge_filter_function is None:
             warnings.warn(
-                "No edge filter function provided. Skipping all edges within background databases."
+                "No edge filter function provided. Skipping all edges in background databases."
             )
             skippable = []
             for db in self.database_date_dict_static_only.keys():
@@ -232,7 +232,7 @@ class TimexLCA:
         )  # making sure we get unique ids by counting up from the highest current activity id
 
         # pre-populate the activity time mapping dict with the static activities.
-        # Doing this here because we need the temporal grouping for consistent times resolution.
+        # Doing this here because we need the temporal grouping for consistent time resolution.
         self.add_static_activities_to_time_mapping_dict()
 
         # Create timeline builder that does the graph traversal (similar to bw_temporalis) and
@@ -255,6 +255,7 @@ class TimexLCA:
         )
 
         self.timeline = self.timeline_builder.build_timeline()
+        
         return self.timeline[
             [
                 "date_producer",
@@ -498,7 +499,7 @@ class TimexLCA:
     def base_score(self) -> float:
         """
         Score of the base LCA, i.e., the "normal" LCA without time-explicit information.
-        Same as when using bw2calc.LCA.score
+        Same as bw2calc.LCA.score
         """
         return self.base_lca.score
 
@@ -1100,9 +1101,10 @@ class TimexLCA:
         Adds all activities from the static LCA to `activity_time_mapping_dict`, an instance of
         `TimeMappingDict`. This gives a unique mapping in the form of
         (('database', 'code'), datetime_as_integer): time_mapping_id) that is later used to uniquely
-        identify time-resolved processes. This is the pre-population of the time mapping dict with
-        the static activities. Further time-explicit activities (from other temporalized background
-        databases) are added lateron by in the TimelineBuilder.
+        identify time-resolved processes. Here,  the activity_time_mapping_dict is the pre-population with
+        the static activities. The time-explicit activities (from other temporalized background
+        databases) are added later on by the TimelineBuilder. Activities in the foreground database are 
+        mapped with (('database', 'code'), "dynamic"): time_mapping_id)" as their timing is not yet known.
 
         Parameters
         ----------
@@ -1110,7 +1112,7 @@ class TimexLCA:
 
         Returns
         -------
-        None but adds the activities to the `activity_time_mapping_dict`
+        None but adds the static activities to the `activity_time_mapping_dict`
         """
         for idx in self.base_lca.dicts.activity.keys():  # activity ids
             key = self.base_lca.remapping_dicts["activity"][idx]  # ('database', 'code')

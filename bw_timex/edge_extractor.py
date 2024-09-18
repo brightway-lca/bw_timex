@@ -40,7 +40,7 @@ class EdgeExtractor(TemporalisLCA):
 
     def __init__(self, *args, edge_filter_function: Callable = None, **kwargs) -> None:
         """
-        Initialize the EdgeExtractor class.
+        Initialize the EdgeExtractor class and traverses the supply chain using functions of the parent class TemporalisLCA.
 
         Parameters
         ----------
@@ -51,7 +51,8 @@ class EdgeExtractor(TemporalisLCA):
 
         Returns
         -------
-        None
+        None but stores the output of the TemporalisLCA graph traversal (incl. relation of edges (edge_mapping)
+        and nodes (node_mapping) in the instance of the class.
 
         """
         super().__init__(*args, **kwargs)  # use __init__ of TemporalisLCA
@@ -63,8 +64,8 @@ class EdgeExtractor(TemporalisLCA):
 
     def build_edge_timeline(self) -> list:
         """
-        Creates a timeline of the edges from the graph traversal. Starting from the edges of the functional unit node, it goes through each node using a heap, selecting the node with the highest impact first.
-        It, then, propagates the TemporalDistributions of the edges from node to node through time using convolution-operators during multiplication.
+        Creates a timeline of the edges from the output of the graph traversal. Starting from the edges of the functional unit node, it goes through each node using a heap, selecting the node with the highest impact first.
+        It, then, propagates the TemporalDistributions of the edges from node to node through time using convolution-operators.
         It stops in case the current edge is known to have no temporal distribution (=leaf) (e.g. part of background database).
 
         Parameters
