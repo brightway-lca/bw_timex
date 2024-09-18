@@ -35,7 +35,7 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
     Returns
     -------
     date_as_integer : int
-        Datetime objectconverted to an integer in the format of time_res
+        Datetime object converted to an integer in the format of time_res
 
     """
     if time_res not in time_res_to_int_dict.keys():
@@ -51,7 +51,7 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
     return date_as_integer
 
 
-def extract_date_as_string(temporal_grouping: str, timestamp: datetime) -> str:
+def extract_date_as_string(timestamp: datetime, temporal_grouping: str) -> str:
     """
     Extracts the grouping date as a string from a datetime object, based on the chosen temporal grouping.
     e.g. for `temporal_grouping` = 'month', and `timestamp` = 2023-03-29T01:00:00, it extracts the string '202303'.
@@ -59,10 +59,11 @@ def extract_date_as_string(temporal_grouping: str, timestamp: datetime) -> str:
 
     Parameters
     ----------
+    timestamp : Datetime object
+        Datetime object to be converted to a string.
     temporal_grouping : str
         Temporal grouping for the date string. Options are: 'year', 'month', 'day', 'hour'
-    timestamp : datetime
-        Datetime object to be converted to a string.
+
 
     Returns
     -------

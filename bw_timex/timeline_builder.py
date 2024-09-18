@@ -159,10 +159,10 @@ class TimelineBuilder:
 
         # extract grouping time of consumer and producer: processes occuring at different times withing in the same time window of grouping get the same grouping time
         edges_df["consumer_grouping_time"] = edges_df["consumer_date"].apply(
-            lambda x: extract_date_as_string(self.temporal_grouping, x)
+            lambda x: extract_date_as_string(x, self.temporal_grouping)
         )
         edges_df["producer_grouping_time"] = edges_df["producer_date"].apply(
-            lambda x: extract_date_as_string(self.temporal_grouping, x)
+            lambda x: extract_date_as_string(x, self.temporal_grouping)
         )
 
         # group unique pair of consumer and producer with the same grouping times
