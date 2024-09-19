@@ -209,21 +209,35 @@ created:
     `TimexLCA.dynamic_inventory_df` contain the emissions of the system
     per biosphere flow including its timestamp and its emitting process.
 
-```{admonition} Example: Matrix modifications
+`````{admonition} Example: Matrix modifications
 :class: admonition-example
-For the simple system above, a schematic representation of the matrix
-modifications looks like this:
-~~~{image} data/matrix_stuff_light.svg
-:class: only-light
+:name: example-matrix-modifications
+For the simple system above, these are the modifications we apply to the matrices:
+
+````{carousel}
+:show_controls:
+:show_indicators:
+:show_dark:
+:show_fade:
+:data-bs-interval: 0
+
+~~~{image} data/matrix1.svg
 :align: center
 ~~~
-~~~{image} data/matrix_stuff_dark.svg
-:class: only-dark
+~~~{image} data/matrix2.svg
 :align: center
 ~~~
+~~~{image} data/matrix3.svg
+:align: center
+~~~
+~~~{image} data/matrix4.svg
+:align: center
+~~~
+````
+</br>
 
 The inventory information from the time-explicit databases is inserted into the matrices. For each specific point in time that product b is demanded, temporal markets are created, distributing the demand for b between the time-explicit databases. The dynamic biosphere matrix is created, containing the timing of emissions. You can see that the CO2 emission at process A occurs both in 2024 and 2025, based on the temporal distribution on this biosphere exchange.
-```
+`````
 
 ## Static or dynamic impact assessment
 
