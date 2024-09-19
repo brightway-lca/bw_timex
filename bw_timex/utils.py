@@ -2,7 +2,6 @@ import warnings
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
 
-import bw2data as bd
 import matplotlib.pyplot as plt
 import pandas as pd
 from bw2data.backends import ActivityDataset as AD
@@ -140,24 +139,23 @@ def round_datetime(date: datetime, resolution: str) -> datetime:
             else pd.Timestamp(f"{date.year}-01-01")
         )
 
-    elif resolution == "month":
+    if resolution == "month":
         start_of_month = pd.Timestamp(f"{date.year}-{date.month}-01")
         next_month = start_of_month + pd.DateOffset(months=1)
         mid_month = start_of_month + (next_month - start_of_month) / 2
         return next_month if date >= mid_month else start_of_month
 
-    elif resolution == "day":
+    if resolution == "day":
         start_of_day = datetime(date.year, date.month, date.day)
         mid_day = start_of_day + timedelta(hours=12)
         return start_of_day + timedelta(days=1) if date >= mid_day else start_of_day
 
-    elif resolution == "hour":
+    if resolution == "hour":
         start_of_hour = datetime(date.year, date.month, date.day, date.hour)
         mid_hour = start_of_hour + timedelta(minutes=30)
         return start_of_hour + timedelta(hours=1) if date >= mid_hour else start_of_hour
 
-    else:
-        raise ValueError("Resolution must be one of 'year', 'month', 'day', or 'hour'.")
+    raise ValueError("Resolution must be one of 'year', 'month', 'day', or 'hour'.")
 
 
 def add_flows_to_characterization_function_dict(
