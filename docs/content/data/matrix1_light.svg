@@ -1,10 +1,8 @@
 <svg
-  width="4354"
-  height="2173"
   xmlns="http://www.w3.org/2000/svg"
   xmlns:xlink="http://www.w3.org/1999/xlink"
   xml:space="preserve"
-  overflow="hidden"
+  viewBox="0 0 4354 2173"
 >
   <g transform="translate(-32 -265)">
     <g>
@@ -135,7 +133,7 @@
               transform="matrix(1.00025 0 0 1 -1471.47 -10494.7)"
             />
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -153,7 +151,7 @@
               1
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -171,7 +169,7 @@
               0
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -189,7 +187,7 @@
               -
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -207,7 +205,7 @@
               3
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -232,7 +230,7 @@
               transform="matrix(1.00025 0 0 1 -1471.47 -10494.7)"
             />
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -250,7 +248,7 @@
               5
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -1219,7 +1217,7 @@
               @ 2024
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -1255,7 +1253,7 @@
               0
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -1309,7 +1307,7 @@
               0
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -1363,7 +1361,7 @@
               0
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -1381,7 +1379,7 @@
               0
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -1417,7 +1415,7 @@
               7
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Arial,Arial_MSFontService,sans-serif"
               font-style="normal"
@@ -1435,7 +1433,7 @@
               11
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Aptos,Aptos_MSFontService,sans-serif"
               font-style="normal"
@@ -1453,7 +1451,7 @@
               …
             </text>
             <text
-              fill="#000000"
+              fill="#222832"
               fill-opacity="1"
               font-family="Aptos,Aptos_MSFontService,sans-serif"
               font-style="normal"
