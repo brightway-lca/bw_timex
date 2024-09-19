@@ -23,7 +23,7 @@ from bw2data import (
 from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import get_id
 from bw2data.errors import Brightway2Project
-from dynamic_characterization import characterize_dynamic_inventory
+from dynamic_characterization import characterize
 from peewee import fn
 from scipy import sparse
 
@@ -462,7 +462,7 @@ class TimexLCA:
         if not time_horizon_start:
             time_horizon_start = t0_date
 
-        self.characterized_inventory = characterize_dynamic_inventory(
+        self.characterized_inventory = characterize(
             dynamic_inventory_df=inventory_in_time_horizon,
             metric=metric,
             characterization_function_dict=characterization_function_dict,
