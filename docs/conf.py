@@ -45,6 +45,8 @@ extensions = [
     "sphinx_favicon",
     # copy button on code blocks
     "sphinx_copybutton",
+    # carousels
+    "sphinx_carousel.carousel",
 ]
 
 autoapi_dirs = ["../bw_timex"]
