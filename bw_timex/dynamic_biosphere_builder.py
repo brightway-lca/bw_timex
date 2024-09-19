@@ -235,7 +235,7 @@ class DynamicBiosphereBuilder:
                         td_producer = TemporalDistribution(
                             date=np.array([str(time_in_datetime)], dtype=self.time_res),
                             amount=np.array([1]),
-                        ).date  # TODO: Simplify
+                        ).date
                         date = td_producer[0]
 
                         time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(

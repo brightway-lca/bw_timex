@@ -1,5 +1,5 @@
 import warnings
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
 
 import bw2data as bd
@@ -115,25 +115,49 @@ def convert_date_string_to_datetime(temporal_grouping, datestring) -> datetime:
     return datetime.strptime(datestring, time_res_dict[temporal_grouping])
 
 
-def round_datetime_to_nearest_year(date: datetime) -> datetime:
+def round_datetime(date: datetime, resolution: str) -> datetime:
     """
-    Round a datetime object to the nearest year.
+    Round a datetime object based on a given resolution
+
+    Parameters
+    ----------
+    date : datetime
+        datetime object to be rounded
+    resolution: str
+        Temporal resolution to round the datetime object to. Options are: 'year', 'month', 'day' and
+        'hour'.
 
     Returns
     -------
     datetime
-        datetime object rounded to nearest year.
+        rounded datetime object
     """
-    year = date.year
-    start_of_year = pd.Timestamp(f"{year}-01-01")
-    start_of_next_year = pd.Timestamp(f"{year+1}-01-01")
+    if resolution == "year":
+        mid_year = pd.Timestamp(f"{date.year}-07-01")
+        return (
+            pd.Timestamp(f"{date.year+1}-01-01")
+            if date >= mid_year
+            else pd.Timestamp(f"{date.year}-01-01")
+        )
 
-    mid_year = start_of_year + (start_of_next_year - start_of_year) / 2
+    elif resolution == "month":
+        start_of_month = pd.Timestamp(f"{date.year}-{date.month}-01")
+        next_month = start_of_month + pd.DateOffset(months=1)
+        mid_month = start_of_month + (next_month - start_of_month) / 2
+        return next_month if date >= mid_month else start_of_month
 
-    if date < mid_year:
-        return start_of_year
+    elif resolution == "day":
+        start_of_day = datetime(date.year, date.month, date.day)
+        mid_day = start_of_day + timedelta(hours=12)
+        return start_of_day + timedelta(days=1) if date >= mid_day else start_of_day
+
+    elif resolution == "hour":
+        start_of_hour = datetime(date.year, date.month, date.day, date.hour)
+        mid_hour = start_of_hour + timedelta(minutes=30)
+        return start_of_hour + timedelta(hours=1) if date >= mid_hour else start_of_hour
+
     else:
-        return start_of_next_year
+        raise ValueError("Resolution must be one of 'year', 'month', 'day', or 'hour'.")
 
 
 def add_flows_to_characterization_function_dict(
@@ -151,7 +175,8 @@ def add_flows_to_characterization_function_dict(
     func : Callable
         Dynamic characterization function for flow.
     characterization_function_dict : dict, optional
-        Dictionary of flows and their corresponding characterization functions. Default is an empty dictionary.
+        Dictionary of flows and their corresponding characterization functions. Default is an empty
+        dictionary.
 
     Returns
     -------

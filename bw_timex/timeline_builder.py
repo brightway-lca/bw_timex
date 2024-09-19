@@ -13,6 +13,7 @@ from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
     extract_date_as_string,
+    round_datetime,
 )
 
 
@@ -157,11 +158,18 @@ class TimelineBuilder:
             edges_df["consumer"] == -1, "producer_date"
         ]
 
+        edges_df["rounded_consumer_date"] = edges_df["consumer_date"].apply(
+            lambda x: round_datetime(x, self.temporal_grouping)
+        )
+        edges_df["rounded_producer_date"] = edges_df["producer_date"].apply(
+            lambda x: round_datetime(x, self.temporal_grouping)
+        )
+
         # extract grouping time of consumer and producer: processes occuring at different times within in the same time window of grouping get the same grouping time
-        edges_df["consumer_grouping_time"] = edges_df["consumer_date"].apply(
+        edges_df["consumer_grouping_time"] = edges_df["rounded_consumer_date"].apply(
             lambda x: extract_date_as_string(x, self.temporal_grouping)
         )
-        edges_df["producer_grouping_time"] = edges_df["producer_date"].apply(
+        edges_df["producer_grouping_time"] = edges_df["rounded_producer_date"].apply(
             lambda x: extract_date_as_string(x, self.temporal_grouping)
         )
 

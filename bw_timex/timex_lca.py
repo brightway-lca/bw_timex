@@ -31,19 +31,15 @@ from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import SetList, TimeMappingDict
 from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
-from .utils import (
-    extract_date_as_integer,
-    resolve_temporalized_node_name,
-    round_datetime_to_nearest_year,
-)
+from .utils import extract_date_as_integer, resolve_temporalized_node_name
 
 
 class TimexLCA:
     """
     Class to perform time-explicit LCA calculations.
 
-    A TimexLCA contains the LCI of processes occuring at explicit points in time. It tracks the timing of processes, 
-    relinks their technosphere and biosphere exchanges to match the technology landscape at that point in time, 
+    A TimexLCA contains the LCI of processes occuring at explicit points in time. It tracks the timing of processes,
+    relinks their technosphere and biosphere exchanges to match the technology landscape at that point in time,
     and also keeps track of the timing of the resulting emissions. As such, it combines prospective and dynamic LCA
     approaches.
 
@@ -255,7 +251,7 @@ class TimexLCA:
         )
 
         self.timeline = self.timeline_builder.build_timeline()
-        
+
         return self.timeline[
             [
                 "date_producer",
@@ -446,18 +442,6 @@ class TimexLCA:
 
         # Set a default for inventory_in_time_horizon using the full dynamic_inventory_df
         inventory_in_time_horizon = self.dynamic_inventory_df
-
-        # Round dates to nearest year and sum up emissions for each year
-        inventory_in_time_horizon.date = inventory_in_time_horizon.date.apply(
-            round_datetime_to_nearest_year
-        )
-        inventory_in_time_horizon = (
-            inventory_in_time_horizon.groupby(
-                inventory_in_time_horizon.columns.tolist()
-            )
-            .sum()
-            .reset_index()
-        )
 
         # Calculate the latest considered impact date
         t0_date = pd.Timestamp(self.timeline_builder.edge_extractor.t0.date[0])
@@ -1103,7 +1087,7 @@ class TimexLCA:
         (('database', 'code'), datetime_as_integer): time_mapping_id) that is later used to uniquely
         identify time-resolved processes. Here,  the activity_time_mapping_dict is the pre-population with
         the static activities. The time-explicit activities (from other temporalized background
-        databases) are added later on by the TimelineBuilder. Activities in the foreground database are 
+        databases) are added later on by the TimelineBuilder. Activities in the foreground database are
         mapped with (('database', 'code'), "dynamic"): time_mapping_id)" as their timing is not yet known.
 
         Parameters
