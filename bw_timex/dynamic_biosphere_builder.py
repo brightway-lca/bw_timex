@@ -193,7 +193,7 @@ class DynamicBiosphereBuilder:
                     # Add entries to dynamic bio matrix
                     for date, amount in zip(dates, values):
 
-                        # first create a row index for the tuple((db, bioflow), date))
+                        # first create a row index for the tuple (bioflow_id, date)
                         time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(
                             (exc.input.id, date)
                         )
@@ -326,7 +326,7 @@ class DynamicBiosphereBuilder:
 
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
         """
-        Adds an entry to the lists of row, col and values, which are then used to construct the
+        Adds an entry to a list of row, col and values, which are then used to construct the
         dynamic biosphere matrix. Only unqiue entries are added, i.e. if the same row and col index
         already exists, the value is not added again.
 

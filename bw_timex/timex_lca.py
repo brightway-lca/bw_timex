@@ -395,7 +395,7 @@ class TimexLCA:
         Two dynamic climate change metrics are supported: "GWP" and "radiative_forcing".
         The time horizon for the impact assessment can be set with the `time_horizon` parameter,
         defaulting to 100 years. The `fixed_time_horizon` parameter determines whether the emission
-        time horizon for all emissions is calculated from the functional unit
+        time horizon for all emissions is calculated from a specific starting point `time_horizon_start`
         (`fixed_time_horizon=True`) or from the time of the emission (`fixed_time_horizon=False`).
         The former is the implementation of the Levasseur approach
         (see https://doi.org/10.1021/es9030003), while the latter is how conventional LCA is done.
@@ -419,8 +419,8 @@ class TimexLCA:
             None, which triggers the use of the provided dynamic characterization functions based on
             IPCC AR6 Chapter 7.
         characterization_function_co2: Callable, optional
-            Characterization function for CO2 emissions. Necessary if GWP metrix is chosen. Default
-            is None, which triggers the use of the provided dynamic characterization function of co2
+            Characterization function for CO2 emissions. Necessary if GWP metric is chosen. Default
+            is None, which triggers the use of the provided dynamic characterization function of CO2
             based on IPCC AR6 Chapter 7.
 
 
@@ -436,7 +436,7 @@ class TimexLCA:
 
         if not hasattr(self, "dynamic_inventory"):
             raise AttributeError(
-                "Dynamic lci not yet calculated. Call TimexLCA.calculate_dynamic_lci() first."
+                "Dynamic lci not yet calculated. Call TimexLCA.lci(build_dynamic_biosphere=True) first."
             )
 
         self.current_metric = metric
@@ -619,7 +619,8 @@ class TimexLCA:
         )
 
     def create_dynamic_inventory_dataframe(self, from_timeline=False) -> pd.DataFrame:
-        """Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the the
+        """
+        Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the
         format of a pandas.DataFrame, with the right structure to later apply dynamic
         characterization functions.
 
@@ -641,7 +642,9 @@ class TimexLCA:
 
         Parameters
         ----------
-        None
+        from_timeline: bool
+            A boolean indicating if the dynamic biosphere matrix is built directly from the
+            timeline or from the expanded matrices. Default is False.
 
         Returns
         -------
