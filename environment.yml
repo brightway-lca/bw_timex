@@ -15,4 +15,3 @@ dependencies:
   # - scikit-umfpack # for macOS ARM machine
   # - numpy==1.24 # for macOS ARM machine
   # - matplotlib==3.5.2 # for macOS ARM machine
-k
