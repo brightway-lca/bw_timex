@@ -7,8 +7,8 @@ channels:
 dependencies:
   - bw_timex
   - brightway25 # for Linux/Windows/macOS(x64)
-  - bw_temporalis
-  - dynamic_characterization
+  - bw_temporalis>=1.1
+  - dynamic_characterization>=1.0.0
   - matplotlib
   - seaborn
   # - brightway25_nosolver # for macOS ARM machine

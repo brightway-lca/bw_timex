@@ -20,7 +20,7 @@ The inventory calculated by a `TimexLCA` retains temporal information. That mean
 First, we need to define which characterization function we want to apply to which biosphere flow:
 
 ```python
-from dynamic_characterization.timex import characterize_co2
+from dynamic_characterization.ipcc_ar6 import characterize_co2
 emission_id = bd.get_activity(("biosphere", "CO2")).id
 
 characterization_function_dict = {
