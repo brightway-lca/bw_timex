@@ -5,4 +5,4 @@ from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
 from .timex_lca import TimexLCA
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
