@@ -109,38 +109,37 @@ class DynamicBiosphereBuilder:
 
         Every temporally resolved biosphere flow has its own row in the matrix, making it highly
         sparse. The timing of the emitting process and potential additional temporal information of
-        the bioshpere flow (e.g. delay of emission compared to timing of process) are considered.
+        the bioshpere flow (e.g. delay of emission compared to the timing of the process) are considered.
 
         Absolute Temporal Distributions for biosphere exchanges are dealt with as a look up
-        function: If an activity happens at timestamp X then and the biosphere exchange has an
-        absolute temporal distribution (ATD), it looks up the amount from from the ATD correspnding
-        to timestamp X. E.g.: X = 2024, TD=(data=[2020,2021,2022,2023,2024,.....,2120 ],
+        function: If an activity happens at timestamp X and the biosphere exchange has an
+        absolute temporal distribution (ATD), it looks up the amount from the ATD corresponding
+        to timestamp X. E.g.: X = 2024, TD=(data=[2020,2021,2022,2023,2024,.....,2120],
         amount=[3,4,4,5,6,......,3]), it will look up the value 6 corresponding 2024. If timestamp X
-        does not exist it find the nearest timestamp available (if two timestamps are equally close,
-        it will take the first in order of appearance (see numpy.argmin() for this behabiour).
+        does not exist, it finds the nearest timestamp available (if two timestamps are equally close,
+        it will take the first in order of appearance (see numpy.argmin() for this behaviour).
 
         Parameters
         ----------
-        from_timeline
+        from_timeline : bool, optional
+            A boolean indicating if the dynamic biosphere matrix is built directly from the
+            timeline or from expanded matrices. Default is False.
 
         Returns
         -------
         dynamic_biomatrix : scipy.sparse.csr_matrix
-            A sparse matrix with the dimensions (bio_flows at a specific timestep) x (processes),
-            where every row represents a biosphere flow at a specific time.
+            A sparse matrix with the dimensions (bio_flows at a specific timestep) x (processes).
         """
 
         for row in self.timeline.itertuples():
             idx = row.time_mapped_producer
             if from_timeline:
-                process_col_index = row.Index
+                process_col_index = row.Index  # start a new matrix
             else:
                 process_col_index = self.activity_dict[
                     idx
                 ]  # get the matrix column index
 
-            # time is here an integer, with various length depending on temporal grouping, e.g.
-            # [Y] -> 2024, [M] - > 202401
             (
                 (original_db, original_code),
                 time,
@@ -183,7 +182,7 @@ class DynamicBiosphereBuilder:
                                 ]
                             ]  # look up the value correponding to the absolute producer time
                         else:
-                            # we can add a datetime of len(1)to a timedelta of len(N) easily
+                            # we can add a datetime of len(1) to a timedelta of len(N) easily
                             dates = td_producer + td_dates
                             values = exc["amount"] * td_values
 
@@ -206,8 +205,6 @@ class DynamicBiosphereBuilder:
                             amount=amount,
                         )
             elif idx in self.node_id_collection_dict["temporal_markets"]:
-                # time is here an integer, with various length depending on temporal grouping, e.g.
-                # [Y] -> 2024, [M] - > 202401
                 (
                     (original_db, original_code),
                     time,
@@ -263,6 +260,20 @@ class DynamicBiosphereBuilder:
         """
         Returns a demand dict directly from the timeline row
         and its interpolation_weights.
+
+        Parameters:
+        -----------
+        row: pd.Series
+            A row of the timeline DataFrame
+        original_db: str
+            The original database name of the activity
+
+        Returns
+        -------
+        demand: dict
+            A demand-dictionary with as keys the ids of the time-mapped activities and as values the share.
+
+
         """
         demand = {}
         for db, amount in row.interpolation_weights.items():
@@ -278,7 +289,20 @@ class DynamicBiosphereBuilder:
 
     def demand_from_technosphere(self, idx, process_col_index):
         """
-        Returns a demand dict based on the technosphere colummn.
+        Returns a demand dict of background processes based on the technosphere colummn.
+        Foreground exchanges are skipped as these are added separately.
+
+        Parameters:
+        -----------
+        idx: int
+            The time-mapped-activity id of the producer
+        process_col_index: int
+            The technosphere matrix id of the producer
+
+        Returns
+        -------
+        demand: dict
+            A demand-dictionary with as keys the brightway ids of the consumed background activities and as values their consumed amount.
         """
         technosphere_column = (
             self.technosphere_matrix[:, process_col_index].toarray().ravel()
@@ -297,7 +321,6 @@ class DynamicBiosphereBuilder:
             ):  # We only aggregate background process bioflows
                 continue
 
-            # demand[bd.get_node(id=node_id)] = -amount
             demand[node_id] = -amount
         return demand
 

@@ -68,9 +68,9 @@ class MatrixModifier:
     def create_technosphere_datapackage(self) -> bwp.Datapackage:
         """
         Creates the modifications to the technosphere matrix in form of a datapackage. Datapackages add or overwrite datapoints in the LCA matrices before LCA calculations.
-        The technospher datapackage add the temporalized processes from the timeline to the technosphere matrix.
+        The technosphere datapackage adds the temporalized processes from the timeline to the technosphere matrix.
 
-        The heavy lifting of this method happens in the method `add_row_to_datapackage()` that is called.
+        The heavy lifting of this method happens in the method `add_row_to_datapackage()`.
         Here, each node with a temporal distribution is "exploded", which means each occurrence of this node (e.g. steel production on 2020-01-01
         and steel production on 2015-01-01) becomes a separate, time-explicit new node, by adding the new elements to the technosphere matrix.
         For processes at the intersection with background databases, the timing of the exchanges determines which background database to link to in so called "Temporal Markets".
@@ -131,7 +131,7 @@ class MatrixModifier:
             self.timeline.groupby(["producer", "time_mapped_producer"])
             .count()
             .index.values
-        )  # array of unique (producer, timestamp) tuples
+        )  # array of unique ((original) producer_id, (new) time_mapped_producer_id) tuples
 
         datapackage_bio = bwp.create_datapackage(sum_inter_duplicates=False)
 
@@ -140,17 +140,17 @@ class MatrixModifier:
                 bd.get_activity(producer[0])["database"]
                 not in self.database_date_dict_static_only.keys()  # skip temporal markets
             ):
-                producer_id = producer[1]
-                # the producer_id is a combination of the activity_id and the timestamp
-                producer_node = bd.get_node(id=producer[0])
+                new_producer_id = producer[1]
+                # id of time-mapped process
+                orig_producer_node = bd.get_node(id=producer[0])
                 indices = (
                     []
                 )  # list of (biosphere, technosphere) indices for the biosphere flow exchanges
                 amounts = []  # list of amounts corresponding to the bioflows
-                for exc in producer_node.biosphere():
+                for exc in orig_producer_node.biosphere():
                     indices.append(
-                        (exc.input.id, producer_id)
-                    )  # directly build a list of tuples to pass into the datapackage, the producer_id is used to for the column of that activity
+                        (exc.input.id, new_producer_id)
+                    )  # directly build a list of tuples to pass into the datapackage, the new_producer_id is the new column index
                     amounts.append(exc.amount)
 
                 datapackage_bio.add_persistent_vector(
@@ -267,7 +267,7 @@ class MatrixModifier:
         else:  # comes from foreground, so it is a temporalized process
             self.temporalized_process_ids.add(new_producer_id)
 
-            # Get the production amount of the previous producer if its not a temporal market - needed diagonal matrix entry
+            # Get the production amount of the previous producer if it's not a temporal market - needed for diagonal matrix entry
             if isinstance(
                 previous_producer_node, bd.backends.iotable.proxies.IOTableActivity
             ):

@@ -271,13 +271,15 @@ class TimexLCA:
         """
         Calculates the time-explicit LCI.
 
-        Generates the biosphere and technosphere modifications via the `MatrixModifier` class by
-        calling `TimexLCA. build_datapackage() if `expand_technosphere' is True. Otherwise it
-        generates a dynamic inventory directly from from the timeline. Optionally, the dynamic
-        biosphere matrix and dynamic inventory is calculated via
-        `TimexLCA.calculate_dynamic_inventory()`. Set `build_dynamic_biosphere` to False if you only
-        want to get a new overall score and don't care about the timing of the emissions. This saves
-        time and memory.
+        There are two ways to generate time-explicit LCIs:
+        If `expand_technosphere' is True, the biosphere and technosphere matrices are expanded by inserting time-specific
+        processes via the `MatrixModifier` class by calling `TimexLCA.build_datapackage(). Otherwise ('expand_technosphere' is False), it
+        generates a dynamic inventory directly from the timeline without technosphere matrix calculations.
+
+        Next to the choice above concerning how to retrieve the time-explicit inventory, users can also decide if
+        they want to retain all temporal information at the biosphere level (build_dynamic_biosphere = True).
+        Set `build_dynamic_biosphere` to False if you only want to get a new overall score of the time-explicit inventory and don't care about
+        the timing of the emissions. This saves time and memory.
 
         Parameters
         ----------
@@ -285,8 +287,8 @@ class TimexLCA:
             if True, build the dynamic biosphere matrix and calculate the dynamic LCI.
             Default is True.
         expand_technosphere: bool
-            if True, creates an expanded time-explicit technosphere and calculates the LCI from it.
-            If False, creates no new technosphere, but calculates the dynamic inventory directly
+            if True, creates an expanded time-explicit technosphere and biosphere matrix and calculates the LCI from it.
+            if False, creates no new technosphere, but calculates the dynamic inventory directly
             from the timeline. Building from the timeline currently only works if
             `build_dynamic_biosphere` is also True.
 
@@ -303,7 +305,7 @@ class TimexLCA:
 
         if not expand_technosphere and not build_dynamic_biosphere:
             raise ValueError(
-                "Currently it is only possible to calculate a dynamic inventory from the timeline.\
+                "Currently, it is not possible to skip the construction of the dynamic biosphere when building the inventories from the timeline.\
                     Please either set build_dynamic_biosphere=True or expand_technosphere=True"
             )
 
@@ -323,7 +325,7 @@ class TimexLCA:
         if expand_technosphere:
             self.datapackage = self.build_datapackage()
             data_obs = self.data_objs + self.datapackage
-            self.expanded_technosphere = True  # set flag for later static lcia useage
+            self.expanded_technosphere = True  # set flag for later static lcia usage
         else:  # setup for timeline approach
             self.collect_temporalized_processes_from_timeline()
             data_obs = self.data_objs
@@ -523,7 +525,7 @@ class TimexLCA:
         Returns
         -------
         list
-            List of datapackages that contain the modifications to the technopshere and biosphere
+            List of datapackages that contain the modifications to the technosphere and biosphere
             matrix
 
         See also
@@ -553,7 +555,9 @@ class TimexLCA:
 
         Parameters
         ----------
-        None
+        from_timeline: bool
+            A boolean indicating if the dynamic biosphere matrix is built directly from the
+            timeline or from the expanded matrices. Default is False.
 
         Returns
         -------
@@ -566,9 +570,7 @@ class TimexLCA:
         """
 
         if not hasattr(self, "lca"):
-            warnings.warn(
-                "Static Timex LCA has not been run. Call TimexLCA.lci() first."
-            )
+            warnings.warn("Timex LCA has not been run. Call TimexLCA.lci() first.")
             return
 
         self.len_technosphere_dbs = sum(
