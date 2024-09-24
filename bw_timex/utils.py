@@ -385,14 +385,14 @@ def get_exchange(**kwargs) -> Exchange:
     # Process input_node if present
     input_node = kwargs.pop("input_node", None)
     if input_node:
-        kwargs["input_code"] = input_node.code
-        kwargs["input_database"] = input_node.database
+        kwargs["input_code"] = input_node["code"]
+        kwargs["input_database"] = input_node["database"]
 
     # Process output_node if present
     output_node = kwargs.pop("output_node", None)
     if output_node:
-        kwargs["output_code"] = output_node.code
-        kwargs["output_database"] = output_node.database
+        kwargs["output_code"] = output_node["code"]
+        kwargs["output_database"] = output_node["database"]
 
     # Map kwargs to database fields
     mapping = {
