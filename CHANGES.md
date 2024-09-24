@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2024-09-24
+* Added support for passing Node objects to `bw_timex.utils.get_exchange` and `bw_timex.utils.add_temporal_distribution_to_exchange`.
+
 ## [0.2.3] - 2024-09-22
 * Modified the date rounding behavior: Instead of always rounding off the dates in the timeline (using the resolution specified in temporal_grouping), we now round to the nearest year/month/day/hour (depending on temporal_grouping).
 * Fixed interface to dynamic_characterization (see https://github.com/brightway-lca/dynamic_characterization/releases/tag/v1.0.0) and pinned version to >=1.0.0. 
