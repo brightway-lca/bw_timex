@@ -534,7 +534,7 @@ class TimelineBuilder:
             raise ValueError(
                 f"Sorry, but {interpolation_type} interpolation is not available yet."
             )
-        return {closest_lower: 1 - weight, closest_higher: weight}
+        return {closest_lower: round(1 - weight, 3), closest_higher: round(weight, 3)}
 
     def add_interpolation_weights_at_intersection_to_background(
         self, row
