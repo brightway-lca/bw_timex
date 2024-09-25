@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2024-09-25
+* Added rounding to 3 decimal places for interpolation weights
+
 ## [0.2.4] - 2024-09-24
 * Added support for passing Node objects to `bw_timex.utils.get_exchange` and `bw_timex.utils.add_temporal_distribution_to_exchange`.
 
