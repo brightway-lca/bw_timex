@@ -1,5 +1,6 @@
 import warnings
 from datetime import datetime
+from functools import partial
 from itertools import chain
 from typing import Callable, Optional
 
@@ -31,7 +32,11 @@ from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import SetList, TimeMappingDict
 from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
-from .utils import extract_date_as_integer, resolve_temporalized_node_name
+from .utils import (
+    extract_date_as_integer,
+    resolve_temporalized_node_name,
+    round_datetime,
+)
 
 
 class TimexLCA:
@@ -444,6 +449,18 @@ class TimexLCA:
 
         # Set a default for inventory_in_time_horizon using the full dynamic_inventory_df
         inventory_in_time_horizon = self.dynamic_inventory_df
+
+        # Round dates to nearest year and sum up emissions for each year
+        inventory_in_time_horizon.date = inventory_in_time_horizon.date.apply(
+            partial(round_datetime, resolution="year")
+        )
+        inventory_in_time_horizon = (
+            inventory_in_time_horizon.groupby(
+                inventory_in_time_horizon.columns.tolist()
+            )
+            .sum()
+            .reset_index()
+        )
 
         # Calculate the latest considered impact date
         t0_date = pd.Timestamp(self.timeline_builder.edge_extractor.t0.date[0])
