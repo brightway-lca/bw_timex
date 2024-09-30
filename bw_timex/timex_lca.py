@@ -59,15 +59,6 @@ class TimexLCA:
     Temporal information of both processes and biosphere flows is retained, allowing for dynamic
     LCIA.
 
-    Currently, Absolute Temporal Distributions (ATD) for biosphere exchanges are dealt with as a look up
-    function: If an activity happens at timestamp X then and the biosphere exchange has an absolute
-    temporal distribution (ATD), it looks up the amount from the ATD corresponding to timestamp
-    X. E.g.: X=2024, TD=(data=[2020,2021,2022,2023,2024,.....,2120 ], amount=[3,4,4,5,6,......,3]),
-    it will look up the value 6 corresponding 2024. If timestamp X does not exist it find the
-    nearest timestamp available (if two timestamps are equally close, it will take the first in
-    order of appearance (see numpy.argmin() for this behaviour).
-
-
     TimexLCA calculates:
      1) a static "base" LCA score (`TimexLCA.base_score`, same as `bw2calc.lca.score`),
      2) a static time-explicit LCA score (`TimexLCA.static_score`), which links LCIs to the
@@ -126,9 +117,11 @@ class TimexLCA:
         if not self.database_date_dict:
             warnings.warn(
                 "No database_date_dict provided. Treating the databases containing the functional \
-                unit as dynamic. No remapping to time explicit databases will be done."
+                unit as dynamic. No remapping of inventories to time explicit databases will be done."
             )
             self.database_date_dict = {key[0]: "dynamic" for key in demand.keys()}
+
+        self.check_format_database_date_dict()
 
         # Create static_only dict that excludes dynamic processes that will be exploded later.
         # This way we only have the "background databases" that we can later link to from the dates
@@ -952,6 +945,31 @@ class TimexLCA:
             indexed_demand = None
 
         return indexed_demand, data_objs, remapping_dicts
+
+    def check_format_database_date_dict(self) -> None:
+        """
+        Checks that the database_date_dict is provided by the user in the correct format
+        and that the databases are available in the Brightway2 project.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None, but raises an error if the format is not correct or the databases are not available.
+
+        """
+        for database, value in self.database_date_dict.items():
+            if not (value == "dynamic" or isinstance(value, datetime)):
+                raise ValueError(
+                    f"Warning: The timestamp {value} is neither 'dynamic' nor a datetime object. Check the format of the database_date_dict."
+                )
+
+            if database not in bd.databases:
+                raise ValueError(
+                    f"Database '{database}' not available in the Brightway2 project."
+                )
 
     def create_node_id_collection_dict(self) -> None:
         """
