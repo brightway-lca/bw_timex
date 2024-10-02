@@ -1132,7 +1132,7 @@ class TimexLCA:
                     
                 except KeyError as e:
                     warnings.warn(
-                    f"Failed to find process in database {original_database} for name='{orig_act["name"]}', reference product='{orig_act['reference product']}', location='{orig_act['location']}': {e}"
+                    f"Failed to find process in database {original_database} for name='{orig_act['name']}', reference product='{orig_act['reference product']}', location='{orig_act['location']}': {e}"
                     )
             
             self.interdatabase_activity_mapping.add(act_set)
