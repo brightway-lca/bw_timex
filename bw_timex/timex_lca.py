@@ -36,6 +36,7 @@ from .utils import (
     extract_date_as_integer,
     resolve_temporalized_node_name,
     round_datetime,
+    find_matching_node,
 )
 
 
@@ -249,6 +250,8 @@ class TimexLCA:
         )
 
         self.timeline = self.timeline_builder.build_timeline()
+
+        self.add_interdatabase_activity_mapping_from_timeline()
 
         return self.timeline[
             [
@@ -983,7 +986,7 @@ class TimexLCA:
         - ``demand_dependent_background_node_ids``: set of node ids of all processes that depend on the demand processes and are in the background databases
         - ``foreground_node_ids``: set of node ids of all processes that are not in the background databases
         - ``first_level_background_node_ids_static``: set of node ids of all processes that are in the background databases and are directly linked to the demand processes
-        - ``first_level_background_node_ids_all``: like first_level_background_node_ids_static, but includes first level background processes from other time explicit databases.
+        - ``first_level_background_node_ids_interpolated``: like first_level_background_node_ids_static, but includes first level background processes from the other time explicit databases that are used (is filled after timeline is built)
         - ``first_level_background_node_id_dbs``: dictionary with the first_level_background_node_ids_static as keys returning their database
 
         It also initiates an instance of SetList which contains all mappings of equivalent
@@ -1001,7 +1004,6 @@ class TimexLCA:
             as well as interdatabase_activity_mapping
         """
         self.node_id_collection_dict = {}
-        self.interdatabase_activity_mapping = SetList()
 
         # Original variable names preserved, set types for performance and uniqueness
         demand_database_names = {
@@ -1042,9 +1044,10 @@ class TimexLCA:
         self.node_id_collection_dict["foreground_node_ids"] = foreground_node_ids
 
         first_level_background_node_ids_static = set()
-        first_level_background_node_ids_all = set()
+        foreground_db = bd.Database(list(demand_database_names)[0])
+
         for node_id in foreground_node_ids:
-            node = bd.get_node(id=node_id)
+            node = foreground_db.get(id=node_id)
             for exc in chain(node.technosphere(), node.substitution()):
                 if (
                     exc.input["database"]
@@ -1053,35 +1056,95 @@ class TimexLCA:
                     ]
                 ):
                     first_level_background_node_ids_static.add(exc.input.id)
-                    act_set = {(exc.input.id, exc.input["database"])}
-
-                    for background_db in self.database_date_dict_static_only.keys():
-                        try:
-                            other_node = bd.get_node(
-                                **{
-                                    "database": background_db,
-                                    "name": exc.input["name"],
-                                    "product": exc.input["reference product"],
-                                    "location": exc.input["location"],
-                                }
-                            )
-                            first_level_background_node_ids_all.add(other_node.id)
-                            act_set.add((other_node.id, background_db))
-                        except KeyError as e:
-                            warnings.warn(
-                                f"Failed to find process in database {background_db} for \
-                                    name='{exc.input['name']}', \
-                                    reference product='{exc.input['reference product']}', \
-                                    location='{exc.input['location']}': {e}"
-                            )
-                    self.interdatabase_activity_mapping.add(act_set)
 
         self.node_id_collection_dict["first_level_background_node_ids_static"] = (
             first_level_background_node_ids_static
         )
-        self.node_id_collection_dict["first_level_background_node_ids_all"] = (
-            first_level_background_node_ids_all
-        )
+
+    def add_interdatabase_activity_mapping_from_timeline(self) -> None:
+        """
+        Fills the interdatabase_activity_mapping, which is a SetList of the matching processes
+        across background databases in the format of {(id, database_name_1), (id, database_name_2)}
+        with only those activities and background databases that are actually mapped in the
+        timeline. Also adds the ids to the
+        node_id_collection_dict["first_level_background_node_ids_interpolated"]. This avoids
+        unneccessary peewee calls.
+
+        Parameters
+        ----------
+        None
+
+
+        Returns
+        -------
+        None, but adds the ids of producers in other background databases (only those interpolated to in the timeline) to the `interdatabase_activity_mapping` and `node_id_collection["first_level_background_node_ids_interpolated"]`.
+        """
+        if not hasattr(self, "timeline"):
+            warnings.warn(
+                "Timeline not yet built. Call TimexLCA.build_timeline() first."
+            )
+            return
+
+        self.interdatabase_activity_mapping = SetList()
+        first_level_background_node_ids_interpolated = set()
+        unique_producer_background_db_combos = {}
+
+        # get unique combos of producers and background dbs from timeline
+        for _, row in self.timeline.iterrows():
+            if (
+                row["interpolation_weights"] is not None
+            ):  # "None" corresponds to exchanges linked within the foreground -> skipped
+
+                if row["producer"] not in unique_producer_background_db_combos.keys():
+                    unique_producer_background_db_combos[row["producer"]] = set()
+                unique_producer_background_db_combos[row["producer"]].update(
+                    row["interpolation_weights"].keys()
+                )
+
+        # fill interdatabase_activity_mapping with unique combos
+        for (
+            original_producer_id,
+            background_databases,
+        ) in unique_producer_background_db_combos.items():
+            original_database = list(
+                self.node_id_collection_dict[
+                    "demand_dependent_background_database_names"
+                ]
+            )[
+                0
+            ]  # what if more than one orignal bg database is linked?
+            orig_act = bd.get_node(id=original_producer_id)
+            act_set = set()
+
+            for background_db in background_databases:
+                try:
+                    other_node = find_matching_node(orig_act, background_db)
+                    first_level_background_node_ids_interpolated.add(other_node.id)
+                    act_set.add((other_node.id, background_db))
+
+                except KeyError as e:
+                    warnings.warn(
+                        f"Failed to find process in database {background_db} for name='{orig_act['name']}', reference product='{orig_act['reference product']}', location='{orig_act['location']}': {e}"
+                    )
+
+            if (
+                original_database not in background_databases
+            ):  # add original background db in case it's not interpolated to in the timeline
+                try:
+                    other_node = find_matching_node(orig_act, original_database)
+                    first_level_background_node_ids_interpolated.add(other_node.id)
+                    act_set.add((other_node.id, original_database))
+
+                except KeyError as e:
+                    warnings.warn(
+                        f"Failed to find process in database {original_database} for name='{orig_act['name']}', reference product='{orig_act['reference product']}', location='{orig_act['location']}': {e}"
+                    )
+
+            self.interdatabase_activity_mapping.add(act_set)
+            self.node_id_collection_dict[
+                "first_level_background_node_ids_interpolated"
+            ] = first_level_background_node_ids_interpolated
+        return
 
     def collect_temporalized_processes_from_timeline(self) -> None:
         """
