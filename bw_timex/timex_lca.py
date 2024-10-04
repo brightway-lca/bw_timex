@@ -36,6 +36,7 @@ from .utils import (
     extract_date_as_integer,
     resolve_temporalized_node_name,
     round_datetime,
+    find_matching_node,
 )
 
 
@@ -1117,14 +1118,7 @@ class TimexLCA:
 
             for background_db in background_databases:
                 try:
-                    other_node = bd.get_node(
-                        **{
-                            "database": background_db,
-                            "name": orig_act["name"],
-                            "product": orig_act["reference product"],
-                            "location": orig_act["location"],
-                        }
-                    )
+                    other_node = find_matching_node(orig_act, background_db)
                     first_level_background_node_ids_interpolated.add(other_node.id)
                     act_set.add((other_node.id, background_db))
 
@@ -1137,14 +1131,7 @@ class TimexLCA:
                 original_database not in background_databases
             ):  # add original background db in case it's not interpolated to in the timeline
                 try:
-                    other_node = bd.get_node(
-                        **{
-                            "database": original_database,
-                            "name": orig_act["name"],
-                            "product": orig_act["reference product"],
-                            "location": orig_act["location"],
-                        }
-                    )
+                    other_node = find_matching_node(orig_act, original_database)
                     first_level_background_node_ids_interpolated.add(other_node.id)
                     act_set.add((other_node.id, original_database))
 

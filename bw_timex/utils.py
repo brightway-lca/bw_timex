@@ -4,6 +4,7 @@ from typing import Callable, List, Optional, Union
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import bw2data as bd
 from bw2data.backends import ActivityDataset as AD
 from bw2data.backends.proxies import Exchange
 from bw2data.backends.schema import ExchangeDataset
@@ -219,6 +220,34 @@ def resolve_temporalized_node_name(code: str) -> str:
     elif not qs:
         raise UnknownObject
     return names.pop()
+
+
+def find_matching_node(original_node, other_background_db):
+    """
+    Find a node in another background database that matches the original node based on name,
+    reference product, and location.
+
+    Parameters
+    ----------
+    original_node : dict
+        Original node to find a match for.
+    other_background_db : str
+        Name of the other background database to search in.
+
+    Returns
+    -------
+    dict
+        Matching node in the other background database.
+    """
+    other_node = bd.get_node(
+        **{
+            "database": other_background_db,
+            "name": original_node["name"],
+            "product": original_node["reference product"],
+            "location": original_node["location"],
+        }
+    )
+    return other_node
 
 
 def plot_characterized_inventory_as_waterfall(
