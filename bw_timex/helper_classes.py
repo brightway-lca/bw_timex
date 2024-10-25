@@ -39,9 +39,7 @@ class SetList:
             ]
             if len(checklist_items) != 0:
                 warnings.warn(
-                    "tried to add {} to the SetList\n, but {} already exist in the SetList in:\n {}. \n Skipping {}".format(
-                        new_set, checklist_items, checklist_sets, new_set
-                    )
+                    f"tried to add {new_set} to the SetList\n, but {checklist_items} already exist in the SetList in:\n {checklist_sets}. \n Skipping {new_set}"
                 )
                 pass
             else:
@@ -63,14 +61,12 @@ class SetList:
         sets = [matching_set for matching_set in self.list if key in matching_set]
         if len(sets) > 1:
             warnings.warn(
-                "Key found in multiple sets!!!! {} Please check! Returning only the first set".format(
-                    sets
-                )
+                f"Key found in multiple sets! Please check {sets} ! Returning only the first set"
             )
         if len(sets) > 0:
             return sets[0]
         else:
-            warnings.warn("Key {} not found in SetList".format(key))
+            warnings.warn(f"Key {key} not found in SetList")
             return None
 
     def __len__(
@@ -84,7 +80,8 @@ class SetList:
 
 class TimeMappingDict(dict):
     """
-    This class is used to create a dictionary that maps a tuple of (flow and timestamp) to an unique integer id.
+    This class is used to create a dictionary that maps a tuple of (flow and timestamp)
+    to an unique integer id.
     """
 
     def __init__(self, start_id=2, *args, **kwargs) -> None:
@@ -123,7 +120,8 @@ class TimeMappingDict(dict):
         Returns
         -------
         int
-            An unique id for the process_time_tuple, and adds it to the dictionary, if not already present.
+            An unique id for the process_time_tuple, and adds it to the dictionary,
+            if not already present.
         """
         if process_time_tuple in self:
             return self[process_time_tuple]

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from heapq import heappop, heappush
 from numbers import Number
-from typing import Callable, List
+from typing import Callable
 
 import numpy as np
 from bw_temporalis import TemporalDistribution, TemporalisLCA
@@ -34,25 +34,30 @@ class Edge:
 
 class EdgeExtractor(TemporalisLCA):
     """
-    Child class of TemporalisLCA that traverses the supply chain just as the parent class but can create a timeline of edges, in addition timeline of flows or nodes.
-    The edge timeline is then used to match the timestamp of edges to that of background databases and to replace these edges with edges from these background databases using Brightway Datapackages.
+    Child class of TemporalisLCA that traverses the supply chain just as the parent
+    class but can create a timeline of edges, in addition timeline of flows or nodes.
+    The edge timeline is then used to match the timestamp of edges to that of background
+    databases and to replace these edges with edges from these background databases
+    using Brightway Datapackages.
     """
 
     def __init__(self, *args, edge_filter_function: Callable = None, **kwargs) -> None:
         """
-        Initialize the EdgeExtractor class and traverses the supply chain using functions of the parent class TemporalisLCA.
+        Initialize the EdgeExtractor class and traverses the supply chain using
+        functions of the parent class TemporalisLCA.
 
         Parameters
         ----------
         *args : Variable length argument list
         edge_filter_function : Callable, optional
-            A callable that filters edges. If not provided, a function that always returns False is used.
+            A callable that filters edges. If not provided, a function that always
+            returns False is used.
         **kwargs : Arbitrary keyword arguments
 
         Returns
         -------
-        None but stores the output of the TemporalisLCA graph traversal (incl. relation of edges (edge_mapping)
-        and nodes (node_mapping) in the instance of the class.
+        None but stores the output of the TemporalisLCA graph traversal (incl. relation
+        of edges (edge_mapping) and nodes (node_mapping) in the instance of the class.
 
         """
         super().__init__(*args, **kwargs)  # use __init__ of TemporalisLCA
@@ -64,9 +69,12 @@ class EdgeExtractor(TemporalisLCA):
 
     def build_edge_timeline(self) -> list:
         """
-        Creates a timeline of the edges from the output of the graph traversal. Starting from the edges of the functional unit node, it goes through each node using a heap, selecting the node with the highest impact first.
-        It, then, propagates the TemporalDistributions of the edges from node to node through time using convolution-operators.
-        It stops in case the current edge is known to have no temporal distribution (=leaf) (e.g. part of background database).
+        Creates a timeline of the edges from the output of the graph traversal.
+        Starting from the edges of the functional unit node, it goes through
+        each node using a heap, selecting the node with the highest impact first.
+        It, then, propagates the TemporalDistributions of the edges from node to
+        node through time using convolution-operators. It stops in case the current edge
+        is known to have no temporal distribution (=leaf) (e.g. part of background database).
 
         Parameters
         ----------
@@ -75,7 +83,8 @@ class EdgeExtractor(TemporalisLCA):
         Returns
         -------
         list
-            A list of Edge instances with timestamps and amounts, and ids of its producing and consuming node.
+            A list of Edge instances with timestamps and amounts, and ids of its producing
+            and consuming node.
 
         """
 
@@ -182,9 +191,11 @@ class EdgeExtractor(TemporalisLCA):
         self, td_producer: TemporalDistribution, td_consumer: TemporalDistribution
     ) -> TemporalDistribution:
         """
-        Joins a datetime TemporalDistribution (td_producer) with a timedelta TemporalDistribution (td_consumer) to create a new TemporalDistribution.
+        Joins a datetime TemporalDistribution (td_producer) with a timedelta
+        TemporalDistribution (td_consumer) to create a new TemporalDistribution.
 
-        If the producer does not have a TemporalDistribution, the consumer's TemporalDistribution is returned to continue the timeline.
+        If the producer does not have a TemporalDistribution, the consumer's
+        TemporalDistribution is returned to continue the timeline.
         If both the producer and consumer have TemporalDistributions, they are joined together.
 
         Parameters
@@ -197,12 +208,14 @@ class EdgeExtractor(TemporalisLCA):
         Returns
         -------
         TemporalDistribution
-            A new TemporalDistribution that is the result of joining the producer and consumer TemporalDistributions.
+            A new TemporalDistribution that is the result of joining the producer
+            and consumer TemporalDistributions.
 
         Raises
         ------
         ValueError
-            If the dtype of `td_consumer.date` is not `datetime64[s]` or the dtype of `td_producer.date` is not `timedelta64[s]`.
+            If the dtype of `td_consumer.date` is not `datetime64[s]` or the dtype
+            of `td_producer.date` is not `timedelta64[s]`.
 
         """
         # if an edge does not have a TD, then return the consumer_td so that the timeline continues
@@ -230,7 +243,5 @@ class EdgeExtractor(TemporalisLCA):
             return TemporalDistribution(date, amount)
         else:
             raise ValueError(
-                "Can't join TemporalDistribution and something else: Trying with {} and {}".format(
-                    type(td_consumer.date), type(td_producer.date)
-                )
+                f"Can't join TemporalDistribution and something else: Trying with {type(td_consumer.date)} and {type(td_producer.date)}"
             )

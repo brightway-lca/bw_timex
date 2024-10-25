@@ -44,7 +44,7 @@ class TimexLCA:
     """
     Class to perform time-explicit LCA calculations.
 
-    A TimexLCA contains the LCI of processes occuring at explicit points in time. It tracks the timing of processes,
+    A TimexLCA contains the LCI of processes occurring at explicit points in time. It tracks the timing of processes,
     relinks their technosphere and biosphere exchanges to match the technology landscape at that point in time,
     and also keeps track of the timing of the resulting emissions. As such, it combines prospective and dynamic LCA
     approaches.
@@ -54,7 +54,7 @@ class TimexLCA:
     the timing of the processes, bw_timex matches the processes at the intersection between
     foreground and background to the best available background databases. This temporal relinking is
     achieved by using datapackages to add new time-specific processes. The new processes and their
-    exchanges to other technosphere processes or biosphere flows extent the technopshere and
+    exchanges to other technosphere processes or biosphere flows extent the technosphere and
     biosphere matrices.
 
     Temporal information of both processes and biosphere flows is retained, allowing for dynamic
@@ -65,7 +65,7 @@ class TimexLCA:
      2) a static time-explicit LCA score (`TimexLCA.static_score`), which links LCIs to the
         respective background databases, but without dynamic characterization of the time-explicit inventory
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and
-        dynamic charaterization. These are provided for radiative forcing and GWP but can also be
+        dynamic characterization. These are provided for radiative forcing and GWP but can also be
         user-defined.
 
     Example
@@ -132,7 +132,7 @@ class TimexLCA:
         }
 
         # Create some collections of nodes that will be useful down the line, e.g. all nodes from
-        # the background databases that link to foregroud nodes.
+        # the background databases that link to foreground nodes.
         self.create_node_id_collection_dict()
 
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
@@ -167,8 +167,9 @@ class TimexLCA:
         Parameters
         ----------
         starting_datetime: datetime | str, optional
-            Point in time when the demand occurs. This is the initial starting point of the graph traversal and the
-            timeline. Something like `"now"` or `"2023-01-01"`. Default is `"now"`.
+            Point in time when the demand occurs. This is the initial starting point of the
+            graph traversal and the timeline. Something like `"now"` or `"2023-01-01"`.
+            Default is `"now"`.
         temporal_grouping : str, optional
             Time resolution for grouping exchanges over time in the timeline. Default is 'year',
             other options are 'month', 'day', 'hour'.
@@ -273,14 +274,17 @@ class TimexLCA:
         Calculates the time-explicit LCI.
 
         There are two ways to generate time-explicit LCIs:
-        If `expand_technosphere' is True, the biosphere and technosphere matrices are expanded by inserting time-specific
-        processes via the `MatrixModifier` class by calling `TimexLCA.build_datapackage(). Otherwise ('expand_technosphere' is False), it
-        generates a dynamic inventory directly from the timeline without technosphere matrix calculations.
+        If `expand_technosphere' is True, the biosphere and technosphere matrices are expanded by inserting
+        time-specific processes via the `MatrixModifier` class by calling `TimexLCA.build_datapackage().
+        Otherwise ('expand_technosphere' is False), it generates a dynamic inventory directly from the
+        timeline without technosphere matrix calculations.
 
-        Next to the choice above concerning how to retrieve the time-explicit inventory, users can also decide if
-        they want to retain all temporal information at the biosphere level (build_dynamic_biosphere = True).
-        Set `build_dynamic_biosphere` to False if you only want to get a new overall score of the time-explicit inventory and don't care about
-        the timing of the emissions. This saves time and memory.
+        Next to the choice above concerning how to retrieve the time-explicit inventory, users
+        can also decide if they want to retain all temporal information at the biosphere level
+        (build_dynamic_biosphere = True).
+        Set `build_dynamic_biosphere` to False if you only want to get a new overall score of
+        the time-explicit inventory and don't care about the timing of the emissions.
+        This saves time and memory.
 
         Parameters
         ----------
@@ -288,7 +292,8 @@ class TimexLCA:
             if True, build the dynamic biosphere matrix and calculate the dynamic LCI.
             Default is True.
         expand_technosphere: bool
-            if True, creates an expanded time-explicit technosphere and biosphere matrix and calculates the LCI from it.
+            if True, creates an expanded time-explicit technosphere and biosphere matrix and
+            calculates the LCI from it.
             if False, creates no new technosphere, but calculates the dynamic inventory directly
             from the timeline. Building from the timeline currently only works if
             `build_dynamic_biosphere` is also True.
@@ -300,14 +305,16 @@ class TimexLCA:
 
         See also
         --------
-        build_datapackage: Method to create the datapackages that contain the modifications to the technopshere and biosphere matrix using the `MatrixModifier` class.
+        build_datapackage: Method to create the datapackages that contain the modifications
+        to the technosphere and biosphere matrix using the `MatrixModifier` class.
         calculate_dynamic_inventory: Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
 
         if not expand_technosphere and not build_dynamic_biosphere:
             raise ValueError(
-                "Currently, it is not possible to skip the construction of the dynamic biosphere when building the inventories from the timeline.\
-                    Please either set build_dynamic_biosphere=True or expand_technosphere=True"
+                "Currently, it is not possible to skip the construction of the dynamic \
+                biosphere when building the inventories from the timeline.\
+                Please either set build_dynamic_biosphere=True or expand_technosphere=True"
             )
 
         if not hasattr(self, "timeline"):
@@ -428,11 +435,12 @@ class TimexLCA:
         Returns
         -------
         pandas.DataFrame
-            A Dataframe with the characterized inventory for the chosen metric and parameters.
+            A DataFrame with the characterized inventory for the chosen metric and parameters.
 
         See also
         --------
-        dynamic_charaterization: Package handling the dynamic characterization: https://dynamic-characterization.readthedocs.io/en/latest/
+        dynamic_characterization: Package handling the dynamic characterization:
+        https://dynamic-characterization.readthedocs.io/en/latest/
         """
 
         if not hasattr(self, "dynamic_inventory"):
@@ -528,7 +536,7 @@ class TimexLCA:
 
     def build_datapackage(self) -> list:
         """
-        Creates the datapackages that contain the modifications to the technopshere and biosphere
+        Creates the datapackages that contain the modifications to the technosphere and biosphere
         matrix using the `MatrixModifier` class.
 
         Parameters
@@ -579,7 +587,8 @@ class TimexLCA:
 
         See also
         --------
-        bw_timex.dynamic_biosphere_builder.DynamicBiosphereBuilder: Class for creating the dynamic biosphere matrix and inventory.
+        bw_timex.dynamic_biosphere_builder.DynamicBiosphereBuilder: Class for creating
+        the dynamic biosphere matrix and inventory.
         """
 
         if not hasattr(self, "lca"):
@@ -613,7 +622,7 @@ class TimexLCA:
 
         # Build the dynamic inventory
         count = len(self.dynamic_biosphere_builder.dynamic_supply_array)
-        # diagnolization of supply array keeps the dimension of the process, which we want to pass
+        # diagonalization of supply array keeps the dimension of the process, which we want to pass
         # as additional information to the dynamic inventory dict
         diagonal_supply_array = sparse.spdiags(
             [self.dynamic_biosphere_builder.dynamic_supply_array], [0], count, count
@@ -750,7 +759,8 @@ class TimexLCA:
 
         See also
         --------
-        bw2data.compat.prepare_lca_inputs: Original code this function is adapted from (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
+        bw2data.compat.prepare_lca_inputs: Original code this function is adapted from
+        (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
 
         """
         if not projects.dataset.data.get("25"):
@@ -863,7 +873,8 @@ class TimexLCA:
 
         See also
         --------
-        bw2data.compat.prepare_lca_inputs: Original code this function is adapted from (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
+        bw2data.compat.prepare_lca_inputs: Original code this function is adapted
+        from (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
         """
 
         if not projects.dataset.data.get("25"):
@@ -981,13 +992,21 @@ class TimexLCA:
         Available collections are:
 
         - ``demand_database_names``: set of database names of the demand processes
-        - ``demand_dependent_database_names``: set of database names of all processes that depend on the demand processes
-        - ``demand_dependent_background_database_names``: set of database names of all processes that depend on the demand processes and are in the background databases
-        - ``demand_dependent_background_node_ids``: set of node ids of all processes that depend on the demand processes and are in the background databases
-        - ``foreground_node_ids``: set of node ids of all processes that are not in the background databases
-        - ``first_level_background_node_ids_static``: set of node ids of all processes that are in the background databases and are directly linked to the demand processes
-        - ``first_level_background_node_ids_interpolated``: like first_level_background_node_ids_static, but includes first level background processes from the other time explicit databases that are used (is filled after timeline is built)
-        - ``first_level_background_node_id_dbs``: dictionary with the first_level_background_node_ids_static as keys returning their database
+        - ``demand_dependent_database_names``: set of database names of all processes
+        that depend on the demand processes
+        - ``demand_dependent_background_database_names``: set of database names of all
+        processes that depend on the demand processes and are in the background databases
+        - ``demand_dependent_background_node_ids``: set of node ids of all processes
+        that depend on the demand processes and are in the background databases
+        - ``foreground_node_ids``: set of node ids of all processes that are
+        not in the background databases
+        - ``first_level_background_node_ids_static``: set of node ids of all
+        processes that are in the background databases and are directly linked to the demand processes
+        - ``first_level_background_node_ids_interpolated``: like first_level_background_node_ids_static,
+        but includes first level background processes from the other time explicit databases that are
+        used (is filled after timeline is built)
+        - ``first_level_background_node_id_dbs``: dictionary with the first_level_background_node_ids_static
+        as keys returning their database
 
         It also initiates an instance of SetList which contains all mappings of equivalent
         activities across time-specific databases:
@@ -1068,7 +1087,7 @@ class TimexLCA:
         with only those activities and background databases that are actually mapped in the
         timeline. Also adds the ids to the
         node_id_collection_dict["first_level_background_node_ids_interpolated"]. This avoids
-        unneccessary peewee calls.
+        unnecessary peewee calls.
 
         Parameters
         ----------
@@ -1077,7 +1096,9 @@ class TimexLCA:
 
         Returns
         -------
-        None, but adds the ids of producers in other background databases (only those interpolated to in the timeline) to the `interdatabase_activity_mapping` and `node_id_collection["first_level_background_node_ids_interpolated"]`.
+        None, but adds the ids of producers in other background databases
+        (only those interpolated to in the timeline) to the `interdatabase_activity_mapping`
+        and `node_id_collection["first_level_background_node_ids_interpolated"]`.
         """
         if not hasattr(self, "timeline"):
             warnings.warn(
@@ -1157,7 +1178,7 @@ class TimexLCA:
         Returns
         -------
         None, but adds "temporal_markets" and "temporalized_processes" to the
-        node_id_colletion_dict based on the timeline.
+        node_id_collection_dict based on the timeline.
 
         """
         unique_producers = (
@@ -1188,10 +1209,11 @@ class TimexLCA:
         Adds all activities from the static LCA to `activity_time_mapping_dict`, an instance of
         `TimeMappingDict`. This gives a unique mapping in the form of
         (('database', 'code'), datetime_as_integer): time_mapping_id) that is later used to uniquely
-        identify time-resolved processes. Here,  the activity_time_mapping_dict is the pre-population with
-        the static activities. The time-explicit activities (from other temporalized background
-        databases) are added later on by the TimelineBuilder. Activities in the foreground database are
-        mapped with (('database', 'code'), "dynamic"): time_mapping_id)" as their timing is not yet known.
+        identify time-resolved processes. Here,  the activity_time_mapping_dict is the
+        pre-population with the static activities. The time-explicit activities (from other
+        temporalized background databases) are added later on by the TimelineBuilder.
+        Activities in the foreground database are mapped with
+        (('database', 'code'), "dynamic"): time_mapping_id)" as their timing is not yet known.
 
         Parameters
         ----------
@@ -1413,7 +1435,7 @@ class TimexLCA:
     ) -> None:
         """
         Plot the characterized inventory of the dynamic LCI in a very simple plot.
-        Legend and title are selcted automatically based on the chosen metric.
+        Legend and title are selected automatically based on the chosen metric.
 
         Parameters
         ----------

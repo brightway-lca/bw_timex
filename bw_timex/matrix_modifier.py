@@ -25,7 +25,8 @@ class MatrixModifier:
         name: Optional[str] = None,
     ) -> None:
         """
-        Initializes the MatrixModifier object and creates empty sets to collect the ids of temporalized processes and temporal markets.
+        Initializes the MatrixModifier object and creates empty sets to collect
+        the ids of temporalized processes and temporal markets.
 
         Parameters
         ----------
@@ -49,7 +50,8 @@ class MatrixModifier:
 
     def create_datapackage(self) -> None:
         """
-        Creates a list of datapackages for the technosphere and biosphere matrices, by calling the respective functions.
+        Creates a list of datapackages for the technosphere and biosphere matrices,
+        by calling the respective functions.
 
         Parameters
         ----------
@@ -67,13 +69,17 @@ class MatrixModifier:
 
     def create_technosphere_datapackage(self) -> bwp.Datapackage:
         """
-        Creates the modifications to the technosphere matrix in form of a datapackage. Datapackages add or overwrite datapoints in the LCA matrices before LCA calculations.
-        The technosphere datapackage adds the temporalized processes from the timeline to the technosphere matrix.
+        Creates the modifications to the technosphere matrix in form of a datapackage.
+        Datapackages add or overwrite data points in the LCA matrices before LCA calculations.
+        The technosphere datapackage adds the temporalized processes from the timeline
+        to the technosphere matrix.
 
         The heavy lifting of this method happens in the method `add_row_to_datapackage()`.
-        Here, each node with a temporal distribution is "exploded", which means each occurrence of this node (e.g. steel production on 2020-01-01
-        and steel production on 2015-01-01) becomes a separate, time-explicit new node, by adding the new elements to the technosphere matrix.
-        For processes at the intersection with background databases, the timing of the exchanges determines which background database to link to in so called "Temporal Markets".
+        Here, each node with a temporal distribution is "exploded", which means each occurrence
+        of this node (e.g. steel production on 2020-01-01 and steel production on 2015-01-01)
+        becomes a separate, time-explicit new node, by adding the new elements to the technosphere matrix.
+        For processes at the intersection with background databases, the timing of the exchanges
+         determines which background database to link to in so called "Temporal Markets".
 
         Parameters
         ----------
@@ -110,13 +116,15 @@ class MatrixModifier:
 
     def create_biosphere_datapackage(self) -> bwp.Datapackage:
         """
-        Creates the modifications to the biosphere matrix in form of a datapackage. Datapackages add or overwrite datapoints in the LCA matrices before LCA calculations.
+        Creates the modifications to the biosphere matrix in form of a datapackage.
+        Datapackages add or overwrite data points in the LCA matrices before LCA calculations.
         It adds the biosphere flows to the exploded technosphere processes.
 
-        This function iterates over each unique producer, and for each biosphere exchange of the original activity,
-        it creates a new biosphere exchange for the new "temporalized" node.
+        This function iterates over each unique producer, and for each biosphere exchange
+        of the original activity, it creates a new biosphere exchange for the new "temporalized" node.
 
-        Temporal markets have no biosphere exchanges, as they only divide the amount of a technosphere exchange between the different databases.
+        Temporal markets have no biosphere exchanges, as they only divide the amount of
+        a technosphere exchange between the different databases.
 
         Parameters
         ----------
@@ -172,10 +180,14 @@ class MatrixModifier:
         new_nodes: set,
     ) -> None:
         """
-        This adds the modifications to the technosphere matrix for each time-dependent exchange as datapackage elements to a given `bwp.Datapackage`.
+        This adds the modifications to the technosphere matrix for each time-dependent exchange
+        as datapackage elements to a given `bwp.Datapackage`.
         Modifications include:
-        1) Exploded processes: new matrix elements for time-explicit consumer and time-explicit producer, representing the temporal edge between them.
-        2) Temporal markets: new matrix entries for "temporal markets" and links to the producers in temporally matching background databases. Processes in the background databases are matched on name, reference product and location.
+        1) Exploded processes: new matrix elements for time-explicit consumer and time-explicit
+        producer, representing the temporal edge between them.
+        2) Temporal markets: new matrix entries for "temporal markets" and links to the producers
+        in temporally matching background databases. Processes in the background databases are
+        matched on name, reference product and location.
         3) Diagonal entries: ones on the diagonal for new nodes.
 
         This function also collects the ids of new nodes, temporalized nodes and temporal markets.
@@ -191,7 +203,8 @@ class MatrixModifier:
 
         Returns
         -------
-        None but adds elements for this edge to the bwp.Datapackage and stores the ids of new nodes, temporalized nodes and temporal markets.
+        None but adds elements for this edge to the bwp.Datapackage and stores the ids of new nodes,
+        temporalized nodes and temporal markets.
         """
 
         if row.consumer == -1:  # functional unit
@@ -209,7 +222,7 @@ class MatrixModifier:
         previous_producer_id = row.producer
         previous_producer_node = bd.get_node(
             id=previous_producer_id
-        )  # in future versions, insead of getting node, just provide list of producer ids
+        )  # in future versions, instead of getting node, just provide list of producer ids
 
         # Add entry between exploded consumer and exploded producer (not in background database)
         datapackage.add_persistent_vector(

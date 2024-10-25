@@ -11,7 +11,8 @@ from .utils import convert_date_string_to_datetime
 
 class DynamicBiosphereBuilder:
     """
-    Class for building a dynamic biosphere matrix with dimensions (biosphere flow at a specific point in time) x (processes)
+    Class for building a dynamic biosphere matrix with dimensions
+    (biosphere flow at a specific point in time) x (processes)
     """
 
     def __init__(
@@ -33,7 +34,7 @@ class DynamicBiosphereBuilder:
 
         Parameters
         ----------
-        lca_obj : LCA objecct
+        lca_obj : LCA object
             instance of the bw2calc LCA class, e.g. TimexLCA.lca
         activity_time_mapping_dict : dict
             A dictionary mapping activity to their respective timing in the format
@@ -104,12 +105,12 @@ class DynamicBiosphereBuilder:
         from_timeline: bool = False,
     ):
         """
-        This function creates a separate biosphere matrix, with the dimenions
-        (bio_flows at a specific timestep) x (processes).
+        This function creates a separate biosphere matrix, with the dimensions
+        (bio_flows at a specific time step) x (processes).
 
         Every temporally resolved biosphere flow has its own row in the matrix, making it highly
         sparse. The timing of the emitting process and potential additional temporal information of
-        the bioshpere flow (e.g. delay of emission compared to the timing of the process) are considered.
+        the biosphere flow (e.g. delay of emission compared to the timing of the process) are considered.
 
         Absolute Temporal Distributions for biosphere exchanges are dealt with as a look up
         function: If an activity happens at timestamp X and the biosphere exchange has an
@@ -117,7 +118,7 @@ class DynamicBiosphereBuilder:
         to timestamp X. E.g.: X = 2024, TD=(data=[2020,2021,2022,2023,2024,.....,2120],
         amount=[3,4,4,5,6,......,3]), it will look up the value 6 corresponding 2024. If timestamp X
         does not exist, it finds the nearest timestamp available (if two timestamps are equally close,
-        it will take the first in order of appearance (see numpy.argmin() for this behaviour).
+        it will take the first in order of appearance (see numpy.argmin() for this behavior).
 
         Parameters
         ----------
@@ -128,7 +129,7 @@ class DynamicBiosphereBuilder:
         Returns
         -------
         dynamic_biomatrix : scipy.sparse.csr_matrix
-            A sparse matrix with the dimensions (bio_flows at a specific timestep) x (processes).
+            A sparse matrix with the dimensions (bio_flows at a specific time step) x (processes).
         """
 
         for row in self.timeline.itertuples():
@@ -271,7 +272,8 @@ class DynamicBiosphereBuilder:
         Returns
         -------
         demand: dict
-            A demand-dictionary with as keys the ids of the time-mapped activities and as values the share.
+            A demand-dictionary with as keys the ids of the time-mapped activities
+            and as values the share.
 
 
         """
@@ -289,7 +291,7 @@ class DynamicBiosphereBuilder:
 
     def demand_from_technosphere(self, idx, process_col_index):
         """
-        Returns a demand dict of background processes based on the technosphere colummn.
+        Returns a demand dict of background processes based on the technosphere column.
         Foreground exchanges are skipped as these are added separately.
 
         Parameters:
@@ -302,7 +304,8 @@ class DynamicBiosphereBuilder:
         Returns
         -------
         demand: dict
-            A demand-dictionary with as keys the brightway ids of the consumed background activities and as values their consumed amount.
+            A demand-dictionary with as keys the brightway ids of the consumed background
+            activities and as values their consumed amount.
         """
         technosphere_column = (
             self.technosphere_matrix[:, process_col_index].toarray().ravel()
@@ -327,8 +330,8 @@ class DynamicBiosphereBuilder:
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
         """
         Adds an entry to a list of row, col and values, which are then used to construct the
-        dynamic biosphere matrix. Only unqiue entries are added, i.e. if the same row and col index
-        already exists, the value is not added again.
+        dynamic biosphere matrix. Only unique entries are added, i.e. if the same row and
+        col index already exists, the value is not added again.
 
         Parameters
         ----------

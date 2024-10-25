@@ -40,9 +40,7 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
     """
     if time_res not in time_res_to_int_dict.keys():
         warnings.warn(
-            'time_res: {} is not a valid option. Please choose from: {} defaulting to "year"'.format(
-                time_res, time_res_to_int_dict.keys()
-            ),
+            f'time_res: {time_res} is not a valid option. Please choose from: {list(time_res_to_int_dict.keys())} defaulting to "year"',
             category=Warning,
         )
     formatted_date = dt_obj.strftime(time_res_to_int_dict[time_res])
@@ -73,24 +71,22 @@ def extract_date_as_string(timestamp: datetime, temporal_grouping: str) -> str:
 
     if temporal_grouping not in time_res_to_int_dict.keys():
         warnings.warn(
-            'temporal_grouping: {} is not a valid option. Please choose from: {} defaulting to "year"'.format(
-                temporal_grouping, time_res_to_int_dict.keys()
-            ),
+            f'temporal_grouping: {temporal_grouping} is not a valid option. Please choose from: {list(time_res_to_int_dict.keys())} defaulting to "year"',
             category=Warning,
         )
     return timestamp.strftime(time_res_to_int_dict[temporal_grouping])
 
 
-def convert_date_string_to_datetime(temporal_grouping, datestring) -> datetime:
+def convert_date_string_to_datetime(temporal_grouping, date_string) -> datetime:
     """
     Converts the string of a date to datetime object.
-    e.g. for `temporal_grouping` = 'month', and `datestring` = '202303', it extracts 2023-03-01
+    e.g. for `temporal_grouping` = 'month', and `date_string` = '202303', it extracts 2023-03-01
 
     Parameters
     ----------
     temporal_grouping : str
         Temporal grouping for the date string. Options are: 'year', 'month', 'day', 'hour'
-    datestring : str
+    date_string : str
         Date as a string
 
     Returns
@@ -107,12 +103,10 @@ def convert_date_string_to_datetime(temporal_grouping, datestring) -> datetime:
 
     if temporal_grouping not in time_res_dict.keys():
         warnings.warn(
-            'temporal grouping: {} is not a valid option. Please choose from: {} defaulting to "year"'.format(
-                temporal_grouping, time_res_dict.keys()
-            ),
+            f'temporal grouping: {temporal_grouping} is not a valid option. Please choose from: {list(time_res_dict.keys())} defaulting to "year"',
             category=Warning,
         )
-    return datetime.strptime(datestring, time_res_dict[temporal_grouping])
+    return datetime.strptime(date_string, time_res_dict[temporal_grouping])
 
 
 def round_datetime(date: datetime, resolution: str) -> datetime:
@@ -257,8 +251,8 @@ def plot_characterized_inventory_as_waterfall(
     order_stacked_activities=None,
 ):
     """
-    Plot a stacked waterfall chart of characterized inventory data. As comparison, static and prospective scores can be added.
-    Only works for metric GWP at the moment.
+    Plot a stacked waterfall chart of characterized inventory data. As comparison,
+    static and prospective scores can be added. Only works for metric GWP at the moment.
 
     Parameters
     ----------

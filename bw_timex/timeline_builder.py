@@ -107,11 +107,17 @@ class TimelineBuilder:
 
     def build_timeline(self) -> pd.DataFrame:
         """
-        Create a dataframe with grouped, time-explicit edges and, for each grouped edge, interpolate to the database with the closest time of representativeness.
+        Create a DataFrame with grouped, time-explicit edges and, for each grouped edge,
+        interpolate to the database with the closest time of representativeness.
 
-        It uses the edge_timeline, an output from the graph traversal in EdgeExtractor. Edges from same producer to same consumer that occur at different times within the same time window (temporal_grouping) are grouped together. Possible temporal groupings are "year", "month", "day" and "hour".
+        It uses the edge_timeline, an output from the graph traversal in EdgeExtractor.
+        Edges from same producer to same consumer that occur at different times within
+        the same time window (temporal_grouping) are grouped together.
+        Possible temporal groupings are "year", "month", "day" and "hour".
 
-        For edges between forground and background system, the column "interpolation weights" assigns the ratio [0-1] of the edge's amount to be taken from the database with the closest time of representativeness. If a process is in the foreground system only, the interpolation weight is set to None.
+        For edges between foreground and background system, the column "interpolation weights"
+        assigns the ratio [0-1] of the edge's amount to be taken from the database with the closest
+        time of representativeness. If a process is in the foreground system only, the interpolation weight is set to None.
         Available interpolation types are:
             - "linear": linear interpolation between the two closest databases, based on temporal distance.
             - "closest": closest database is assigned 1
@@ -195,7 +201,7 @@ class TimelineBuilder:
             lambda x: convert_date_string_to_datetime(self.temporal_grouping, x)
         )
 
-        # add dates as integers as hashes to the dataframe
+        # add dates as integers as hashes to the DataFrame
         grouped_edges["hash_producer"] = grouped_edges["date_producer"].apply(
             lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
         )
@@ -213,7 +219,7 @@ class TimelineBuilder:
                 )
             )
 
-        # store the ids from the time_mapping_dict in dataframe
+        # store the ids from the time_mapping_dict in DataFrame
         grouped_edges["time_mapped_producer"] = grouped_edges.apply(
             lambda row: self.get_time_mapping_key(row.producer, row.hash_producer),
             axis=1,
@@ -228,7 +234,7 @@ class TimelineBuilder:
             axis=1,
         )
 
-        # Add interpolation weights to background databases to the dataframe
+        # Add interpolation weights to background databases to the DataFrame
         grouped_edges = self.add_column_interpolation_weights_to_timeline(
             grouped_edges,
             interpolation_type=self.interpolation_type,
@@ -268,13 +274,13 @@ class TimelineBuilder:
 
     def check_database_names(self) -> None:
         """
-        Check that the strings of the databases exist in the databases of the brightway project.
+        Check that the strings of the databases exist in the databases of the Brightway project.
 
         """
         for db in self.database_date_dict_static_only.keys():
             assert (
                 db in bd.databases
-            ), f"{db} is not in your brightway project databases."
+            ), f"{db} is not in your Brightway project databases."
 
     def extract_edge_data(self, edge: Edge) -> dict:
         """
@@ -309,7 +315,8 @@ class TimelineBuilder:
 
     def adjust_sign_of_amount_based_on_edge_type(self, edge_type):
         """
-        It checks if the an exchange is of type substitution or a technosphere exchange, based on bw2data labelling convention, and adjusts the amount accordingly.
+        It checks if the an exchange is of type substitution or a technosphere exchange,
+        based on bw2data labelling convention, and adjusts the amount accordingly.
         Flips the sign of the amount value in the timeline for substitution (positive technosphere) exchanges.
 
         Parameters
@@ -326,7 +333,7 @@ class TimelineBuilder:
 
         if (
             edge_type in labels.technosphere_negative_edge_types
-        ):  # variants of technosphere lables
+        ):  # variants of technosphere labels
             multiplicator = 1
         elif (
             edge_type in labels.technosphere_positive_edge_types
@@ -374,19 +381,22 @@ class TimelineBuilder:
         interpolation_type: str = "linear",
     ) -> pd.DataFrame:
         """
-        Add a column to a timeline with the weights for an interpolation between the two nearest dates, from the list of dates of the available databases.
+        Add a column to a timeline with the weights for an interpolation between
+        the two nearest dates, from the list of dates of the available databases.
 
         Parameters
         ----------
         tl_df: pd.DataFrame
-            Timeline as a dataframe.
+            Timeline as a DataFrame.
         interpolation_type: str, optional
-            Type of interpolation between the nearest lower and higher dates. Available options: "linear" and "nearest", defaulting to "linear".
+            Type of interpolation between the nearest lower and higher dates.
+            Available options: "linear" and "nearest", defaulting to "linear".
 
         Returns
         -------
         pd.DataFrame
-            Timeline as a dataframe with a column 'interpolation_weights' added, this column looks like {database_name: weight, database_name: weight}.
+            Timeline as a DataFrame with a column 'interpolation_weights' added,
+            this column looks like {database_name: weight, database_name: weight}.
         """
         if not self.database_date_dict_static_only:
             tl_df["interpolation_weights"] = None
@@ -470,7 +480,8 @@ class TimelineBuilder:
         interpolation_type: str = "linear",
     ) -> dict:
         """
-        Find the nearest dates (lower and higher) for a given date from a list of dates and calculate the interpolation weights based on temporal proximity.
+        Find the nearest dates (lower and higher) for a given date from a list of dates
+        and calculate the interpolation weights based on temporal proximity.
 
         Parameters
         ----------
@@ -540,16 +551,17 @@ class TimelineBuilder:
         self, row
     ) -> Union[dict, None]:
         """
-        returns the interpolation weights to background databases only for those exchanges, where the producing process
-        actually comes from a background database (temporal markets).
+        returns the interpolation weights to background databases only for those exchanges,
+        where the producing process actually comes from a background database (temporal markets).
 
         Only these processes are receiving inputs from the background databases.
-        All other process in the timeline are not directly linked to the background, so the interpolation weight info is not needed and set to None
+        All other process in the timeline are not directly linked to the background,
+        so the interpolation weight info is not needed and set to None
 
         Parameters
         ----------
         row : pd.Series
-            Row of the timeline dataframe
+            Row of the timeline DataFrame
         Returns
         -------
         dict
