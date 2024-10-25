@@ -105,7 +105,7 @@ By default, only the foreground system is traversed, but nodes to be
 skipped during traversal can be specified by a `edge_filter_function`.
 At each process, the graph traversal uses convolution to combine the
 temporal distributions of the process and the exchange it consumes into
-the resoluting combined temporal distribution of the upstream producer
+the resulting combined temporal distribution of the upstream producer
 of the exchange.
 
 ## Building the process timeline
@@ -175,7 +175,7 @@ as the old background producer.
 
 ## Modifying the matrices
 
-`bw_timex` now modifies the technopshere and biosphere matrices using
+`bw_timex` now modifies the technosphere and biosphere matrices using
 `datapackages` from
 [bw_processing](https://github.com/brightway-lca/bw_processing?tab=readme-ov-file).
 
@@ -205,7 +205,7 @@ created:
     LCI from the time-explicit databases also contains the timing of
     emissions. `build_dynamic_biosphere=True` is the default, so it has
     to be set to `False` to skip this step. The matrix
-    `TimexLCA.dynamic_inventory` and the more readable dataframe
+    `TimexLCA.dynamic_inventory` and the more readable DataFrame
     `TimexLCA.dynamic_inventory_df` contain the emissions of the system
     per biosphere flow including its timestamp and its emitting process.
 
@@ -290,4 +290,4 @@ meaning that later emissions are counted for shorter, and flexible time
 horizon means that each emission is evaluated starting from its own
 timing until the end of the time horizon. The former is the approach of
 [Levasseur et al. 2010](https://pubs.acs.org/doi/10.1021/es9030003).
-This behaviour is set with the boolean `fixed_time_horizon`.
+This behavior is set with the boolean `fixed_time_horizon`.

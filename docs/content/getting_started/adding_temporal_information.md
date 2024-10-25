@@ -134,7 +134,7 @@ end
 
 ```
 
-Now it's time to add this information to our modeled production system in brightway:
+Now it's time to add this information to our modeled production system in Brightway:
 ```python
 import numpy as np
 from bw_temporalis import TemporalDistribution
@@ -237,7 +237,7 @@ bd.Database("background_2030").write(
 ```
 :::
 
-So, as you can see, the prospective processes can reside within your normal brightway databases. To hand them to `bw_timex`, we just need to define a dictionary that maps the prospective database names to the point in time that they represent:
+So, as you can see, the prospective processes can reside within your normal Brightway databases. To hand them to `bw_timex`, we just need to define a dictionary that maps the prospective database names to the point in time that they represent:
 
 ```python
 from datetime import datetime

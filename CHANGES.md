@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fixed unintuitive rounding down of timestamps in dynamic characterization. 2024-12-31 would have been rounded to 2024, whereas 2025 makes more sense here. Now we round to the nearest year (https://github.com/brightway-lca/bw_timex/commit/21fa55bbcafee196447840c6518b5fee49fb6660)
 
 ## [0.2.1] - 2024-09-16
-* Added labels and units to the yaxis in `TimexLCA.plot_dynamic_characterized_inventory()`
+* Added labels and units to the y-axis in `TimexLCA.plot_dynamic_characterized_inventory()`
 * Fixed functions for creating labelled matrix representations
 
 ## [0.2.0] - 2024-09-13
@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Refactored dynamic characterization to separate package [dynamic_characterization](https://github.com/brightway-lca/dynamic_characterization)
 
 ## [0.1.4] - 2024-06-15
-* Handled emissions occuring outside of fixed time horizon in dynamic characterization [#46](https://github.com/brightway-lca/bw_timex/issues/46)
+* Handled emissions occurring outside of fixed time horizon in dynamic characterization [#46](https://github.com/brightway-lca/bw_timex/issues/46)
 * Fix substitution exchanges [#53](https://github.com/brightway-lca/bw_timex/issues/53)
 * Fix non-unitary production exchanges [#55](https://github.com/brightway-lca/bw_timex/issues/55)
 
@@ -70,4 +70,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Improved user-friendliness for SETAC
 
 ## [0.1.0] - 2024-04-29
-* Inital version with core functionalities
+* Initial version with core functionalities
