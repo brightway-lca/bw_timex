@@ -6,12 +6,13 @@ build-backend = "setuptools.build_meta"
 name = "bw_timex"
 authors = [
   { name="Timo Diepers", email="timo.diepers@ltt.rwth-aachen.de"},
-  { name="Amelie Müller"},
-  { name="Arthur Jakobs"},
+  { name="Amelie Müller", email="a.muller@cml.leidenuniv.nl"},
+  { name="Arthur Jakobs", email="artos.jakobs@psi.ch"},
 ]
 maintainers = [
   { name="Timo Diepers", email="timo.diepers@ltt.rwth-aachen.de"},
-  { name="Amelie Müller"}
+  { name="Amelie Müller", email="a.muller@cml.leidenuniv.nl"},
+  { name="Arthur Jakobs", email="artos.jakobs@psi.ch"},
 ]
 
 description = "Time-explicit Life Cycle Assessment"
@@ -43,9 +44,9 @@ dependencies = [
 ]
 
 [project.urls]
-source = "https://github.com/TimoDiepers/timex"
-homepage = "https://github.com/TimoDiepers/timex"
-tracker = "https://github.com/TimoDiepers/timex/issues"
+source = "https://github.com/brightway-lca/bw_timex"
+homepage = "https://github.com/brightway-lca/bw_timex"
+tracker = "https://github.com/brightway-lca/bw_timex/issues"
 
 [project.optional-dependencies]
 testing = [
