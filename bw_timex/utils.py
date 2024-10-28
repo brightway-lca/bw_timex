@@ -65,7 +65,7 @@ def extract_date_as_string(timestamp: datetime, temporal_grouping: str) -> str:
 
     Returns
     -------
-    date_as_string
+    date_as_string: str
         Date as a string in the format of the chosen temporal grouping.
     """
 
@@ -267,7 +267,8 @@ def plot_characterized_inventory_as_waterfall(
 
     Returns
     -------
-    None but plots the waterfall chart.
+    None
+        plots the waterfall chart.
 
     """
     if not hasattr(lca_obj, "characterized_inventory"):

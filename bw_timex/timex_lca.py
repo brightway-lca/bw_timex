@@ -300,13 +300,13 @@ class TimexLCA:
 
         Returns
         -------
-        None, but calls LCI calculations from bw2calc and calculates the dynamic inventory, if
-        `build_dynamic_biosphere` is True.
+        None
+            calls LCI calculations from bw2calc and calculates the dynamic inventory, if
+            `build_dynamic_biosphere` is True.
 
         See also
         --------
-        build_datapackage: Method to create the datapackages that contain the modifications
-        to the technosphere and biosphere matrix using the `MatrixModifier` class.
+        build_datapackage: Method to create the datapackages that contain the modifications to the technosphere and biosphere matrix using the `MatrixModifier` class.
         calculate_dynamic_inventory: Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
 
@@ -368,7 +368,8 @@ class TimexLCA:
 
         Returns
         -------
-        None, but stores the static score in the attribute `static_score`.
+        None
+            Stores the static score in the attribute `static_score`.
         """
         if not hasattr(self, "lca"):
             raise AttributeError("LCI not yet calculated. Call TimexLCA.lci() first.")
@@ -439,8 +440,7 @@ class TimexLCA:
 
         See also
         --------
-        dynamic_characterization: Package handling the dynamic characterization:
-        https://dynamic-characterization.readthedocs.io/en/latest/
+        dynamic_characterization: Package handling the dynamic characterization: https://dynamic-characterization.readthedocs.io/en/latest/
         """
 
         if not hasattr(self, "dynamic_inventory"):
@@ -582,13 +582,13 @@ class TimexLCA:
 
         Returns
         -------
-        None, but calculates the dynamic inventory and stores it in the attribute
-        `dynamic_inventory` as a matrix and in `dynamic_inventory_df` as a DataFrame.
+        None
+            calculates the dynamic inventory and stores it in the attribute
+            `dynamic_inventory` as a matrix and in `dynamic_inventory_df` as a DataFrame.
 
         See also
         --------
-        bw_timex.dynamic_biosphere_builder.DynamicBiosphereBuilder: Class for creating
-        the dynamic biosphere matrix and inventory.
+        bw_timex.dynamic_biosphere_builder.DynamicBiosphereBuilder: Class for creating the dynamic biosphere matrix and inventory.
         """
 
         if not hasattr(self, "lca"):
@@ -759,9 +759,7 @@ class TimexLCA:
 
         See also
         --------
-        bw2data.compat.prepare_lca_inputs: Original code this function is adapted from
-        (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
-
+        bw2data.compat.prepare_lca_inputs: Original code this function is adapted from (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
         """
         if not projects.dataset.data.get("25"):
             raise Brightway2Project(
@@ -873,8 +871,7 @@ class TimexLCA:
 
         See also
         --------
-        bw2data.compat.prepare_lca_inputs: Original code this function is adapted
-        from (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
+        bw2data.compat.prepare_lca_inputs: Original code this function is adapted from (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
         """
 
         if not projects.dataset.data.get("25"):
@@ -971,7 +968,8 @@ class TimexLCA:
 
         Returns
         -------
-        None, but raises an error if the format is not correct or the databases are not available.
+        None
+            raises an error if the format is not correct or the databases are not available.
 
         """
         for database, value in self.database_date_dict.items():
@@ -992,21 +990,13 @@ class TimexLCA:
         Available collections are:
 
         - ``demand_database_names``: set of database names of the demand processes
-        - ``demand_dependent_database_names``: set of database names of all processes
-        that depend on the demand processes
-        - ``demand_dependent_background_database_names``: set of database names of all
-        processes that depend on the demand processes and are in the background databases
-        - ``demand_dependent_background_node_ids``: set of node ids of all processes
-        that depend on the demand processes and are in the background databases
-        - ``foreground_node_ids``: set of node ids of all processes that are
-        not in the background databases
-        - ``first_level_background_node_ids_static``: set of node ids of all
-        processes that are in the background databases and are directly linked to the demand processes
-        - ``first_level_background_node_ids_interpolated``: like first_level_background_node_ids_static,
-        but includes first level background processes from the other time explicit databases that are
-        used (is filled after timeline is built)
-        - ``first_level_background_node_id_dbs``: dictionary with the first_level_background_node_ids_static
-        as keys returning their database
+        - ``demand_dependent_database_names``: set of database names of all processes that depend on the demand processes
+        - ``demand_dependent_background_database_names``: set of database names of all processes that depend on the demand processes and are in the background databases
+        - ``demand_dependent_background_node_ids``: set of node ids of all processes that depend on the demand processes and are in the background databases
+        - ``foreground_node_ids``: set of node ids of all processes that are not in the background databases
+        - ``first_level_background_node_ids_static``: set of node ids of all processes that are in the background databases and are directly linked to the demand processes
+        - ``first_level_background_node_ids_interpolated``: like first_level_background_node_ids_static, but includes first level background processes from the other time explicit databases that are used (is filled after timeline is built)
+        - ``first_level_background_node_id_dbs``: dictionary with the first_level_background_node_ids_static as keys returning their database
 
         It also initiates an instance of SetList which contains all mappings of equivalent
         activities across time-specific databases:
@@ -1019,8 +1009,9 @@ class TimexLCA:
 
         Returns
         -------
-            None, but adds the `node_id_collection_dict containing` the above-mentioned collections,
-            as well as interdatabase_activity_mapping
+            None
+                adds the `node_id_collection_dict containing` the above-mentioned collections,
+                as well as interdatabase_activity_mapping
         """
         self.node_id_collection_dict = {}
 
@@ -1096,9 +1087,10 @@ class TimexLCA:
 
         Returns
         -------
-        None, but adds the ids of producers in other background databases
-        (only those interpolated to in the timeline) to the `interdatabase_activity_mapping`
-        and `node_id_collection["first_level_background_node_ids_interpolated"]`.
+        None
+            Adds the ids of producers in other background databases
+            (only those interpolated to in the timeline) to the `interdatabase_activity_mapping`
+            and `node_id_collection["first_level_background_node_ids_interpolated"]`.
         """
         if not hasattr(self, "timeline"):
             warnings.warn(
@@ -1177,8 +1169,9 @@ class TimexLCA:
 
         Returns
         -------
-        None, but adds "temporal_markets" and "temporalized_processes" to the
-        node_id_collection_dict based on the timeline.
+        None
+            Adds "temporal_markets" and "temporalized_processes" to the
+            node_id_collection_dict based on the timeline.
 
         """
         unique_producers = (
@@ -1221,7 +1214,8 @@ class TimexLCA:
 
         Returns
         -------
-        None but adds the static activities to the `activity_time_mapping_dict`
+        None
+            adds the static activities to the `activity_time_mapping_dict`
         """
         for idx in self.base_lca.dicts.activity.keys():  # activity ids
             key = self.base_lca.remapping_dicts["activity"][idx]  # ('database', 'code')
@@ -1252,7 +1246,8 @@ class TimexLCA:
 
         Returns
         -------
-        Dictionary mapping producer ids to reference timing for the specified demands.
+        dict
+            Dictionary mapping producer ids to reference timing for the specified demands.
         """
         demand_ids = [bd.get_activity(key).id for key in self.demand.keys()]
         demand_rows = self.timeline[
@@ -1278,8 +1273,9 @@ class TimexLCA:
 
         Returns
         -------
-        pd.DataFrame, technosphere matrix as a pandas.DataFrame with comprehensible labels instead
-        of ids.
+        pd.DataFrame
+            technosphere matrix as a pandas.DataFrame with comprehensible labels instead
+            of ids.
         """
 
         df = pd.DataFrame(self.lca.technosphere_matrix.toarray())
@@ -1305,8 +1301,9 @@ class TimexLCA:
 
         Returns
         -------
-        pd.DataFrame, biosphere matrix as a pandas.DataFrame with comprehensible labels instead of
-        ids.
+        pd.DataFrame
+            biosphere matrix as a pandas.DataFrame with comprehensible labels instead of
+            ids.
         """
 
         df = pd.DataFrame(self.lca.biosphere_matrix.toarray())
@@ -1336,8 +1333,9 @@ class TimexLCA:
 
         Returns
         -------
-        pd.DataFrame, dynamic biosphere matrix as a pandas.DataFrame with comprehensible labels
-        instead of ids.
+        pd.DataFrame
+            dynamic biosphere matrix as a pandas.DataFrame with comprehensible labels
+            instead of ids.
         """
         df = pd.DataFrame(self.dynamic_biomatrix.toarray())
         df.rename(  # from matrix id to activity id
@@ -1365,8 +1363,9 @@ class TimexLCA:
 
         Returns
         -------
-        pd.DataFrame, dynamic inventory matrix as a pandas.DataFrame with comprehensible labels
-        instead of ids.
+        pd.DataFrame
+            dynamic inventory matrix as a pandas.DataFrame with comprehensible labels
+            instead of ids.
         """
 
         if not hasattr(self, "dynamic_inventory_df"):
@@ -1404,7 +1403,8 @@ class TimexLCA:
 
         Returns
         -------
-        none, but shows a plot
+        None
+            shows a plot
         """
         plt.figure(figsize=(14, 6))
 
@@ -1448,7 +1448,8 @@ class TimexLCA:
 
         Returns
         -------
-        none, but shows a plot
+        None
+            shows a plot
         """
 
         if not hasattr(self, "characterized_inventory"):

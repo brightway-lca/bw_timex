@@ -118,9 +118,12 @@ class TimelineBuilder:
         For edges between foreground and background system, the column "interpolation weights"
         assigns the ratio [0-1] of the edge's amount to be taken from the database with the closest
         time of representativeness. If a process is in the foreground system only, the interpolation weight is set to None.
+
         Available interpolation types are:
-            - "linear": linear interpolation between the two closest databases, based on temporal distance.
-            - "closest": closest database is assigned 1
+
+        - "linear": linear interpolation between the two closest databases, based on temporal distance.
+
+        - "closest": closest database is assigned 1
 
         Parameters
         ----------

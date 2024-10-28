@@ -79,7 +79,7 @@ class MatrixModifier:
         of this node (e.g. steel production on 2020-01-01 and steel production on 2015-01-01)
         becomes a separate, time-explicit new node, by adding the new elements to the technosphere matrix.
         For processes at the intersection with background databases, the timing of the exchanges
-         determines which background database to link to in so called "Temporal Markets".
+        determines which background database to link to in so called "Temporal Markets".
 
         Parameters
         ----------
@@ -182,12 +182,17 @@ class MatrixModifier:
         """
         This adds the modifications to the technosphere matrix for each time-dependent exchange
         as datapackage elements to a given `bwp.Datapackage`.
+
+
         Modifications include:
+
         1) Exploded processes: new matrix elements for time-explicit consumer and time-explicit
         producer, representing the temporal edge between them.
+
         2) Temporal markets: new matrix entries for "temporal markets" and links to the producers
         in temporally matching background databases. Processes in the background databases are
         matched on name, reference product and location.
+
         3) Diagonal entries: ones on the diagonal for new nodes.
 
         This function also collects the ids of new nodes, temporalized nodes and temporal markets.
@@ -203,8 +208,8 @@ class MatrixModifier:
 
         Returns
         -------
-        None but adds elements for this edge to the bwp.Datapackage and stores the ids of new nodes,
-        temporalized nodes and temporal markets.
+        None
+            Adds elements for this edge to the bwp.Datapackage and stores the ids of new nodes, temporalized nodes and temporal markets.
         """
 
         if row.consumer == -1:  # functional unit

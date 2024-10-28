@@ -34,8 +34,8 @@ class Edge:
 
 class EdgeExtractor(TemporalisLCA):
     """
-    Child class of TemporalisLCA that traverses the supply chain just as the parent
-    class but can create a timeline of edges, in addition timeline of flows or nodes.
+    Child class of TemporalisLCA that traverses the supply chain just as the parent class but can create a timeline of edges, in addition timeline of flows or nodes.
+
     The edge timeline is then used to match the timestamp of edges to that of background
     databases and to replace these edges with edges from these background databases
     using Brightway Datapackages.
@@ -56,8 +56,8 @@ class EdgeExtractor(TemporalisLCA):
 
         Returns
         -------
-        None but stores the output of the TemporalisLCA graph traversal (incl. relation
-        of edges (edge_mapping) and nodes (node_mapping) in the instance of the class.
+        None
+            stores the output of the TemporalisLCA graph traversal (incl. relation of edges (edge_mapping) and nodes (node_mapping) in the instance of the class.
 
         """
         super().__init__(*args, **kwargs)  # use __init__ of TemporalisLCA

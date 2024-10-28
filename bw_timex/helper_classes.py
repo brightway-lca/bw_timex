@@ -2,11 +2,11 @@ import warnings
 
 
 class SetList:
-    """A little helper class fot the mapping of the same/mapped activity in different (temporal) databases.
-    It contains a list of sets, that hold can hold the set of tuples of (act_id, database). It is built by
-    adding sets to the list, and returns the matching sets if one calls the an item from a set.
+    """A helper class for the mapping of the same/mapped activity in different (temporal) databases, composed of a list of sets, that hold can hold the set of tuples of (act_id, database).
+    It is built by adding sets to the list, and returns the matching sets if one
+    calls the an item from a set.
 
-    Example: If the class instance is called my_setlist, my_setlist.add(set). When called
+    Example: If the class instance is called my_setlist, my_setlist.add(set).
     """
 
     def __init__(
@@ -20,13 +20,14 @@ class SetList:
     ) -> None:
         """
         This method adds a set to the SetList instance.
-        Input
+
+        Parameters
         -----
         new_set: a set to add to the SetList instance
 
         Returns
         -------
-        None (or rather nothing)
+        None
 
         """
 
@@ -80,8 +81,7 @@ class SetList:
 
 class TimeMappingDict(dict):
     """
-    This class is used to create a dictionary that maps a tuple of (flow and timestamp)
-    to an unique integer id.
+    This class is used to create a dictionary that maps a tuple of (flow and timestamp) to an unique integer id.
     """
 
     def __init__(self, start_id=2, *args, **kwargs) -> None:

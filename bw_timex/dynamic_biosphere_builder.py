@@ -11,8 +11,7 @@ from .utils import convert_date_string_to_datetime
 
 class DynamicBiosphereBuilder:
     """
-    Class for building a dynamic biosphere matrix with dimensions
-    (biosphere flow at a specific point in time) x (processes)
+    Class for building a dynamic biosphere matrix with dimensions (biosphere flow at a specific point in time) x (processes)
     """
 
     def __init__(
@@ -344,7 +343,8 @@ class DynamicBiosphereBuilder:
 
         Returns
         -------
-        None, but the lists of row, col and values are updated
+        None
+            the lists of row, col and values are updated
 
         """
 
