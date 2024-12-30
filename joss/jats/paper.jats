@@ -18,7 +18,7 @@
 <article-id pub-id-type="publisher-id">0</article-id>
 <article-id pub-id-type="doi">N/A</article-id>
 <title-group>
-<article-title><monospace>bw_timex</monospace>: a software package for
+<article-title><monospace>bw_timex</monospace>: a python package for
 time-explicit life cycle assessment</article-title>
 </title-group>
 <contrib-group>
@@ -96,10 +96,10 @@ a Creative Commons Attribution 4.0 International License (CC BY
 </permissions>
 <kwd-group kwd-group-type="author">
 <kwd>Python</kwd>
+<kwd>time-explicit LCA</kwd>
 <kwd>life cycle assessment</kwd>
 <kwd>prospective</kwd>
 <kwd>dynamic</kwd>
-<kwd>time-explicit</kwd>
 </kwd-group>
 </article-meta>
 </front>
@@ -108,8 +108,8 @@ a Creative Commons Attribution 4.0 International License (CC BY
   <title>Summary</title>
   <p><monospace>bw_timex</monospace> is a Python package for
   time-explicit Life Cycle Assessment (LCA) that quantifies
-  environmental impacts of products and processes over time. It accounts
-  for:</p>
+  environmental impacts of products and processes over time. It enables
+  considering:</p>
   <list list-type="bullet">
     <list-item>
       <p>the timing of processes throughout the supply chain (e.g.,
@@ -127,44 +127,227 @@ a Creative Commons Attribution 4.0 International License (CC BY
   <p>To achieve this, <monospace>bw_timex</monospace> uses graph
   traversal to propagate temporal information through the product system
   and then automatically re-links Life Cycle Inventories (LCIs) across
-  LCI databases representing specific points in time. The resulting
+  LCI databases that represent specific points in time. The resulting
   time-explicit LCI reflects the current technology status within the
   product system at the actual time of each process. Moreover,
   <monospace>bw_timex</monospace> preserves the timing of emissions,
-  enabling advanced dynamic characterization methods alongside standard
-  static characterization factors.</p>
+  enabling the application of dynamic characterization methods in
+  addition to standard static characterization factors.</p>
 </sec>
 <sec id="statement-of-need">
   <title>Statement of need</title>
   <p>LCA traditionally assumes a static LCI, in which all processes
-  occur simultaneously and do not change over time. To add a temporal
-  dimension in LCA, the fields of dynamic LCA (dLCA) and prospective LCA
-  (pLCA) have emerged. While dLCA focuses on when emissions occur and
-  how impacts are distributed over time, it typically assumes the
-  underlying product system remains unchanged. Conversely, pLCA tracks
-  how processes evolve using future scenarios but generally only
-  assesses a single discrete point in time, overlooking that processes
-  occur at different times across a product’s life cycle. Both fields
-  have seen open-source tool development in recent years, including
-  <monospace>Temporalis</monospace> for dLCA and
-  <monospace>premise</monospace> and <monospace>pathways</monospace> for
-  pLCA. However, a comprehensive open-source package for joint
-  dynamic-prospective LCA, i.e., time-explicit LCA, has been lacking
-  until now.</p>
+  occur simultaneously and do not change over time
+  (<xref alt="Heijungs &amp; Suh, 2002" rid="ref-HeijungsU003A2002" ref-type="bibr">Heijungs
+  &amp; Suh, 2002</xref>). To add a temporal dimension in LCA, the
+  fields of dynamic LCA (dLCA) and prospective LCA (pLCA) have emerged.
+  While dLCA focuses on when emissions occur and how impacts are
+  distributed over time, it typically assumes the underlying product
+  system remains unchanged
+  (<xref alt="Beloin-Saint-Pierre et al., 2020" rid="ref-BeloinU003A2020" ref-type="bibr">Beloin-Saint-Pierre
+  et al., 2020</xref>). Conversely, pLCA tracks how processes evolve
+  using future scenarios but generally only assesses a single (future)
+  point in time, overlooking that processes occur at different times
+  across a product’s life cycle
+  (<xref alt="Arvidsson et al., 2024" rid="ref-ArvidssonU003A2024" ref-type="bibr">Arvidsson
+  et al., 2024</xref>). Both fields have seen open-source tool
+  development in recent years, including
+  <monospace>Temporalis</monospace>
+  (<xref alt="Cardellini et al., 2018" rid="ref-CardelliniU003A2018" ref-type="bibr">Cardellini
+  et al., 2018</xref>) for dLCA and <monospace>premise</monospace>
+  (<xref alt="Sacchi et al., 2022" rid="ref-SacchiU003A2022" ref-type="bibr">Sacchi
+  et al., 2022</xref>),
+  <monospace>Futura</monospace>(<xref alt="Joyce &amp; Björklund, 2022" rid="ref-JoyceU003A2022" ref-type="bibr">Joyce
+  &amp; Björklund, 2022</xref>) and <monospace>pathways</monospace>
+  (<xref alt="Sacchi &amp; Hahn-Menacho, 2024" rid="ref-SacchiU003A2024" ref-type="bibr">Sacchi
+  &amp; Hahn-Menacho, 2024</xref>) for pLCA. However, a comprehensive
+  open-source package for joint dynamic-prospective LCA, i.e.,
+  time-explicit LCA, is currently lacking.</p>
   <p><monospace>bw_timex</monospace> addresses this gap by providing a
-  framework for time-explicit LCA calculations within the Brightway
-  ecosystem. It enables accounting for both the timing of processes and
-  emissions as well as the state of the product system at the respective
-  points in time. This makes <monospace>bw_timex</monospace>
+  framework for time-explicit LCA calculations within the
+  <monospace>Brightway</monospace> ecosystem
+  (<xref alt="Mutel, 2017" rid="ref-MutelU003A2017" ref-type="bibr">Mutel,
+  2017</xref>). It enables accounting for both the timing of processes
+  and emissions as well as the state of the product system at the
+  respective points in time. This makes <monospace>bw_timex</monospace>
   particularly useful for studies involving variable or strongly
   evolving product systems, long-lived products, and biogenic
   carbon.</p>
 </sec>
 <sec id="acknowledgements">
   <title>Acknowledgements</title>
-  <p>tba</p>
+  <p>This work received funding from the European Union’s Horizon Europe
+  Research and Innovation Programme ForestPaths (ID No 101056755) and
+  Swiss Center of Excellence on Net Zero Emissions (SCENE) project.</p>
 </sec>
 </body>
 <back>
+<ref-list>
+  <title></title>
+  <ref id="ref-SacchiU003A2022">
+    <element-citation publication-type="article-journal">
+      <person-group person-group-type="author">
+        <name><surname>Sacchi</surname><given-names>R.</given-names></name>
+        <name><surname>Terlouw</surname><given-names>T.</given-names></name>
+        <name><surname>Siala</surname><given-names>K.</given-names></name>
+        <name><surname>Dirnaichner</surname><given-names>A.</given-names></name>
+        <name><surname>Bauer</surname><given-names>C.</given-names></name>
+        <name><surname>Cox</surname><given-names>B.</given-names></name>
+        <name><surname>Mutel</surname><given-names>C.</given-names></name>
+        <name><surname>Daioglou</surname><given-names>V.</given-names></name>
+        <name><surname>Luderer</surname><given-names>G.</given-names></name>
+      </person-group>
+      <article-title>PRospective EnvironMental Impact asSEment (premise): A streamlined approach to producing databases for prospective life cycle assessment using integrated assessment models</article-title>
+      <source>Renewable and Sustainable Energy Reviews</source>
+      <year iso-8601-date="2022-05">2022</year><month>05</month>
+      <date-in-citation content-type="access-date"><year iso-8601-date="2024-06-10">2024</year><month>06</month><day>10</day></date-in-citation>
+      <volume>160</volume>
+      <issn>1364-0321</issn>
+      <uri>https://www.sciencedirect.com/science/article/pii/S136403212200226X</uri>
+      <pub-id pub-id-type="doi">10.1016/j.rser.2022.112311</pub-id>
+    </element-citation>
+  </ref>
+  <ref id="ref-MutelU003A2017">
+    <element-citation publication-type="article-journal">
+      <person-group person-group-type="author">
+        <name><surname>Mutel</surname><given-names>Chris</given-names></name>
+      </person-group>
+      <article-title>Brightway: An open source framework for Life Cycle Assessment</article-title>
+      <source>Journal of Open Source Software</source>
+      <year iso-8601-date="2017-04">2017</year><month>04</month>
+      <date-in-citation content-type="access-date"><year iso-8601-date="2024-06-17">2024</year><month>06</month><day>17</day></date-in-citation>
+      <volume>2</volume>
+      <issue>12</issue>
+      <issn>2475-9066</issn>
+      <uri>https://joss.theoj.org/papers/10.21105/joss.00236</uri>
+      <pub-id pub-id-type="doi">10.21105/joss.00236</pub-id>
+      <fpage>236</fpage>
+      <lpage></lpage>
+    </element-citation>
+  </ref>
+  <ref id="ref-CardelliniU003A2018">
+    <element-citation publication-type="article-journal">
+      <person-group person-group-type="author">
+        <name><surname>Cardellini</surname><given-names>Giuseppe</given-names></name>
+        <name><surname>Mutel</surname><given-names>Christopher L.</given-names></name>
+        <name><surname>Vial</surname><given-names>Estelle</given-names></name>
+        <name><surname>Muys</surname><given-names>Bart</given-names></name>
+      </person-group>
+      <article-title>Temporalis, a generic method and tool for dynamic Life Cycle Assessment</article-title>
+      <source>Science of The Total Environment</source>
+      <year iso-8601-date="2018-12">2018</year><month>12</month>
+      <date-in-citation content-type="access-date"><year iso-8601-date="2023-11-24">2023</year><month>11</month><day>24</day></date-in-citation>
+      <volume>645</volume>
+      <uri>https://linkinghub.elsevier.com/retrieve/pii/S0048969718325257</uri>
+      <pub-id pub-id-type="doi">10.1016/j.scitotenv.2018.07.044</pub-id>
+      <fpage>585</fpage>
+      <lpage>595</lpage>
+    </element-citation>
+  </ref>
+  <ref id="ref-SacchiU003A2024">
+    <element-citation publication-type="article-journal">
+      <person-group person-group-type="author">
+        <name><surname>Sacchi</surname><given-names>R.</given-names></name>
+        <name><surname>Hahn-Menacho</surname><given-names>A. J.</given-names></name>
+      </person-group>
+      <article-title>Pathways: Life cycle assessment of energy transition scenarios</article-title>
+      <source>Journal of Open Source Software</source>
+      <publisher-name>The Open Journal</publisher-name>
+      <year iso-8601-date="2024">2024</year>
+      <volume>9</volume>
+      <issue>103</issue>
+      <uri>https://doi.org/10.21105/joss.07309</uri>
+      <pub-id pub-id-type="doi">10.21105/joss.07309</pub-id>
+      <fpage>7309</fpage>
+      <lpage></lpage>
+    </element-citation>
+  </ref>
+  <ref id="ref-HeijungsU003A2002">
+    <element-citation publication-type="book">
+      <person-group person-group-type="author">
+        <name><surname>Heijungs</surname><given-names>R.</given-names></name>
+        <name><surname>Suh</surname><given-names>S.</given-names></name>
+      </person-group>
+      <source>The Computational Structure of Life Cycle Assessment</source>
+      <person-group person-group-type="editor">
+        <name><surname>Tukker</surname><given-names>A.</given-names></name>
+      </person-group>
+      <publisher-name>Springer Netherlands</publisher-name>
+      <publisher-loc>Dordrecht</publisher-loc>
+      <year iso-8601-date="2002">2002</year>
+      <date-in-citation content-type="access-date"><year iso-8601-date="2024-12-13">2024</year><month>12</month><day>13</day></date-in-citation>
+      <volume>11</volume>
+      <isbn>978-94-015-9900-9</isbn>
+      <uri>http://link.springer.com/10.1007/978-94-015-9900-9</uri>
+      <pub-id pub-id-type="doi">10.1007/978-94-015-9900-9</pub-id>
+    </element-citation>
+  </ref>
+  <ref id="ref-BeloinU003A2020">
+    <element-citation publication-type="article-journal">
+      <person-group person-group-type="author">
+        <name><surname>Beloin-Saint-Pierre</surname><given-names>D.</given-names></name>
+        <name><surname>Albers</surname><given-names>A.</given-names></name>
+        <name><surname>Hélias</surname><given-names>A.</given-names></name>
+        <name><surname>Tiruta-Barna</surname><given-names>L.</given-names></name>
+        <name><surname>Fantke</surname><given-names>P.</given-names></name>
+        <name><surname>Levasseur</surname><given-names>A.</given-names></name>
+        <name><surname>Benetto</surname><given-names>E.</given-names></name>
+        <name><surname>Benoist</surname><given-names>A.</given-names></name>
+        <name><surname>Collet</surname><given-names>P.</given-names></name>
+      </person-group>
+      <article-title>Addressing temporal considerations in life cycle assessment</article-title>
+      <source>Science of The Total Environment</source>
+      <year iso-8601-date="2020-11">2020</year><month>11</month>
+      <date-in-citation content-type="access-date"><year iso-8601-date="2024-12-30">2024</year><month>12</month><day>30</day></date-in-citation>
+      <volume>743</volume>
+      <uri>https://linkinghub.elsevier.com/retrieve/pii/S0048969720342224</uri>
+      <pub-id pub-id-type="doi">10.1016/j.scitotenv.2020.140700</pub-id>
+      <fpage>140700</fpage>
+      <lpage></lpage>
+    </element-citation>
+  </ref>
+  <ref id="ref-ArvidssonU003A2024">
+    <element-citation publication-type="article-journal">
+      <person-group person-group-type="author">
+        <name><surname>Arvidsson</surname><given-names>R.</given-names></name>
+        <name><surname>Svanström</surname><given-names>M.</given-names></name>
+        <name><surname>Sandén</surname><given-names>B. A.</given-names></name>
+        <name><surname>Thonemann</surname><given-names>N.</given-names></name>
+        <name><surname>Steubing</surname><suffix>B</suffix></name>
+        <name><surname>Cucurachi</surname><given-names>S.</given-names></name>
+      </person-group>
+      <article-title>Terminology for future-oriented life cycle assessment: Review and recommendations</article-title>
+      <source>The International Journal of Life Cycle Assessment</source>
+      <year iso-8601-date="2024-04">2024</year><month>04</month>
+      <date-in-citation content-type="access-date"><year iso-8601-date="2024-12-30">2024</year><month>12</month><day>30</day></date-in-citation>
+      <volume>29</volume>
+      <issue>4</issue>
+      <issn>1614-7502</issn>
+      <uri>https://doi.org/10.1007/s11367-023-02265-8</uri>
+      <pub-id pub-id-type="doi">10.1007/s11367-023-02265-8</pub-id>
+      <fpage>607</fpage>
+      <lpage>613</lpage>
+    </element-citation>
+  </ref>
+  <ref id="ref-JoyceU003A2022">
+    <element-citation publication-type="article-journal">
+      <person-group person-group-type="author">
+        <name><surname>Joyce</surname><given-names>P. J.</given-names></name>
+        <name><surname>Björklund</surname><given-names>A.</given-names></name>
+      </person-group>
+      <article-title>Futura: A new tool for transparent and shareable scenario analysis in prospective life cycle assessment</article-title>
+      <source>Journal of Industrial Ecology</source>
+      <year iso-8601-date="2022">2022</year>
+      <date-in-citation content-type="access-date"><year iso-8601-date="2024-12-30">2024</year><month>12</month><day>30</day></date-in-citation>
+      <volume>26</volume>
+      <issue>1</issue>
+      <issn>1530-9290</issn>
+      <uri>https://onlinelibrary.wiley.com/doi/abs/10.1111/jiec.13115</uri>
+      <pub-id pub-id-type="doi">10.1111/jiec.13115</pub-id>
+      <fpage>134</fpage>
+      <lpage>144</lpage>
+    </element-citation>
+  </ref>
+</ref-list>
 </back>
 </article>

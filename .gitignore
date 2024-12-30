@@ -4,6 +4,7 @@ export
 .ipynb_checkpoints
 .DS_Store
 .vscode/
+joss/jats/
 conda/
 conda-out/
 docs_local/
