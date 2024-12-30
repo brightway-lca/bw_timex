@@ -14,19 +14,19 @@ authors:
   - name: Amelie Müller
     orcid: 0000-0001-5609-5609
     affiliation: "2,3"
-- name: Arthur Jakobs
+  - name: Arthur Jakobs
     orcid: 0000-0003-0825-2184
     affiliation: 4
 
 affiliations:
- - name: Institute of Technical Thermodynamics, RWTH Aachen University, Germany
-   index: 1
- - name: Institute of Environmental Sciences (CML), Leiden University, The Netherlands
-   index: 2
-- name: Flemish Institute for Technology Research (VITO), EnergyVille, Belgium
-   index: 3
-- name: Technology Assessment Group, Laboratory for Energy Analysis, Center for Nuclear Engineering and Sciences & Center for Energy and Environmental Sciences, Paul Scherrer Institut (PSI), Villigen PSI, Switzerland
-   index: 4
+  - name: Institute of Technical Thermodynamics, RWTH Aachen University, Germany
+    index: 1
+  - name: Institute of Environmental Sciences (CML), Leiden University, The Netherlands
+    index: 2
+  - name: Flemish Institute for Technology Research (VITO), EnergyVille, Belgium
+    index: 3
+  - name: Technology Assessment Group, Laboratory for Energy Analysis, Center for Nuclear Engineering and Sciences & Center for Energy and Environmental Sciences, Paul Scherrer Institut (PSI), Villigen PSI, Switzerland
+    index: 4
 
 date: 01 January 2025
 bibliography: paper.bib
@@ -60,8 +60,8 @@ distributed over time, it typically assumes the underlying product system remain
 Conversely, pLCA tracks how processes evolve using future scenarios but generally only assesses a
 single discrete point in time, overlooking that processes occur at different times across a
 product’s life cycle. Both fields have seen open-source tool development in recent years, including
-`Temporalis` for dLCA and `premise` [@Sacchi:2022] and `pathways` for pLCA. However, a comprehensive open-source package
-for joint dynamic-prospective LCA, i.e., time-explicit LCA, has been lacking until now.
+`Temporalis` for dLCA and `premise` and `pathways` for pLCA. However, a comprehensive open-source 
+package for joint dynamic-prospective LCA, i.e., time-explicit LCA, has been lacking until now.
 
 `bw_timex` addresses this gap by providing a framework for time-explicit LCA calculations within
 the Brightway ecosystem. It enables accounting for both the timing of processes and emissions as

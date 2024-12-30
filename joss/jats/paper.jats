@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE article PUBLIC "-//NLM//DTD JATS (Z39.96) Journal Publishing DTD v1.2 20190208//EN"
+                  "JATS-publishing1.dtd">
+<article xmlns:mml="http://www.w3.org/1998/Math/MathML" xmlns:xlink="http://www.w3.org/1999/xlink" dtd-version="1.2" article-type="other">
+<front>
+<journal-meta>
+<journal-id></journal-id>
+<journal-title-group>
+<journal-title>Journal of Open Source Software</journal-title>
+<abbrev-journal-title>JOSS</abbrev-journal-title>
+</journal-title-group>
+<issn publication-format="electronic">2475-9066</issn>
+<publisher>
+<publisher-name>Open Journals</publisher-name>
+</publisher>
+</journal-meta>
+<article-meta>
+<article-id pub-id-type="publisher-id">0</article-id>
+<article-id pub-id-type="doi">N/A</article-id>
+<title-group>
+<article-title><monospace>bw_timex</monospace>: a software package for
+time-explicit life cycle assessment</article-title>
+</title-group>
+<contrib-group>
+<contrib contrib-type="author">
+<contrib-id contrib-id-type="orcid">https://orcid.org/0009-0002-8566-8618</contrib-id>
+<name>
+<surname>Diepers</surname>
+<given-names>Timo</given-names>
+</name>
+<xref ref-type="aff" rid="aff-1"/>
+</contrib>
+<contrib contrib-type="author">
+<contrib-id contrib-id-type="orcid">https://orcid.org/0000-0001-5609-5609</contrib-id>
+<name>
+<surname>Müller</surname>
+<given-names>Amelie</given-names>
+</name>
+<xref ref-type="aff" rid="aff-2"/>
+<xref ref-type="aff" rid="aff-3"/>
+</contrib>
+<contrib contrib-type="author">
+<contrib-id contrib-id-type="orcid">https://orcid.org/0000-0003-0825-2184</contrib-id>
+<name>
+<surname>Jakobs</surname>
+<given-names>Arthur</given-names>
+</name>
+<xref ref-type="aff" rid="aff-4"/>
+</contrib>
+<aff id="aff-1">
+<institution-wrap>
+<institution>Institute of Technical Thermodynamics, RWTH Aachen
+University, Germany</institution>
+</institution-wrap>
+</aff>
+<aff id="aff-2">
+<institution-wrap>
+<institution>Institute of Environmental Sciences (CML), Leiden
+University, The Netherlands</institution>
+</institution-wrap>
+</aff>
+<aff id="aff-3">
+<institution-wrap>
+<institution>Flemish Institute for Technology Research (VITO),
+EnergyVille, Belgium</institution>
+</institution-wrap>
+</aff>
+<aff id="aff-4">
+<institution-wrap>
+<institution>Technology Assessment Group, Laboratory for Energy
+Analysis, Center for Nuclear Engineering and Sciences &amp; Center for
+Energy and Environmental Sciences, Paul Scherrer Institut (PSI),
+Villigen PSI, Switzerland</institution>
+</institution-wrap>
+</aff>
+</contrib-group>
+<pub-date date-type="pub" publication-format="electronic" iso-8601-date="2025-01-01">
+<day>1</day>
+<month>1</month>
+<year>2025</year>
+</pub-date>
+<volume>¿VOL?</volume>
+<issue>¿ISSUE?</issue>
+<fpage>¿PAGE?</fpage>
+<permissions>
+<copyright-statement>Authors of papers retain copyright and release the
+work under a Creative Commons Attribution 4.0 International License (CC
+BY 4.0)</copyright-statement>
+<copyright-year>1970</copyright-year>
+<copyright-holder>The article authors</copyright-holder>
+<license license-type="open-access" xlink:href="https://creativecommons.org/licenses/by/4.0/">
+<license-p>Authors of papers retain copyright and release the work under
+a Creative Commons Attribution 4.0 International License (CC BY
+4.0)</license-p>
+</license>
+</permissions>
+<kwd-group kwd-group-type="author">
+<kwd>Python</kwd>
+<kwd>life cycle assessment</kwd>
+<kwd>prospective</kwd>
+<kwd>dynamic</kwd>
+<kwd>time-explicit</kwd>
+</kwd-group>
+</article-meta>
+</front>
+<body>
+<sec id="summary">
+  <title>Summary</title>
+  <p><monospace>bw_timex</monospace> is a Python package for
+  time-explicit Life Cycle Assessment (LCA) that quantifies
+  environmental impacts of products and processes over time. It accounts
+  for:</p>
+  <list list-type="bullet">
+    <list-item>
+      <p>the timing of processes throughout the supply chain (e.g.,
+      end-of-life treatment occurs 20 years after construction),</p>
+    </list-item>
+    <list-item>
+      <p>variable and/or evolving supply chains and technologies (e.g.,
+      increasing shares of renewable electricity in the future), and</p>
+    </list-item>
+    <list-item>
+      <p>the timing of emissions (e.g., enabling the use of dynamic
+      characterization functions).</p>
+    </list-item>
+  </list>
+  <p>To achieve this, <monospace>bw_timex</monospace> uses graph
+  traversal to propagate temporal information through the product system
+  and then automatically re-links Life Cycle Inventories (LCIs) across
+  LCI databases representing specific points in time. The resulting
+  time-explicit LCI reflects the current technology status within the
+  product system at the actual time of each process. Moreover,
+  <monospace>bw_timex</monospace> preserves the timing of emissions,
+  enabling advanced dynamic characterization methods alongside standard
+  static characterization factors.</p>
+</sec>
+<sec id="statement-of-need">
+  <title>Statement of need</title>
+  <p>LCA traditionally assumes a static LCI, in which all processes
+  occur simultaneously and do not change over time. To add a temporal
+  dimension in LCA, the fields of dynamic LCA (dLCA) and prospective LCA
+  (pLCA) have emerged. While dLCA focuses on when emissions occur and
+  how impacts are distributed over time, it typically assumes the
+  underlying product system remains unchanged. Conversely, pLCA tracks
+  how processes evolve using future scenarios but generally only
+  assesses a single discrete point in time, overlooking that processes
+  occur at different times across a product’s life cycle. Both fields
+  have seen open-source tool development in recent years, including
+  <monospace>Temporalis</monospace> for dLCA and
+  <monospace>premise</monospace> and <monospace>pathways</monospace> for
+  pLCA. However, a comprehensive open-source package for joint
+  dynamic-prospective LCA, i.e., time-explicit LCA, has been lacking
+  until now.</p>
+  <p><monospace>bw_timex</monospace> addresses this gap by providing a
+  framework for time-explicit LCA calculations within the Brightway
+  ecosystem. It enables accounting for both the timing of processes and
+  emissions as well as the state of the product system at the respective
+  points in time. This makes <monospace>bw_timex</monospace>
+  particularly useful for studies involving variable or strongly
+  evolving product systems, long-lived products, and biogenic
+  carbon.</p>
+</sec>
+<sec id="acknowledgements">
+  <title>Acknowledgements</title>
+  <p>tba</p>
+</sec>
+</body>
+<back>
+</back>
+</article>
