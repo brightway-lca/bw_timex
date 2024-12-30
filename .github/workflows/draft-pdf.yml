@@ -1,4 +1,7 @@
-on: [push]
+on:
+  push:
+    branches:
+      - joss_paper
 name: Paper Draft
 
 jobs:
@@ -13,10 +16,9 @@ jobs:
       - name: Build draft PDF
         uses: openjournals/openjournals-draft-action@master
         with:
-          journal: joss
-          paper-path: paper.md
+          journal: 'joss'
+          paper-path: 'paper.md'
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: paper
-          path: paper.pdf
