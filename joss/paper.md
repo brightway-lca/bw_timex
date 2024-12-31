@@ -34,8 +34,8 @@ bibliography: paper.bib
 
 # Summary
 
-`bw_timex` is a Python package for time-explicit Life Cycle Assessment (LCA) that quantifies
-environmental impacts of products and processes over time. It enables considering:
+`bw_timex` is a Python package for time-explicit Life Cycle Assessment (LCA). It enables the 
+quantification of environmental impacts of products and processes over time, considering:
 
 - the timing of processes throughout the supply chain (e.g., end-of-life treatment occurs 20 years
   after construction),
@@ -44,35 +44,35 @@ environmental impacts of products and processes over time. It enables considerin
 - the timing of emissions (e.g., enabling the use of dynamic characterization functions).
 
 To achieve this, `bw_timex` uses graph traversal to propagate temporal information through the
-product system and then automatically re-links Life Cycle Inventories (LCIs) across LCI databases
+supply chain and then automatically re-links Life Cycle Inventories (LCIs) across LCI databases
 that represent specific points in time. The resulting time-explicit LCI reflects the current
 technology status within the product system at the actual time of each process. Moreover,
-`bw_timex` preserves the timing of emissions, enabling the application of dynamic characterization 
+`bw_timex` preserves the timing of emissions, enabling the application of dynamic characterization
 methods in addition to standard static characterization factors.
 
 # Statement of need
 
 LCA traditionally assumes a static LCI, in which all processes occur simultaneously and do not
-change over time [@Heijungs:2002]. To add a temporal dimension in LCA, the fields of dynamic LCA 
-(dLCA) and prospective LCA (pLCA) have emerged. While dLCA focuses on when emissions occur and how 
-impacts are distributed over time, it typically assumes the underlying product system remains 
-unchanged [@Beloin:2020]. Conversely, pLCA tracks how processes evolve using future scenarios but 
-generally only assesses a single (future) point in time, overlooking that processes occur at 
-different times across a product’s life cycle [@Arvidsson:2024]. Both fields have seen open-source 
-tool development in recent years, including `Temporalis` [@Cardellini:2018] for dLCA and `premise` 
-[@Sacchi:2022], `Futura`[@Joyce:2022] and `pathways` [@Sacchi:2024] for pLCA. However, a 
-comprehensive open-source package for joint dynamic-prospective LCA, i.e., time-explicit LCA, is 
+change over time [@Heijungs:2002]. To add a temporal dimension in LCA, the fields of dynamic LCA
+(dLCA) and prospective LCA (pLCA) have emerged. While dLCA focuses on when emissions occur and how
+impacts are distributed over time, it typically assumes the underlying product system remains
+unchanged [@Beloin:2020]. Conversely, pLCA tracks how processes evolve using future scenarios but
+generally only assesses a single (future) point in time, overlooking that processes occur at
+different times across a product’s life cycle [@Arvidsson:2024]. Both fields have seen open-source
+tool development in recent years, including `Temporalis` [@Cardellini:2018] for dLCA and `premise`
+[@Sacchi:2022], `Futura`[@Joyce:2022] and `pathways` [@Sacchi:2024] for pLCA. However, a
+comprehensive open-source package for joint dynamic-prospective LCA, i.e., time-explicit LCA, is
 currently lacking.
 
 `bw_timex` addresses this gap by providing a framework for time-explicit LCA calculations within
-the `Brightway` ecosystem [@Mutel:2017]. It enables accounting for both the timing of processes and 
-emissions as well as the state of the product system at the respective points in time. This makes 
-`bw_timex` particularly useful for studies involving variable or strongly evolving product systems, 
+the `Brightway` ecosystem [@Mutel:2017]. It enables accounting for both the timing of processes and
+emissions as well as the state of the product system at the respective points in time. This makes
+`bw_timex` particularly useful for studies involving variable or strongly evolving product systems,
 long-lived products, and biogenic carbon.
 
 # Acknowledgements
 
-This work received funding from the European Union’s Horizon Europe Research and Innovation 
+This work received funding from the European Union’s Horizon Europe Research and Innovation
 Programme ForestPaths (ID No 101056755) and Swiss Center of Excellence on Net Zero Emissions (SCENE)
 project.
 
