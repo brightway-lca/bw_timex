@@ -30,8 +30,8 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "bw2calc>=2.0.dev13",
-    "bw2data>=4.0.dev39",
+    "bw2calc==2.0.dev13",
+    "bw2data==4.0.dev43",
     "bw_graph_tools>0.4",
     "numpy",
     "pandas",
