@@ -211,7 +211,14 @@ class DynamicBiosphereBuilder:
                 ) = self.activity_time_mapping_dict.reversed()[idx]
 
                 if from_timeline:
-                    demand = self.demand_from_timeline(row, original_db)
+                    originally_linked_db = list(
+                        self.node_id_collection_dict[
+                            "demand_dependent_background_database_names"
+                        ]
+                    )[
+                        0
+                    ]  # what if more than one db?
+                    demand = self.demand_from_timeline(row, originally_linked_db)
                 else:
                     demand = self.demand_from_technosphere(idx, process_col_index)
 
