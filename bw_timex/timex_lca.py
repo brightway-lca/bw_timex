@@ -595,6 +595,8 @@ class TimexLCA:
         None
             calculates the dynamic inventory and stores it in the attribute
             `dynamic_inventory` as a matrix and in `dynamic_inventory_df` as a DataFrame.
+            Also calculates and stores the lci of the temporal markets in the attribute 
+            self.temporal_market_lcis for use in contribution analysis of the background processes.
 
         See also
         --------
@@ -624,7 +626,7 @@ class TimexLCA:
             self.interdatabase_activity_mapping,
             from_timeline=from_timeline,
         )
-        self.dynamic_biomatrix = (
+        self.dynamic_biomatrix, self.temporal_market_lcis = (
             self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(
                 from_timeline=from_timeline
             )
@@ -1176,7 +1178,7 @@ class TimexLCA:
 
         for producer, time_mapped_producer in unique_producers:
             if (
-                bd.get_activity(producer)["database"]
+                self.nodes_dict[producer]["database"]
                 in self.database_date_dict_static_only.keys()
             ):
                 temporal_market_ids.add(time_mapped_producer)

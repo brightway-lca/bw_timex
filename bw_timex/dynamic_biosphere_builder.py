@@ -131,6 +131,9 @@ class DynamicBiosphereBuilder:
             A sparse matrix with the dimensions (bio_flows at a specific time step) x (processes).
         """
 
+        lci_dict = {}
+        temporal_market_lci_dict = {}
+        
         for row in self.timeline.itertuples():
             idx = row.time_mapped_producer
             if from_timeline:
@@ -144,6 +147,8 @@ class DynamicBiosphereBuilder:
                 (original_db, original_code),
                 time,
             ) = self.activity_time_mapping_dict.reversed()[idx]
+
+            
 
             if idx in self.node_id_collection_dict["temporalized_processes"]:
 
@@ -204,6 +209,7 @@ class DynamicBiosphereBuilder:
                             col=process_col_index,
                             amount=amount,
                         )
+            
             elif idx in self.node_id_collection_dict["temporal_markets"]:
                 (
                     (original_db, original_code),
@@ -215,11 +221,24 @@ class DynamicBiosphereBuilder:
                 else:
                     demand = self.demand_from_technosphere(idx, process_col_index)
 
+                
                 if demand:
-                    self.lca_obj.redo_lci(demand)
-                    # aggregated biosphere flows of background supply chain emissions.
-                    # Rows are bioflows.
-                    aggregated_inventory = self.lca_obj.inventory.sum(axis=1)
+                    for act, amount in demand.items():
+                        # check if lci already calculated for this activity
+                        if not act in lci_dict.keys():
+                            self.lca_obj.redo_lci({act: 1})
+                            #  biosphere flows by activity of background supply chain emissions.
+                            # Rows are bioflows. Columns are activities.
+                            # save for reuse in dict
+                            lci_dict[act] = self.lca_obj.inventory
+                        # add lci of both background activities of the temporal market and save total lci
+                        if idx not in temporal_market_lci_dict.keys():
+                            temporal_market_lci_dict[idx] = lci_dict[act] * amount
+                        else:
+                            temporal_market_lci_dict[idx] += lci_dict[act] * amount
+                        
+
+                    aggregated_inventory = temporal_market_lci_dict[idx].sum(axis=1)
 
                     for row_idx, amount in enumerate(aggregated_inventory.A1):
                         bioflow = self.lca_obj.dicts.biosphere.reversed[row_idx]
@@ -254,7 +273,7 @@ class DynamicBiosphereBuilder:
         dynamic_biomatrix = sp.coo_matrix((self.values, (self.rows, self.cols)), shape)
         self.dynamic_biomatrix = dynamic_biomatrix.tocsr()
 
-        return self.dynamic_biomatrix
+        return self.dynamic_biomatrix, temporal_market_lci_dict
 
     def demand_from_timeline(self, row, original_db):
         """
@@ -278,13 +297,9 @@ class DynamicBiosphereBuilder:
         """
         demand = {}
         for db, amount in row.interpolation_weights.items():
-            [(timed_act_id, _)] = [
-                (act, db_name)
-                for (act, db_name) in self.interdatabase_activity_mapping[
-                    (row.producer, original_db)
-                ]
-                if db == db_name
-            ]
+            timed_act_id = self.interdatabase_activity_mapping.find_match(
+                row.producer, db
+            )
             demand[timed_act_id] = amount
         return demand
 
