@@ -1,6 +1,4 @@
 import warnings
-from copy import deepcopy
-from itertools import permutations
 
 
 class SetList:
@@ -44,7 +42,6 @@ class SetList:
                 warnings.warn(
                     f"tried to add {new_set} to the SetList\n, but {checklist_items} already exist in the SetList in:\n {checklist_sets}. \n Skipping {new_set}"
                 )
-                pass
             else:
                 self.list.append(new_set)
         else:
@@ -68,9 +65,9 @@ class SetList:
             )
         if len(sets) > 0:
             return sets[0]
-        else:
-            warnings.warn(f"Key {key} not found in SetList")
-            return None
+        
+        warnings.warn(f"Key {key} not found in SetList")
+        return None
 
     def __len__(
         self,
@@ -152,12 +149,20 @@ class InterDatabaseMapping(dict):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self._reciprocal = False
 
     def find_match(self, id_, db_name) -> any:
         return self[id_][db_name]
 
     def make_reciprocal(self):
-        for mapping in list(self.values()):
-            for id_ in list(mapping.values()):
-                if id_ not in self.keys():
-                    self[id_] = mapping
+        if not self._reciprocal:
+            for mapping in list(self.values()):
+                for id_ in list(mapping.values()):
+                    if id_ not in self.keys():
+                        self[id_] = mapping
+            self._reciprocal = True
+
+    def __getitem__(self, key):
+        if not self._reciprocal:
+            self.make_reciprocal()
+        return super().__getitem__(key)
