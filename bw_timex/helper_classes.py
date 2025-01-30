@@ -1,4 +1,6 @@
 import warnings
+from copy import deepcopy
+from itertools import permutations
 
 
 class SetList:
@@ -139,3 +141,21 @@ class TimeMappingDict(dict):
             self._reversed_dict = {v: k for k, v in self.items()}
             self._modified = False  # Reset modification flag
         return self._reversed_dict
+
+
+class InterDatabaseMapping(dict):
+    """
+    A dictionary of the form {id:{database: id}} that maps the same activity in different databases.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    def find_match(self, id_, db_name) -> any:
+        return self[id_][db_name]
+
+    def make_reciprocal(self):
+        for mapping in list(self.values()):
+            for id_ in list(mapping.values()):
+                if id_ not in self.keys():
+                    self[id_] = mapping

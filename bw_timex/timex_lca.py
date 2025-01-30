@@ -29,14 +29,14 @@ from peewee import fn
 from scipy import sparse
 
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
-from .helper_classes import SetList, TimeMappingDict
+from .helper_classes import InterDatabaseMapping, TimeMappingDict
 from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
 from .utils import (
     extract_date_as_integer,
+    find_matching_node,
     resolve_temporalized_node_name,
     round_datetime,
-    find_matching_node,
 )
 
 
@@ -135,6 +135,8 @@ class TimexLCA:
         # the background databases that link to foreground nodes.
         self.create_node_id_collection_dict()
 
+        self.interdatabase_activity_mapping = InterDatabaseMapping()
+
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
         # background databases in the LCA. We need all the IDs for the time mapping dict.
         fu, data_objs, remapping = self.prepare_base_lca_inputs(
@@ -144,9 +146,13 @@ class TimexLCA:
         self.base_lca.lci()
         self.base_lca.lcia()
 
-        self.nodes_dict = {node.id: bd.backends.Activity(node) for node 
-                           in bd.backends.ActivityDataset.select().where(
-                               bd.backends.ActivityDataset.database << list(self.database_date_dict.keys()))}
+        self.nodes_dict = {
+            node.id: bd.backends.Activity(node)
+            for node in bd.backends.ActivityDataset.select().where(
+                bd.backends.ActivityDataset.database
+                << list(self.database_date_dict.keys())
+            )
+        }
 
     ########################################
     # Main functions to be called by users #
@@ -1102,28 +1108,47 @@ class TimexLCA:
             )
             return
 
-        self.interdatabase_activity_mapping = SetList()
-        
-        filtered_timeline = self.timeline.loc[self.timeline.interpolation_weights.notnull()]
+        filtered_timeline = self.timeline.loc[
+            self.timeline.interpolation_weights.notnull()
+        ]
         unique_producers = filtered_timeline.producer.unique()
 
+        self.interdatabase_activity_mapping.update(
+            {producer: {} for producer in unique_producers}
+        )
 
-
-        producer_tuples_list = []
+        producer_tuples_dict = {}
         for producer in unique_producers:
             producer_node = self.nodes_dict[producer]
-            producer_tuples_list.append((producer_node["name"], producer_node.get("reference product"), producer_node["location"]))
-        
-        tuples_dict = {producer_tuple: set() for producer_tuple in producer_tuples_list}
+            producer_tuples_dict[
+                (
+                    producer_node["name"],
+                    producer_node.get("reference product"),
+                    producer_node["location"],
+                )
+            ] = producer
+
+        unique_produces_tuples = producer_tuples_dict.keys()
+
         for node in self.nodes_dict.values():
             node_tuple = (node["name"], node.get("reference product"), node["location"])
-            if node_tuple in producer_tuples_list:
-                tuples_dict[node_tuple].add((node.id, node["database"]))
-        
-        for tuple_set in tuples_dict.values():
-            self.interdatabase_activity_mapping.add(tuple_set)
+            if node_tuple in unique_produces_tuples:
+                print(node["name"], node.id, node["database"])
+                producer_id = producer_tuples_dict[node_tuple]
+                self.interdatabase_activity_mapping[producer_id][
+                    node["database"]
+                ] = node.id
 
-        return
+        self.interdatabase_activity_mapping.make_reciprocal()
+
+        # tuples_dict = {producer_tuple: set() for producer_tuple in producer_tuples_list}
+        # for node in self.nodes_dict.values():
+        #     node_tuple = (node["name"], node.get("reference product"), node["location"])
+        #     if node_tuple in producer_tuples_list:
+        #         tuples_dict[node_tuple].add((node.id, node["database"]))
+
+        # for tuple_set in tuples_dict.values():
+        #     self.interdatabase_activity_mapping.add(tuple_set)
 
     def collect_temporalized_processes_from_timeline(self) -> None:
         """
