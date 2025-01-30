@@ -145,7 +145,8 @@ class TimeMappingDict(dict):
 
 class InterDatabaseMapping(dict):
     """
-    A dictionary of the form {id:{database: id}} that maps the same activity in different databases.
+    A dictionary of the form {id1:{database1: id1, database2: id2, ...}, id2: ...} that maps the
+    same activity in different databases.
     """
 
     def __init__(self, *args, **kwargs) -> None:

@@ -34,7 +34,6 @@ from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
 from .utils import (
     extract_date_as_integer,
-    find_matching_node,
     resolve_temporalized_node_name,
     round_datetime,
 )
@@ -146,13 +145,12 @@ class TimexLCA:
         self.base_lca.lci()
         self.base_lca.lcia()
 
-        self.nodes_dict = {
-            node.id: bd.backends.Activity(node)
-            for node in bd.backends.ActivityDataset.select().where(
-                bd.backends.ActivityDataset.database
-                << list(self.database_date_dict.keys())
-            )
-        }
+        # Getting all nodes from the databases
+        all_nodes = bd.backends.ActivityDataset.select().where(
+            bd.backends.ActivityDataset.database << list(self.database_date_dict.keys())
+        )
+
+        self.nodes_dict = {node.id: bd.backends.Activity(node) for node in all_nodes}
 
     ########################################
     # Main functions to be called by users #
@@ -252,6 +250,7 @@ class TimexLCA:
             self.database_date_dict_static_only,
             self.activity_time_mapping_dict,
             self.node_id_collection_dict,
+            self.nodes_dict,
             self.temporal_grouping,
             self.interpolation_type,
             self.cutoff,
@@ -564,7 +563,11 @@ class TimexLCA:
         bw_timex.matrix_modifier.MatrixModifier: Class that handles the technosphere and biosphere matrix modifications.
         """
         self.matrix_modifier = MatrixModifier(
-            self.timeline, self.database_date_dict_static_only, self.demand_timing_dict
+            self.timeline,
+            self.database_date_dict_static_only,
+            self.demand_timing_dict,
+            self.nodes_dict,
+            self.interdatabase_activity_mapping,
         )
         self.node_id_collection_dict["temporal_markets"] = (
             self.matrix_modifier.temporal_market_ids
@@ -595,7 +598,7 @@ class TimexLCA:
         None
             calculates the dynamic inventory and stores it in the attribute
             `dynamic_inventory` as a matrix and in `dynamic_inventory_df` as a DataFrame.
-            Also calculates and stores the lci of the temporal markets in the attribute 
+            Also calculates and stores the lci of the temporal markets in the attribute
             self.temporal_market_lcis for use in contribution analysis of the background processes.
 
         See also
@@ -1135,7 +1138,6 @@ class TimexLCA:
         for node in self.nodes_dict.values():
             node_tuple = (node["name"], node.get("reference product"), node["location"])
             if node_tuple in unique_produces_tuples:
-                print(node["name"], node.id, node["database"])
                 producer_id = producer_tuples_dict[node_tuple]
                 self.interdatabase_activity_mapping[producer_id][
                     node["database"]

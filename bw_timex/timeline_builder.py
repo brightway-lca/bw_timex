@@ -35,6 +35,7 @@ class TimelineBuilder:
         database_date_dict_static_only: dict,
         activity_time_mapping_dict: dict,
         node_id_collection_dict: dict,
+        nodes_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
         cutoff: float = 1e-9,
@@ -75,6 +76,7 @@ class TimelineBuilder:
         self.database_date_dict_static_only = database_date_dict_static_only
         self.activity_time_mapping_dict = activity_time_mapping_dict
         self.node_id_collection_dict = node_id_collection_dict
+        self.nodes_dict = nodes_dict
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
         self.cutoff = cutoff
@@ -217,7 +219,7 @@ class TimelineBuilder:
         for row in grouped_edges.itertuples():
             self.activity_time_mapping_dict.add(
                 (
-                    ("temporalized", bd.get_node(id=row.producer)["code"]),
+                    ("temporalized", self.nodes_dict[row.producer]["code"]),
                     row.hash_producer,
                 )
             )
@@ -245,7 +247,7 @@ class TimelineBuilder:
 
         # Retrieve producer and consumer names
         grouped_edges["producer_name"] = grouped_edges.producer.apply(
-            lambda x: bd.get_node(id=x)["name"]
+            lambda x: self.nodes_dict[x]["name"]
         )
         grouped_edges["consumer_name"] = grouped_edges.consumer.apply(
             self.get_consumer_name
@@ -371,11 +373,11 @@ class TimelineBuilder:
         """
         try:
             return self.activity_time_mapping_dict[
-                (("temporalized", bd.get_node(id=node_id)["code"]), node_hash)
+                (("temporalized", self.nodes_dict[node_id]["code"]), node_hash)
             ]
-        except:
+        except KeyError:
             return self.activity_time_mapping_dict[
-                ((bd.get_node(id=node_id).key), node_hash)
+                ((self.nodes_dict[node_id].key), node_hash)
             ]
 
     def add_column_interpolation_weights_to_timeline(
@@ -597,6 +599,6 @@ class TimelineBuilder:
             Name of the node or -1
         """
         try:
-            return bd.get_node(id=idx)["name"]
-        except:
+            return self.nodes_dict[idx]["name"]
+        except KeyError:
             return "-1"  # functional unit
