@@ -648,9 +648,6 @@ class TimexLCA:
             v: k for k, v in self.biosphere_time_mapping_dict.items()
         }
 
-        self.activity_time_mapping_dict_reversed = {
-            v: k for k, v in self.activity_time_mapping_dict.items()
-        }
         self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(
             from_timeline
         )
@@ -1280,8 +1277,8 @@ class TimexLCA:
             inplace=True,
         )
         df.rename(  # from activity id to ((database, code), time)
-            index=self.activity_time_mapping_dict.reversed(),
-            columns=self.activity_time_mapping_dict.reversed(),
+            index=self.activity_time_mapping_dict.reversed,
+            columns=self.activity_time_mapping_dict.reversed,
             inplace=True,
         )
         return df
@@ -1311,7 +1308,7 @@ class TimexLCA:
             index=self.lca.remapping_dicts[
                 "biosphere"
             ],  # from activity id to bioflow name
-            columns=self.activity_time_mapping_dict.reversed(),  # id to ((database, code), time)
+            columns=self.activity_time_mapping_dict.reversed,  # id to ((database, code), time)
             inplace=True,
         )
 
@@ -1339,7 +1336,7 @@ class TimexLCA:
             inplace=True,
         )
         df.rename(  # from activity id to ((database, code), time)
-            columns=self.activity_time_mapping_dict.reversed(),
+            columns=self.activity_time_mapping_dict.reversed,
             inplace=True,
         )
 
@@ -1377,7 +1374,7 @@ class TimexLCA:
         for activity in df["activity"].unique():
             if activity not in activity_name_cache:
                 activity_name_cache[activity] = resolve_temporalized_node_name(
-                    self.activity_time_mapping_dict_reversed[activity][0][1]
+                    self.activity_time_mapping_dict.reversed[activity][0][1]
                 )
 
         df["activity"] = df["activity"].map(activity_name_cache)
@@ -1483,7 +1480,7 @@ class TimexLCA:
             for activity in plot_data["activity"].unique():
                 if activity not in activity_name_cache:
                     activity_name_cache[activity] = resolve_temporalized_node_name(
-                        self.activity_time_mapping_dict_reversed[activity][0][1]
+                        self.activity_time_mapping_dict.reversed[activity][0][1]
                     )
 
             plot_data["activity_label"] = plot_data["activity"].map(activity_name_cache)

@@ -246,7 +246,7 @@ def plot_characterized_inventory_as_waterfall(
     if not hasattr(lca_obj, "characterized_inventory"):
         raise ValueError("LCA object does not have characterized inventory data.")
 
-    if not hasattr(lca_obj, "activity_time_mapping_dict_reversed"):
+    if not hasattr(lca_obj, "activity_time_mapping_dict"):
         raise ValueError("Make sure to pass an instance of a TimexLCA.")
 
     time_res_dict = {
@@ -268,7 +268,7 @@ def plot_characterized_inventory_as_waterfall(
     unique_activities = plot_data["activity"].unique()
     activity_labels = {
         idx: resolve_temporalized_node_name(
-            lca_obj.activity_time_mapping_dict_reversed[idx][0][1]
+            lca_obj.activity_time_mapping_dict.reversed[idx][0][1]
         )
         for idx in unique_activities
     }

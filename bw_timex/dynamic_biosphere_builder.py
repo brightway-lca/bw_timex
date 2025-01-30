@@ -133,7 +133,7 @@ class DynamicBiosphereBuilder:
 
         lci_dict = {}
         temporal_market_lci_dict = {}
-        
+
         for row in self.timeline.itertuples():
             idx = row.time_mapped_producer
             if from_timeline:
@@ -146,9 +146,7 @@ class DynamicBiosphereBuilder:
             (
                 (original_db, original_code),
                 time,
-            ) = self.activity_time_mapping_dict.reversed()[idx]
-
-            
+            ) = self.activity_time_mapping_dict.reversed[idx]
 
             if idx in self.node_id_collection_dict["temporalized_processes"]:
 
@@ -209,19 +207,18 @@ class DynamicBiosphereBuilder:
                             col=process_col_index,
                             amount=amount,
                         )
-            
+
             elif idx in self.node_id_collection_dict["temporal_markets"]:
                 (
                     (original_db, original_code),
                     time,
-                ) = self.activity_time_mapping_dict.reversed()[idx]
+                ) = self.activity_time_mapping_dict.reversed[idx]
 
                 if from_timeline:
                     demand = self.demand_from_timeline(row, original_db)
                 else:
                     demand = self.demand_from_technosphere(idx, process_col_index)
 
-                
                 if demand:
                     for act, amount in demand.items():
                         # check if lci already calculated for this activity
@@ -236,13 +233,12 @@ class DynamicBiosphereBuilder:
                             temporal_market_lci_dict[idx] = lci_dict[act] * amount
                         else:
                             temporal_market_lci_dict[idx] += lci_dict[act] * amount
-                        
 
                     aggregated_inventory = temporal_market_lci_dict[idx].sum(axis=1)
 
                     for row_idx, amount in enumerate(aggregated_inventory.A1):
                         bioflow = self.lca_obj.dicts.biosphere.reversed[row_idx]
-                        ((_, _), time) = self.activity_time_mapping_dict.reversed()[idx]
+                        ((_, _), time) = self.activity_time_mapping_dict.reversed[idx]
 
                         time_in_datetime = convert_date_string_to_datetime(
                             self.temporal_grouping, str(time)

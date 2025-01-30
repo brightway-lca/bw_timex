@@ -128,6 +128,7 @@ class TimeMappingDict(dict):
         self._modified = True  # Mark as modified
         return self[process_time_tuple]
 
+    @property
     def reversed(self):
         """
         Returns a reversed version of the dictionary, updating it only if necessary.
