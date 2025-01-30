@@ -144,6 +144,10 @@ class TimexLCA:
         self.base_lca.lci()
         self.base_lca.lcia()
 
+        self.nodes_dict = {node.id: bd.backends.Activity(node) for node 
+                           in bd.backends.ActivityDataset.select().where(
+                               bd.backends.ActivityDataset.database << list(self.database_date_dict.keys()))}
+
     ########################################
     # Main functions to be called by users #
     ########################################
@@ -1099,64 +1103,26 @@ class TimexLCA:
             return
 
         self.interdatabase_activity_mapping = SetList()
-        first_level_background_node_ids_interpolated = set()
-        unique_producer_background_db_combos = {}
+        
+        filtered_timeline = self.timeline.loc[self.timeline.interpolation_weights.notnull()]
+        unique_producers = filtered_timeline.producer.unique()
 
-        # get unique combos of producers and background dbs from timeline
-        for _, row in self.timeline.iterrows():
-            if (
-                row["interpolation_weights"] is not None
-            ):  # "None" corresponds to exchanges linked within the foreground -> skipped
 
-                if row["producer"] not in unique_producer_background_db_combos.keys():
-                    unique_producer_background_db_combos[row["producer"]] = set()
-                unique_producer_background_db_combos[row["producer"]].update(
-                    row["interpolation_weights"].keys()
-                )
 
-        # fill interdatabase_activity_mapping with unique combos
-        for (
-            original_producer_id,
-            background_databases,
-        ) in unique_producer_background_db_combos.items():
-            original_database = list(
-                self.node_id_collection_dict[
-                    "demand_dependent_background_database_names"
-                ]
-            )[
-                0
-            ]  # what if more than one orignal bg database is linked?
-            orig_act = bd.get_node(id=original_producer_id)
-            act_set = set()
+        producer_tuples_list = []
+        for producer in unique_producers:
+            producer_node = self.nodes_dict[producer]
+            producer_tuples_list.append((producer_node["name"], producer_node.get("reference product"), producer_node["location"]))
+        
+        tuples_dict = {producer_tuple: set() for producer_tuple in producer_tuples_list}
+        for node in self.nodes_dict.values():
+            node_tuple = (node["name"], node.get("reference product"), node["location"])
+            if node_tuple in producer_tuples_list:
+                tuples_dict[node_tuple].add((node.id, node["database"]))
+        
+        for tuple_set in tuples_dict.values():
+            self.interdatabase_activity_mapping.add(tuple_set)
 
-            for background_db in background_databases:
-                try:
-                    other_node = find_matching_node(orig_act, background_db)
-                    first_level_background_node_ids_interpolated.add(other_node.id)
-                    act_set.add((other_node.id, background_db))
-
-                except KeyError as e:
-                    warnings.warn(
-                        f"Failed to find process in database {background_db} for name='{orig_act['name']}', reference product='{orig_act['reference product']}', location='{orig_act['location']}': {e}"
-                    )
-
-            if (
-                original_database not in background_databases
-            ):  # add original background db in case it's not interpolated to in the timeline
-                try:
-                    other_node = find_matching_node(orig_act, original_database)
-                    first_level_background_node_ids_interpolated.add(other_node.id)
-                    act_set.add((other_node.id, original_database))
-
-                except KeyError as e:
-                    warnings.warn(
-                        f"Failed to find process in database {original_database} for name='{orig_act['name']}', reference product='{orig_act['reference product']}', location='{orig_act['location']}': {e}"
-                    )
-
-            self.interdatabase_activity_mapping.add(act_set)
-            self.node_id_collection_dict[
-                "first_level_background_node_ids_interpolated"
-            ] = first_level_background_node_ids_interpolated
         return
 
     def collect_temporalized_processes_from_timeline(self) -> None:
