@@ -306,24 +306,18 @@ class DynamicBiosphereBuilder:
             A demand-dictionary with as keys the brightway ids of the consumed background
             activities and as values their consumed amount.
         """
-        technosphere_column = (
-            self.technosphere_matrix[:, process_col_index].toarray().ravel()
-        )  # 1-d np.array
-        demand = {}
-        for row_idx, amount in enumerate(technosphere_column):
-            if row_idx == self.activity_dict[idx]:  # Skip production exchange
-                continue
-            if amount == 0:
-                continue
+        col = self.technosphere_matrix[:, process_col_index]  # Sparse column
+        activity_row = self.activity_dict[idx]  # Producer's row index
+        foreground_nodes = self.node_id_collection_dict["foreground_node_ids"]
 
-            node_id = self.activity_dict.reversed[row_idx]
+        demand = {
+            self.activity_dict.reversed[row_idx]: -amount
+            for row_idx, amount in zip(col.nonzero()[0], col.data)
+            if row_idx != activity_row  # Skip production exchange
+            and self.activity_dict.reversed[row_idx]
+            not in foreground_nodes  # Only background
+        }
 
-            if (
-                node_id in self.node_id_collection_dict["foreground_node_ids"]
-            ):  # We only aggregate background process bioflows
-                continue
-
-            demand[node_id] = -amount
         return demand
 
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
