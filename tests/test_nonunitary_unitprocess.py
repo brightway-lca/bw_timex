@@ -19,7 +19,7 @@ class TestClass_EV:
     def setup_method(self):
         self.node_a = bd.get_node(database="foreground", code="A")
 
-        database_date_dict = {
+        database_dates = {
             "db_2020": datetime.strptime("2020", "%Y"),
             "foreground": "dynamic",
         }
@@ -27,7 +27,7 @@ class TestClass_EV:
         self.tlca = TimexLCA(
             demand={self.node_a: 1},
             method=("GWP", "example"),
-            database_date_dict=database_date_dict,
+            database_dates=database_dates,
         )
 
         self.tlca.build_timeline(

@@ -1,6 +1,6 @@
 # Step 2 - Building the process timeline
 
-With all the temporal information prepared, we can now instantiate our TimexLCA object. This is very similar to a normal Brightway LCA object, but with the additional argument of our `database_date_dict`:
+With all the temporal information prepared, we can now instantiate our TimexLCA object. This is very similar to a normal Brightway LCA object, but with the additional argument of our `database_dates`:
 
 ```python
 from bw_timex import TimexLCA
@@ -8,7 +8,7 @@ from bw_timex import TimexLCA
 tlca = TimexLCA(
     demand={("foreground", "A"): 1},
     method=("our", "method"),
-    database_date_dict=database_date_dict,
+    database_dates=database_dates,
 )
 ```
 

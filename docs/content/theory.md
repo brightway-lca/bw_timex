@@ -184,7 +184,7 @@ as the old background producer.
 1.  For each temporalized process in the timeline, a new process copy is
     created, which links to its new temporalized producers and
     consumers. The timing of the processes is stored in the
-    `activity_time_mapping_dict`, which maps the process ids to process
+    `activity_time_mapping`, which maps the process ids to process
     timing.
 2.  For those processes linking to the background databases, `bw_timex`
     relinks the exchanges to the new producing processes from the

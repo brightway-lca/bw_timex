@@ -153,10 +153,10 @@ def round_datetime(date: datetime, resolution: str) -> datetime:
     raise ValueError("Resolution must be one of 'year', 'month', 'day', or 'hour'.")
 
 
-def add_flows_to_characterization_function_dict(
+def add_flows_to_characterization_functions(
     flows: Union[str, List[str]],
     func: Callable,
-    characterization_function_dict: Optional[dict] = dict(),
+    characterization_functions: Optional[dict] = dict(),
 ) -> dict:
     """
     Add a new flow or a list of flows to the available characterization functions.
@@ -167,7 +167,7 @@ def add_flows_to_characterization_function_dict(
         Flow or list of flows to be added to the characterization function dictionary.
     func : Callable
         Dynamic characterization function for flow.
-    characterization_function_dict : dict, optional
+    characterization_functions : dict, optional
         Dictionary of flows and their corresponding characterization functions. Default is an empty
         dictionary.
 
@@ -180,13 +180,13 @@ def add_flows_to_characterization_function_dict(
     # Check if the input is a single flow (str) or a list of flows (List[str])
     if isinstance(flows, str):
         # It's a single flow, add it directly
-        characterization_function_dict[flows] = func
+        characterization_functions[flows] = func
     elif isinstance(flows, list):
         # It's a list of flows, iterate and add each one
         for flow in flows:
-            characterization_function_dict[flow] = func
+            characterization_functions[flow] = func
 
-    return characterization_function_dict
+    return characterization_functions
 
 
 def resolve_temporalized_node_name(code: str) -> str:
@@ -246,7 +246,7 @@ def plot_characterized_inventory_as_waterfall(
     if not hasattr(lca_obj, "characterized_inventory"):
         raise ValueError("LCA object does not have characterized inventory data.")
 
-    if not hasattr(lca_obj, "activity_time_mapping_dict"):
+    if not hasattr(lca_obj, "activity_time_mapping"):
         raise ValueError("Make sure to pass an instance of a TimexLCA.")
 
     time_res_dict = {
@@ -268,7 +268,7 @@ def plot_characterized_inventory_as_waterfall(
     unique_activities = plot_data["activity"].unique()
     activity_labels = {
         idx: resolve_temporalized_node_name(
-            lca_obj.activity_time_mapping_dict.reversed[idx][0][1]
+            lca_obj.activity_time_mapping.reversed[idx][0][1]
         )
         for idx in unique_activities
     }

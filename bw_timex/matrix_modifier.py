@@ -22,9 +22,9 @@ class MatrixModifier:
     def __init__(
         self,
         timeline: pd.DataFrame,
-        database_date_dict_static_only: dict,
+        database_dates_static: dict,
         demand_timing: dict,
-        nodes_dict: dict,
+        nodes: dict,
         interdatabase_activity_mapping: InterDatabaseMapping,
         name: Optional[str] = None,
     ) -> None:
@@ -36,7 +36,7 @@ class MatrixModifier:
         ----------
         timeline : pd.DataFrame
             A DataFrame of the timeline of exchanges
-        database_date_dict_static_only : dict
+        database_dates_static : dict
             A dictionary mapping the static background databases to dates.
         demand_timing : dict
             A dictionary mapping the demand to its timing.
@@ -46,9 +46,9 @@ class MatrixModifier:
         """
 
         self.timeline = timeline
-        self.database_date_dict_static_only = database_date_dict_static_only
+        self.database_dates_static = database_dates_static
         self.demand_timing = demand_timing
-        self.nodes_dict = nodes_dict
+        self.nodes = nodes
         self.interdatabase_activity_mapping = interdatabase_activity_mapping
         self.name = name
         self.temporalized_process_ids = set()
@@ -150,10 +150,10 @@ class MatrixModifier:
         datapackage_bio = bwp.create_datapackage(sum_inter_duplicates=False)
 
         for producer in unique_producers:
-            original_producer_node = self.nodes_dict[producer[0]]
+            original_producer_node = self.nodes[producer[0]]
             if (
                 original_producer_node["database"]
-                not in self.database_date_dict_static_only.keys()  # skip temporal markets
+                not in self.database_dates_static.keys()  # skip temporal markets
             ):
                 new_producer_id = producer[1]
                 indices = (
@@ -219,7 +219,7 @@ class MatrixModifier:
 
         if row.consumer == -1:  # functional unit
             new_producer_id = row.time_mapped_producer
-            fu_production_amount = self.nodes_dict[row.producer].rp_exchange().amount
+            fu_production_amount = self.nodes[row.producer].rp_exchange().amount
             new_nodes.add((new_producer_id, fu_production_amount))
             self.temporalized_process_ids.add(
                 new_producer_id
@@ -230,7 +230,7 @@ class MatrixModifier:
         new_producer_id = row.time_mapped_producer
 
         previous_producer_id = row.producer
-        previous_producer_node = self.nodes_dict[previous_producer_id]
+        previous_producer_node = self.nodes[previous_producer_id]
 
         # Add entry between exploded consumer and exploded producer (not in background database)
         datapackage.add_persistent_vector(
@@ -245,10 +245,7 @@ class MatrixModifier:
         )
 
         # Check if previous producer comes from background database -> temporal market
-        if (
-            previous_producer_node["database"]
-            in self.database_date_dict_static_only.keys()
-        ):
+        if previous_producer_node["database"] in self.database_dates_static.keys():
             # Create new edges based on interpolation_weights from the row
             for database, db_share in row.interpolation_weights.items():
                 # Get the producer activity in the corresponding background database
@@ -299,7 +296,7 @@ class MatrixModifier:
                     )
             elif isinstance(previous_producer_node, bd.backends.proxies.Activity):
                 producer_production_amount = (
-                    self.nodes_dict[row.producer].rp_exchange().amount
+                    self.nodes[row.producer].rp_exchange().amount
                 )
             else:
                 raise ValueError(
