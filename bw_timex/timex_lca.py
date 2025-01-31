@@ -1,4 +1,3 @@
-import time as ti
 import warnings
 from calendar import day_abbr
 from datetime import datetime
@@ -426,7 +425,7 @@ class TimexLCA:
             )
             time_int = (
                 np.datetime64(time_in_datetime).astype("datetime64[s]").astype("int64")
-            )  # now time is a numpy datetime
+            )  # now time is a int64 in secs
 
             lci = lci.tocoo()
 
@@ -436,8 +435,8 @@ class TimexLCA:
 
             new_rows = [biosphere_time_mapping_int[x] for x in list_of_tuples]
             dynamic_inv_row_ids.extend(new_rows)
-            dynamic_inv_col_ids.extend(lci.col)  # (c for c in lci.col)
-            dynamic_inv_data.extend(lci.data)  # (d for d in lci.data)
+            dynamic_inv_col_ids.extend(lci.col)
+            dynamic_inv_data.extend(lci.data)
 
         dynamic_inventory_disaggregated = sparse.coo_matrix(  # construct the new dynamic inventory including background inventory instead of aggregated temporal market emissions
             (dynamic_inv_data, (dynamic_inv_row_ids, dynamic_inv_col_ids)),
@@ -451,27 +450,7 @@ class TimexLCA:
     def static_lcia(self) -> None:
         """
         Calculates static LCIA using time-explicit LCIs with the standard static characterization
-        factors of the selected LCIA method using `bw2calc.lcia()`.def lci_with_background_inventory(self) -> None:
-        if not hasattr(self, "dynamic_inventory"):
-            raise AttributeError(
-                "Dynamic lci not yet calculated. Call TimexLCA.lci(build_dynamic_biosphere=True) first."
-            )
-        self.dynamic_inventory_bg = self.dynamic_inventory.copy()
-        # 1) set all temporal market emissions to zero
-        self.dynamic_inventory_bg.tocsc()
-        temporal_market_columns = [self.lca.activity_dict[id_] for id_ self.node_collections["temporal_markets"]]
-        self.dynamic_inventory_bg[:, temporal_market_columns].data = 0
-        # 2) add all background inventory to the dynamic inventory for all temporal markets
-        self.dynamic_inventory_bg.tocsr()
-        for id_, lci in self.temporal_market_lci.items():
-            ((_, _), time) = self.activity_time_mapping.reversed()[id_] #time of temporal market
-            time_in_datetime = convert_date_string_to_datetime(
-                            self.temporal_grouping, str(time)
-                        )  # now time is a datetime
-            for row_idx, row_data in enumerate(lci):
-                bioflow = self.lca_obj.dicts.biosphere.reversed[row_idx]
-                dynamic_inv_row_id= self.biosphere_time_mapping[(bioflow, time_in_datetime)]
-                self.dynamic_inventory_bg[dynamic_inv_row_id, row_data.indices] = row_data.data # add background inventory to dynamic inventory for each time-stamped bioflow
+        factors of the selected LCIA method using `bw2calc.lcia()`.
 
         Parameters
         ----------
@@ -1233,15 +1212,6 @@ class TimexLCA:
                 ] = node.id
 
         self.interdatabase_activity_mapping.make_reciprocal()
-
-        # tuples_dict = {producer_tuple: set() for producer_tuple in producer_tuples_list}
-        # for node in self.nodes.values():
-        #     node_tuple = (node["name"], node.get("reference product"), node["location"])
-        #     if node_tuple in producer_tuples_list:
-        #         tuples_dict[node_tuple].add((node.id, node["database"]))
-
-        # for tuple_set in tuples_dict.values():
-        #     self.interdatabase_activity_mapping.add(tuple_set)
 
     def collect_temporalized_processes_from_timeline(self) -> None:
         """
