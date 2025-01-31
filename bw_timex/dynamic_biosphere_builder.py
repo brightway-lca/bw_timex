@@ -98,6 +98,7 @@ class DynamicBiosphereBuilder:
         self.cols = []
         self.values = []
         self.unique_rows_cols = set()  # To keep track of (row, col) pairs
+        self.temporal_markets_col_list = []  # To keep track of temporal market columns
 
     def build_dynamic_biosphere_matrix(
         self,
@@ -209,6 +210,7 @@ class DynamicBiosphereBuilder:
                         )
 
             elif idx in self.node_id_collection_dict["temporal_markets"]:
+                self.temporal_markets_col_list.append(process_col_index)
                 (
                     (original_db, original_code),
                     time,
@@ -235,6 +237,11 @@ class DynamicBiosphereBuilder:
                             temporal_market_lci_dict[idx] += lci_dict[act] * amount
 
                     aggregated_inventory = temporal_market_lci_dict[idx].sum(axis=1)
+
+                    # multiply LCI with supply of temporal market
+                    temporal_market_lci_dict[idx] *= self.dynamic_supply_array[
+                        process_col_index
+                    ]
 
                     for row_idx, amount in enumerate(aggregated_inventory.A1):
                         bioflow = self.lca_obj.dicts.biosphere.reversed[row_idx]

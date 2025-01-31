@@ -1,3 +1,4 @@
+from calendar import day_abbr
 import warnings
 from datetime import datetime
 from functools import partial
@@ -36,7 +37,9 @@ from .utils import (
     extract_date_as_integer,
     resolve_temporalized_node_name,
     round_datetime,
+    convert_date_string_to_datetime,
 )
+import time as ti
 
 
 class TimexLCA:
@@ -318,6 +321,7 @@ class TimexLCA:
         build_datapackage: Method to create the datapackages that contain the modifications to the technosphere and biosphere matrix using the `MatrixModifier` class.
         calculate_dynamic_inventory: Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
+        self.expand_technosphere = expand_technosphere
 
         if not expand_technosphere and not build_dynamic_biosphere:
             raise ValueError(
@@ -366,10 +370,86 @@ class TimexLCA:
             else:
                 self.calculate_dynamic_inventory(from_timeline=True)
 
+    def lci_with_background_inventory(self) -> None:
+        if not hasattr(self, "dynamic_inventory"):
+            raise AttributeError(
+                "Dynamic lci not yet calculated. Call TimexLCA.lci(build_dynamic_biosphere=True) first."
+            )
+        self.dynamic_inventory_bg = self.dynamic_inventory.tocsc()
+        # 1) set all temporal market emissions to zero
+
+        for col in self.dynamic_biosphere_builder.temporal_markets_col_list:
+            self.dynamic_inventory_bg.data[
+                self.dynamic_inventory_bg.indptr[
+                    col
+                ] : self.dynamic_inventory_bg.indptr[col + 1]
+            ] = 0
+        self.dynamic_inventory_bg.eliminate_zeros()
+        # 2) add all background inventory to the dynamic inventory for all temporal markets
+
+        self.dynamic_inventory_bg = self.dynamic_inventory_bg.tocoo()
+
+        dynamic_inv_row_ids = self.dynamic_inventory_bg.row.tolist()
+        dynamic_inv_col_ids = self.dynamic_inventory_bg.col.tolist()
+        dynamic_inv_data = self.dynamic_inventory_bg.data.tolist()
+
+        for id_, lci in self.temporal_market_lci_dict.items():
+
+            ((_, _), time) = self.activity_time_mapping_dict.reversed[
+                id_
+            ]  # time of temporal market
+            time_in_datetime = convert_date_string_to_datetime(
+                self.temporal_grouping, str(time)
+            )
+            time_in_datetime = np.datetime64(time_in_datetime).astype(
+                "datetime64[s]"
+            )  # now time is a numpy datetime
+
+            lci = lci.tocoo()
+            t0 = ti.time()
+
+            our_list = [
+                self.biosphere_time_mapping_dict[
+                    (self.lca.dicts.biosphere.reversed[row_idx], time_in_datetime)
+                ]
+                for row_idx in lci.row
+            ]
+            t1 = ti.time()
+            print(f"Time for our_list: {t1-t0}")
+            dynamic_inv_row_ids.extend(our_list)
+            dynamic_inv_col_ids.extend(lci.col)  # (c for c in lci.col)
+            dynamic_inv_data.extend(lci.data)  # (d for d in lci.data)
+
+        dynamic_inventory_bg = sparse.coo_matrix(  # construct the new dynamic inventory including background inventory instead of aggregated temporal market emissions
+            (dynamic_inv_data, (dynamic_inv_row_ids, dynamic_inv_col_ids)),
+            shape=self.dynamic_inventory_bg.shape,
+        )
+        self.dynamic_inventory_bg = dynamic_inventory_bg.tocsr()
+
     def static_lcia(self) -> None:
         """
         Calculates static LCIA using time-explicit LCIs with the standard static characterization
-        factors of the selected LCIA method using `bw2calc.lcia()`.
+        factors of the selected LCIA method using `bw2calc.lcia()`.def lci_with_background_inventory(self) -> None:
+        if not hasattr(self, "dynamic_inventory"):
+            raise AttributeError(
+                "Dynamic lci not yet calculated. Call TimexLCA.lci(build_dynamic_biosphere=True) first."
+            )
+        self.dynamic_inventory_bg = self.dynamic_inventory.copy()
+        # 1) set all temporal market emissions to zero
+        self.dynamic_inventory_bg.tocsc()
+        temporal_market_columns = [self.lca.activity_dict[id_] for id_ self.node_id_collection_dict["temporal_markets"]]
+        self.dynamic_inventory_bg[:, temporal_market_columns].data = 0
+        # 2) add all background inventory to the dynamic inventory for all temporal markets
+        self.dynamic_inventory_bg.tocsr()
+        for id_, lci in self.temporal_market_lci.items():
+            ((_, _), time) = self.activity_time_mapping_dict.reversed()[id_] #time of temporal market
+            time_in_datetime = convert_date_string_to_datetime(
+                            self.temporal_grouping, str(time)
+                        )  # now time is a datetime
+            for row_idx, row_data in enumerate(lci):
+                bioflow = self.lca_obj.dicts.biosphere.reversed[row_idx]
+                dynamic_inv_row_id= self.biosphere_time_mapping_dict[(bioflow, time_in_datetime)]
+                self.dynamic_inventory_bg[dynamic_inv_row_id, row_data.indices] = row_data.data # add background inventory to dynamic inventory for each time-stamped bioflow
 
         Parameters
         ----------
@@ -599,7 +679,7 @@ class TimexLCA:
             calculates the dynamic inventory and stores it in the attribute
             `dynamic_inventory` as a matrix and in `dynamic_inventory_df` as a DataFrame.
             Also calculates and stores the lci of the temporal markets in the attribute
-            self.temporal_market_lcis for use in contribution analysis of the background processes.
+            self.temporal_market_lci_dict for use in contribution analysis of the background processes.
 
         See also
         --------
@@ -629,7 +709,7 @@ class TimexLCA:
             self.interdatabase_activity_mapping,
             from_timeline=from_timeline,
         )
-        self.dynamic_biomatrix, self.temporal_market_lcis = (
+        self.dynamic_biomatrix, self.temporal_market_lci_dict = (
             self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(
                 from_timeline=from_timeline
             )
