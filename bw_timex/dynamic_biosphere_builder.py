@@ -128,7 +128,7 @@ class DynamicBiosphereBuilder:
 
         Returns
         -------
-        dynamic_biomatrix : scipy.sparse.csr_matrix
+        dynamic_biosphere_matrix : scipy.sparse.csr_matrix
             A sparse matrix with the dimensions (bio_flows at a specific time step) x (processes).
         """
 
@@ -273,10 +273,10 @@ class DynamicBiosphereBuilder:
         else:
             ncols = len(self.activity_time_mapping_dict)
         shape = (max(self.rows) + 1, ncols)
-        dynamic_biomatrix = sp.coo_matrix((self.values, (self.rows, self.cols)), shape)
-        self.dynamic_biomatrix = dynamic_biomatrix.tocsr()
+        dynamic_biosphere_matrix = sp.coo_matrix((self.values, (self.rows, self.cols)), shape)
+        self.dynamic_biosphere_matrix = dynamic_biosphere_matrix.tocsr()
 
-        return self.dynamic_biomatrix, temporal_market_lci_dict
+        return self.dynamic_biosphere_matrix, temporal_market_lci_dict
 
     def demand_from_timeline(self, row, original_db):
         """

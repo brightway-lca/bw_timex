@@ -7,8 +7,8 @@ from bw_temporalis import TemporalDistribution
 
 @pytest.fixture
 @bw2test
-def dynamic_biomatrix_db():
-    bd.projects.set_current("__test_dynamic_biomatrix__")
+def dynamic_biosphere_matrix_db():
+    bd.projects.set_current("__test_dynamic_biosphere_matrix__")
     bd.Database("bio").write(
         {
             ("bio", "CO2"): {
