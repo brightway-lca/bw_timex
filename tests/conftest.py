@@ -1,4 +1,4 @@
-from .fixtures.dynamic_biosphere_matrix_db_fixture import dynamic_biosphere_matrix_db
+from .fixtures.dynamic_biomatrix_db_fixture import dynamic_biosphere_matrix_db
 from .fixtures.nonunitary_db_fixture import nonunitary_db
 from .fixtures.process_at_base_database_time_db_fixture import (
     process_at_base_database_time_db,
