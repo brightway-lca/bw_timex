@@ -11,7 +11,7 @@ from bw2data.backends.schema import ExchangeDataset
 from bw2data.errors import MultipleResults, UnknownObject
 from bw_temporalis import TemporalDistribution
 
-time_res_to_int_dict = {
+time_res_mapping_strftime = {
     "year": "%Y",
     "month": "%Y%m",
     "day": "%Y%m%d",
@@ -38,12 +38,12 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
         Datetime object converted to an integer in the format of time_res
 
     """
-    if time_res not in time_res_to_int_dict.keys():
+    if time_res not in time_res_mapping_strftime.keys():
         warnings.warn(
-            f'time_res: {time_res} is not a valid option. Please choose from: {list(time_res_to_int_dict.keys())} defaulting to "year"',
+            f'time_res: {time_res} is not a valid option. Please choose from: {list(time_res_mapping_strftime.keys())} defaulting to "year"',
             category=Warning,
         )
-    formatted_date = dt_obj.strftime(time_res_to_int_dict[time_res])
+    formatted_date = dt_obj.strftime(time_res_mapping_strftime[time_res])
     date_as_integer = int(formatted_date)
 
     return date_as_integer
@@ -69,12 +69,12 @@ def extract_date_as_string(timestamp: datetime, temporal_grouping: str) -> str:
         Date as a string in the format of the chosen temporal grouping.
     """
 
-    if temporal_grouping not in time_res_to_int_dict.keys():
+    if temporal_grouping not in time_res_mapping_strftime.keys():
         warnings.warn(
-            f'temporal_grouping: {temporal_grouping} is not a valid option. Please choose from: {list(time_res_to_int_dict.keys())} defaulting to "year"',
+            f'temporal_grouping: {temporal_grouping} is not a valid option. Please choose from: {list(time_res_mapping_strftime.keys())} defaulting to "year"',
             category=Warning,
         )
-    return timestamp.strftime(time_res_to_int_dict[temporal_grouping])
+    return timestamp.strftime(time_res_mapping_strftime[temporal_grouping])
 
 
 def convert_date_string_to_datetime(temporal_grouping, date_string) -> datetime:

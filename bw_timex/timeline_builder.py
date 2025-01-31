@@ -210,7 +210,7 @@ class TimelineBuilder:
             lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
         )
 
-        # add new processes to activity time mapping dict
+        # add new processes to activity_time_mapping
         for row in grouped_edges.itertuples():
             self.activity_time_mapping.add(
                 (
@@ -219,7 +219,7 @@ class TimelineBuilder:
                 )
             )
 
-        # store the ids from the time_mapping_dict in DataFrame
+        # store the ids from the time_mapping in DataFrame
         grouped_edges["time_mapped_producer"] = grouped_edges.apply(
             lambda row: self.get_time_mapping_key(row.producer, row.hash_producer),
             axis=1,

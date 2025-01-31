@@ -51,8 +51,8 @@ class TestBioflows(unittest.TestCase):
         mlca.calculate_dynamic_biosphere_lci()
 
         for idx, row in enumerate(mlca.lca.inventory.toarray()):
-            bioflow_matrix_id = mlca.lca.dicts.biosphere.reversed[idx]
-            bioflow_name = bd.get_node(id=bioflow_matrix_id)["code"]
+            bioflow_id = mlca.lca.dicts.biosphere.reversed[idx]
+            bioflow_name = bd.get_node(id=bioflow_id)["code"]
             self.assertTrue(
                 math.isclose(
                     row.sum(),

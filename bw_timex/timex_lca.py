@@ -97,7 +97,7 @@ class TimexLCA:
         database_dates: dict = None,
     ) -> None:
         """
-        Instantiating a `TimexLCA` object calculates a static LCA, initializes time mapping dicts
+        Instantiating a `TimexLCA` object calculates a static LCA, initializes time mappings
         for activities and biosphere flows, and stores useful subsets of ids in the
         node_collections.
 
@@ -762,10 +762,6 @@ class TimexLCA:
         )
         self.dynamic_inventory = self.dynamic_biosphere_matrix @ diagonal_supply_array
 
-        self.biosphere_time_mapping_reversed = {
-            v: k for k, v in self.biosphere_time_mapping.items()
-        }
-
         self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(
             from_timeline
         )
@@ -829,7 +825,7 @@ class TimexLCA:
 
                 # indices are already the same as in the matrix, as we create an entirely new
                 # biosphere instead of adding new entries (like we do with the technosphere matrix)
-                bioflow_id, date = self.biosphere_time_mapping_reversed[row]
+                bioflow_id, date = self.biosphere_time_mapping.reversed[row]
                 dataframe_rows.append(
                     (
                         date,
@@ -1422,7 +1418,7 @@ class TimexLCA:
         """
         df = pd.DataFrame(self.dynamic_biosphere_matrix.toarray())
         df.rename(  # from matrix id to activity id
-            index=self.biosphere_time_mapping_reversed,
+            index=self.biosphere_time_mapping.reversed,
             columns=self.lca.dicts.activity.reversed,
             inplace=True,
         )

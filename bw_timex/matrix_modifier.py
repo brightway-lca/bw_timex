@@ -80,7 +80,7 @@ class MatrixModifier:
         The technosphere datapackage adds the temporalized processes from the timeline
         to the technosphere matrix.
 
-        The heavy lifting of this method happens in the method `add_row_to_datapackage()`.
+        The heavy lifting of this method happens in the method `add_row_to_technosphere_datapackage()`.
         Here, each node with a temporal distribution is "exploded", which means each occurrence
         of this node (e.g. steel production on 2020-01-01 and steel production on 2015-01-01)
         becomes a separate, time-explicit new node, by adding the new elements to the technosphere matrix.
@@ -96,29 +96,29 @@ class MatrixModifier:
         bwp.Datapackage
             A datapackage containing the modifications for the technosphere matrix.
         """
-        datapackage = bwp.create_datapackage(
+        datapackage_technosphere = bwp.create_datapackage(
             sum_inter_duplicates=False
         )  # 'sum_inter_duplicates=False': If the same market is used by multiple foreground processes, the market gets created again, inputs should not be summed.
 
         new_nodes = set()
 
         for row in self.timeline.iloc[::-1].itertuples():
-            self.add_row_to_datapackage(
+            self.add_row_to_technosphere_datapackage(
                 row,
-                datapackage,
+                datapackage_technosphere,
                 new_nodes,
             )
 
         # Adding the production exchanges for new nodes
         for node_id, production_amount in new_nodes:
-            datapackage.add_persistent_vector(
+            datapackage_technosphere.add_persistent_vector(
                 matrix="technosphere_matrix",
                 name=uuid.uuid4().hex,
                 data_array=np.array([production_amount], dtype=float),
                 indices_array=np.array([(node_id, node_id)], dtype=bwp.INDICES_DTYPE),
             )
 
-        return datapackage
+        return datapackage_technosphere
 
     def create_biosphere_datapackage(self) -> bwp.Datapackage:
         """
@@ -147,7 +147,7 @@ class MatrixModifier:
             .index.values
         )  # array of unique ((original) producer_id, (new) time_mapped_producer_id) tuples
 
-        datapackage_bio = bwp.create_datapackage(sum_inter_duplicates=False)
+        datapackage_biosphere = bwp.create_datapackage(sum_inter_duplicates=False)
 
         for producer in unique_producers:
             original_producer_node = self.nodes[producer[0]]
@@ -166,7 +166,7 @@ class MatrixModifier:
                     )  # directly build a list of tuples to pass into the datapackage, the new_producer_id is the new column index
                     amounts.append(exc.amount)
 
-                datapackage_bio.add_persistent_vector(
+                datapackage_biosphere.add_persistent_vector(
                     matrix="biosphere_matrix",
                     name=uuid.uuid4().hex,
                     data_array=np.array(amounts, dtype=float),
@@ -176,9 +176,9 @@ class MatrixModifier:
                     ),
                     flip_array=np.array([False], dtype=bool),
                 )
-        return datapackage_bio
+        return datapackage_biosphere
 
-    def add_row_to_datapackage(
+    def add_row_to_technosphere_datapackage(
         self,
         row: pd.core.frame,
         datapackage: bwp.Datapackage,

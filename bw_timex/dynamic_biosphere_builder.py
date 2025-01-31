@@ -68,7 +68,7 @@ class DynamicBiosphereBuilder:
 
         """
 
-        self._time_res_dict = {
+        self._time_res_mapping = {
             "year": "datetime64[Y]",
             "month": "datetime64[M]",
             "day": "datetime64[D]",
@@ -88,7 +88,7 @@ class DynamicBiosphereBuilder:
         self.biosphere_time_mapping = biosphere_time_mapping
         self.demand_timing = demand_timing
         self.node_collections = node_collections
-        self.time_res = self._time_res_dict[temporal_grouping]
+        self.time_res = self._time_res_mapping[temporal_grouping]
         self.temporal_grouping = temporal_grouping
         self.database_dates = database_dates
         self.database_dates_static = database_dates_static
@@ -198,13 +198,13 @@ class DynamicBiosphereBuilder:
                     for date, amount in zip(dates, values):
 
                         # first create a row index for the tuple (bioflow_id, date)
-                        time_mapped_matrix_id = self.biosphere_time_mapping.add(
+                        time_mapped_matrix_idx = self.biosphere_time_mapping.add(
                             (exc.input.id, date)
                         )
 
                         # populate lists with which sparse matrix is constructed
                         self.add_matrix_entry_for_biosphere_flows(
-                            row=time_mapped_matrix_id,
+                            row=time_mapped_matrix_idx,
                             col=process_col_index,
                             amount=amount,
                         )
@@ -257,12 +257,12 @@ class DynamicBiosphereBuilder:
                         ).date
                         date = td_producer[0]
 
-                        time_mapped_matrix_id = self.biosphere_time_mapping.add(
+                        time_mapped_matrix_idx = self.biosphere_time_mapping.add(
                             (bioflow, date)
                         )
 
                         self.add_matrix_entry_for_biosphere_flows(
-                            row=time_mapped_matrix_id,
+                            row=time_mapped_matrix_idx,
                             col=process_col_index,
                             amount=amount,
                         )
