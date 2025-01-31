@@ -155,7 +155,7 @@ style biosphere fill:none, stroke:none;
 ```
 
 The resulting timeline looks like this:
-| date_producer | producer_name | date_consumer | consumer_name | amount | interpolation_weights                          |
+| date_producer | producer_name | date_consumer | consumer_name | amount | temporal_market_shares                          |
 |---------------|---------------|---------------|---------------|--------|------------------------------------------------|
 | 2022-01-01    | B             | 2024-01-01    | A             | 0.9    | {'background': 0.8, 'background_2030': 0.2}    |
 | 2024-01-01    | B             | 2024-01-01    | A             | 1.5    | {'background': 0.6, 'background_2030': 0.4}    |

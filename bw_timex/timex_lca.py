@@ -272,7 +272,7 @@ class TimexLCA:
                 "date_consumer",
                 "consumer_name",
                 "amount",
-                "interpolation_weights",
+                "temporal_market_shares",
             ]
         ]
 
@@ -1203,7 +1203,7 @@ class TimexLCA:
             return
 
         filtered_timeline = self.timeline.loc[
-            self.timeline.interpolation_weights.notnull()
+            self.timeline.temporal_market_shares.notnull()
         ]
         unique_producers = filtered_timeline.producer.unique()
 

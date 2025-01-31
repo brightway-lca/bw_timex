@@ -246,8 +246,8 @@ class MatrixModifier:
 
         # Check if previous producer comes from background database -> temporal market
         if previous_producer_node["database"] in self.database_dates_static.keys():
-            # Create new edges based on interpolation_weights from the row
-            for database, db_share in row.interpolation_weights.items():
+            # Create new edges based on temporal_market_shares from the row
+            for database, db_share in row.temporal_market_shares.items():
                 # Get the producer activity in the corresponding background database
                 try:
                     producer_id_in_background_db = (

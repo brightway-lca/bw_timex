@@ -283,7 +283,7 @@ class DynamicBiosphereBuilder:
     def demand_from_timeline(self, row, original_db):
         """
         Returns a demand dict directly from the timeline row
-        and its interpolation_weights.
+        and its temporal_market_shares.
 
         Parameters:
         -----------
@@ -301,7 +301,7 @@ class DynamicBiosphereBuilder:
 
         """
         demand = {}
-        for db, amount in row.interpolation_weights.items():
+        for db, amount in row.temporal_market_shares.items():
             timed_act_id = self.interdatabase_activity_mapping.find_match(
                 row.producer, db
             )

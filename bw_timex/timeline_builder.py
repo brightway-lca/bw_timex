@@ -112,7 +112,7 @@ class TimelineBuilder:
         the same time window (temporal_grouping) are grouped together.
         Possible temporal groupings are "year", "month", "day" and "hour".
 
-        For edges between foreground and background system, the column "interpolation weights"
+        For edges between foreground and background system, the column "temporal_market_shares"
         assigns the ratio [0-1] of the edge's amount to be taken from the database with the closest
         time of representativeness. If a process is in the foreground system only, the interpolation weight is set to None.
 
@@ -130,7 +130,7 @@ class TimelineBuilder:
         Returns
         -------
         pd.DataFrame
-            A timeline with grouped, time-explicit edges and interpolation weights to background databases.
+            A timeline with grouped, time-explicit edges and temporal_market_shares to background databases.
         """
 
         # check if database names match with databases in BW project
@@ -234,8 +234,8 @@ class TimelineBuilder:
             axis=1,
         )
 
-        # Add interpolation weights to background databases to the DataFrame
-        grouped_edges = self.add_column_interpolation_weights_to_timeline(
+        # Add temporal_market_shares to background databases to the DataFrame
+        grouped_edges = self.add_column_temporal_market_shares_to_timeline(
             grouped_edges,
             interpolation_type=self.interpolation_type,
         )
@@ -262,7 +262,7 @@ class TimelineBuilder:
                 "consumer",
                 "consumer_name",
                 "amount",
-                "interpolation_weights",
+                "temporal_market_shares",
             ]
         ]
 
@@ -375,7 +375,7 @@ class TimelineBuilder:
                 ((self.nodes_dict[node_id].key), node_hash)
             ]
 
-    def add_column_interpolation_weights_to_timeline(
+    def add_column_temporal_market_shares_to_timeline(
         self,
         tl_df: pd.DataFrame,
         interpolation_type: str = "linear",
@@ -395,11 +395,11 @@ class TimelineBuilder:
         Returns
         -------
         pd.DataFrame
-            Timeline as a DataFrame with a column 'interpolation_weights' added,
+            Timeline as a DataFrame with a column 'temporal_market_shares' added,
             this column looks like {database_name: weight, database_name: weight}.
         """
         if not self.database_dates_static:
-            tl_df["interpolation_weights"] = None
+            tl_df["temporal_market_shares"] = None
             warnings.warn(
                 "No time-explicit databases are provided. Mapping to time-explicit databases is not possible.",
                 category=Warning,
@@ -422,12 +422,12 @@ class TimelineBuilder:
         }
 
         if self.interpolation_type == "nearest":
-            tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
+            tl_df["temporal_market_shares"] = tl_df["date_producer"].apply(
                 lambda x: self.find_closest_date(x, dates_list)
             )
 
         if self.interpolation_type == "linear":
-            tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
+            tl_df["temporal_market_shares"] = tl_df["date_producer"].apply(
                 lambda x: self.get_weights_for_interpolation_between_nearest_years(
                     x, dates_list, interpolation_type
                 )
@@ -438,7 +438,7 @@ class TimelineBuilder:
                 f"Sorry, but {interpolation_type} interpolation is not available yet."
             )
 
-        tl_df["interpolation_weights"] = tl_df.apply(
+        tl_df["temporal_market_shares"] = tl_df.apply(
             self.add_interpolation_weights_at_intersection_to_background, axis=1
         )  # add the weights to the timeline for processes at intersection
 
@@ -571,7 +571,7 @@ class TimelineBuilder:
         if row["producer"] in self.node_collections["first_level_background_static"]:
             return {
                 self.reversed_database_dates[x]: v
-                for x, v in row["interpolation_weights"].items()
+                for x, v in row["temporal_market_shares"].items()
             }
         return None
 
