@@ -1,3 +1,4 @@
+from math import exp
 import warnings
 from calendar import day_abbr
 from datetime import datetime
@@ -363,15 +364,15 @@ class TimexLCA:
 
         if not build_dynamic_biosphere:
             self.lca.lci()
-        else:
+        else:  # building dynamic biosphere
             if expand_technosphere:
                 self.lca.lci(factorize=True)
-                self.calculate_dynamic_inventory(from_timeline=False)
+                self.calculate_dynamic_inventory(expand_technosphere=True)
                 # to get back the original LCI - necessary because we do some redo_lci's in the
                 # dynamic inventory calculation
                 self.lca.redo_lci(self.fu)
             else:
-                self.calculate_dynamic_inventory(from_timeline=True)
+                self.calculate_dynamic_inventory(expand_technosphere=False)
 
     def disaggregate_background_lci(self) -> None:
         if not hasattr(self, "dynamic_inventory"):
@@ -678,7 +679,7 @@ class TimexLCA:
 
     def calculate_dynamic_inventory(
         self,
-        from_timeline: bool = False,
+        expand_technosphere=True,
     ) -> None:
         """
         Calculates the dynamic inventory, by first creating a dynamic biosphere matrix using the
@@ -688,9 +689,9 @@ class TimexLCA:
 
         Parameters
         ----------
-        from_timeline: bool
-            A boolean indicating if the dynamic biosphere matrix is built directly from the
-            timeline or from the expanded matrices. Default is False.
+        expand_technosphere: bool
+           A boolean indicating if the dynamic biosphere matrix is built directly from the expanded
+           matrices or from the timeline. Default is True (from expanded matrices).
 
         Returns
         -------
@@ -726,11 +727,11 @@ class TimexLCA:
             self.database_dates_static,
             self.timeline,
             self.interdatabase_activity_mapping,
-            from_timeline=from_timeline,
+            expand_technosphere=expand_technosphere,
         )
         self.dynamic_biosphere_matrix, self.temporal_market_lcis = (
             self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(
-                from_timeline=from_timeline
+                expand_technosphere=expand_technosphere,
             )
         )
 
@@ -744,12 +745,12 @@ class TimexLCA:
         self.dynamic_inventory = self.dynamic_biosphere_matrix @ diagonal_supply_array
 
         self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(
-            from_timeline
+            expand_technosphere
         )
 
     def create_dynamic_inventory_dataframe(
         self,
-        from_timeline=False,
+        expand_technosphere=True,
         use_disaggregated_lci=False,
     ) -> pd.DataFrame:
         """
@@ -775,9 +776,9 @@ class TimexLCA:
 
         Parameters
         ----------
-        from_timeline: bool
+        expand_technosphere: bool
             A boolean indicating if the dynamic biosphere matrix is built directly from the
-            timeline or from the expanded matrices. Default is False.
+            expanded matrices or from the timeline. Default is True.
 
         Returns
         -------
@@ -797,12 +798,12 @@ class TimexLCA:
                 col = dynamic_inventory.indices[j]
                 value = dynamic_inventory.data[j]
 
-                if from_timeline:
+                if expand_technosphere:
+                    emitting_process_id = self.lca.activity_dict.reversed[col]
+                else:
                     emitting_process_id = self.timeline.iloc[col][
                         "time_mapped_producer"
                     ]
-                else:
-                    emitting_process_id = self.lca.activity_dict.reversed[col]
 
                 # indices are already the same as in the matrix, as we create an entirely new
                 # biosphere instead of adding new entries (like we do with the technosphere matrix)

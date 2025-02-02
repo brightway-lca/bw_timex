@@ -26,7 +26,7 @@ class DynamicBiosphereBuilder:
         database_dates_static: dict,
         timeline: pd.DataFrame,
         interdatabase_activity_mapping: SetList,
-        from_timeline: bool = False,
+        expand_technosphere: bool = True,
     ) -> None:
         """
         Initializes the DynamicBiosphereBuilder object.
@@ -58,9 +58,9 @@ class DynamicBiosphereBuilder:
         interdatabase_activity_mapping : SetList
             A list of sets, where each set contains the activity ids of the same activity in
             different databases
-        from_timeline : bool, optional
-            A boolean indicating if the dynamic biosphere matrix is built directly from the
-            timeline. Default is False.
+        expand_technosphere : bool, optional
+            A boolean indicating if the dynamic biosphere matrix is built via expanded matrices or directly from the timeline.
+            Default is True.
 
         Returns
         -------
@@ -76,14 +76,18 @@ class DynamicBiosphereBuilder:
         }
 
         self.lca_obj = lca_obj
-        if not from_timeline:
+
+        if expand_technosphere:
             self.technosphere_matrix = (
                 lca_obj.technosphere_matrix.tocsc()
             )  # convert to csc as this is only used for column slicing
             self.dynamic_supply_array = lca_obj.supply_array
             self.activity_dict = lca_obj.dicts.activity
         else:
-            self.dynamic_supply_array = timeline.amount.values.astype(float)
+            self.dynamic_supply_array = timeline.amount.values.astype(
+                float
+            )  # get the supply vector directly from the timeline
+
         self.activity_time_mapping = activity_time_mapping
         self.biosphere_time_mapping = biosphere_time_mapping
         self.demand_timing = demand_timing
@@ -102,7 +106,7 @@ class DynamicBiosphereBuilder:
 
     def build_dynamic_biosphere_matrix(
         self,
-        from_timeline: bool = False,
+        expand_technosphere: bool = True,
     ):
         """
         This function creates a separate biosphere matrix, with the dimensions
@@ -122,9 +126,9 @@ class DynamicBiosphereBuilder:
 
         Parameters
         ----------
-        from_timeline : bool, optional
-            A boolean indicating if the dynamic biosphere matrix is built directly from the
-            timeline or from expanded matrices. Default is False.
+        expand_technosphere : bool, optional
+            A boolean indicating if the dynamic biosphere matrix is built via expanded matrices or directly from the timeline.
+            Default is via expanded matrices.
 
         Returns
         -------
@@ -137,12 +141,14 @@ class DynamicBiosphereBuilder:
 
         for row in self.timeline.itertuples():
             idx = row.time_mapped_producer
-            if from_timeline:
-                process_col_index = row.Index  # start a new matrix
-            else:
+
+            if expand_technosphere:
                 process_col_index = self.activity_dict[
                     idx
                 ]  # get the matrix column index
+
+            else:  # from timeline
+                process_col_index = row.Index  # start a new matrix
 
             (
                 (original_db, original_code),
@@ -216,10 +222,10 @@ class DynamicBiosphereBuilder:
                     time,
                 ) = self.activity_time_mapping.reversed[idx]
 
-                if from_timeline:
-                    demand = self.demand_from_timeline(row, original_db)
-                else:
+                if expand_technosphere:
                     demand = self.demand_from_technosphere(idx, process_col_index)
+                else:
+                    demand = self.demand_from_timeline(row, original_db)
 
                 if demand:
                     for act, amount in demand.items():
@@ -268,10 +274,11 @@ class DynamicBiosphereBuilder:
                         )
 
         # now build the dynamic biosphere matrix
-        if from_timeline:
-            ncols = len(self.timeline)
-        else:
+        if expand_technosphere:
             ncols = len(self.activity_time_mapping)
+        else:
+            ncols = len(self.timeline)
+
         shape = (max(self.rows) + 1, ncols)
         dynamic_biosphere_matrix = sp.coo_matrix(
             (self.values, (self.rows, self.cols)), shape
