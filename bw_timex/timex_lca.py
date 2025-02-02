@@ -554,7 +554,7 @@ class TimexLCA:
             if not hasattr(self, "dynamic_inventory_disaggregated"):
                 print("Disaggregating background LCI...")
                 self.disaggregate_background_lci()
-                print("Background LCI's gisaggregated. Continue with dynamic LCIA.")
+                print("Background LCI's disaggregated. Continue with dynamic LCIA.")
             dynamic_inventory_df = self.dynamic_inventory_disaggregated_df
 
         else:
