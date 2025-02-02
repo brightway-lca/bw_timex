@@ -20,7 +20,7 @@ class TestClass_dynamic_biosphere_matrix:
     def setup_method(self):
         self.node_a = bd.get_node(database="foreground", code="A")
 
-        database_date_dict = {
+        database_dates = {
             "db_2020": datetime.strptime("2020", "%Y"),
             "foreground": "dynamic",
         }
@@ -28,7 +28,7 @@ class TestClass_dynamic_biosphere_matrix:
         self.tlca = TimexLCA(
             demand={self.node_a: 1},
             method=("GWP", "example"),
-            database_date_dict=database_date_dict,
+            database_dates=database_dates,
         )
 
         self.tlca.build_timeline(
@@ -51,5 +51,6 @@ class TestClass_dynamic_biosphere_matrix:
         )  # 1.5 CO2 is only added once for the time_mapped producer, depsite it occuring twice in the timeline! Before #78, it was added twice , resulting in 3.0
 
         assert np.array_equal(
-            self.tlca.dynamic_biosphere_matrix.toarray(), expected_dynamic_biosphere_matrix_as_array
+            self.tlca.dynamic_biosphere_matrix.toarray(),
+            expected_dynamic_biosphere_matrix_as_array,
         ), "Arrays are not equal"

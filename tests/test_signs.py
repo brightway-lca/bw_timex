@@ -165,12 +165,12 @@ def wastes_db():
 
 def test_signs_fu_to_car_to_treatment(wastes_db):
     method = ("GWP", "example")
-    database_date_dict = {
+    database_dates = {
         "background_2020": datetime.strptime("2020", "%Y"),
         "foreground": "dynamic",
     }
     fu = ("foreground", "fu1")
-    tlca = TimexLCA({fu: 1}, method, database_date_dict)
+    tlca = TimexLCA({fu: 1}, method, database_dates)
     tlca.build_timeline()
     tlca.lci()
     tlca.static_lcia()
@@ -180,12 +180,12 @@ def test_signs_fu_to_car_to_treatment(wastes_db):
 
 def test_signs_fu_to_intermediate_to_treatment(wastes_db):
     method = ("GWP", "example")
-    database_date_dict = {
+    database_dates = {
         "background_2020": datetime.strptime("2020", "%Y"),
         "foreground": "dynamic",
     }
     fu = ("foreground", "fu2")
-    tlca = TimexLCA({fu: 1}, method, database_date_dict)
+    tlca = TimexLCA({fu: 1}, method, database_dates)
     tlca.build_timeline()
     tlca.lci()
     tlca.static_lcia()
@@ -195,12 +195,12 @@ def test_signs_fu_to_intermediate_to_treatment(wastes_db):
 
 def test_signs_fu_to_treatment(wastes_db):
     method = ("GWP", "example")
-    database_date_dict = {
+    database_dates = {
         "background_2020": datetime.strptime("2020", "%Y"),
         "foreground": "dynamic",
     }
     fu = ("foreground", "fu3")
-    tlca = TimexLCA({fu: 1}, method, database_date_dict)
+    tlca = TimexLCA({fu: 1}, method, database_dates)
     tlca.build_timeline()
     tlca.lci()
     tlca.static_lcia()
@@ -210,12 +210,12 @@ def test_signs_fu_to_treatment(wastes_db):
 
 def test_signs_fu_to_normal_intermediate_to_normal_background(wastes_db):
     method = ("GWP", "example")
-    database_date_dict = {
+    database_dates = {
         "background_2020": datetime.strptime("2020", "%Y"),
         "foreground": "dynamic",
     }
     fu = ("foreground", "fu4")
-    tlca = TimexLCA({fu: 1}, method, database_date_dict)
+    tlca = TimexLCA({fu: 1}, method, database_dates)
     tlca.build_timeline()
     tlca.lci()
     tlca.static_lcia()
@@ -225,12 +225,12 @@ def test_signs_fu_to_normal_intermediate_to_normal_background(wastes_db):
 
 def test_signs_fu_with_unusual_positives_and_negatives(wastes_db):
     method = ("GWP", "example")
-    database_date_dict = {
+    database_dates = {
         "background_2020": datetime.strptime("2020", "%Y"),
         "foreground": "dynamic",
     }
     fu = ("foreground", "fu5")
-    tlca = TimexLCA({fu: 1}, method, database_date_dict)
+    tlca = TimexLCA({fu: 1}, method, database_dates)
     tlca.build_timeline()
     tlca.lci()
     tlca.static_lcia()

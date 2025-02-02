@@ -244,7 +244,7 @@ from datetime import datetime
 
 # Note: The foreground does not represent a specific point in time, but should
 # later be dynamically distributed over time
-database_date_dict = {
+database_dates = {
     "background": datetime.strptime("2020", "%Y"),
     "background_2030": datetime.strptime("2030", "%Y"),
     "foreground": "dynamic",

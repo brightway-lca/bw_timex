@@ -2422,7 +2422,7 @@
         text-decoration="none"
         transform="matrix(1 0 0 1 2347.25 1190)"
       >
-        interpolation_weights
+        temporal_market_shares
       </text>
       <text
         fill="#CDD6DD"
