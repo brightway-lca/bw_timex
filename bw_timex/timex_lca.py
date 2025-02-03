@@ -1,7 +1,6 @@
 from datetime import datetime
 from functools import partial
 from itertools import chain
-from loguru import logger
 from typing import Callable, Optional
 
 import bw2data as bd
@@ -25,6 +24,7 @@ from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import get_id
 from bw2data.errors import Brightway2Project
 from dynamic_characterization import characterize
+from loguru import logger
 from peewee import fn
 from scipy import sparse
 
@@ -705,7 +705,9 @@ class TimexLCA:
         """
 
         if not hasattr(self, "lca"):
-            raise AttributeError("Time-explicit LCA object does not exist. Call TimexLCA.lci() first.")
+            raise AttributeError(
+                "Time-explicit LCA object does not exist. Call TimexLCA.lci() first."
+            )
 
         self.biosphere_time_mapping = TimeMappingDict(start_id=0)
 
