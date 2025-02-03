@@ -45,6 +45,17 @@ class TestClass_EV:
         self.tlca.lci()
         self.tlca.static_lcia()
 
+        # new instance for expand_technosphere = False-approach (from_timeline)
+        self.timeline_tlca = TimexLCA(
+            demand={self.electric_vehicle.key: 1},
+            method=("GWP", "example"),
+            database_dates=database_dates,
+        )
+        self.timeline_tlca.build_timeline(
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d")
+        )
+        self.timeline_tlca.lci(expand_technosphere=False, build_dynamic_biosphere=True)
+
     def test_base_lca_score(self):
         slca = bc.LCA({self.electric_vehicle.key: 1}, method=("GWP", "example"))
         slca.lci()
@@ -215,3 +226,16 @@ class TestClass_EV:
         assert self.tlca.static_score == pytest.approx(
             expected_timex_score, abs=0.5
         )  # allow for some rounding errors
+
+    # compare expand_matrix = True and False on inventory level
+    def test_sum_dynamic_inventory_from_expanded_matrix_and_timeline(self):
+        assert self.tlca.dynamic_inventory.sum() == pytest.approx(
+            self.timeline_tlca.dynamic_inventory.sum(), rel=1e-5
+        )  # same sum of LCIs in the dynamic inventory matrix
+
+    def test_elements_dynamic_inventory_from_expanded_matrix_and_timeline(self):
+        count_timeline = self.timeline_tlca.dynamic_inventory.count_nonzero()
+        count_tlca = self.tlca.dynamic_inventory.count_nonzero()
+        assert (
+            count_timeline == count_tlca
+        )  # same number of LCI entries in the dynamic inventory matrix but matrix position varies
