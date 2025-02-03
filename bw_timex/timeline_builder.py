@@ -1,4 +1,3 @@
-import warnings
 from datetime import datetime, timedelta
 from typing import Callable, KeysView, Union
 
@@ -7,6 +6,7 @@ import numpy as np
 import pandas as pd
 from bw2calc import LCA
 from bw2data.configuration import labels
+from loguru import logger
 
 from .edge_extractor import Edge, EdgeExtractor
 from .utils import (
@@ -331,23 +331,13 @@ class TimelineBuilder:
 
         """
 
-        if (
-            edge_type in labels.technosphere_negative_edge_types
-        ):  # variants of technosphere labels
-            multiplicator = 1
-        elif (
-            edge_type in labels.technosphere_positive_edge_types
-        ):  # variants of production AND substitution labels
-            multiplicator = 1
-            if (
-                edge_type in labels.substitution_edge_types
-            ):  # overwrite variants of substitution labels
-                multiplicator = -1
-        else:
-            # Raise a warning for unrecognized edge type
-            warnings.warn(f"Unrecognized type in this edge: {edge_type}", UserWarning)
-            raise ValueError("Unrecognized edge type")
-        return multiplicator
+        if edge_type in labels.technosphere_negative_edge_types:
+            return 1  # Variants of technosphere labels
+
+        if edge_type in labels.technosphere_positive_edge_types:
+            return -1 if edge_type in labels.substitution_edge_types else 1
+
+        raise TypeError(f"Unrecognized type in this edge: {edge_type}")
 
     def get_time_mapping_key(self, node_id: int, node_hash: int) -> int:
         """
@@ -400,9 +390,8 @@ class TimelineBuilder:
         """
         if not self.database_dates_static:
             tl_df["temporal_market_shares"] = None
-            warnings.warn(
+            logger.info(
                 "No time-explicit databases are provided. Mapping to time-explicit databases is not possible.",
-                category=Warning,
             )
             return tl_df
 
@@ -524,16 +513,14 @@ class TimelineBuilder:
                     closest_higher = date
 
         if closest_lower is None:
-            warnings.warn(
+            logger.info(
                 f"Reference date {reference_date} is lower than all provided dates. Data will be taken from the closest higher year.",
-                category=Warning,
             )
             return {closest_higher: 1}
 
         if closest_higher is None:
-            warnings.warn(
+            logger.info(
                 f"Reference date {reference_date} is higher than all provided dates. Data will be taken from the closest lower year.",
-                category=Warning,
             )
             return {closest_lower: 1}
 

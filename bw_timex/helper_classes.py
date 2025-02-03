@@ -1,5 +1,7 @@
 import warnings
 
+from loguru import logger
+
 
 class SetList:
     """A helper class for the mapping of the same/mapped activity in different (temporal) databases, composed of a list of sets, that hold can hold the set of tuples of (act_id, database).
@@ -39,7 +41,7 @@ class SetList:
                 itemset for itemset in self.list for item in new_set if item in itemset
             ]
             if len(checklist_items) != 0:
-                warnings.warn(
+                logger.info(
                     f"tried to add {new_set} to the SetList\n, but {checklist_items} already exist in the SetList in:\n {checklist_sets}. \n Skipping {new_set}"
                 )
             else:
@@ -60,12 +62,12 @@ class SetList:
         """
         sets = [matching_set for matching_set in self.list if key in matching_set]
         if len(sets) > 1:
-            warnings.warn(
+            logger.warning(
                 f"Key found in multiple sets! Please check {sets} ! Returning only the first set"
             )
         if len(sets) > 0:
             return sets[0]
-        
+
         warnings.warn(f"Key {key} not found in SetList")
         return None
 

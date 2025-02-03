@@ -1,9 +1,7 @@
-from math import exp
-import warnings
-from calendar import day_abbr
 from datetime import datetime
 from functools import partial
 from itertools import chain
+from loguru import logger
 from typing import Callable, Optional
 
 import bw2data as bd
@@ -118,7 +116,7 @@ class TimexLCA:
         self.database_dates = database_dates
 
         if not self.database_dates:
-            warnings.warn(
+            logger.info(
                 "No database_dates provided. Treating the databases containing the functional \
                 unit as dynamic. No remapping of inventories to time explicit databases will be done."
             )
@@ -215,7 +213,7 @@ class TimexLCA:
 
         """
         if edge_filter_function is None:
-            warnings.warn(
+            logger.info(
                 "No edge filter function provided. Skipping all edges in background databases."
             )
             skippable = []
@@ -331,7 +329,7 @@ class TimexLCA:
             )
 
         if not hasattr(self, "timeline"):
-            raise ValueError(
+            raise AttributeError(
                 "Timeline not yet built. Call TimexLCA.build_timeline() first."
             )
 
@@ -348,7 +346,7 @@ class TimexLCA:
             data_obs = self.data_objs + self.datapackage
             self.expanded_technosphere = True  # set flag for later static lcia usage
         else:  # setup for timeline approach
-            warnings.warn(
+            logger.warning(
                 "Building the dynamic inventory directly from the timeline. This feature is under development.\
                 Use at your own risk... and check your results! Disaggregated lci is not yet implemented."
             )
@@ -552,9 +550,9 @@ class TimexLCA:
             # Check if disaggregated inventory is available
             # otherwise disaggregate the background LCI
             if not hasattr(self, "dynamic_inventory_disaggregated"):
-                print("Disaggregating background LCI...")
+                logger.info("Disaggregating background LCI...")
                 self.disaggregate_background_lci()
-                print("Background LCI's disaggregated. Continue with dynamic LCIA.")
+                logger.info("Background LCI's disaggregated.")
             dynamic_inventory_df = self.dynamic_inventory_disaggregated_df
 
         else:
@@ -583,7 +581,7 @@ class TimexLCA:
         if fixed_time_horizon:
             last_emission = dynamic_inventory_df.date.max()
             if latest_considered_impact < last_emission:
-                warnings.warn(
+                logger.warning(
                     "An emission occurs outside of the specified time horizon and will not be \
                         characterized. Please make sure this is intended."
                 )
@@ -707,12 +705,7 @@ class TimexLCA:
         """
 
         if not hasattr(self, "lca"):
-            warnings.warn("Timex LCA has not been run. Call TimexLCA.lci() first.")
-            return
-
-        self.len_technosphere_dbs = sum(
-            [len(bd.Database(db)) for db in self.database_dates.keys()]
-        )
+            raise AttributeError("Time-explicit LCA object does not exist. Call TimexLCA.lci() first.")
 
         self.biosphere_time_mapping = TimeMappingDict(start_id=0)
 
@@ -1179,10 +1172,9 @@ class TimexLCA:
             (only those interpolated to in the timeline) to the `interdatabase_activity_mapping`.
         """
         if not hasattr(self, "timeline"):
-            warnings.warn(
+            raise AttributeError(
                 "Timeline not yet built. Call TimexLCA.build_timeline() first."
             )
-            return
 
         filtered_timeline = self.timeline.loc[
             self.timeline.temporal_market_shares.notnull()
@@ -1282,7 +1274,7 @@ class TimexLCA:
                     unique_id=idx,
                 )  # if datetime, map to the date as integer
             else:
-                warnings.warn(f"Time of activity {key} is neither datetime nor str.")
+                raise ValueError(f"Time of activity {key} is neither datetime nor str.")
 
     def create_demand_timing(self) -> dict:
         """
@@ -1421,7 +1413,7 @@ class TimexLCA:
         """
 
         if not hasattr(self, "dynamic_inventory_df"):
-            warnings.warn(
+            raise AttributeError(
                 "Dynamic inventory not yet calculated. Call \
                     TimexLCA.lci(build_dynamic_biosphere=True) first."
             )
@@ -1505,10 +1497,9 @@ class TimexLCA:
         """
 
         if not hasattr(self, "characterized_inventory"):
-            warnings.warn(
+            raise AttributeError(
                 "Characterized inventory not yet calculated. Call TimexLCA.dynamic_lcia() first."
             )
-            return
 
         metric_ylabels = {
             "radiative_forcing": "radiative forcing [W/m²]",
