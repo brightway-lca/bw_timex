@@ -42,6 +42,7 @@ dependencies = [
     "dynamic_characterization>=1.0.0",
     "matplotlib",
     "seaborn",
+    "loguru",
 ]
 
 [project.urls]
