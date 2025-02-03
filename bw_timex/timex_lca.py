@@ -319,6 +319,7 @@ class TimexLCA:
         build_datapackage: Method to create the datapackages that contain the modifications to the technosphere and biosphere matrix using the `MatrixModifier` class.
         calculate_dynamic_inventory: Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
+
         if hasattr(self, "dynamic_inventory"):
             del self.dynamic_inventory
 
