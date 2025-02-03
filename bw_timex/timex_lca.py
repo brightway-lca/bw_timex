@@ -1,4 +1,3 @@
-from math import exp
 import warnings
 from calendar import day_abbr
 from datetime import datetime
@@ -320,8 +319,8 @@ class TimexLCA:
         build_datapackage: Method to create the datapackages that contain the modifications to the technosphere and biosphere matrix using the `MatrixModifier` class.
         calculate_dynamic_inventory: Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
-        self.dynamic_inventory = 0  # reset dynamic inventory
-        self.expand_technosphere = expand_technosphere
+        if hasattr(self, "dynamic_inventory"):
+            del self.dynamic_inventory
 
         if not expand_technosphere and not build_dynamic_biosphere:
             raise ValueError(
@@ -535,7 +534,7 @@ class TimexLCA:
         dynamic_characterization: Package handling the dynamic characterization: https://dynamic-characterization.readthedocs.io/en/latest/
         """
 
-        if self.dynamic_inventory == 0:
+        if not hasattr(self, "dynamic_inventory"):
             raise AttributeError(
                 "Dynamic lci not yet calculated. Call TimexLCA.lci(build_dynamic_biosphere=True) first."
             )
