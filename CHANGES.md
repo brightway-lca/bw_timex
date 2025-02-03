@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.3] - 2024-09-22
 * Modified the date rounding behavior: Instead of always rounding off the dates in the timeline (using the resolution specified in temporal_grouping), we now round to the nearest year/month/day/hour (depending on temporal_grouping).
-* Fixed interface to dynamic_characterization (see https://github.com/brightway-lca/dynamic_characterization/releases/tag/v1.0.0) and pinned version to >=1.0.0. 
+* Fixed interface to dynamic_characterization (see https://github.com/brightway-lca/dynamic_characterization/releases/tag/v1.0.0) and pinned version to >=1.0.0.
 
 ## [0.2.2] - 2024-09-18
 * Added optional `starting_datetime` argument to `TimexLCA.build_timeline` explicitly. Before, it was buried in *args, which were passed to the underlying graph traversal (https://github.com/brightway-lca/bw_timex/pull/93)

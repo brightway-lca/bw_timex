@@ -255,13 +255,17 @@ class MatrixModifier:
                             previous_producer_id, database
                         )
                     )
-                except:
-                    print(
-                        f"Could not find producer in database {database} with id {previous_producer_id}."
-                    )
-                    raise SystemExit
+                except KeyError as exc:
+                    raise ValueError(
+                        f"Producer with ID {previous_producer_id} not found in database {database}."
+                    ) from exc
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Error finding producer {previous_producer_id} in database {database}: {e}"
+                    ) from e
 
-                # Add entry between exploded producer and producer in background database ("Temporal Market")
+                # Add entry between exploded producer and producer in background database
+                # -->("Temporal Market")
                 datapackage.add_persistent_vector(
                     matrix="technosphere_matrix",
                     name=uuid.uuid4().hex,

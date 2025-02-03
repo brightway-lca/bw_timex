@@ -1,8 +1,6 @@
-import warnings
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
 
-import bw2data as bd
 import matplotlib.pyplot as plt
 import pandas as pd
 from bw2data.backends import ActivityDataset as AD
@@ -38,10 +36,9 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
         Datetime object converted to an integer in the format of time_res
 
     """
-    if time_res not in time_res_mapping_strftime.keys():
-        warnings.warn(
-            f'time_res: {time_res} is not a valid option. Please choose from: {list(time_res_mapping_strftime.keys())} defaulting to "year"',
-            category=Warning,
+    if time_res not in time_res_mapping_strftime:
+        raise ValueError(
+            f"Invalid time_res: '{time_res}'. Please choose from: {list(time_res_mapping_strftime.keys())}."
         )
     formatted_date = dt_obj.strftime(time_res_mapping_strftime[time_res])
     date_as_integer = int(formatted_date)
@@ -70,9 +67,9 @@ def extract_date_as_string(timestamp: datetime, temporal_grouping: str) -> str:
     """
 
     if temporal_grouping not in time_res_mapping_strftime.keys():
-        warnings.warn(
-            f'temporal_grouping: {temporal_grouping} is not a valid option. Please choose from: {list(time_res_mapping_strftime.keys())} defaulting to "year"',
-            category=Warning,
+        raise ValueError(
+            f'temporal_grouping: {temporal_grouping} is not a valid option. Please \
+            choose from: {list(time_res_mapping_strftime.keys())}, defaulting to "year"',
         )
     return timestamp.strftime(time_res_mapping_strftime[temporal_grouping])
 
@@ -102,9 +99,9 @@ def convert_date_string_to_datetime(temporal_grouping, date_string) -> datetime:
     }
 
     if temporal_grouping not in time_res_dict.keys():
-        warnings.warn(
-            f'temporal grouping: {temporal_grouping} is not a valid option. Please choose from: {list(time_res_dict.keys())} defaulting to "year"',
-            category=Warning,
+        raise ValueError(
+            f'temporal grouping: {temporal_grouping} is not a valid option. Please \
+            choose from: {list(time_res_dict.keys())}, defaulting to "year"',
         )
     return datetime.strptime(date_string, time_res_dict[temporal_grouping])
 
@@ -415,7 +412,7 @@ def get_exchange(**kwargs) -> Exchange:
             f"Found {num_candidates} results for the given search. "
             "Please be more specific or double-check your system model for duplicates."
         )
-    elif num_candidates == 0:
+    if num_candidates == 0:
         raise UnknownObject("No exchange found matching the criteria.")
 
     return candidates[0]
