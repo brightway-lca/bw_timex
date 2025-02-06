@@ -253,10 +253,8 @@ def plot_characterized_inventory_as_waterfall(
         "hour": "%Y-%m-%d %H",
     }
 
-    # Grouping and summing data
-    plot_data = lca_obj.characterized_inventory.groupby(
-        ["date", "activity"], as_index=False
-    ).sum()
+    plot_data = lca_obj.characterized_inventory.copy()
+    
     plot_data["year"] = plot_data["date"].dt.strftime(
         time_res_dict[lca_obj.temporal_grouping]
     )  # TODO make temporal resolution flexible
@@ -271,7 +269,7 @@ def plot_characterized_inventory_as_waterfall(
     }
     plot_data["activity_label"] = plot_data["activity"].map(activity_labels)
 
-    # Pivoting data for plotting
+    plot_data = plot_data.groupby(["year", "activity_label"], as_index=False)["amount"].sum()
     pivoted_data = plot_data.pivot(
         index="year", columns="activity_label", values="amount"
     )
