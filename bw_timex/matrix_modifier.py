@@ -6,6 +6,8 @@ import bw_processing as bwp
 import numpy as np
 import pandas as pd
 
+from .helper_classes import InterDatabaseMapping
+
 
 class MatrixModifier:
     """
@@ -20,8 +22,10 @@ class MatrixModifier:
     def __init__(
         self,
         timeline: pd.DataFrame,
-        database_date_dict_static_only: dict,
+        database_dates_static: dict,
         demand_timing: dict,
+        nodes: dict,
+        interdatabase_activity_mapping: InterDatabaseMapping,
         name: Optional[str] = None,
     ) -> None:
         """
@@ -32,7 +36,7 @@ class MatrixModifier:
         ----------
         timeline : pd.DataFrame
             A DataFrame of the timeline of exchanges
-        database_date_dict_static_only : dict
+        database_dates_static : dict
             A dictionary mapping the static background databases to dates.
         demand_timing : dict
             A dictionary mapping the demand to its timing.
@@ -42,8 +46,10 @@ class MatrixModifier:
         """
 
         self.timeline = timeline
-        self.database_date_dict_static_only = database_date_dict_static_only
+        self.database_dates_static = database_dates_static
         self.demand_timing = demand_timing
+        self.nodes = nodes
+        self.interdatabase_activity_mapping = interdatabase_activity_mapping
         self.name = name
         self.temporalized_process_ids = set()
         self.temporal_market_ids = set()
@@ -74,7 +80,7 @@ class MatrixModifier:
         The technosphere datapackage adds the temporalized processes from the timeline
         to the technosphere matrix.
 
-        The heavy lifting of this method happens in the method `add_row_to_datapackage()`.
+        The heavy lifting of this method happens in the method `add_row_to_technosphere_datapackage()`.
         Here, each node with a temporal distribution is "exploded", which means each occurrence
         of this node (e.g. steel production on 2020-01-01 and steel production on 2015-01-01)
         becomes a separate, time-explicit new node, by adding the new elements to the technosphere matrix.
@@ -90,29 +96,29 @@ class MatrixModifier:
         bwp.Datapackage
             A datapackage containing the modifications for the technosphere matrix.
         """
-        datapackage = bwp.create_datapackage(
+        datapackage_technosphere = bwp.create_datapackage(
             sum_inter_duplicates=False
         )  # 'sum_inter_duplicates=False': If the same market is used by multiple foreground processes, the market gets created again, inputs should not be summed.
 
         new_nodes = set()
 
         for row in self.timeline.iloc[::-1].itertuples():
-            self.add_row_to_datapackage(
+            self.add_row_to_technosphere_datapackage(
                 row,
-                datapackage,
+                datapackage_technosphere,
                 new_nodes,
             )
 
         # Adding the production exchanges for new nodes
         for node_id, production_amount in new_nodes:
-            datapackage.add_persistent_vector(
+            datapackage_technosphere.add_persistent_vector(
                 matrix="technosphere_matrix",
                 name=uuid.uuid4().hex,
                 data_array=np.array([production_amount], dtype=float),
                 indices_array=np.array([(node_id, node_id)], dtype=bwp.INDICES_DTYPE),
             )
 
-        return datapackage
+        return datapackage_technosphere
 
     def create_biosphere_datapackage(self) -> bwp.Datapackage:
         """
@@ -141,27 +147,26 @@ class MatrixModifier:
             .index.values
         )  # array of unique ((original) producer_id, (new) time_mapped_producer_id) tuples
 
-        datapackage_bio = bwp.create_datapackage(sum_inter_duplicates=False)
+        datapackage_biosphere = bwp.create_datapackage(sum_inter_duplicates=False)
 
         for producer in unique_producers:
+            original_producer_node = self.nodes[producer[0]]
             if (
-                bd.get_activity(producer[0])["database"]
-                not in self.database_date_dict_static_only.keys()  # skip temporal markets
+                original_producer_node["database"]
+                not in self.database_dates_static.keys()  # skip temporal markets
             ):
                 new_producer_id = producer[1]
-                # id of time-mapped process
-                orig_producer_node = bd.get_node(id=producer[0])
                 indices = (
                     []
                 )  # list of (biosphere, technosphere) indices for the biosphere flow exchanges
                 amounts = []  # list of amounts corresponding to the bioflows
-                for exc in orig_producer_node.biosphere():
+                for exc in original_producer_node.biosphere():
                     indices.append(
                         (exc.input.id, new_producer_id)
                     )  # directly build a list of tuples to pass into the datapackage, the new_producer_id is the new column index
                     amounts.append(exc.amount)
 
-                datapackage_bio.add_persistent_vector(
+                datapackage_biosphere.add_persistent_vector(
                     matrix="biosphere_matrix",
                     name=uuid.uuid4().hex,
                     data_array=np.array(amounts, dtype=float),
@@ -171,9 +176,9 @@ class MatrixModifier:
                     ),
                     flip_array=np.array([False], dtype=bool),
                 )
-        return datapackage_bio
+        return datapackage_biosphere
 
-    def add_row_to_datapackage(
+    def add_row_to_technosphere_datapackage(
         self,
         row: pd.core.frame,
         datapackage: bwp.Datapackage,
@@ -214,7 +219,7 @@ class MatrixModifier:
 
         if row.consumer == -1:  # functional unit
             new_producer_id = row.time_mapped_producer
-            fu_production_amount = bd.get_node(id=row.producer).rp_exchange().amount
+            fu_production_amount = self.nodes[row.producer].rp_exchange().amount
             new_nodes.add((new_producer_id, fu_production_amount))
             self.temporalized_process_ids.add(
                 new_producer_id
@@ -225,9 +230,7 @@ class MatrixModifier:
         new_producer_id = row.time_mapped_producer
 
         previous_producer_id = row.producer
-        previous_producer_node = bd.get_node(
-            id=previous_producer_id
-        )  # in future versions, instead of getting node, just provide list of producer ids
+        previous_producer_node = self.nodes[previous_producer_id]
 
         # Add entry between exploded consumer and exploded producer (not in background database)
         datapackage.add_persistent_vector(
@@ -242,25 +245,19 @@ class MatrixModifier:
         )
 
         # Check if previous producer comes from background database -> temporal market
-        if (
-            previous_producer_node["database"]
-            in self.database_date_dict_static_only.keys()
-        ):
-            # Create new edges based on interpolation_weights from the row
-            for database, db_share in row.interpolation_weights.items():
+        if previous_producer_node["database"] in self.database_dates_static.keys():
+            # Create new edges based on temporal_market_shares from the row
+            for database, db_share in row.temporal_market_shares.items():
                 # Get the producer activity in the corresponding background database
                 try:
-                    producer_id_in_background_db = bd.get_node(
-                        **{
-                            "database": database,
-                            "name": previous_producer_node["name"],
-                            "product": previous_producer_node["reference product"],
-                            "location": previous_producer_node["location"],
-                        }
-                    ).id
+                    producer_id_in_background_db = (
+                        self.interdatabase_activity_mapping.find_match(
+                            previous_producer_id, database
+                        )
+                    )
                 except:
                     print(
-                        f"Could not find producer in database {database} with name {previous_producer_node['name']}, product {previous_producer_node['reference product']}, location {previous_producer_node['location']}"
+                        f"Could not find producer in database {database} with id {previous_producer_id}."
                     )
                     raise SystemExit
 
@@ -299,7 +296,7 @@ class MatrixModifier:
                     )
             elif isinstance(previous_producer_node, bd.backends.proxies.Activity):
                 producer_production_amount = (
-                    bd.get_node(id=row.producer).rp_exchange().amount
+                    self.nodes[row.producer].rp_exchange().amount
                 )
             else:
                 raise ValueError(

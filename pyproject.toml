@@ -28,14 +28,15 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "bw2calc>=2.0.dev13",
-    "bw2data>=4.0.dev39",
+    "bw2calc==2.0.dev23",
+    "bw2data==4.0.dev46",
+    "bw2io==0.9.dev31",
     "bw_graph_tools>0.4",
     "numpy",
     "pandas",
-    "scipy",
+    "scipy<1.15",
     "tqdm",
     "bw_temporalis>=1.1",
     "dynamic_characterization>=1.0.0",

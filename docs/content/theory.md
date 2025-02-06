@@ -155,7 +155,7 @@ style biosphere fill:none, stroke:none;
 ```
 
 The resulting timeline looks like this:
-| date_producer | producer_name | date_consumer | consumer_name | amount | interpolation_weights                          |
+| date_producer | producer_name | date_consumer | consumer_name | amount | temporal_market_shares                          |
 |---------------|---------------|---------------|---------------|--------|------------------------------------------------|
 | 2022-01-01    | B             | 2024-01-01    | A             | 0.9    | {'background': 0.8, 'background_2030': 0.2}    |
 | 2024-01-01    | B             | 2024-01-01    | A             | 1.5    | {'background': 0.6, 'background_2030': 0.4}    |
@@ -184,7 +184,7 @@ as the old background producer.
 1.  For each temporalized process in the timeline, a new process copy is
     created, which links to its new temporalized producers and
     consumers. The timing of the processes is stored in the
-    `activity_time_mapping_dict`, which maps the process ids to process
+    `activity_time_mapping`, which maps the process ids to process
     timing.
 2.  For those processes linking to the background databases, `bw_timex`
     relinks the exchanges to the new producing processes from the

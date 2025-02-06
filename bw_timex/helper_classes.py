@@ -42,7 +42,6 @@ class SetList:
                 warnings.warn(
                     f"tried to add {new_set} to the SetList\n, but {checklist_items} already exist in the SetList in:\n {checklist_sets}. \n Skipping {new_set}"
                 )
-                pass
             else:
                 self.list.append(new_set)
         else:
@@ -66,9 +65,9 @@ class SetList:
             )
         if len(sets) > 0:
             return sets[0]
-        else:
-            warnings.warn(f"Key {key} not found in SetList")
-            return None
+        
+        warnings.warn(f"Key {key} not found in SetList")
+        return None
 
     def __len__(
         self,
@@ -81,79 +80,89 @@ class SetList:
 
 class TimeMappingDict(dict):
     """
-    This class is used to create a dictionary that maps a tuple of (flow and timestamp) to an unique integer id.
+    A dictionary mapping (flow, timestamp) tuples to unique integer IDs.
     """
 
     def __init__(self, start_id=2, *args, **kwargs) -> None:
-        """ "
-        Initializes the `TimeMappingDict` object.
-
-        Parameters
-        ----------
-        start_id : int, optional
-            The starting id for the mapping. Default is 2.
-        *args : Variable length argument list
-        **kwargs : Arbitrary keyword arguments
-
-        Returns
-        -------
-        None
-        """
-
+        """Initializes the dictionary with a starting ID."""
         super().__init__(*args, **kwargs)
         self._current_id = start_id
-        self._check_id = (
-            start_id - 1
-        )  # check_id that is different from the start id for the reversed dict
+        self._used_ids = set(self.values())  # Track assigned IDs efficiently
+        self._modified = False  # Track changes
+        self._reversed_dict = None  # Store reversed dict when needed
 
     def add(self, process_time_tuple, unique_id=None):
         """
-        Adds a new process_time_tuple to the `TimeMappingDict` object.
+        Adds a new process_time_tuple to the dictionary.
 
         Parameters
         ----------
         process_time_tuple : tuple
             A tuple of (flow and timestamp)
         unique_id : int, optional
-            An unique id for the process_time_tuple. Default is None.
+            A unique ID for the tuple (default: None).
 
         Returns
         -------
         int
-            An unique id for the process_time_tuple, and adds it to the dictionary,
-            if not already present.
+            The assigned unique ID.
         """
+        # If already exists, return immediately
         if process_time_tuple in self:
             return self[process_time_tuple]
 
         if unique_id is not None:
-            if unique_id in self.values():
-                raise ValueError(
-                    f"Unique ID {unique_id} is already assigned to another process_time_tuple."
-                )
+            if unique_id in self._used_ids:
+                raise ValueError(f"Unique ID {unique_id} is already assigned.")
+            self._used_ids.add(unique_id)
             self[process_time_tuple] = unique_id
-            return unique_id
+        else:
+            new_id = self._current_id
+            self._current_id += 1
+            self[process_time_tuple] = new_id
+            self._used_ids.add(new_id)
 
-        self[process_time_tuple] = self._current_id
-        self._current_id += 1
+        self._modified = True  # Mark as modified
+        return self[process_time_tuple]
 
-        return self._current_id - 1
-
+    @property
     def reversed(self):
         """
-        Returns a reversed version of dict, updates it only if necessary
-
-        Parameters
-        ----------
-        None
+        Returns a reversed version of the dictionary, updating it only if necessary.
 
         Returns
         -------
         dict
-            A reversed dictionary of the `TimeMappingDict` object.
+            A reversed dictionary mapping unique IDs to (flow, timestamp) tuples.
         """
+        if self._modified or self._reversed_dict is None:
+            self._reversed_dict = {v: k for k, v in self.items()}
+            self._modified = False  # Reset modification flag
+        return self._reversed_dict
 
-        if self._check_id != self._current_id:  # if the dict has been updated
-            self.reversed_dict = {v: k for k, v in self.items()}
-            self._check_id = self._current_id
-        return self.reversed_dict
+
+class InterDatabaseMapping(dict):
+    """
+    A dictionary of the form {id1:{database1: id1, database2: id2, ...}, id2: ...} that maps the
+    same activity in different databases.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._reciprocal = False
+
+    def find_match(self, id_, db_name) -> any:
+        return self[id_][db_name]
+
+    def make_reciprocal(self):
+        if not self._reciprocal:
+            for mapping in list(self.values()):
+                for id_ in list(mapping.values()):
+                    if id_ not in self.keys():
+                        self[id_] = mapping
+            self._reciprocal = True
+
+    def __getitem__(self, key):
+        if not self._reciprocal:
+            self.make_reciprocal()
+        return super().__getitem__(key)
