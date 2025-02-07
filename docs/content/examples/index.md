@@ -35,7 +35,7 @@ Example of some of the dynamic characterization capabilities that come with a Ti
 by @muelleram
 :::
 
-:::{grid-item-card} 📄🚗 EV Case Study from our paper
+:::{grid-item-card} 📄🚗 EV Case Study for our paper
 :link: ./paper_case_study.html
 :link-type: url
 :class-body: sphinx-design-class-body-examples
