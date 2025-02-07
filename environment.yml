@@ -10,4 +10,3 @@ dependencies:
   # - brightway25_nosolver # for macOS ARM machine
   # - scikit-umfpack # for macOS ARM machine
   # - numpy==1.24 # for macOS ARM machine
-  # - matplotlib==3.5.2 # for macOS ARM machine
