@@ -67,6 +67,7 @@ class TimexLCA:
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and
         dynamic characterization. These are provided for radiative forcing and GWP but can also be
         user-defined.
+    
 
     Example
     -------
@@ -315,8 +316,11 @@ class TimexLCA:
 
         See also
         --------
-        build_datapackage: Method to create the datapackages that contain the modifications to the technosphere and biosphere matrix using the `MatrixModifier` class.
-        calculate_dynamic_inventory: Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
+        build_datapackage: 
+            Method to create the datapackages that contain the modifications
+            to the technosphere and biosphere matrix using the `MatrixModifier` class.
+        calculate_dynamic_inventory: 
+            Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
 
         if hasattr(self, "dynamic_inventory"):
@@ -374,13 +378,31 @@ class TimexLCA:
                 self.calculate_dynamic_inventory(expand_technosphere=False)
 
     def disaggregate_background_lci(self) -> None:
+        """
+        This method disaggregates the background LCI's of the temporal markets.
+        The disaggregated background LCI's allow a contribution analysis on the
+        orginal inventory level as compared to the aggregated temporal market emissions.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+            Stores the disaggregated background inventory in the attribute
+            `dynamic_inventory_disaggregated` as a matrix and in `dynamic_inventory_disaggregated_df`
+            as a DataFrame.
+        """
+
         if not hasattr(self, "dynamic_inventory"):
             raise AttributeError(
                 "Dynamic lci not yet calculated. Call TimexLCA.lci(build_dynamic_biosphere=True) first."
             )
         if not self.expanded_technosphere:
             raise NotImplementedError(
-                "Currently the disaggregation of background processes is only possible if the expanded matrix has been built. Please call TimexLCA.lci(expand_technosphere=True) first."
+                "Currently the disaggregation of background processes is only possible\n\
+                    if the expanded matrix has been built. Please call TimexLCA.lci(expand_technosphere=True) first."
             )
         # create array_dict for fast lookup
         # (key becomes index, value becomes value of 1D array)
@@ -437,8 +459,9 @@ class TimexLCA:
             dynamic_inv_row_ids.extend(new_rows)
             dynamic_inv_col_ids.extend(lci.col)
             dynamic_inv_data.extend(lci.data)
-
-        dynamic_inventory_disaggregated = sparse.coo_matrix(  # construct the new dynamic inventory including background inventory instead of aggregated temporal market emissions
+        
+        # construct the new dynamic inventory including background inventory instead of aggregated temporal market emissions
+        dynamic_inventory_disaggregated = sparse.coo_matrix(
             (dynamic_inv_data, (dynamic_inv_row_ids, dynamic_inv_col_ids)),
             shape=self.dynamic_inventory_disaggregated.shape,
         )
@@ -522,7 +545,9 @@ class TimexLCA:
             Characterization function for CO2 emissions. Necessary if GWP metric is chosen. Default
             is None, which triggers the use of the provided dynamic characterization function of CO2
             based on IPCC AR6 Chapter 7.
-
+        use_disaggregated_lci: bool, optional
+            Whether to use the disaggregated background LCI for the dynamic LCIA. Default is False.
+            Use True if you want to perform a contribution analysis on the disaggregated background.
 
         Returns
         -------

@@ -127,13 +127,16 @@ class DynamicBiosphereBuilder:
         Parameters
         ----------
         expand_technosphere : bool, optional
-            A boolean indicating if the dynamic biosphere matrix is built via expanded matrices or directly from the timeline.
-            Default is via expanded matrices.
+            A boolean indicating if the dynamic biosphere matrix is built via expanded matrices
+            or directly from the timeline. Default is via expanded matrices.
 
         Returns
         -------
         dynamic_biosphere_matrix : scipy.sparse.csr_matrix
             A sparse matrix with the dimensions (bio_flows at a specific time step) x (processes).
+        temporal_market_lcis : dict
+            A dictionary containing the disaggregated LCI's of the temporal markets, 
+            with the time-mapped-activity id as key.
         """
 
         lci_dict = {}
@@ -225,7 +228,7 @@ class DynamicBiosphereBuilder:
                 if expand_technosphere:
                     demand = self.demand_from_technosphere(idx, process_col_index)
                 else:
-                    demand = self.demand_from_timeline(row, original_db)
+                    demand = self.demand_from_timeline(row)
 
                 if demand:
                     for act, amount in demand.items():
@@ -283,11 +286,11 @@ class DynamicBiosphereBuilder:
         dynamic_biosphere_matrix = sp.coo_matrix(
             (self.values, (self.rows, self.cols)), shape
         )
-        self.dynamic_biosphere_matrix = dynamic_biosphere_matrix.tocsr()
+        dynamic_biosphere_matrix = dynamic_biosphere_matrix.tocsr()
 
-        return self.dynamic_biosphere_matrix, temporal_market_lcis
+        return dynamic_biosphere_matrix, temporal_market_lcis
 
-    def demand_from_timeline(self, row, original_db):
+    def demand_from_timeline(self, row):
         """
         Returns a demand dict directly from the timeline row
         and its temporal_market_shares.
@@ -296,8 +299,6 @@ class DynamicBiosphereBuilder:
         -----------
         row: pd.Series
             A row of the timeline DataFrame
-        original_db: str
-            The original database name of the activity
 
         Returns
         -------

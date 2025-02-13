@@ -154,9 +154,15 @@ class InterDatabaseMapping(dict):
         self._reciprocal = False
 
     def find_match(self, id_, db_name) -> any:
+        """
+        Returns the matching ID in the given database for the given ID.
+        """
         return self[id_][db_name]
 
     def make_reciprocal(self):
+        """
+        Internal method to make the mapping reciprocal.
+        """
         if not self._reciprocal:
             for mapping in list(self.values()):
                 for id_ in list(mapping.values()):
