@@ -23,7 +23,7 @@ First, we need to define which characterization function we want to apply to whi
 from dynamic_characterization.ipcc_ar6 import characterize_co2
 emission_id = bd.get_activity(("biosphere", "CO2")).id
 
-characterization_function_dict = {
+characterization_functions = {
     emission_id: characterize_co2,
 }
 ```
@@ -34,7 +34,7 @@ So, let's characterize our inventory. As a metric we choose radiative forcing, a
 tlca.dynamic_lcia(
     metric="radiative_forcing",
     time_horizon=100,
-    characterization_function_dict=characterization_function_dict,
+    characterization_functions=characterization_functions,
 )
 ```
 
@@ -69,7 +69,7 @@ Of course we can also assess the "standard" climate change metric Global Warming
 tlca.dynamic_lcia(
     metric="GWP",
     time_horizon=100,
-    characterization_function_dict=characterization_function_dict,
+    characterization_functions=characterization_functions,
 )
 ```
 

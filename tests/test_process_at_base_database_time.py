@@ -8,13 +8,13 @@ from bw_timex import TimexLCA
 
 def test_process_at_base_database_time(process_at_base_database_time_db):
     method = ("GWP", "example")
-    database_date_dict = {
+    database_dates = {
         "background_2020": datetime.strptime("2020", "%Y"),
         "background_2030": datetime.strptime("2030", "%Y"),
         "foreground": "dynamic",  # flag databases that should be temporally distributed with "dynamic"
     }
     fu = ("foreground", "fu")
-    tlca = TimexLCA({fu: 1}, method, database_date_dict)
+    tlca = TimexLCA({fu: 1}, method, database_dates)
     tlca.build_timeline(starting_datetime="2024-01-01")
     tlca.lci()
 

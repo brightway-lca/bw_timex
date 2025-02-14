@@ -1,4 +1,3 @@
-import warnings
 from datetime import datetime, timedelta
 from typing import Callable, KeysView, Union
 
@@ -7,6 +6,7 @@ import numpy as np
 import pandas as pd
 from bw2calc import LCA
 from bw2data.configuration import labels
+from loguru import logger
 
 from .edge_extractor import Edge, EdgeExtractor
 from .utils import (
@@ -31,10 +31,10 @@ class TimelineBuilder:
         base_lca: LCA,
         starting_datetime: datetime,
         edge_filter_function: Callable,
-        database_date_dict: dict,
-        database_date_dict_static_only: dict,
-        activity_time_mapping_dict: dict,
-        node_id_collection_dict: dict,
+        database_dates: dict,
+        database_dates_static: dict,
+        activity_time_mapping: dict,
+        node_collections: dict,
         nodes_dict: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
@@ -52,9 +52,9 @@ class TimelineBuilder:
             Point in time when the demand occurs.
         edge_filter_function: Callable
             A callable that filters edges. If not provided, a function that always returns False is used.
-        database_date_dict: dict
+        database_dates: dict
             A dictionary mapping databases to dates.
-        activity_time_mapping_dict: dict
+        activity_time_mapping: dict
           A dictionary to map processes to specific times.
         temporal_grouping: str, optional
             The temporal grouping to be used. Default is "year".
@@ -72,10 +72,10 @@ class TimelineBuilder:
         self.base_lca = base_lca
         self.starting_datetime = starting_datetime
         self.edge_filter_function = edge_filter_function
-        self.database_date_dict = database_date_dict
-        self.database_date_dict_static_only = database_date_dict_static_only
-        self.activity_time_mapping_dict = activity_time_mapping_dict
-        self.node_id_collection_dict = node_id_collection_dict
+        self.database_dates = database_dates
+        self.database_dates_static = database_dates_static
+        self.activity_time_mapping = activity_time_mapping
+        self.node_collections = node_collections
         self.nodes_dict = nodes_dict
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
@@ -84,16 +84,11 @@ class TimelineBuilder:
 
         # Finding indices of activities from the connected background databases that are known to be static, i.e. have no temporal distributions connecting to them.
         # These will be be skipped in the graph traversal.
-        static_background_activity_indices = [
+        static_background_activity_ids = {
             node_id
-            for node_id in self.node_id_collection_dict[
-                "demand_dependent_background_node_ids"
-            ]
-            if node_id
-            not in self.node_id_collection_dict[
-                "first_level_background_node_ids_static"
-            ]
-        ]
+            for node_id in self.node_collections["background"]
+            if node_id not in self.node_collections["first_level_background_static"]
+        }
 
         self.edge_extractor = EdgeExtractor(
             base_lca,
@@ -102,7 +97,7 @@ class TimelineBuilder:
             edge_filter_function=edge_filter_function,
             cutoff=self.cutoff,
             max_calc=self.max_calc,
-            static_activity_indices=set(static_background_activity_indices),
+            static_activity_indices=set(static_background_activity_ids),
             **kwargs,
         )
         self.edge_timeline = self.edge_extractor.build_edge_timeline()
@@ -117,7 +112,7 @@ class TimelineBuilder:
         the same time window (temporal_grouping) are grouped together.
         Possible temporal groupings are "year", "month", "day" and "hour".
 
-        For edges between foreground and background system, the column "interpolation weights"
+        For edges between foreground and background system, the column "temporal_market_shares"
         assigns the ratio [0-1] of the edge's amount to be taken from the database with the closest
         time of representativeness. If a process is in the foreground system only, the interpolation weight is set to None.
 
@@ -135,7 +130,7 @@ class TimelineBuilder:
         Returns
         -------
         pd.DataFrame
-            A timeline with grouped, time-explicit edges and interpolation weights to background databases.
+            A timeline with grouped, time-explicit edges and temporal_market_shares to background databases.
         """
 
         # check if database names match with databases in BW project
@@ -215,16 +210,16 @@ class TimelineBuilder:
             lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
         )
 
-        # add new processes to activity time mapping dict
+        # add new processes to activity_time_mapping
         for row in grouped_edges.itertuples():
-            self.activity_time_mapping_dict.add(
+            self.activity_time_mapping.add(
                 (
                     ("temporalized", self.nodes_dict[row.producer]["code"]),
                     row.hash_producer,
                 )
             )
 
-        # store the ids from the time_mapping_dict in DataFrame
+        # store the ids from the time_mapping in DataFrame
         grouped_edges["time_mapped_producer"] = grouped_edges.apply(
             lambda row: self.get_time_mapping_key(row.producer, row.hash_producer),
             axis=1,
@@ -239,8 +234,8 @@ class TimelineBuilder:
             axis=1,
         )
 
-        # Add interpolation weights to background databases to the DataFrame
-        grouped_edges = self.add_column_interpolation_weights_to_timeline(
+        # Add temporal_market_shares to background databases to the DataFrame
+        grouped_edges = self.add_column_temporal_market_shares_to_timeline(
             grouped_edges,
             interpolation_type=self.interpolation_type,
         )
@@ -267,7 +262,7 @@ class TimelineBuilder:
                 "consumer",
                 "consumer_name",
                 "amount",
-                "interpolation_weights",
+                "temporal_market_shares",
             ]
         ]
 
@@ -282,7 +277,7 @@ class TimelineBuilder:
         Check that the strings of the databases exist in the databases of the Brightway project.
 
         """
-        for db in self.database_date_dict_static_only.keys():
+        for db in self.database_dates_static.keys():
             assert (
                 db in bd.databases
             ), f"{db} is not in your Brightway project databases."
@@ -336,27 +331,17 @@ class TimelineBuilder:
 
         """
 
-        if (
-            edge_type in labels.technosphere_negative_edge_types
-        ):  # variants of technosphere labels
-            multiplicator = 1
-        elif (
-            edge_type in labels.technosphere_positive_edge_types
-        ):  # variants of production AND substitution labels
-            multiplicator = 1
-            if (
-                edge_type in labels.substitution_edge_types
-            ):  # overwrite variants of substitution labels
-                multiplicator = -1
-        else:
-            # Raise a warning for unrecognized edge type
-            warnings.warn(f"Unrecognized type in this edge: {edge_type}", UserWarning)
-            raise ValueError("Unrecognized edge type")
-        return multiplicator
+        if edge_type in labels.technosphere_negative_edge_types:
+            return 1  # Variants of technosphere labels
+
+        if edge_type in labels.technosphere_positive_edge_types:
+            return -1 if edge_type in labels.substitution_edge_types else 1
+
+        raise TypeError(f"Unrecognized type in this edge: {edge_type}")
 
     def get_time_mapping_key(self, node_id: int, node_hash: int) -> int:
         """
-        Returns the time_mapping_id (key) from the activity_time_mapping_dict for a given node.
+        Returns the time_mapping_id (key) from the activity_time_mapping for a given node.
 
         Parameters
         ----------
@@ -372,15 +357,15 @@ class TimelineBuilder:
 
         """
         try:
-            return self.activity_time_mapping_dict[
+            return self.activity_time_mapping[
                 (("temporalized", self.nodes_dict[node_id]["code"]), node_hash)
             ]
         except KeyError:
-            return self.activity_time_mapping_dict[
+            return self.activity_time_mapping[
                 ((self.nodes_dict[node_id].key), node_hash)
             ]
 
-    def add_column_interpolation_weights_to_timeline(
+    def add_column_temporal_market_shares_to_timeline(
         self,
         tl_df: pd.DataFrame,
         interpolation_type: str = "linear",
@@ -400,39 +385,38 @@ class TimelineBuilder:
         Returns
         -------
         pd.DataFrame
-            Timeline as a DataFrame with a column 'interpolation_weights' added,
+            Timeline as a DataFrame with a column 'temporal_market_shares' added,
             this column looks like {database_name: weight, database_name: weight}.
         """
-        if not self.database_date_dict_static_only:
-            tl_df["interpolation_weights"] = None
-            warnings.warn(
+        if not self.database_dates_static:
+            tl_df["temporal_market_shares"] = None
+            logger.info(
                 "No time-explicit databases are provided. Mapping to time-explicit databases is not possible.",
-                category=Warning,
             )
             return tl_df
 
         dates_list = [
             date
-            for date in self.database_date_dict_static_only.values()
+            for date in self.database_dates_static.values()
             if isinstance(date, datetime)
         ]
         if "date_producer" not in list(tl_df.columns):
             raise ValueError("The timeline does not contain dates.")
 
         # create reversed dict {date: database} with only static "background" db's
-        self.reversed_database_date_dict = {
+        self.reversed_database_dates = {
             v: k
-            for k, v in self.database_date_dict_static_only.items()
+            for k, v in self.database_dates_static.items()
             if isinstance(v, datetime)
         }
 
         if self.interpolation_type == "nearest":
-            tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
+            tl_df["temporal_market_shares"] = tl_df["date_producer"].apply(
                 lambda x: self.find_closest_date(x, dates_list)
             )
 
         if self.interpolation_type == "linear":
-            tl_df["interpolation_weights"] = tl_df["date_producer"].apply(
+            tl_df["temporal_market_shares"] = tl_df["date_producer"].apply(
                 lambda x: self.get_weights_for_interpolation_between_nearest_years(
                     x, dates_list, interpolation_type
                 )
@@ -443,7 +427,7 @@ class TimelineBuilder:
                 f"Sorry, but {interpolation_type} interpolation is not available yet."
             )
 
-        tl_df["interpolation_weights"] = tl_df.apply(
+        tl_df["temporal_market_shares"] = tl_df.apply(
             self.add_interpolation_weights_at_intersection_to_background, axis=1
         )  # add the weights to the timeline for processes at intersection
 
@@ -529,16 +513,14 @@ class TimelineBuilder:
                     closest_higher = date
 
         if closest_lower is None:
-            warnings.warn(
+            logger.info(
                 f"Reference date {reference_date} is lower than all provided dates. Data will be taken from the closest higher year.",
-                category=Warning,
             )
             return {closest_higher: 1}
 
         if closest_higher is None:
-            warnings.warn(
+            logger.info(
                 f"Reference date {reference_date} is higher than all provided dates. Data will be taken from the closest lower year.",
-                category=Warning,
             )
             return {closest_lower: 1}
 
@@ -573,13 +555,10 @@ class TimelineBuilder:
             Dictionary with the name of databases and interpolation weights.
         """
 
-        if (
-            row["producer"]
-            in self.node_id_collection_dict["first_level_background_node_ids_static"]
-        ):
+        if row["producer"] in self.node_collections["first_level_background_static"]:
             return {
-                self.reversed_database_date_dict[x]: v
-                for x, v in row["interpolation_weights"].items()
+                self.reversed_database_dates[x]: v
+                for x, v in row["temporal_market_shares"].items()
             }
         return None
 

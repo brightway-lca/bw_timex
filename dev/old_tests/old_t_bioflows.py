@@ -22,7 +22,7 @@ class TestBioflows(unittest.TestCase):
         warnings.filterwarnings("ignore")
 
         db_abc_loopA_with_biosphere_tds_CO2_and_CH4()
-        database_date_dict = {
+        database_dates = {
             "background_2008": datetime.strptime("2008", "%Y"),
             "background_2024": datetime.strptime("2024", "%Y"),
             "foreground": "dynamic",  # flag databases that should be temporally distributed with "dynamic"
@@ -37,9 +37,7 @@ class TestBioflows(unittest.TestCase):
         demand = {("foreground", "A"): 1}
         method = ("GWP", "example")
 
-        mlca = MedusaLCA(
-            demand, method, filter_function, database_date_dict, max_calc=5000
-        )
+        mlca = MedusaLCA(demand, method, filter_function, database_dates, max_calc=5000)
         mlca.build_timeline()
         mlca.build_datapackage()
         mlca.lci()
@@ -53,8 +51,8 @@ class TestBioflows(unittest.TestCase):
         mlca.calculate_dynamic_biosphere_lci()
 
         for idx, row in enumerate(mlca.lca.inventory.toarray()):
-            bioflow_matrix_id = mlca.lca.dicts.biosphere.reversed[idx]
-            bioflow_name = bd.get_node(id=bioflow_matrix_id)["code"]
+            bioflow_id = mlca.lca.dicts.biosphere.reversed[idx]
+            bioflow_name = bd.get_node(id=bioflow_id)["code"]
             self.assertTrue(
                 math.isclose(
                     row.sum(),
