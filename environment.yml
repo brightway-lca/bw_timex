@@ -5,9 +5,7 @@ channels:
   - cmutel
   - diepers
 dependencies:
-  - python>=3.10
-  - bw_timex>=0.2.6
-  - brightway25 # for Linux/Windows/macOS(x64)
+  - bw_timex>=0.3
   # - brightway25_nosolver # for macOS ARM machine
   # - scikit-umfpack # for macOS ARM machine
   # - numpy==1.24 # for macOS ARM machine
