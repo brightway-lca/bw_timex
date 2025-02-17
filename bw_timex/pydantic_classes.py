@@ -2,7 +2,13 @@ from datetime import datetime
 from typing import Dict, Tuple, Union
 
 import bw2data as bd
-from pydantic import BaseModel, root_validator, validator
+from pydantic import BaseModel, model_validator, validator
+
+
+class TimexConfig(BaseModel):
+    """Represents all the inputs needed to initialize Timex."""
+
+    general: GeneralSettings
 
 
 class DatabaseDateEntry(BaseModel):
@@ -25,7 +31,7 @@ class TimexLCAConfig(BaseModel):
     method: Tuple[str, ...]
     database_date_list: Tuple[DatabaseDateEntry, ...]
 
-    @root_validator
+    @model_validator(mode="after")
     def check_databases_in_current_project(cls, values):
         """Ensure each database_name is present in the current Brightway project."""
         for entry in values.get("database_date_list", ()):
