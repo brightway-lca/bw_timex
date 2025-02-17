@@ -1,7 +1,14 @@
-name: timex
+name: example-environment
 channels:
   - conda-forge
-  - cmutel
-  - diepers
 dependencies:
-  - bw_timex>=0.3
+  - python=3.11
+  - numpy
+  - psutil
+  - toolz
+  - matplotlib
+  - dill
+  - pandas
+  - partd
+  - bokeh
+  - dask
