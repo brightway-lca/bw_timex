@@ -1,6 +1,6 @@
 # Step 1 - Adding temporal information
 
-To get you started with time-explicit LCA, we'll investigate this very simple production system with two "technosphere" nodes A and B and a "biosphere" node representing some CO2 emissions. For the sake of this example, we'll assume that we demand Process A to run exactly once.
+To get you started with time-explicit LCA, we'll investigate this very simple production system with two "technosphere" nodes A and B and a "biosphere" node representing some CO<sub>2</sub> emissions. For the sake of this example, we'll assume that we demand Process A to run exactly once.
 ```{mermaid}
 :caption: Example production system
 flowchart LR
@@ -13,7 +13,7 @@ subgraph foreground[<i>foreground</i>]
 end
 
 subgraph biosphere[<i>biosphere</i>]
-    CO2(CO2):::bio
+    CO2(CO<sub>2</sub>):::bio
 end
 
 B-->|"3 kg \n &nbsp;"|A
@@ -105,7 +105,7 @@ bd.Method(("our", "method")).write(
 Now, if you want to consider time in your LCA, you need to somehow add temporal information. For time-explicit LCA, we consider two kinds of temporal information, that will be discussed in the following.
 
 ## Temporal distributions
-To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges. To carry the temporal information, we use the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class is a *container for a series of amount spread over time*, so it tells you what share of an exchange happens at what point in time. So, let's include this information in out production system - visually at first:
+To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges. To carry the temporal information, we use the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class is a *container for a series of amount spread over time*, so it tells you what share of an exchange happens at what point in time. So, let's include this information in our production system - first visually:
 ```{mermaid}
 :caption: Temporalized example production system
 flowchart LR
@@ -118,12 +118,12 @@ subgraph foreground[" "]
 end
 
 subgraph biosphere[" "]
-    CO2:::b
+    CO2(CO<sub>2</sub>):::b
 end
 
-    B_2020-->|"amounts: [30%,50%,20%] * 3 kg\n dates:[-2,0,+4]" years|A
-    A-.->|"amounts: [60%, 40%] * 5 kg\n dates: [0,+1]" years|CO2
-    B_2020-.->|"amounts: [100%] * 11 kg\n dates:[0]" years|CO2
+    B_2020-->|"dates:[-2,0,+4] years \n shares: [30%,50%,20%] * 3 kg "|A
+    A-.->|"dates: [0,+1] years\n  shares: [60%,40%] * 5 kg"|CO2
+    B_2020-.->|"dates:[0] years\n  shares: [100%] * 11 kg"|CO2
 
     classDef bg color:#222832, fill:#3fb1c5, stroke:none;
     classDef fg color:#222832, fill:#3fb1c5, stroke:none;
@@ -133,8 +133,9 @@ end
     style biosphere fill:none, stroke:none;
 
 ```
+:::{dropdown} <span style="font-weight: normal; font-style: italic;">Here's the code to add this information to our modeled production system in Brightway</style>
+:icon: codescan
 
-Now it's time to add this information to our modeled production system in Brightway:
 ```python
 import numpy as np
 from bw_temporalis import TemporalDistribution
@@ -174,14 +175,15 @@ add_temporal_distribution_to_exchange(
     output_code="A"
 )
 ```
+:::
 
 ## Time-specific process data
 
-While the temporal information above tells us when the processes occurs, we also need information on how our processes change over time. So, for our simple example, let's say our background process B somehow evolves, so that it emits less CO2 in the future. To make it precise, we assume that the original process we modeled above represents the process state in the year 2020, emitting 11 kg CO2, which reduces to 7 kg CO2 by 2030:
+While the temporal information above tells us when the processes occur, we also need information on how our processes change over time. So, for our simple example, let's say our background process B somehow evolves, so that it emits less CO<sub>2</sub> in the future. To make it precise, we assume that the original process we modeled above represents the process state in the year 2020, emitting 11 kg CO<sub>2</sub>, which reduces to 7 kg CO<sub>2</sub> by 2030:
 
 
 ```{mermaid}
-:caption: Temporalized example production system
+:caption: Temporalized example production system with two time-specific background processes B
 flowchart LR
 subgraph background[" "]
     B_2020(Process B \n 2020):::bg
@@ -193,12 +195,12 @@ subgraph foreground[" "]
 end
 
 subgraph biosphere[" "]
-    CO2:::b
+    CO2(CO<sub>2</sub>):::b
 end
-    B_2020-->|"amounts: [30%,50%,20%] * 3 kg\n dates:[-2,0,+4]" years|A
-    A-.->|"amounts: [60%, 40%] * 5 kg\n dates: [0,+1]" years|CO2
-    B_2020-.->|"amounts: [100%] * <span style='color:#9c5ffd'><b>11 kg</b></span>\n dates:[0]" years|CO2
-    B_2030-.->|"amounts: [100%] * <span style='color:#9c5ffd'><b>7 kg</b></span>\n dates:[0]" years|CO2
+    B_2020-->|"dates:[-2,0,+4] years \n shares: [30%,50%,20%] * 3 kg"|A
+    A-.->|"dates: [0,+1] years\n  shares: [60%,40%] * 5 kg"|CO2   
+    B_2020-.->|"dates:[0] years\n shares: [100%] * <span style='color:#9c5ffd'><b>11 kg</b></span>"|CO2
+    B_2030-.->|"dates:[0] years\n shares: [100%] * <span style='color:#9c5ffd'><b>7 kg</b></span>"|CO2
 
     classDef bg color:#222832, fill:#3fb1c5, stroke:none;
     classDef fg color:#222832, fill:#3fb1c5, stroke:none;
@@ -237,7 +239,7 @@ bd.Database("background_2030").write(
 ```
 :::
 
-So, as you can see, the prospective processes can reside within your normal Brightway databases. To hand them to `bw_timex`, we just need to define a dictionary that maps the prospective database names to the point in time that they represent:
+So, as you can see, the processes at specific time steps reside within a separate normal Brightway database. To hand them to `bw_timex`, we just need to define a dictionary that maps the names of time-specific databases to the point in time that they represent:
 
 ```python
 from datetime import datetime
@@ -252,5 +254,5 @@ database_dates = {
 ```
 
 :::{note}
-You can use whatever data source you want for this prospective data. A nice package from the Brightway cosmos that can help you is [premise](https://premise.readthedocs.io/en/latest/introduction.html).
+You can use whatever data source you want for the time-specific process data. A nice package from the Brightway cosmos that can help you is [premise](https://premise.readthedocs.io/en/latest/introduction.html).
 :::
