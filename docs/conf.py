@@ -93,7 +93,7 @@ mermaid_init_js = """
                 startOnLoad: true,
                 theme: 'base',
                 themeVariables: {
-                    edgeLabelBackground: 'transparent',
+                    edgeLabelBackground: '#14181E',
                     defaultLinkColor: '#ced6dd',
                     titleColor: '#ced6dd',
                     nodeTextColor: '#ced6dd',
@@ -105,7 +105,7 @@ mermaid_init_js = """
                 startOnLoad: true,
                 theme: 'base',
                 themeVariables: {
-                    edgeLabelBackground: 'transparent',
+                    edgeLabelBackground: '#FFFFFF',
                     defaultLinkColor: '#222832',
                     titleColor: '#222832',
                     nodeTextColor: '#222832',
