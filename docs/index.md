@@ -30,6 +30,7 @@ maxdepth: 1
 Installation <content/installation>
 Getting Started <content/getting_started/index>
 Theory <content/theory>
+Decision tree <content/decisiontree>
 Examples <content/examples/index>
 API <content/api/index>
 Contributing <content/contributing>
