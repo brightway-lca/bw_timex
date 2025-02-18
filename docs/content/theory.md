@@ -1,29 +1,35 @@
 # Theory
 
-This section explains some of the theory behind time-explicit LCAs with `bw_timex`. In contrast to the [Getting Started section](getting_started/index.md), we explain a bit more of what`s going on in the background here. If this is still to vague for you, you can always check out our [API reference](api/index).
+This section explains some of the theory behind time-explicit LCAs with `bw_timex`. In contrast to the [Getting Started section](getting_started/index.md), we explain a bit more of what`s going on in the background here. If this is still too vague for you, you can always check out our [API reference](api/index).
 
 ## Terminology
-LCA terminology can be confusing sometimes. Here's an attempt of visualizing what we mean with "time-explicit LCA". Essentially, it combines dynamic LCA, where processes are spread out over time, with prospective LCA, where processes change over time:
+LCA terminology can be confusing sometimes, also for experienced practitioners. Particularly, we found the terminology around temporal aspects of LCA confusing, where different terms have been used to describe the same temporal aspect or the same term has been used to describe different temporal aspects. 
 
-```{image} data/dynamic_prospective_timeexplicit_dark.svg
+In an attempt for improved clarity, we use the term "time-explicit LCA". Essentially, time-explicit LCA jointly considers "temporal distribution", i.e., how processes, emissions and environmental responses are *spread out* over time, and "temporal evolution", i.e., how processes, emissions and environmental responses *change* over time. Very broadly speaking, the former is frequently considered in dynamic LCA, while the latter is frequently considered in prospective LCA. 
+
+Below, you find a visualization of the time-explicit approach. And our [decision tree](decisiontree.md) also helps to understand the difference between the different types of LCA.
+
+```{image} data/timeexplicit_lca_dark.svg
 :class: only-dark
 ```
-```{image} data/dynamic_prospective_timeexplicit_light.svg
+```{image} data/timeexplicit_lca_light.svg
 :class: only-light
 ```
+
 
 ## Data requirements
 
 For a time-explicit LCA, three inputs are required:
 
-1.  a static foreground system model with
+1.  a static product system model with
 2.  temporal information using the attribute `temporal_distribution` on
-    technosphere or biosphere exchanges in the foreground system model,
+    technosphere or biosphere exchanges in the product system model,
     and
-3.  a set of background databases, which must have a reference in time.
+3.  a set of time-specific background databases, which must have a reference in time.
+
 
 ```{note}
--   The foreground system must have exchanges linked to one of the
+-   The foreground system must have exchanges linked to one of the time-specific
     background databases. These exchanges at the intersection between
     foreground and background databases will be relinked by `bw_timex`.
 -   Temporal distributions can occur at technosphere and biosphere
@@ -37,13 +43,14 @@ For a time-explicit LCA, three inputs are required:
     the consuming process is adopted also for the producing process.
 ```
 
+
 ## Temporal distributions and graph traversal
-To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges, using the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class is a *container for a series of amount spread over time*, so it tells you what share of an exchange happens at what point in time. If two consecutive edges in the supply chain graph carry a `TemporalDistribution`, they are [convoluted](https://en.wikipedia.org/wiki/Convolution), combining the two temporal profiles.
+To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges, using the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class carries the information how the amount of the exchange is spread over time in two numpy arrays (`date`and `amount`). So, it tells you what share of an exchange happens at what point in time. If two consecutive edges in the supply chain graph carry a `TemporalDistribution`, they are [convoluted](https://en.wikipedia.org/wiki/Convolution), combining the two temporal profiles.
 
 ````{admonition} Example: Convolution
 :class: admonition-example
 
-Let's say we have two temporal distributions. The first dates 30% of some amount two years into the future, and 70% of that amount four years into the future:
+Let's say we have two temporal distributions. The first dates 30% of some exchange two years into the future, and 70% of that exchange four years into the future:
 
 ```python
 import numpy as np
@@ -77,7 +84,7 @@ spread_over_four_months.graph(resolution="M")
 
 </br>
 
-Now let's see what happens when we convolute these temporal distributions:
+Now, let's see what happens when we convolute these temporal distributions:
 ```python
 convoluted_distribution = two_and_four_years_ahead * spread_over_four_months
 
@@ -89,13 +96,13 @@ convoluted_distribution.graph(resolution="M")
 
 </br>
 
-Note how both the dates and the amounts get scaled.
+Note how both the dates and the amounts of the output distribution get scaled.
 ````
 
 To convolute all the temporal information from the supply chain graph, `bw_timex` uses the graph traversal from
 [bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main). An in-depth
 description of how this works is available in the [brightway-docs](https://docs.brightway.dev/en/latest/content/theory/graph_traversal.html). In short,
-it is a priority-first supply chain graph traversal, following the most
+it is a best-first supply chain graph traversal, following the most
 impactful node in the graph based on the static pre-calculated LCIA score
 for a chosen impact category. Several input arguments for the graph traversal,
 such as maximum calculation count or cut-off, can be passed to the `TimexLCA`
@@ -115,7 +122,7 @@ technosphere exchange in the temporalized foreground system. Exchanges
 that flow from same producer to the same consumer within a certain
 time-window (`temporal_grouping`, default is \'year\') are grouped
 together. This is done to avoid countless exchanges in the timeline, as
-the temporal distributions at exchange level can have temporal
+the temporal distributions at the exchange level can have temporal
 resolutions down to seconds while one may not have a similar temporal
 resolution for the databases. We recommend aligning `temporal_grouping`
 to the temporal resolution of the available databases.
@@ -124,7 +131,7 @@ to the temporal resolution of the available databases.
 :class: admonition-example
 
 Let's consider the following system: a process A consumes an
-exchange b from a process B. Both A and B emit CO2. The emission of CO2 from B decreases in the future. All exchanges occur at a certain point in time, relative to process A, which takes place "now" (2024).
+exchange b from a process B. Both A and B emit CO<sub>2</sub>. The emission of CO<sub>2</sub> from B decreases in the future. All exchanges occur at a certain point in time, relative to process A, which takes place "now" (2024).
 ```{mermaid}
 flowchart LR
 subgraph background[" "]
@@ -137,7 +144,7 @@ subgraph foreground[" "]
 end
 
 subgraph biosphere[" "]
-    CO2:::b
+    CO2(CO<sub>2</sub>):::b
 end
 
 B_2020-->|"amounts: [30%,50%,20%] * 3 kg\n dates:[-2,0,+4]" years|A
@@ -167,47 +174,50 @@ The resulting timeline looks like this:
 
 Based on the timing of the processes in the timeline, `bw_timex` matches
 the processes at the intersection between foreground and background to
-the best available background databases. Available matching strategies
+the best available, time-specific background databases. Available matching strategies
 are closest database or linear interpolation between two closest
-databases based on temporal proximity. The new best-fitting background
+databases based on temporal proximity. The column `temporal_market_shares` in the timeline specifies how much of that temporalized exchange is taken from the respective background databases. As only exchanges between foreground and background are relinked, this field is `None` for exchanges within the foreground system, e.g., A to -1 (the functional unit). The new best-fitting background
 producer(s) are mapped on the same name, reference product and location
-as the old background producer.
+as the old background producer. 
 
 ## Modifying the matrices
 
 `bw_timex` now modifies the technosphere and biosphere matrices using
 `datapackages` from
-[bw_processing](https://github.com/brightway-lca/bw_processing?tab=readme-ov-file).
+[bw_processing](https://github.com/brightway-lca/bw_processing?tab=readme-ov-file). In order to store reference to multiple time points in a single matrix, we add a new element (row-column pair) for each process at a specific time to the matrices.
 
 ### Technosphere matrix modifications
 
-1.  For each temporalized process in the timeline, a new process copy is
-    created, which links to its new temporalized producers and
-    consumers. The timing of the processes is stored in the
+1.  For each temporalized process in the timeline, a new process copy, a "temporalized process" is
+    created, which links to its new temporalized producer and
+    consumer. The timing of the processes is stored in the
     `activity_time_mapping`, which maps the process ids to process
     timing.
-2.  For those processes linking to the background databases, `bw_timex`
+2.  For those processes linking to the background databases, `bw_timex` creates "temporal markets", a new row-column pair that
     relinks the exchanges to the new producing processes from the
-    best-fitting background database(s).
+    best-fitting background database(s). Temporal markets are similar to regional markets in LCI databases, that distribute a commodity between different regional providers, only here across different temporal providers.
 
 ### Biosphere matrix modifications
 
 Depending on the user\'s choice, two different biosphere matrices are
 created:
 
-1.  If `TimexLCA.lci()` is executed, the \'static\' biosphere matrix is
-    expanded, by adding the original biosphere flows for the new
-    temporalized process copies. With this, static LCI with inputs from
-    the time-explicit databases are calculated and stored in
-    `TimexLCA.lca.inventory`.
-2.  If `TimexLCA.lci(build_dynamic_biosphere=True)` is executed, a
-    \'dynamic\' biosphere matrix is created, which next to the links to
-    LCI from the time-explicit databases also contains the timing of
-    emissions. `build_dynamic_biosphere=True` is the default, so it has
-    to be set to `False` to skip this step. The matrix
+1.  The basic command `TimexLCA.lci()` defaults to creating the dynamic biosphere matrix 
+    (`TimexLCA.lci(build_dynamic_biosphere=True)`). The dynamic biosphere matrix contains 
+    both the time-explicit inventories from the links to the time-specific background 
+    databases as well as the timing of the emissions. The timing of the emissions is 
+    realized through adding a separate biosphere flow for each time of emission. 
+    The inventories from the time-specific background databases are aggregated at the 
+    temporal markets as these have the correct timing from the timeline. The matrix
     `TimexLCA.dynamic_inventory` and the more readable DataFrame
     `TimexLCA.dynamic_inventory_df` contain the emissions of the system
     per biosphere flow including its timestamp and its emitting process.
+
+2. If you are only interested in the new inventories, but not their timings, 
+    you can set `build_dynamic_biosphere=False`, which will only create an inventory 
+    linking to the new background processes but without the timing of the biosphere 
+    flows and is stored under `TimexLCA.lca.inventory`.
+
 
 ````{admonition} Example: Matrix modifications
 :class: admonition-example
@@ -265,7 +275,7 @@ For the simple system above, these are the modifications we apply to the matrice
 
 </br>
 
-The inventory information from the time-explicit databases is inserted into the matrices. For each specific point in time that product b is demanded, temporal markets are created, distributing the demand for b between the time-explicit databases. The dynamic biosphere matrix is created, containing the timing of emissions. You can see that the CO2 emission at process A occurs both in 2024 and 2025, based on the temporal distribution on this biosphere exchange.
+The timings from the timeline and the inventory information from the time-specific databases is inserted into the new time-explicit matrices. For each specific point in time that product b is demanded, temporal markets are created, distributing the demand for b between the time-specific background databases. The dynamic biosphere matrix is created, containing the timing of emissions. You can see that the CO<sub>2</sub> emission at process A occurs both in 2024 and 2025, based on the temporal distribution on this biosphere exchange.
 ````
 
 ## Static or dynamic impact assessment
@@ -274,12 +284,12 @@ The inventory information from the time-explicit databases is inserted into the 
 which are executed using `TimexLCA.static_lcia()`. Conventional LCIA methods have one characterization factor per substance, regardless of the timing of emission.
 
 To take advantage of the detailed temporal information at the inventory
-level, dynamic LCIA can be applied, using `TimexLCA.dynamic_lcia()`.
+level of `TimexLCA.dynamic_inventory`, dynamic LCIA can be applied, using `TimexLCA.dynamic_lcia()`.
 Users can define or import their own dynamic LCIA functions. Out of the
 box, we provide dynamic LCIA functions for the climate change metrics
 \'radiative forcing\' and \'global warming potential (GWP)\' for all
 greenhouse gases in the [IPCC AR6 report Chapter 7 Table
-7.SM.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/).
+7.SM.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) from the brightway package [`dynamic_characterization`](https://github.com/brightway-lca/dynamic_characterization).
 
 The `time_horizon`, over which both metrics are evaluated,
 defaults to 100 years, but can be set flexibly in years. Additionally,
@@ -291,3 +301,16 @@ horizon means that each emission is evaluated starting from its own
 timing until the end of the time horizon. The former is the approach of
 [Levasseur et al. 2010](https://pubs.acs.org/doi/10.1021/es9030003).
 This behavior is set with the boolean `fixed_time_horizon`.
+
+## Contribution assessment of impacts
+
+Sometimes it might be helpful to understand where the time-explicit environmental 
+impacts actually originate from. While the default is to aggregate background 
+emissions at the respective temporal markets (to keep the correct timing), there is the option to disaggregate them 
+to their original emitting processes from the time-specific background databases. This is helpful for an in-depth contribution
+analysis and can be executed with `TimexLCA.dynamic_lcia(use_disaggregated_lci=True)`. 
+ This overwrites the `TimexLCA.dynamic_inventory` and `TimexLCA.dynamic_inventory_df` 
+ with versions, in which the background emissions are retained at corresponding 
+ background processes, and uses these when calculating the dynamic LCIA results.
+
+ Unsure about the different options? Check out the [decision tree](decisiontree.md) for guidance for your time-explicit LCA.
