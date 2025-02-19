@@ -38,7 +38,7 @@ bibliography: paper.bib
 
 - the timing of processes throughout the supply chain (e.g., end-of-life treatment occurs 20 years after production),
 - variable and/or evolving supply chains and technologies (e.g., increasing shares of renewable electricity in the future), and
-- the timing of emissions (e.g., enabling dynamic characterization).
+- the timing of emissions (enabling dynamic characterization).
 
 To achieve this, `bw_timex` uses graph traversal to convolute process-relative temporal distributions through the supply chain. From the resulting timeline of technosphere exchanges, Life Cycle Inventories (LCIs) are automatically linked across time-specific background databases. The resulting time-explicit LCI reflects the current technology status within the product system at the actual time of each process. Moreover, `bw_timex` preserves the timing of emissions, enabling both dynamic and static Life Cycle Impact Assessment.
 
