@@ -1,13 +1,13 @@
-# Decision tree
+# What LCA should I do?
 
-To give a quick overview of when to use time-explicit LCA in comparison to other types of LCAs and to show which options are available when conducting a time-explicit LCA, we have created the following decision tree:
+Not only are there many "types" of LCA already, `bw_timex` also adds lots of further options for time-explicit LCA alone. The following decision tree tries to give some guidance on what type of LCA is suitable in your case, and also navigate the options coming with `bw_timex`:
 
 ```{mermaid}
 flowchart TD
     %% Define node classes
     classDef decision fill:#3fb1c5,color:black,stroke:none;
     classDef lcaType fill:#9c5ffd,color:black,stroke:none;
-    classDef codeNode fill:#DBDBDB,text-align:left,color:black,stroke:none,font-family:monospace; 
+    classDef codeNode fill:#DBDBDB,text-align:left,color:black,stroke:none,font-family:monospace;
 
     TimingDecision{{"Do temporal aspects matter?"}}:::decision
     AspectDecision{{"Which aspects matter?"}}:::decision
@@ -16,7 +16,7 @@ flowchart TD
     ProspectiveLCA("Prospective LCA"):::lcaType
     RetrospectiveLCA("Retrospective LCA"):::lcaType
     TimeExplicitLCA("Time-explicit LCA"):::lcaType
-    CodeTimeExplicit("tlca = bw_timex.TimexLCA(...)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"):::codeNode  
+    CodeTimeExplicit("tlca = bw_timex.TimexLCA(...)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"):::codeNode
     %%non-breaking space used to make boxes wide enough for mono-spaced font, otherwise cut off.
     DynamicLCA("Dynamic LCA"):::lcaType
     DynamicLCIADecision{{"Dynamic LCIA?"}}:::decision

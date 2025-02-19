@@ -16,6 +16,8 @@ You can define temporal distributions for process and emission exchanges, which 
 - **Long-lived** products
 - **Biogenic** carbon
 
+Still unsure if you need time-explicit LCA? Overwhelmed by all the options? [Check out our decision tree](content/decisiontree.md) for some guidance.
+
 ## 💬 Support
 If you have any questions or need help, do not hesitate to contact us:
 - Timo Diepers ([timo.diepers@ltt.rwth-aachen.de](mailto:timo.diepers@ltt.rwth-aachen.de))
@@ -30,9 +32,9 @@ maxdepth: 1
 Installation <content/installation>
 Getting Started <content/getting_started/index>
 Theory <content/theory>
-Decision tree <content/decisiontree>
 Examples <content/examples/index>
 API <content/api/index>
+What LCA should i do? <content/decisiontree>
 Contributing <content/contributing>
 Code of Conduct <content/codeofconduct>
 License <content/license>

@@ -3,11 +3,11 @@
 This section explains some of the theory behind time-explicit LCAs with `bw_timex`. In contrast to the [Getting Started section](getting_started/index.md), we explain a bit more of what`s going on in the background here. If this is still too vague for you, you can always check out our [API reference](api/index).
 
 ## Terminology
-LCA terminology can be confusing sometimes, also for experienced practitioners. Particularly, we found the terminology around temporal aspects of LCA confusing, where different terms have been used to describe the same temporal aspect or the same term has been used to describe different temporal aspects. 
+LCA terminology can be confusing sometimes, also for experienced practitioners. Particularly, we found the terminology around temporal aspects of LCA confusing, where different terms have been used to describe the same temporal aspect or the same term has been used to describe different temporal aspects.
 
-In an attempt for improved clarity, we use the term "time-explicit LCA". Essentially, time-explicit LCA jointly considers "temporal distribution", i.e., how processes, emissions and environmental responses are *spread out* over time, and "temporal evolution", i.e., how processes, emissions and environmental responses *change* over time. Very broadly speaking, the former is frequently considered in dynamic LCA, while the latter is frequently considered in prospective LCA. 
+In an attempt for improved clarity, we use the term "time-explicit LCA". Essentially, time-explicit LCA jointly considers "temporal distribution", i.e., how processes, emissions and environmental responses are *spread out* over time, and "temporal evolution", i.e., how processes, emissions and environmental responses *change* over time. Very broadly speaking, the former is frequently considered in dynamic LCA, while the latter is frequently considered in prospective LCA.
 
-Below, you find a visualization of the time-explicit approach. And our [decision tree](decisiontree.md) also helps to understand the difference between the different types of LCA.
+Below, you find a visualization of the time-explicit approach. Our [decision tree](decisiontree.md) might also help to understand the differences between the different types of LCA.
 
 ```{image} data/timeexplicit_lca_dark.svg
 :class: only-dark
@@ -178,7 +178,7 @@ the best available, time-specific background databases. Available matching strat
 are closest database or linear interpolation between two closest
 databases based on temporal proximity. The column `temporal_market_shares` in the timeline specifies how much of that temporalized exchange is taken from the respective background databases. As only exchanges between foreground and background are relinked, this field is `None` for exchanges within the foreground system, e.g., A to -1 (the functional unit). The new best-fitting background
 producer(s) are mapped on the same name, reference product and location
-as the old background producer. 
+as the old background producer.
 
 ## Modifying the matrices
 
@@ -202,20 +202,20 @@ as the old background producer.
 Depending on the user\'s choice, two different biosphere matrices are
 created:
 
-1.  The basic command `TimexLCA.lci()` defaults to creating the dynamic biosphere matrix 
-    (`TimexLCA.lci(build_dynamic_biosphere=True)`). The dynamic biosphere matrix contains 
-    both the time-explicit inventories from the links to the time-specific background 
-    databases as well as the timing of the emissions. The timing of the emissions is 
-    realized through adding a separate biosphere flow for each time of emission. 
-    The inventories from the time-specific background databases are aggregated at the 
+1.  The basic command `TimexLCA.lci()` defaults to creating the dynamic biosphere matrix
+    (`TimexLCA.lci(build_dynamic_biosphere=True)`). The dynamic biosphere matrix contains
+    both the time-explicit inventories from the links to the time-specific background
+    databases as well as the timing of the emissions. The timing of the emissions is
+    realized through adding a separate biosphere flow for each time of emission.
+    The inventories from the time-specific background databases are aggregated at the
     temporal markets as these have the correct timing from the timeline. The matrix
     `TimexLCA.dynamic_inventory` and the more readable DataFrame
     `TimexLCA.dynamic_inventory_df` contain the emissions of the system
     per biosphere flow including its timestamp and its emitting process.
 
-2. If you are only interested in the new inventories, but not their timings, 
-    you can set `build_dynamic_biosphere=False`, which will only create an inventory 
-    linking to the new background processes but without the timing of the biosphere 
+2. If you are only interested in the new inventories, but not their timings,
+    you can set `build_dynamic_biosphere=False`, which will only create an inventory
+    linking to the new background processes but without the timing of the biosphere
     flows and is stored under `TimexLCA.lca.inventory`.
 
 
@@ -304,13 +304,13 @@ This behavior is set with the boolean `fixed_time_horizon`.
 
 ## Contribution assessment of impacts
 
-Sometimes it might be helpful to understand where the time-explicit environmental 
-impacts actually originate from. While the default is to aggregate background 
-emissions at the respective temporal markets (to keep the correct timing), there is the option to disaggregate them 
+Sometimes it might be helpful to understand where the time-explicit environmental
+impacts actually originate from. While the default is to aggregate background
+emissions at the respective temporal markets (to keep the correct timing), there is the option to disaggregate them
 to their original emitting processes from the time-specific background databases. This is helpful for an in-depth contribution
-analysis and can be executed with `TimexLCA.dynamic_lcia(use_disaggregated_lci=True)`. 
- This overwrites the `TimexLCA.dynamic_inventory` and `TimexLCA.dynamic_inventory_df` 
- with versions, in which the background emissions are retained at corresponding 
+analysis and can be executed with `TimexLCA.dynamic_lcia(use_disaggregated_lci=True)`.
+ This overwrites the `TimexLCA.dynamic_inventory` and `TimexLCA.dynamic_inventory_df`
+ with versions, in which the background emissions are retained at corresponding
  background processes, and uses these when calculating the dynamic LCIA results.
 
  Unsure about the different options? Check out the [decision tree](decisiontree.md) for guidance for your time-explicit LCA.
