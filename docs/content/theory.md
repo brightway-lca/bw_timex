@@ -45,7 +45,7 @@ For a time-explicit LCA, three inputs are required:
 
 
 ## Temporal distributions and graph traversal
-To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges, using the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class carries the information how the amount of the exchange is spread over time in two numpy arrays (`date`and `amount`). So, it tells you what share of an exchange happens at what point in time. If two consecutive edges in the supply chain graph carry a `TemporalDistribution`, they are [convoluted](https://en.wikipedia.org/wiki/Convolution), combining the two temporal profiles.
+To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges, using the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class carries the information how the amount of the exchange is spread over time in two numpy arrays (`date`and `amount`). So, it tells you what share of an exchange happens at what point in time. If two consecutive edges in the supply chain graph carry a `TemporalDistribution`, they are [convolved](https://en.wikipedia.org/wiki/Convolution), combining the two temporal profiles.
 
 ````{admonition} Example: Convolution
 :class: admonition-example
@@ -86,11 +86,11 @@ spread_over_four_months.graph(resolution="M")
 
 Now, let's see what happens when we convolute these temporal distributions:
 ```python
-convoluted_distribution = two_and_four_years_ahead * spread_over_four_months
+convolved_distribution = two_and_four_years_ahead * spread_over_four_months
 
-convoluted_distribution.graph(resolution="M")
+convolved_distribution.graph(resolution="M")
 ```
-~~~{image} data/td_convoluted.svg
+~~~{image} data/td_convolved.svg
 :align: center
 ~~~
 
