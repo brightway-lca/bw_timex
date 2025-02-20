@@ -7,7 +7,7 @@ flowchart TD
     %% Define node classes
     classDef decision fill:#3fb1c5,color:black,stroke:none;
     classDef lcaType fill:#9c5ffd,color:black,stroke:none;
-    classDef codeNode fill:#DBDBDB,text-align:left,color:black,stroke:none,font-family:monospace;
+    classDef codeNode fill:#DBDBDB,text-align:left,color:black,stroke:none;
 
     TimingDecision{{"Do temporal aspects matter?"}}:::decision
     AspectDecision{{"Which aspects matter?"}}:::decision
@@ -16,15 +16,14 @@ flowchart TD
     ProspectiveLCA("Prospective LCA"):::lcaType
     RetrospectiveLCA("Retrospective LCA"):::lcaType
     TimeExplicitLCA("Time-explicit LCA"):::lcaType
-    CodeTimeExplicit("tlca = bw_timex.TimexLCA(...)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"):::codeNode
-    %%non-breaking space used to make boxes wide enough for mono-spaced font, otherwise cut off.
+    CodeTimeExplicit("tlca = bw_timex.TimexLCA(...)"):::codeNode
     DynamicLCA("Dynamic LCA"):::lcaType
     DynamicLCIADecision{{"Dynamic LCIA?"}}:::decision
-    CodeStaticLCIA("tlca.lci(build_dynamic_biosphere=False)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\n tlca.static_lcia()\nprint(tlca.static_score)"):::codeNode
-    CodeDynamicLCI("tlca.lci(build_dynamic_biosphere=True)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"):::codeNode
+    CodeStaticLCIA("tlca.lci(build_dynamic_biosphere=False)\n tlca.static_lcia()\nprint(tlca.static_score)"):::codeNode
+    CodeDynamicLCI("tlca.lci(build_dynamic_biosphere=True)"):::codeNode
     BackgroundDecision{{"Interested \n in background system \n contributions?"}}:::decision
-    CodeDynamicLCIA("tlca.dynamic_lcia()\nprint(tlca.dynamic_score)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"):::codeNode
-    CodeDisaggregatedLCIA("tlca.dynamic_lcia(use_disaggregated_background=True)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\nprint(tlca.dynamic_score)"):::codeNode
+    CodeDynamicLCIA("tlca.dynamic_lcia()\nprint(tlca.dynamic_score)"):::codeNode
+    CodeDisaggregatedLCIA("tlca.dynamic_lcia(use_disaggregated_background=True)\nprint(tlca.dynamic_score)"):::codeNode
 
 
 
