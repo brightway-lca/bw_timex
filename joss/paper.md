@@ -60,7 +60,7 @@ The documentation of the `bw_timex` package, including installation instructions
 
 # Acknowledgements
 
-We want to thank Chris Mutel for his help adapting the graph traversal algorithms. This work received funding from the European Union’s Horizon Europe Research and Innovation Programme ForestPaths (ID No 101056755) and from the ETH Board in the framework of the Joint Initiative SCENE, Swiss Center of Excellence on Net Zero Emissions.
+We thank Chris Mutel for his help in adapting the graph traversal algorithm. This work received funding from the European Union’s Horizon Europe Research and Innovation Programme ForestPaths (ID No 101056755) and from the ETH Board in the framework of the Joint Initiative SCENE, Swiss Center of Excellence on Net Zero Emissions.
 
 
 # References
