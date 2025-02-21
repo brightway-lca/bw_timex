@@ -1,17 +1,15 @@
-import warnings
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
 
 import matplotlib.pyplot as plt
 import pandas as pd
-import bw2data as bd
 from bw2data.backends import ActivityDataset as AD
 from bw2data.backends.proxies import Exchange
 from bw2data.backends.schema import ExchangeDataset
 from bw2data.errors import MultipleResults, UnknownObject
 from bw_temporalis import TemporalDistribution
 
-time_res_to_int_dict = {
+time_res_mapping_strftime = {
     "year": "%Y",
     "month": "%Y%m",
     "day": "%Y%m%d",
@@ -38,12 +36,11 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
         Datetime object converted to an integer in the format of time_res
 
     """
-    if time_res not in time_res_to_int_dict.keys():
-        warnings.warn(
-            f'time_res: {time_res} is not a valid option. Please choose from: {list(time_res_to_int_dict.keys())} defaulting to "year"',
-            category=Warning,
+    if time_res not in time_res_mapping_strftime:
+        raise ValueError(
+            f"Invalid time_res: '{time_res}'. Please choose from: {list(time_res_mapping_strftime.keys())}."
         )
-    formatted_date = dt_obj.strftime(time_res_to_int_dict[time_res])
+    formatted_date = dt_obj.strftime(time_res_mapping_strftime[time_res])
     date_as_integer = int(formatted_date)
 
     return date_as_integer
@@ -69,12 +66,12 @@ def extract_date_as_string(timestamp: datetime, temporal_grouping: str) -> str:
         Date as a string in the format of the chosen temporal grouping.
     """
 
-    if temporal_grouping not in time_res_to_int_dict.keys():
-        warnings.warn(
-            f'temporal_grouping: {temporal_grouping} is not a valid option. Please choose from: {list(time_res_to_int_dict.keys())} defaulting to "year"',
-            category=Warning,
+    if temporal_grouping not in time_res_mapping_strftime.keys():
+        raise ValueError(
+            f'temporal_grouping: {temporal_grouping} is not a valid option. Please \
+            choose from: {list(time_res_mapping_strftime.keys())}, defaulting to "year"',
         )
-    return timestamp.strftime(time_res_to_int_dict[temporal_grouping])
+    return timestamp.strftime(time_res_mapping_strftime[temporal_grouping])
 
 
 def convert_date_string_to_datetime(temporal_grouping, date_string) -> datetime:
@@ -102,9 +99,9 @@ def convert_date_string_to_datetime(temporal_grouping, date_string) -> datetime:
     }
 
     if temporal_grouping not in time_res_dict.keys():
-        warnings.warn(
-            f'temporal grouping: {temporal_grouping} is not a valid option. Please choose from: {list(time_res_dict.keys())} defaulting to "year"',
-            category=Warning,
+        raise ValueError(
+            f'temporal grouping: {temporal_grouping} is not a valid option. Please \
+            choose from: {list(time_res_dict.keys())}, defaulting to "year"',
         )
     return datetime.strptime(date_string, time_res_dict[temporal_grouping])
 
@@ -153,10 +150,10 @@ def round_datetime(date: datetime, resolution: str) -> datetime:
     raise ValueError("Resolution must be one of 'year', 'month', 'day', or 'hour'.")
 
 
-def add_flows_to_characterization_function_dict(
+def add_flows_to_characterization_functions(
     flows: Union[str, List[str]],
     func: Callable,
-    characterization_function_dict: Optional[dict] = dict(),
+    characterization_functions: Optional[dict] = dict(),
 ) -> dict:
     """
     Add a new flow or a list of flows to the available characterization functions.
@@ -167,7 +164,7 @@ def add_flows_to_characterization_function_dict(
         Flow or list of flows to be added to the characterization function dictionary.
     func : Callable
         Dynamic characterization function for flow.
-    characterization_function_dict : dict, optional
+    characterization_functions : dict, optional
         Dictionary of flows and their corresponding characterization functions. Default is an empty
         dictionary.
 
@@ -180,13 +177,13 @@ def add_flows_to_characterization_function_dict(
     # Check if the input is a single flow (str) or a list of flows (List[str])
     if isinstance(flows, str):
         # It's a single flow, add it directly
-        characterization_function_dict[flows] = func
+        characterization_functions[flows] = func
     elif isinstance(flows, list):
         # It's a list of flows, iterate and add each one
         for flow in flows:
-            characterization_function_dict[flow] = func
+            characterization_functions[flow] = func
 
-    return characterization_function_dict
+    return characterization_functions
 
 
 def resolve_temporalized_node_name(code: str) -> str:
@@ -214,34 +211,6 @@ def resolve_temporalized_node_name(code: str) -> str:
     elif not qs:
         raise UnknownObject
     return names.pop()
-
-
-def find_matching_node(original_node, other_background_db):
-    """
-    Find a node in another background database that matches the original node based on name,
-    reference product, and location.
-
-    Parameters
-    ----------
-    original_node : dict
-        Original node to find a match for.
-    other_background_db : str
-        Name of the other background database to search in.
-
-    Returns
-    -------
-    dict
-        Matching node in the other background database.
-    """
-    other_node = bd.get_node(
-        **{
-            "database": other_background_db,
-            "name": original_node["name"],
-            "product": original_node["reference product"],
-            "location": original_node["location"],
-        }
-    )
-    return other_node
 
 
 def plot_characterized_inventory_as_waterfall(
@@ -274,7 +243,7 @@ def plot_characterized_inventory_as_waterfall(
     if not hasattr(lca_obj, "characterized_inventory"):
         raise ValueError("LCA object does not have characterized inventory data.")
 
-    if not hasattr(lca_obj, "activity_time_mapping_dict_reversed"):
+    if not hasattr(lca_obj, "activity_time_mapping"):
         raise ValueError("Make sure to pass an instance of a TimexLCA.")
 
     time_res_dict = {
@@ -284,10 +253,8 @@ def plot_characterized_inventory_as_waterfall(
         "hour": "%Y-%m-%d %H",
     }
 
-    # Grouping and summing data
-    plot_data = lca_obj.characterized_inventory.groupby(
-        ["date", "activity"], as_index=False
-    ).sum()
+    plot_data = lca_obj.characterized_inventory.copy()
+    
     plot_data["year"] = plot_data["date"].dt.strftime(
         time_res_dict[lca_obj.temporal_grouping]
     )  # TODO make temporal resolution flexible
@@ -296,13 +263,13 @@ def plot_characterized_inventory_as_waterfall(
     unique_activities = plot_data["activity"].unique()
     activity_labels = {
         idx: resolve_temporalized_node_name(
-            lca_obj.activity_time_mapping_dict_reversed[idx][0][1]
+            lca_obj.activity_time_mapping.reversed[idx][0][1]
         )
         for idx in unique_activities
     }
     plot_data["activity_label"] = plot_data["activity"].map(activity_labels)
 
-    # Pivoting data for plotting
+    plot_data = plot_data.groupby(["year", "activity_label"], as_index=False)["amount"].sum()
     pivoted_data = plot_data.pivot(
         index="year", columns="activity_label", values="amount"
     )
@@ -443,7 +410,7 @@ def get_exchange(**kwargs) -> Exchange:
             f"Found {num_candidates} results for the given search. "
             "Please be more specific or double-check your system model for duplicates."
         )
-    elif num_candidates == 0:
+    if num_candidates == 0:
         raise UnknownObject("No exchange found matching the criteria.")
 
     return candidates[0]

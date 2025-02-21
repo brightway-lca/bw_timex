@@ -28,7 +28,7 @@ class TestClass_Grouping:
 
         self.fu = bd.get_node(database="foreground", code="A")
 
-        database_date_dict = {
+        database_dates = {
             "db_2022": datetime.strptime("2022", "%Y"),
             "db_2024": datetime.strptime("2024", "%Y"),
             "foreground": "dynamic",
@@ -37,7 +37,7 @@ class TestClass_Grouping:
         self.tlca = TimexLCA(
             demand={self.fu.key: 1},
             method=("GWP", "example"),
-            database_date_dict=database_date_dict,
+            database_dates=database_dates,
         )
         self.tlca.build_timeline(
             temporal_grouping="month",
@@ -71,7 +71,7 @@ class TestClass_Grouping:
                 )
                 exc.save()
 
-        database_date_dict = {
+        database_dates = {
             "db_2022": datetime.strptime(
                 "2024-01-10", "%Y-%m-%d"
             ),  # give dbs also a daily resolution (makes calculating the expected score easier)
@@ -82,7 +82,7 @@ class TestClass_Grouping:
         self.tlca = TimexLCA(
             demand={self.fu.key: 1},
             method=("GWP", "example"),
-            database_date_dict=database_date_dict,
+            database_dates=database_dates,
         )
         self.tlca.build_timeline(
             temporal_grouping="day",
@@ -116,7 +116,7 @@ class TestClass_Grouping:
                 )
                 exc.save()
 
-        database_date_dict = {
+        database_dates = {
             "db_2022": datetime.strptime(
                 "2024-01-10 06:00", "%Y-%m-%d %H:%M"
             ),  # give dbs also a hourly resolution (makes calculating the expected score easier)
@@ -127,7 +127,7 @@ class TestClass_Grouping:
         self.tlca = TimexLCA(
             demand={self.fu.key: 1},
             method=("GWP", "example"),
-            database_date_dict=database_date_dict,
+            database_dates=database_dates,
         )
         self.tlca.build_timeline(
             temporal_grouping="hour",

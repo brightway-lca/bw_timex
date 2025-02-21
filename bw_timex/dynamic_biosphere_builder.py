@@ -17,16 +17,16 @@ class DynamicBiosphereBuilder:
     def __init__(
         self,
         lca_obj: LCA,
-        activity_time_mapping_dict: dict,
-        biosphere_time_mapping_dict: dict,
-        demand_timing_dict: dict,
-        node_id_collection_dict: dict,
+        activity_time_mapping: dict,
+        biosphere_time_mapping: dict,
+        demand_timing: dict,
+        node_collections: dict,
         temporal_grouping: str,
-        database_date_dict: dict,
-        database_date_dict_static_only: dict,
+        database_dates: dict,
+        database_dates_static: dict,
         timeline: pd.DataFrame,
         interdatabase_activity_mapping: SetList,
-        from_timeline: bool = False,
+        expand_technosphere: bool = True,
     ) -> None:
         """
         Initializes the DynamicBiosphereBuilder object.
@@ -35,22 +35,22 @@ class DynamicBiosphereBuilder:
         ----------
         lca_obj : LCA object
             instance of the bw2calc LCA class, e.g. TimexLCA.lca
-        activity_time_mapping_dict : dict
+        activity_time_mapping : dict
             A dictionary mapping activity to their respective timing in the format
             (('database', 'code'), datetime_as_integer): time_mapping_id)
-        biosphere_time_mapping_dict : dict
+        biosphere_time_mapping : dict
             A dictionary mapping biosphere flows to their respective timing in the format
             (('database', 'code'), datetime_as_integer): time_mapping_id), empty at this point.
-        demand_timing_dict : dict
+        demand_timing : dict
             A dictionary mapping of the demand to demand time
-        node_id_collection_dict : dict
+        node_collections : dict
             A dictionary containing lists of node ids for different node subsets
         temporal_grouping : str
             A string indicating the temporal grouping of the processes, e.g. 'year', 'month',
             'day', 'hour'
-        database_date_dict : dict
+        database_dates : dict
             A dictionary mapping database names to their respective date
-        database_date_dict_static_only : dict
+        database_dates_static : dict
             A dictionary mapping database names to their respective date, but only containing
             static databases, which are the background databases.
         timeline: pd.DataFrame
@@ -58,9 +58,9 @@ class DynamicBiosphereBuilder:
         interdatabase_activity_mapping : SetList
             A list of sets, where each set contains the activity ids of the same activity in
             different databases
-        from_timeline : bool, optional
-            A boolean indicating if the dynamic biosphere matrix is built directly from the
-            timeline. Default is False.
+        expand_technosphere : bool, optional
+            A boolean indicating if the dynamic biosphere matrix is built via expanded matrices or directly from the timeline.
+            Default is True.
 
         Returns
         -------
@@ -68,7 +68,7 @@ class DynamicBiosphereBuilder:
 
         """
 
-        self._time_res_dict = {
+        self._time_res_mapping = {
             "year": "datetime64[Y]",
             "month": "datetime64[M]",
             "day": "datetime64[D]",
@@ -76,32 +76,37 @@ class DynamicBiosphereBuilder:
         }
 
         self.lca_obj = lca_obj
-        if not from_timeline:
+
+        if expand_technosphere:
             self.technosphere_matrix = (
                 lca_obj.technosphere_matrix.tocsc()
             )  # convert to csc as this is only used for column slicing
             self.dynamic_supply_array = lca_obj.supply_array
             self.activity_dict = lca_obj.dicts.activity
         else:
-            self.dynamic_supply_array = timeline.amount.values.astype(float)
-        self.activity_time_mapping_dict = activity_time_mapping_dict
-        self.biosphere_time_mapping_dict = biosphere_time_mapping_dict
-        self.demand_timing_dict = demand_timing_dict
-        self.node_id_collection_dict = node_id_collection_dict
-        self.time_res = self._time_res_dict[temporal_grouping]
+            self.dynamic_supply_array = timeline.amount.values.astype(
+                float
+            )  # get the supply vector directly from the timeline
+
+        self.activity_time_mapping = activity_time_mapping
+        self.biosphere_time_mapping = biosphere_time_mapping
+        self.demand_timing = demand_timing
+        self.node_collections = node_collections
+        self.time_res = self._time_res_mapping[temporal_grouping]
         self.temporal_grouping = temporal_grouping
-        self.database_date_dict = database_date_dict
-        self.database_date_dict_static_only = database_date_dict_static_only
+        self.database_dates = database_dates
+        self.database_dates_static = database_dates_static
         self.timeline = timeline
         self.interdatabase_activity_mapping = interdatabase_activity_mapping
         self.rows = []
         self.cols = []
         self.values = []
         self.unique_rows_cols = set()  # To keep track of (row, col) pairs
+        self.temporal_market_cols = []  # To keep track of temporal market columns
 
     def build_dynamic_biosphere_matrix(
         self,
-        from_timeline: bool = False,
+        expand_technosphere: bool = True,
     ):
         """
         This function creates a separate biosphere matrix, with the dimensions
@@ -121,31 +126,39 @@ class DynamicBiosphereBuilder:
 
         Parameters
         ----------
-        from_timeline : bool, optional
-            A boolean indicating if the dynamic biosphere matrix is built directly from the
-            timeline or from expanded matrices. Default is False.
+        expand_technosphere : bool, optional
+            A boolean indicating if the dynamic biosphere matrix is built via expanded matrices
+            or directly from the timeline. Default is via expanded matrices.
 
         Returns
         -------
-        dynamic_biomatrix : scipy.sparse.csr_matrix
+        dynamic_biosphere_matrix : scipy.sparse.csr_matrix
             A sparse matrix with the dimensions (bio_flows at a specific time step) x (processes).
+        temporal_market_lcis : dict
+            A dictionary containing the disaggregated LCI's of the temporal markets, 
+            with the time-mapped-activity id as key.
         """
+
+        lci_dict = {}
+        temporal_market_lcis = {}
 
         for row in self.timeline.itertuples():
             idx = row.time_mapped_producer
-            if from_timeline:
-                process_col_index = row.Index  # start a new matrix
-            else:
+
+            if expand_technosphere:
                 process_col_index = self.activity_dict[
                     idx
                 ]  # get the matrix column index
 
+            else:  # from timeline
+                process_col_index = row.Index  # start a new matrix
+
             (
                 (original_db, original_code),
                 time,
-            ) = self.activity_time_mapping_dict.reversed()[idx]
+            ) = self.activity_time_mapping.reversed[idx]
 
-            if idx in self.node_id_collection_dict["temporalized_processes"]:
+            if idx in self.node_collections["temporalized_processes"]:
 
                 time_in_datetime = convert_date_string_to_datetime(
                     self.temporal_grouping, str(time)
@@ -194,36 +207,54 @@ class DynamicBiosphereBuilder:
                     for date, amount in zip(dates, values):
 
                         # first create a row index for the tuple (bioflow_id, date)
-                        time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(
+                        time_mapped_matrix_idx = self.biosphere_time_mapping.add(
                             (exc.input.id, date)
                         )
 
                         # populate lists with which sparse matrix is constructed
                         self.add_matrix_entry_for_biosphere_flows(
-                            row=time_mapped_matrix_id,
+                            row=time_mapped_matrix_idx,
                             col=process_col_index,
                             amount=amount,
                         )
-            elif idx in self.node_id_collection_dict["temporal_markets"]:
+
+            elif idx in self.node_collections["temporal_markets"]:
+                self.temporal_market_cols.append(process_col_index)
                 (
                     (original_db, original_code),
                     time,
-                ) = self.activity_time_mapping_dict.reversed()[idx]
+                ) = self.activity_time_mapping.reversed[idx]
 
-                if from_timeline:
-                    demand = self.demand_from_timeline(row, original_db)
-                else:
+                if expand_technosphere:
                     demand = self.demand_from_technosphere(idx, process_col_index)
+                else:
+                    demand = self.demand_from_timeline(row)
 
                 if demand:
-                    self.lca_obj.redo_lci(demand)
-                    # aggregated biosphere flows of background supply chain emissions.
-                    # Rows are bioflows.
-                    aggregated_inventory = self.lca_obj.inventory.sum(axis=1)
+                    for act, amount in demand.items():
+                        # check if lci already calculated for this activity
+                        if not act in lci_dict.keys():
+                            self.lca_obj.redo_lci({act: 1})
+                            #  biosphere flows by activity of background supply chain emissions.
+                            # Rows are bioflows. Columns are activities.
+                            # save for reuse in dict
+                            lci_dict[act] = self.lca_obj.inventory
+                        # add lci of both background activities of the temporal market and save total lci
+                        if idx not in temporal_market_lcis.keys():
+                            temporal_market_lcis[idx] = lci_dict[act] * amount
+                        else:
+                            temporal_market_lcis[idx] += lci_dict[act] * amount
+
+                    aggregated_inventory = temporal_market_lcis[idx].sum(axis=1)
+
+                    # multiply LCI with supply of temporal market
+                    temporal_market_lcis[idx] *= self.dynamic_supply_array[
+                        process_col_index
+                    ]
 
                     for row_idx, amount in enumerate(aggregated_inventory.A1):
                         bioflow = self.lca_obj.dicts.biosphere.reversed[row_idx]
-                        ((_, _), time) = self.activity_time_mapping_dict.reversed()[idx]
+                        ((_, _), time) = self.activity_time_mapping.reversed[idx]
 
                         time_in_datetime = convert_date_string_to_datetime(
                             self.temporal_grouping, str(time)
@@ -235,38 +266,39 @@ class DynamicBiosphereBuilder:
                         ).date
                         date = td_producer[0]
 
-                        time_mapped_matrix_id = self.biosphere_time_mapping_dict.add(
+                        time_mapped_matrix_idx = self.biosphere_time_mapping.add(
                             (bioflow, date)
                         )
 
                         self.add_matrix_entry_for_biosphere_flows(
-                            row=time_mapped_matrix_id,
+                            row=time_mapped_matrix_idx,
                             col=process_col_index,
                             amount=amount,
                         )
 
         # now build the dynamic biosphere matrix
-        if from_timeline:
-            ncols = len(self.timeline)
+        if expand_technosphere:
+            ncols = len(self.activity_time_mapping)
         else:
-            ncols = len(self.activity_time_mapping_dict)
+            ncols = len(self.timeline)
+
         shape = (max(self.rows) + 1, ncols)
-        dynamic_biomatrix = sp.coo_matrix((self.values, (self.rows, self.cols)), shape)
-        self.dynamic_biomatrix = dynamic_biomatrix.tocsr()
+        dynamic_biosphere_matrix = sp.coo_matrix(
+            (self.values, (self.rows, self.cols)), shape
+        )
+        dynamic_biosphere_matrix = dynamic_biosphere_matrix.tocsr()
 
-        return self.dynamic_biomatrix
+        return dynamic_biosphere_matrix, temporal_market_lcis
 
-    def demand_from_timeline(self, row, original_db):
+    def demand_from_timeline(self, row):
         """
         Returns a demand dict directly from the timeline row
-        and its interpolation_weights.
+        and its temporal_market_shares.
 
         Parameters:
         -----------
         row: pd.Series
             A row of the timeline DataFrame
-        original_db: str
-            The original database name of the activity
 
         Returns
         -------
@@ -277,14 +309,10 @@ class DynamicBiosphereBuilder:
 
         """
         demand = {}
-        for db, amount in row.interpolation_weights.items():
-            [(timed_act_id, _)] = [
-                (act, db_name)
-                for (act, db_name) in self.interdatabase_activity_mapping[
-                    (row.producer, original_db)
-                ]
-                if db == db_name
-            ]
+        for db, amount in row.temporal_market_shares.items():
+            timed_act_id = self.interdatabase_activity_mapping.find_match(
+                row.producer, db
+            )
             demand[timed_act_id] = amount
         return demand
 
@@ -306,24 +334,18 @@ class DynamicBiosphereBuilder:
             A demand-dictionary with as keys the brightway ids of the consumed background
             activities and as values their consumed amount.
         """
-        technosphere_column = (
-            self.technosphere_matrix[:, process_col_index].toarray().ravel()
-        )  # 1-d np.array
-        demand = {}
-        for row_idx, amount in enumerate(technosphere_column):
-            if row_idx == self.activity_dict[idx]:  # Skip production exchange
-                continue
-            if amount == 0:
-                continue
+        col = self.technosphere_matrix[:, process_col_index]  # Sparse column
+        activity_row = self.activity_dict[idx]  # Producer's row index
+        foreground_nodes = self.node_collections["foreground"]
 
-            node_id = self.activity_dict.reversed[row_idx]
+        demand = {
+            self.activity_dict.reversed[row_idx]: -amount
+            for row_idx, amount in zip(col.nonzero()[0], col.data)
+            if row_idx != activity_row  # Skip production exchange
+            and self.activity_dict.reversed[row_idx]
+            not in foreground_nodes  # Only background
+        }
 
-            if (
-                node_id in self.node_id_collection_dict["foreground_node_ids"]
-            ):  # We only aggregate background process bioflows
-                continue
-
-            demand[node_id] = -amount
         return demand
 
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):

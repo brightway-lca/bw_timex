@@ -15,7 +15,7 @@ This section will help you quickly getting started with your time-explicit LCA p
 ```
 <br />
 
-In the following sections, we'll walk through the steps 1-4, considering a very simple dummy system. If you directly want to look at a more complex example, take a look at our [example collection](../examples/index.md). If you're interested in the full details on how `bw_timex` works, you can also skip to our [Theory Section](../theory.md).
+In the following sections, we'll walk through the steps 1-4, considering a very simple dummy system. If you directly want to look at a more complex example, take a look at our [example collection](../examples/index.md). If you're interested in the full details on how `bw_timex` works, you can also skip to our [Theory Section](../theory.md). For some general guidance on what kind of LCA is suitable for what kind of case, check out our [decision tree](../decisiontree.md).
 
 ```{admonition} You want more interaction?
 :class: admonition-launch

@@ -95,13 +95,13 @@ def ab_db():
 
 def test_starting_datetime(ab_db):
     method = ("GWP", "example")
-    database_date_dict = {
+    database_dates = {
         "db_2020": datetime.strptime("2020", "%Y"),
         "db_2030": datetime.strptime("2030", "%Y"),
         "foreground": "dynamic",
     }
     fu = ("foreground", "A")
-    tlca = TimexLCA({fu: 1}, method, database_date_dict)
+    tlca = TimexLCA({fu: 1}, method, database_dates)
 
     tlca.build_timeline(starting_datetime="2020-01-01")
     tlca.lci()

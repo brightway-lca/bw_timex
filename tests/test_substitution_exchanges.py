@@ -22,7 +22,7 @@ class TestClass_substitution:
 
         self.node_a = bd.get_node(database="foreground", code="A")
 
-        database_date_dict = {
+        database_dates = {
             "db_2020": datetime.strptime("2020", "%Y"),
             "db_2030": datetime.strptime("2030", "%Y"),
             "foreground": "dynamic",
@@ -31,7 +31,7 @@ class TestClass_substitution:
         self.tlca = TimexLCA(
             demand={self.node_a.key: 1},
             method=("GWP", "example"),
-            database_date_dict=database_date_dict,
+            database_dates=database_dates,
         )
 
         self.tlca.build_timeline(starting_datetime="2024-01-01")
