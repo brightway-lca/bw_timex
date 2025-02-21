@@ -1,11 +1,14 @@
 ---
 title: "bw_timex: A Python Package for Time-Explicit Life Cycle Assessment"
 tags:
-  - Python
-  - time-explicit LCA
-  - life cycle assessment
-  - prospective
-  - dynamic
+  - LCA
+  - temporal distribution
+  - temporal evolution
+  - prospective LCA
+  - dynamic LCA
+  - time-differentiated
+  - time-resolved
+  - dynamic modelling
 
 authors:
   - name: Timo Diepers
