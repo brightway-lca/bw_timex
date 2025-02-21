@@ -27,8 +27,7 @@ You can define temporal distributions for process and emission exchanges, which 
 - **Long-lived** products
 - **Biogenic** carbon
 
-Still wondering if *bw_timex* is for you, or what type of LCA would be best for your case? This [decision tree](https://docs.brightway.dev/projects/bw-timex/en/latest/content/decisiontree.html) might be of help.
-
+Still unsure if you need time-explicit LCA? Overwhelmed by all the options? [Check out our decision tree](content/decisiontree.md) for some guidance.
 
 ## 👩‍💻 Getting Started
 - [Installation Guide](https://docs.brightway.dev/projects/bw-timex/en/latest/content/installation.html)
