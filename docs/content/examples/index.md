@@ -35,15 +35,18 @@ Example of some of the dynamic characterization capabilities that come with a Ti
 by @muelleram
 :::
 
-:::{grid-item-card} ... more is coming soon 🤗
-:link: ./index.html
+:::{grid-item-card} 📄🚗 EV Case Study for our paper
+:link: ./paper_case_study.html
 :link-type: url
 :class-body: sphinx-design-class-body-examples
 :text-align: left
 :style: margin-bottom: 20px;
-We'll be adding more and more examples here, stay tuned!
+This is the notebook used to calculate the time-explicit LCAs and create the Figures for our paper
+on time-explicit LCA.
+```{image} ./data/paper_radiative_forcing.svg
+```
 +++
-by @TimexDevs
+by @TimoDiepers
 :::
 
 :::{grid-item-card} Or do you have anything to add? 🧐

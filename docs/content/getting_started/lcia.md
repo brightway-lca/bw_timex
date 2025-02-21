@@ -1,5 +1,5 @@
 # Step 4 - Impact assessment
-To characterize the calculated inventory, we have two options: Static and dynamic life cycle impact assessment (LCIA).
+To characterize the time-explicit inventory, we have two options: Static and dynamic life cycle impact assessment (LCIA).
 
 ## Static LCIA
 If we don't care about the timing of the emissions, we can do static LCIA using the standard characterization factors. To characterize the inventory with the impact assessment method that we initially chose when creating our `TimexLCA` object, we can simply call:
@@ -15,15 +15,15 @@ print(tlca.static_score)
 ```
 
 ## Dynamic LCIA
-The inventory calculated by a `TimexLCA` retains temporal information. That means that in addition to knowing which process emits what substance, we also know the timing of each emission. This allows for more advanced, dynamic characterization using characterization functions instead of just factors. In `bw_timex`, users can either use their own custom functions or use some existing ones, e.g., from the package [`dynamic_characterization`](https://dynamic-characterization.readthedocs.io/en/latest/). We'll do the latter here.
+The inventory calculated by a `TimexLCA` retains the temporal information of the biosphere flows. That means that in addition to knowing which process emits what substance, we also know the timing of each emission. This allows for more advanced, dynamic characterization using characterization functions instead of just factors. In `bw_timex`, users can either use their own custom functions or use some existing ones, e.g., from the package [`dynamic_characterization`](https://dynamic-characterization.readthedocs.io/en/latest/). We'll do the latter here.
 
-First, we need to define which characterization function we want to apply to which biosphere flow:
+First, we need to assign characterizations function to our biosphere flows:
 
 ```python
 from dynamic_characterization.ipcc_ar6 import characterize_co2
 emission_id = bd.get_activity(("biosphere", "CO2")).id
 
-characterization_function_dict = {
+characterization_functions = {
     emission_id: characterize_co2,
 }
 ```
@@ -34,11 +34,11 @@ So, let's characterize our inventory. As a metric we choose radiative forcing, a
 tlca.dynamic_lcia(
     metric="radiative_forcing",
     time_horizon=100,
-    characterization_function_dict=characterization_function_dict,
+    characterization_functions=characterization_functions,
 )
 ```
 
-This returns the (dynamic) characterized inventory:
+This returns the (dynamic) characterized inventory, which shows you the radiative forcing [W/m<sup>2</sup>] by the CO<sup>2</sup> emissions in the system over the next 100 years:
 
 | date       | amount         | flow | activity |
 |------------|----------------|------|----------|
@@ -69,7 +69,7 @@ Of course we can also assess the "standard" climate change metric Global Warming
 tlca.dynamic_lcia(
     metric="GWP",
     time_horizon=100,
-    characterization_function_dict=characterization_function_dict,
+    characterization_functions=characterization_functions,
 )
 ```
 
@@ -91,4 +91,4 @@ tlca.plot_dynamic_characterized_inventory()
 ```
 <br />
 
-For most of the functions we used here, there are numerous optional arguments and settings you can tweak. We explore some of them in our other [Examples](../examples/index.md), but when in doubt: Our code is pretty well documented, see our [docstrings](../api/index) - so please browse through them as needed ☀️
+For most of the functions we used here, there are numerous optional arguments and settings you can tweak. We explore some of them in our other [Examples](../examples/index.md), but when in doubt check out our [docstrings](../api/index), which provide information also for the more advanced settings - so please browse through them as needed ☀️

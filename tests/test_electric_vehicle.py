@@ -25,7 +25,7 @@ class TestClass_EV:
     def setup_method(self, vehicle_db):
         self.electric_vehicle = bd.get_node(database="foreground", code="EV")
 
-        database_date_dict = {
+        database_dates = {
             "db_2020": datetime.strptime("2020", "%Y"),
             "db_2030": datetime.strptime("2030", "%Y"),
             "db_2040": datetime.strptime("2040", "%Y"),
@@ -35,7 +35,7 @@ class TestClass_EV:
         self.tlca = TimexLCA(
             demand={self.electric_vehicle.key: 1},
             method=("GWP", "example"),
-            database_date_dict=database_date_dict,
+            database_dates=database_dates,
         )
 
         self.tlca.build_timeline(
