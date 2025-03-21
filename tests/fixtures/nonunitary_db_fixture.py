@@ -19,15 +19,36 @@ def nonunitary_db():
     )
     bd.Database("db_2020").write(
         {
-            ("db_2020", "C"): {
-                "name": "c",
+            ("db_2020", "D"): {
+                "name": "d",
                 "location": "somewhere",
-                "reference product": "c",
+                "reference product": "d",
                 "exchanges": [
                     {
                         "amount": 3,  # produces a non unitary (not 1) amount
                         "type": "production",
-                        "input": ("db_2020", "C"),
+                        "input": ("db_2020", "D"),
+                    },
+                    {
+                        "amount": 0.5,
+                        "type": "biosphere",
+                        "input": ("bio", "CO2"),
+                    },
+                ],
+            },
+        }
+    )
+    bd.Database("db_2030").write(
+        {
+            ("db_2030", "D"): {
+                "name": "d",
+                "location": "somewhere",
+                "reference product": "d",
+                "exchanges": [
+                    {
+                        "amount": 3,  # produces a non unitary (not 1) amount
+                        "type": "production",
+                        "input": ("db_2030", "D"),
                     },
                     {
                         "amount": 0.5,
@@ -47,19 +68,27 @@ def nonunitary_db():
                 "reference product": "a",
                 "exchanges": [
                     {
-                        "amount": 1,
+                        "amount": 0.8,
                         "type": "production",
                         "input": ("foreground", "A"),
                     },
                     {
                         "amount": 1.5,
                         "type": "technosphere",
-                        "input": ("db_2020", "C"),
+                        "input": ("db_2020", "D"),
+                        "temporal_distribution": TemporalDistribution(
+                            np.array([-24, -12, 0], dtype="timedelta64[M]"),
+                            np.array([0.5, 0.3, 0.2]),
+                        ),
                     },
                     {
                         "amount": 4,
                         "type": "technosphere",
                         "input": ("foreground", "B"),
+                        "temporal_distribution": TemporalDistribution(
+                            np.array([-24, -12, 0], dtype="timedelta64[M]"),
+                            np.array([0.5, 0.3, 0.2]),
+                        ),
                     },
                 ],
             },
@@ -75,6 +104,33 @@ def nonunitary_db():
                     },
                     {
                         "amount": 0.9,
+                        "type": "biosphere",
+                        "input": ("bio", "CO2"),
+                    },
+                    {
+                        "amount": -2,
+                        "type": "technosphere",
+                        "input": ("foreground", "C"),
+                    },
+                ],
+            },
+            ("foreground", "C"): {
+                "name": "c",
+                "location": "somewhere",
+                "reference product": "c",
+                "exchanges": [
+                    {
+                        "amount": -1,  # produces a non unitary (not 1) amount
+                        "type": "production",
+                        "input": ("foreground", "C"),
+                    },
+                    {
+                        "amount": -1,
+                        "type": "technosphere",
+                        "input": ("db_2020", "D"),
+                    },
+                    {
+                        "amount": 6,
                         "type": "biosphere",
                         "input": ("bio", "CO2"),
                     },
