@@ -232,11 +232,16 @@ class MatrixModifier:
         previous_producer_id = row.producer
         previous_producer_node = self.nodes[previous_producer_id]
 
+        production_exchange_amount = self.nodes[row.consumer].rp_exchange().amount
+        scaled_amount = row.amount * abs(
+            production_exchange_amount
+        )  # abs value used for scaling to preserve the sign of the exchange
+
         # Add entry between exploded consumer and exploded producer (not in background database)
         datapackage.add_persistent_vector(
             matrix="technosphere_matrix",
             name=uuid.uuid4().hex,
-            data_array=np.array([row.amount], dtype=float),
+            data_array=np.array([scaled_amount], dtype=float),
             indices_array=np.array(
                 [(new_producer_id, new_consumer_id)],
                 dtype=bwp.INDICES_DTYPE,
