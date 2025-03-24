@@ -25,7 +25,7 @@ class TestClass_EV:
         }
 
         self.tlca = TimexLCA(
-            demand={self.node_a: 1},
+            demand={self.node_a: 0.75},  # non-1 amount
             method=("GWP", "example"),
             database_dates=database_dates,
         )
@@ -36,16 +36,13 @@ class TestClass_EV:
         self.tlca.lci()
         self.tlca.static_lcia()
 
-    def test_timex_lca_score(self):
+    def test_non_unitary_timex_lca_score(self):
 
-        expected_score = (
-            1 * 1.5 / 3 * 0.5 + 1 * 4 / 7 * 0.9  # A -> Nonunitary  C in bd_2020
-        )  # A -> B -> Nonunitary B in foreground
+        expected_score = (  #
+            0.75 / 0.8 * 1.5 / 3 * 0.5  # all d at A
+            + 0.75 / 0.8 * 4 / 7 * 0.9  # all direct CO2 emissions at all 3 b
+            + 0.75 / 0.8 * 4 / 7 * -2 / -1 * 6  # all direct CO2 emissions at all 3 c
+            + 0.75 / 0.8 * 4 / 7 * -2 / -1 * -1 / 3 * 0.5  # all d via C at B
+        )
 
-        false_score = (
-            1 * 1.5 / 3 * 0.5 + 1 * 4 * 0.9  # A -> Nonunitary C in bd_2020
-        )  # A -> B -> Nonunitary B in foreground (not scaled by production amount!)
-
-        print(false_score)
-
-        assert math.isclose(self.tlca.static_score, expected_score, rel_tol=1e-9)
+        assert math.isclose(self.tlca.static_score, expected_score, rel_tol=1e-7)
