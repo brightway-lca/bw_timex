@@ -38,27 +38,6 @@ def nonunitary_db():
             },
         }
     )
-    bd.Database("db_2030").write(
-        {
-            ("db_2030", "D"): {
-                "name": "d",
-                "location": "somewhere",
-                "reference product": "d",
-                "exchanges": [
-                    {
-                        "amount": 3,  # produces a non unitary (not 1) amount
-                        "type": "production",
-                        "input": ("db_2030", "D"),
-                    },
-                    {
-                        "amount": 0.5,
-                        "type": "biosphere",
-                        "input": ("bio", "CO2"),
-                    },
-                ],
-            },
-        }
-    )
 
     bd.Database("foreground").write(
         {
