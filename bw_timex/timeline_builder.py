@@ -35,7 +35,7 @@ class TimelineBuilder:
         database_dates_static: dict,
         activity_time_mapping: dict,
         node_collections: dict,
-        nodes_dict: dict,
+        nodes: dict,
         temporal_grouping: str = "year",
         interpolation_type: str = "linear",
         cutoff: float = 1e-9,
@@ -54,8 +54,14 @@ class TimelineBuilder:
             A callable that filters edges. If not provided, a function that always returns False is used.
         database_dates: dict
             A dictionary mapping databases to dates.
+        database_dates_static: dict
+            same as database_dates, but excluding the "dynamic" foreground databases.
         activity_time_mapping: dict
           A dictionary to map processes to specific times.
+        node_collections: dict
+            A dictionary collecting useful subsets of node ids.
+        nodes: dict
+            A dictionary {node_id: 'bw2data.backends.proxies.Activity'} for all nodes.
         temporal_grouping: str, optional
             The temporal grouping to be used. Default is "year".
         interpolation_type: str, optional
@@ -76,7 +82,7 @@ class TimelineBuilder:
         self.database_dates_static = database_dates_static
         self.activity_time_mapping = activity_time_mapping
         self.node_collections = node_collections
-        self.nodes_dict = nodes_dict
+        self.nodes = nodes
         self.temporal_grouping = temporal_grouping
         self.interpolation_type = interpolation_type
         self.cutoff = cutoff
@@ -214,7 +220,7 @@ class TimelineBuilder:
         for row in grouped_edges.itertuples():
             self.activity_time_mapping.add(
                 (
-                    ("temporalized", self.nodes_dict[row.producer]["code"]),
+                    ("temporalized", self.nodes[row.producer]["code"]),
                     row.hash_producer,
                 )
             )
@@ -242,7 +248,7 @@ class TimelineBuilder:
 
         # Retrieve producer and consumer names
         grouped_edges["producer_name"] = grouped_edges.producer.apply(
-            lambda x: self.nodes_dict[x]["name"]
+            lambda x: self.nodes[x]["name"]
         )
         grouped_edges["consumer_name"] = grouped_edges.consumer.apply(
             self.get_consumer_name
@@ -358,12 +364,10 @@ class TimelineBuilder:
         """
         try:
             return self.activity_time_mapping[
-                (("temporalized", self.nodes_dict[node_id]["code"]), node_hash)
+                (("temporalized", self.nodes[node_id]["code"]), node_hash)
             ]
         except KeyError:
-            return self.activity_time_mapping[
-                ((self.nodes_dict[node_id].key), node_hash)
-            ]
+            return self.activity_time_mapping[((self.nodes[node_id].key), node_hash)]
 
     def add_column_temporal_market_shares_to_timeline(
         self,
@@ -578,6 +582,6 @@ class TimelineBuilder:
             Name of the node or -1
         """
         try:
-            return self.nodes_dict[idx]["name"]
+            return self.nodes[idx]["name"]
         except KeyError:
             return "-1"  # functional unit

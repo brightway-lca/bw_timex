@@ -316,10 +316,10 @@ class TimexLCA:
 
         See also
         --------
-        build_datapackage: 
+        build_datapackage:
             Method to create the datapackages that contain the modifications
             to the technosphere and biosphere matrix using the `MatrixModifier` class.
-        calculate_dynamic_inventory: 
+        calculate_dynamic_inventory:
             Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
 
@@ -459,7 +459,7 @@ class TimexLCA:
             dynamic_inv_row_ids.extend(new_rows)
             dynamic_inv_col_ids.extend(lci.col)
             dynamic_inv_data.extend(lci.data)
-        
+
         # construct the new dynamic inventory including background inventory instead of aggregated temporal market emissions
         dynamic_inventory_disaggregated = sparse.coo_matrix(
             (dynamic_inv_data, (dynamic_inv_row_ids, dynamic_inv_col_ids)),
@@ -1274,7 +1274,7 @@ class TimexLCA:
         Adds all activities from the static LCA to `activity_time_mapping`, an instance of
         `TimeMappingDict`. This gives a unique mapping in the form of
         (('database', 'code'), datetime_as_integer): time_mapping_id) that is later used to uniquely
-        identify time-resolved processes. Here,  the activity_time_mapping is the
+        identify time-resolved processes. Here, the activity_time_mapping is the
         pre-population with the static activities. The time-explicit activities (from other
         temporalized background databases) are added later on by the TimelineBuilder.
         Activities in the foreground database are mapped with
