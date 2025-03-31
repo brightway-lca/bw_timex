@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2025-03-31
+* Fixed an issue with non-unitary production exchanges
+
 ## [0.3.0] - 2025-02-07
 * Renamed various variables. The main user-facing API change is `database_date_dict` -> `database_dates`. Others are mainly internal, see https://github.com/brightway-lca/bw_timex/commit/991943cd0ea9c0185baace3b84c75abd46b4bd59 and https://github.com/brightway-lca/bw_timex/commit/554a67cc7796264be888840c1c9431f64952fd66.
 * Added a function to disaggregate the background LCI. This means that the aggregated biosphere flows of the upstream supply chains of temporal markets are distributed back to the original producers from the background database.
