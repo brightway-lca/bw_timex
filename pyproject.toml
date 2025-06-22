@@ -36,7 +36,7 @@ dependencies = [
     "bw_graph_tools>0.4",
     "numpy",
     "pandas",
-    "scipy<1.15",
+    "scipy<1.17",
     "tqdm",
     "bw_temporalis>=1.1",
     "dynamic_characterization>=1.0.0",
