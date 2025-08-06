@@ -4,7 +4,7 @@
 # For more info see:
 # https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Python 🐍 CI/CD tests
+name: CI/CD tests
 
 on:
   push:
