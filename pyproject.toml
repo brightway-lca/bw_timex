@@ -43,6 +43,7 @@ dependencies = [
     "matplotlib",
     "seaborn",
     "loguru",
+    "panel>=1.0.0",
 ]
 
 [project.urls]

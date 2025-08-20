@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>bw_timex - Time-explicit LCA</title>
+    <style>
+        /* CSS styles for bw_timex application */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+
+        .header {
+            background: linear-gradient(90deg, #3498db, #2c3e50);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            color: white;
+            border: none;
+        }
+
+        .header p {
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+            font-size: 16px;
+        }
+
+        .navbar {
+            background: #f8f9fa;
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin: 0 20px 20px 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .nav-btn.active {
+            background: #3498db;
+        }
+
+        .nav-btn:hover {
+            background: #495057;
+            transform: translateY(-1px);
+        }
+
+        .nav-btn.active:hover {
+            background: #2980b9;
+        }
+
+        .content {
+            margin: 0 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-height: 400px;
+        }
+
+        .content h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .content h2 {
+            color: #34495e;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            max-width: 300px;
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .status {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border: 1px solid #c3e6cb;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+            }
+            
+            .nav-btn {
+                width: 100%;
+            }
+            
+            .content {
+                margin: 0 10px;
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>bw_timex Web Interface</h1>
+        <p>Time-explicit Life Cycle Assessment</p>
+    </div>
+
+    <!-- Navigation -->
+    <div class="navbar">
+        <button class="nav-btn active" onclick="showPage('home')">🏠 Home</button>
+        <button class="nav-btn" onclick="showPage('calc-setup')">📊 Calculation Setup</button>
+        <button class="nav-btn" onclick="showPage('timeline')">⏱️ Timeline</button>
+        <button class="nav-btn" onclick="showPage('lci')">📈 LCI Results</button>
+        <button class="nav-btn" onclick="showPage('lcia')">🎯 LCIA Results</button>
+    </div>
+
+    <!-- Content Area -->
+    <div class="content">
+        <!-- Home Page -->
+        <div id="home-page" class="page">
+            <h1>Welcome to bw_timex Web Interface</h1>
+            
+            <p>This is the web interface for <strong>bw_timex</strong> - Time-explicit Life Cycle Assessment.</p>
+            
+            <h2>Features</h2>
+            <ul>
+                <li><strong>Modeling</strong>: Set up calculations and configure timelines</li>
+                <li><strong>Results</strong>: View LCI and LCIA results</li>
+            </ul>
+            
+            <h2>Navigation</h2>
+            <p>Use the menu above to navigate between different sections:</p>
+            <ul>
+                <li><strong>Calculation Setup</strong>: Define your time-explicit LCA setup</li>
+                <li><strong>Timeline</strong>: Configure temporal distributions</li>
+                <li><strong>LCI Results</strong>: View inventory results</li>
+                <li><strong>LCIA Results</strong>: View impact assessment results</li>
+            </ul>
+            
+            <h2>Getting Started</h2>
+            <ol>
+                <li>Click on "Calculation Setup" to configure your analysis</li>
+                <li>Set up your "Timeline"</li>
+                <li>View your "Results" once calculations are complete</li>
+            </ol>
+            
+            <div class="status">
+                <strong>Status:</strong> 🟢 Application is running successfully!
+            </div>
+        </div>
+
+        <!-- Calculation Setup Page -->
+        <div id="calc-setup-page" class="page hidden">
+            <h1>Calculation Setup</h1>
+            <p>Configure your time-explicit LCA calculation parameters.</p>
+            
+            <div class="form-group">
+                <label for="project-name">Project Name</label>
+                <input type="text" id="project-name" placeholder="Enter project name">
+            </div>
+            
+            <div class="form-group">
+                <label for="database">Database</label>
+                <select id="database">
+                    <option value="foreground">Foreground</option>
+                    <option value="background_2020">Background 2020</option>
+                    <option value="background_2030">Background 2030</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="amount">Amount</label>
+                <input type="number" id="amount" value="1.0" step="0.1">
+            </div>
+            
+            <div class="form-group">
+                <label for="method">Impact Assessment Method</label>
+                <select id="method">
+                    <option value="ipcc2013">IPCC 2013 GWP100</option>
+                    <option value="cml2001">CML 2001</option>
+                    <option value="recipe2016">ReCiPe 2016</option>
+                </select>
+            </div>
+            
+            <button class="btn">Save Configuration</button>
+            <button class="btn btn-success">Create TimexLCA</button>
+            
+            <div class="status">
+                <strong>Status:</strong> Ready for configuration
+            </div>
+        </div>
+
+        <!-- Timeline Page -->
+        <div id="timeline-page" class="page hidden">
+            <h1>Timeline Configuration</h1>
+            <p>Configure temporal distributions for your analysis.</p>
+            
+            <div class="form-group">
+                <label for="start-date">Start Date</label>
+                <input type="date" id="start-date">
+            </div>
+            
+            <div class="form-group">
+                <label for="end-date">End Date</label>
+                <input type="date" id="end-date">
+            </div>
+            
+            <div class="form-group">
+                <label for="resolution">Temporal Resolution</label>
+                <select id="resolution">
+                    <option value="year">Year</option>
+                    <option value="month">Month</option>
+                    <option value="day">Day</option>
+                </select>
+            </div>
+            
+            <button class="btn btn-success">Build Timeline</button>
+            <button class="btn">Export Timeline</button>
+            
+            <div class="status">
+                <strong>Status:</strong> Timeline configuration ready
+            </div>
+        </div>
+
+        <!-- LCI Results Page -->
+        <div id="lci-page" class="page hidden">
+            <h1>LCI Results</h1>
+            <p>Life Cycle Inventory results from your calculations.</p>
+            
+            <div class="metrics">
+                <div class="metric-card">
+                    <div class="metric-value">1250 × 850</div>
+                    <div class="metric-label">Matrix Dimensions</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">15,420</div>
+                    <div class="metric-label">Non-zero Elements</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">12</div>
+                    <div class="metric-label">Time Periods</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">245</div>
+                    <div class="metric-label">Processes</div>
+                </div>
+            </div>
+            
+            <button class="btn">Export Results</button>
+            <button class="btn">View Matrix</button>
+            
+            <div class="status">
+                <strong>Status:</strong> ✅ Calculation Complete
+            </div>
+        </div>
+
+        <!-- LCIA Results Page -->
+        <div id="lcia-page" class="page hidden">
+            <h1>LCIA Results</h1>
+            <p>Life Cycle Impact Assessment results.</p>
+            
+            <div class="metrics">
+                <div class="metric-card">
+                    <div class="metric-value">245.7 kg CO2-eq</div>
+                    <div class="metric-label">Static LCIA Score</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">267.3 kg CO2-eq</div>
+                    <div class="metric-label">Dynamic LCIA Score</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">+8.8%</div>
+                    <div class="metric-label">Difference</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">100 years</div>
+                    <div class="metric-label">Time Horizon</div>
+                </div>
+            </div>
+            
+            <button class="btn btn-success">Export Report</button>
+            <button class="btn">Run Uncertainty</button>
+            
+            <div class="status">
+                <strong>Status:</strong> ✅ Assessment Complete
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showPage(pageId) {
+            // Hide all pages
+            const pages = document.querySelectorAll('.page');
+            pages.forEach(page => page.classList.add('hidden'));
+            
+            // Show selected page
+            const selectedPage = document.getElementById(pageId + '-page');
+            if (selectedPage) {
+                selectedPage.classList.remove('hidden');
+            }
+            
+            // Update navigation buttons
+            const buttons = document.querySelectorAll('.nav-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            // Find and activate the clicked button
+            const clickedButton = event.target;
+            clickedButton.classList.add('active');
+            
+            // Update URL hash for browser navigation
+            window.location.hash = pageId;
+        }
+        
+        // Handle browser back/forward navigation
+        window.addEventListener('hashchange', function() {
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                // Find the button that corresponds to this hash
+                const buttons = document.querySelectorAll('.nav-btn');
+                buttons.forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.onclick.toString().includes(hash)) {
+                        btn.classList.add('active');
+                    }
+                });
+                
+                // Show the corresponding page
+                const pages = document.querySelectorAll('.page');
+                pages.forEach(page => page.classList.add('hidden'));
+                
+                const targetPage = document.getElementById(hash + '-page');
+                if (targetPage) {
+                    targetPage.classList.remove('hidden');
+                }
+            }
+        });
+        
+        // Handle initial page load with hash
+        window.addEventListener('load', function() {
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                showPage(hash);
+            }
+        });
+    </script>
+</body>
+</html>
