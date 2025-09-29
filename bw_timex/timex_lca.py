@@ -132,10 +132,6 @@ class TimexLCA:
             k: v for k, v in self.database_dates.items() if isinstance(v, datetime)
         }
 
-        # Create some collections of nodes that will be useful down the line, e.g. all nodes from
-        # the background databases that link to foreground nodes.
-        self.create_node_collections()
-
         self.interdatabase_activity_mapping = InterDatabaseMapping()
 
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
@@ -152,6 +148,10 @@ class TimexLCA:
             bd.backends.ActivityDataset.database << list(self.database_dates.keys())
         )
         self.nodes = {node.id: bd.backends.Activity(node) for node in all_nodes}
+
+        # Create some collections of nodes that will be useful down the line, e.g. all nodes from
+        # the background databases that link to foreground nodes.
+        self.create_node_collections()
 
     ########################################
     # Main functions to be called by users #
@@ -1147,20 +1147,15 @@ class TimexLCA:
             for db in self.database_dates.keys()
             if db not in self.database_dates_static.keys()
         }
-        print("demand_database_names:", demand_database_names)
-        print("self.database_dates_static.keys():", self.database_dates_static.keys())
-        print("self.database_dates.keys():", self.database_dates.keys())
 
         demand_dependent_database_names = set()
         for db in demand_database_names:
-            print("Processing:", db)
-            demand_dependent_database_names.update(bd.Database(db).find_graph_dependents())
-        print("demand_dependent_database_names:", demand_dependent_database_names)
+            dependents = bd.Database(db).find_graph_dependents()
+            demand_dependent_database_names.update(dependents)
 
         demand_dependent_background_database_names = (
             demand_dependent_database_names & self.database_dates_static.keys()
         )
-        print("demand_dependent_background_database_names:", demand_dependent_background_database_names)
 
         background = {
             node.id
