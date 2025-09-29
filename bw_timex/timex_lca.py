@@ -1147,14 +1147,20 @@ class TimexLCA:
             for db in self.database_dates.keys()
             if db not in self.database_dates_static.keys()
         }
+        print("demand_database_names:", demand_database_names)
+        print("self.database_dates_static.keys():", self.database_dates_static.keys())
+        print("self.database_dates.keys():", self.database_dates.keys())
 
         demand_dependent_database_names = set()
         for db in demand_database_names:
-            demand_dependent_database_names.update(bd.Database(db).find_dependents())
+            print("Processing:", db)
+            demand_dependent_database_names.update(bd.Database(db).find_graph_dependents())
+        print("demand_dependent_database_names:", demand_dependent_database_names)
 
         demand_dependent_background_database_names = (
             demand_dependent_database_names & self.database_dates_static.keys()
         )
+        print("demand_dependent_background_database_names:", demand_dependent_background_database_names)
 
         background = {
             node.id

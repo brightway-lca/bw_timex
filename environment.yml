@@ -1,11 +1,11 @@
 # in your terminal, run conda: conda env create -f environment.yml
-name: timex
+name: timex_test
 channels:
   - conda-forge
   - cmutel
   - diepers
 dependencies:
-  - bw_timex>=0.3
-  # - brightway25_nosolver # uncomment for macOS ARM machines
-  # - scikit-umfpack # uncomment for macOS ARM machines
-  # - numpy==1.24 # uncomment for macOS ARM machines
+ - bw_timex>=0.3
+ - brightway25_nosolver # uncomment for macOS ARM machines
+ - scikit-umfpack # uncomment for macOS ARM machines
+ - numpy==1.24 # uncomment for macOS ARM machines
