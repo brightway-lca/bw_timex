@@ -341,10 +341,11 @@ def plot_characterized_inventory_as_waterfall(
 
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(
-        handles[::-1], labels[::-1],
+        handles[::-1],
+        labels[::-1],
         loc="center left",
         bbox_to_anchor=(1.02, 0.5),  # x=1.02 moves it outside, y=0.5 centers vertically
-        fontsize="small"
+        fontsize="small",
     )
     ax.set_axisbelow(True)
     plt.grid(True)
