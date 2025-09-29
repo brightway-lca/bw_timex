@@ -8,6 +8,7 @@ from bw2data.backends.proxies import Exchange
 from bw2data.backends.schema import ExchangeDataset
 from bw2data.errors import MultipleResults, UnknownObject
 from bw_temporalis import TemporalDistribution
+from loguru import logger
 
 time_res_mapping_strftime = {
     "year": "%Y",
@@ -254,7 +255,7 @@ def plot_characterized_inventory_as_waterfall(
     }
 
     plot_data = lca_obj.characterized_inventory.copy()
-    
+
     plot_data["year"] = plot_data["date"].dt.strftime(
         time_res_dict[lca_obj.temporal_grouping]
     )  # TODO make temporal resolution flexible
@@ -269,7 +270,9 @@ def plot_characterized_inventory_as_waterfall(
     }
     plot_data["activity_label"] = plot_data["activity"].map(activity_labels)
 
-    plot_data = plot_data.groupby(["year", "activity_label"], as_index=False)["amount"].sum()
+    plot_data = plot_data.groupby(["year", "activity_label"], as_index=False)[
+        "amount"
+    ].sum()
     pivoted_data = plot_data.pivot(
         index="year", columns="activity_label", values="amount"
     )
@@ -338,8 +341,12 @@ def plot_characterized_inventory_as_waterfall(
 
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(
-        handles[::-1], labels[::-1], loc="upper center", fontsize="small"
-    )  # Reversing the order for the legend
+        handles[::-1],
+        labels[::-1],
+        loc="center left",
+        bbox_to_anchor=(1.02, 0.5),  # x=1.02 moves it outside, y=0.5 centers vertically
+        fontsize="small",
+    )
     ax.set_axisbelow(True)
     plt.grid(True)
     plt.show()
@@ -445,3 +452,4 @@ def add_temporal_distribution_to_exchange(
     exchange = get_exchange(**kwargs)
     exchange["temporal_distribution"] = temporal_distribution
     exchange.save()
+    logger.info(f"Added temporal distribution to exchange {exchange}.")

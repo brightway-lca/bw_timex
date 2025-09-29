@@ -8,7 +8,6 @@ from bw_temporalis import TemporalDistribution
 @pytest.fixture
 @bw2test
 def temporal_grouping_db():
-
     bd.Database("bio").write(
         {
             ("bio", "CO2"): {

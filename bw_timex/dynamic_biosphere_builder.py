@@ -135,7 +135,7 @@ class DynamicBiosphereBuilder:
         dynamic_biosphere_matrix : scipy.sparse.csr_matrix
             A sparse matrix with the dimensions (bio_flows at a specific time step) x (processes).
         temporal_market_lcis : dict
-            A dictionary containing the disaggregated LCI's of the temporal markets, 
+            A dictionary containing the disaggregated LCI's of the temporal markets,
             with the time-mapped-activity id as key.
         """
 
@@ -149,7 +149,6 @@ class DynamicBiosphereBuilder:
                 process_col_index = self.activity_dict[
                     idx
                 ]  # get the matrix column index
-
             else:  # from timeline
                 process_col_index = row.Index  # start a new matrix
 

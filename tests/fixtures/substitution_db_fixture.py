@@ -8,8 +8,6 @@ from bw_temporalis import TemporalDistribution
 @pytest.fixture
 @bw2test
 def substitution_db():
-
-    bd.projects.set_current("__test_substitution__")
     bd.Database("bio").write(
         {
             ("bio", "CO2"): {
