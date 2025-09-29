@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
+from loguru import logger
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -445,3 +446,4 @@ def add_temporal_distribution_to_exchange(
     exchange = get_exchange(**kwargs)
     exchange["temporal_distribution"] = temporal_distribution
     exchange.save()
+    logger.info(f"Added temporal distribution to exchange {exchange}.")

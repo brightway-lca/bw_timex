@@ -149,7 +149,6 @@ class DynamicBiosphereBuilder:
                 process_col_index = self.activity_dict[
                     idx
                 ]  # get the matrix column index
-
             else:  # from timeline
                 process_col_index = row.Index  # start a new matrix
 

@@ -8,7 +8,6 @@ from bw_temporalis import TemporalDistribution
 @pytest.fixture
 @bw2test
 def process_at_base_database_time_db():
-    bd.projects.set_current("__process_at_base_database_time_db__")
     biosphere = bd.Database("biosphere")
     biosphere.write(
         {

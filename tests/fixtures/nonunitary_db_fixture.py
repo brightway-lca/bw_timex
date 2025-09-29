@@ -8,7 +8,6 @@ from bw_temporalis import TemporalDistribution
 @pytest.fixture
 @bw2test
 def nonunitary_db():
-    bd.projects.set_current("__test_nonunitary__")
     bd.Database("bio").write(
         {
             ("bio", "CO2"): {

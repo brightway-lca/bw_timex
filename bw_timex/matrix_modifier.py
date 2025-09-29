@@ -252,6 +252,10 @@ class MatrixModifier:
         # Check if previous producer comes from background database -> temporal market
         if previous_producer_node["database"] in self.database_dates_static.keys():
             # Create new edges based on temporal_market_shares from the row
+            if not row.temporal_market_shares:
+                raise ValueError(
+                    f"Row {row} has no temporal market shares, but the previous producer {previous_producer_node['name']} is from a background database."
+                )
             for database, db_share in row.temporal_market_shares.items():
                 # Get the producer activity in the corresponding background database
                 try:

@@ -5,7 +5,7 @@ channels:
   - cmutel
   - diepers
 dependencies:
-  - bw_timex>=0.3
-  # - brightway25_nosolver # uncomment for macOS ARM machines
-  # - scikit-umfpack # uncomment for macOS ARM machines
-  # - numpy==1.24 # uncomment for macOS ARM machines
+  - bw_timex>=0.3.1
+  - brightway25_nosolver # uncomment for macOS ARM machines
+  - scikit-umfpack # uncomment for macOS ARM machines
+  - numpy==1.24 # uncomment for macOS ARM machines
