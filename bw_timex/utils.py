@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
-from loguru import logger
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -9,6 +8,7 @@ from bw2data.backends.proxies import Exchange
 from bw2data.backends.schema import ExchangeDataset
 from bw2data.errors import MultipleResults, UnknownObject
 from bw_temporalis import TemporalDistribution
+from loguru import logger
 
 time_res_mapping_strftime = {
     "year": "%Y",
@@ -255,7 +255,7 @@ def plot_characterized_inventory_as_waterfall(
     }
 
     plot_data = lca_obj.characterized_inventory.copy()
-    
+
     plot_data["year"] = plot_data["date"].dt.strftime(
         time_res_dict[lca_obj.temporal_grouping]
     )  # TODO make temporal resolution flexible
@@ -270,7 +270,9 @@ def plot_characterized_inventory_as_waterfall(
     }
     plot_data["activity_label"] = plot_data["activity"].map(activity_labels)
 
-    plot_data = plot_data.groupby(["year", "activity_label"], as_index=False)["amount"].sum()
+    plot_data = plot_data.groupby(["year", "activity_label"], as_index=False)[
+        "amount"
+    ].sum()
     pivoted_data = plot_data.pivot(
         index="year", columns="activity_label", values="amount"
     )
