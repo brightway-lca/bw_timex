@@ -47,7 +47,7 @@ Brightway runs on the new Apple Silicon ARM architecture. However, the super-fas
 1. Create a new Conda environment (in this example named `timex`):
 
 ```
-conda create -n timex -c conda-forge -c cmutel -c diepers bw_timex brightway25_nosolver scikit-umfpack numpy"<1.25"
+conda create -n timex -c conda-forge -c cmutel -c diepers bw_timex brightway25_nosolver scikit-umfpack
 ```
 
 2. Activate the environment:
