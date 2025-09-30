@@ -6,5 +6,5 @@ channels:
   - diepers
 dependencies:
  - bw_timex>=0.3
- - brightway25_nosolver # uncomment for macOS ARM machines
- - scikit-umfpack # uncomment for macOS ARM machines
+# - brightway25_nosolver # uncomment for macOS ARM machines
+# - scikit-umfpack # uncomment for macOS ARM machines
