@@ -19,7 +19,7 @@ on:
 
   pull_request:
     branches: [main, dev]
-    types: [opened, reopened] # excludes syncronize to avoid redundant trigger from commits on PRs
+    types: [opened, reopened, synchronize]
     paths-ignore:
       - "**.md"
       - "**.bib"
