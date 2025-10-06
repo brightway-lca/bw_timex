@@ -685,9 +685,9 @@ def interactive_td_widget():
             param.disabled = False
             span = max(span, 1)
             param.min = 0.02
-            param.max = max(span / 2.0, 0.5)
-            param.step = max(param.max / 100.0, 0.01)
-            _set_slider_value(param.max / 3.0)
+            param.max = 1.0
+            param.step = 0.01
+            _set_slider_value(0.15)
             param.layout.display = ""
 
         _with_param_unobserved(_apply)
@@ -791,7 +791,7 @@ def interactive_td_widget():
         new_max = max(steps.min, end.value + 1)
         if steps.max != new_max:
             steps.max = new_max
-        steps.value = min(steps.value, steps.max)
+        steps.value = steps.max
 
     _sync_steps_max()
     end.observe(_sync_steps_max, names="value")
@@ -822,6 +822,7 @@ def interactive_td_widget():
     def _mode_refresh(_):
         container.children = _layout_children()
         if mode.value == "Generator":
+            _sync_steps_max()
             _reset_param_for_kind()
         refresh_preview()
 
