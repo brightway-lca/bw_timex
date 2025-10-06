@@ -2,12 +2,27 @@ from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from bw2data.backends import ActivityDataset as AD
 from bw2data.backends.proxies import Exchange
 from bw2data.backends.schema import ExchangeDataset
 from bw2data.errors import MultipleResults, UnknownObject
-from bw_temporalis import TemporalDistribution
+from bw_temporalis import TemporalDistribution, easy_timedelta_distribution
+from IPython.display import Javascript, display
+from ipywidgets import (
+    Button,
+    Dropdown,
+    FloatSlider,
+    HBox,
+    IntSlider,
+    IntText,
+    Label,
+    Output,
+    Textarea,
+    ToggleButtons,
+    VBox,
+)
 from loguru import logger
 
 time_res_mapping_strftime = {
@@ -38,8 +53,9 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
 
     """
     if time_res not in time_res_mapping_strftime:
+        available = list(time_res_mapping_strftime.keys())
         raise ValueError(
-            f"Invalid time_res: '{time_res}'. Please choose from: {list(time_res_mapping_strftime.keys())}."
+            f"Invalid time_res: '{time_res}'. Please choose from: {available}."
         )
     formatted_date = dt_obj.strftime(time_res_mapping_strftime[time_res])
     date_as_integer = int(formatted_date)
@@ -49,8 +65,9 @@ def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") 
 
 def extract_date_as_string(timestamp: datetime, temporal_grouping: str) -> str:
     """
-    Extracts the grouping date as a string from a datetime object, based on the chosen temporal grouping.
-    e.g. for `temporal_grouping` = 'month', and `timestamp` = 2023-03-29T01:00:00, it extracts the string '202303'.
+    Extracts the grouping date as a string from a datetime object, based on the chosen temporal
+    grouping. E.g. for `temporal_grouping` = 'month', and `timestamp` = 2023-03-29T01:00:00, it
+    extracts the string '202303'.
 
 
     Parameters
@@ -453,3 +470,249 @@ def add_temporal_distribution_to_exchange(
     exchange["temporal_distribution"] = temporal_distribution
     exchange.save()
     logger.info(f"Added temporal distribution to exchange {exchange}.")
+
+
+def interactive_td_widget():
+    """
+    Create an interactive ipywidget for drafting temporal distributions and copying them to the
+    clipboard.
+
+    For use in jupyter notebooks.
+
+    Returns
+    -------
+    ipywidgets.VBox
+        Interactive widget for drafting temporal distributions.
+    """
+    # ---------- Controls ----------
+    mode = ToggleButtons(
+        options=["Generator", "Manual"], value="Generator", description="Mode"
+    )
+
+    # Generator controls
+    start = IntText(value=0, description="start")
+    end = IntText(value=10, description="end")
+    resolution = Dropdown(
+        options=[("Years", "Y"), ("Months", "M"), ("Days", "D")],
+        value="Y",
+        description="resolution",
+    )
+    steps = IntSlider(
+        value=10, min=2, max=20, step=1, description="steps", continuous_update=False
+    )
+    kind = ToggleButtons(
+        options=["uniform", "triangular", "normal"], value="uniform", description="kind"
+    )
+    # Give wide initial bounds; we'll override on kind changes
+    param = FloatSlider(
+        value=1.0,
+        min=0.01,
+        max=50.0,
+        step=0.01,
+        description="param",
+        disabled=True,
+        continuous_update=False,
+    )
+
+    # Manual controls
+    manual_unit = Dropdown(
+        options=[
+            ("Years", "Y"),
+            ("Months", "M"),
+            ("Days", "D"),
+            ("Hours", "h"),
+            ("Minutes", "m"),
+            ("Seconds", "s"),
+        ],
+        value="Y",
+        description="resolution",
+    )
+    dates_text = Textarea(value="0, 2, 4, 6, 8, 10", description="dates")
+    amounts_text = Textarea(value="0.1, 0.1, 0.2, 0.2, 0.2, 0.2", description="amounts")
+
+    copy_btn = Button(description="Copy TD code", button_style="success")
+    status = Label(value="")
+    plot_out = Output()
+
+    # ---------- Helpers ----------
+    def _parse_num_list(txt):
+        parts = [p for p in txt.replace(",", " ").split() if p]
+        return [
+            float(p) if (("." in p) or ("e" in p.lower())) else int(p) for p in parts
+        ]
+
+    def _make_td_generator():
+        return easy_timedelta_distribution(
+            start=min(start.value, end.value),
+            end=max(start.value, end.value),
+            resolution=resolution.value,
+            steps=int(steps.value),
+            kind=kind.value,
+            param=None if param.disabled else float(param.value),
+        )
+
+    def _make_td_manual():
+        d = _parse_num_list(dates_text.value)
+        a = _parse_num_list(amounts_text.value)
+        if len(d) != len(a):
+            raise ValueError("dates and amounts must have the same length.")
+        date = np.array(d, dtype=f"timedelta64[{manual_unit.value}]")
+        amount = np.array(a, dtype=float)
+        return TemporalDistribution(date=date, amount=amount)
+
+    def _current_td():
+        return _make_td_generator() if mode.value == "Generator" else _make_td_manual()
+
+    def _current_resolution_for_graph():
+        return resolution.value if mode.value == "Generator" else manual_unit.value
+
+    def _draw_graph(td: TemporalDistribution):
+        with plot_out:
+            plot_out.clear_output(wait=True)
+            plt.figure(figsize=(7, 3))
+            td.graph(style="default", resolution=_current_resolution_for_graph())
+            plt.show()
+        status.value = (
+            f"OK · steps={len(td.amount)} · sum(amount)={float(np.sum(td.amount)):.6f}"
+        )
+
+    def refresh_preview(*_):
+        try:
+            td = _current_td()
+            _draw_graph(td)
+        except Exception as exc:
+            with plot_out:
+                plot_out.clear_output(wait=True)
+            status.value = f"Error: {exc}"
+
+    # --- robust param updater (avoid value snapping back to 1.0) ---
+    def _with_param_unobserved(fn):
+        try:
+            param.unobserve(refresh_preview, names="value")
+            fn()
+        finally:
+            param.observe(refresh_preview, names="value")
+
+    def _reset_param_for_kind():
+        def _apply():
+            if kind.value == "uniform":
+                param.description = "param"
+                param.disabled = True
+                # set bounds first, then value last
+                param.min = 0.1
+                param.max = 50.0
+                param.step = 0.1
+                param.value = 1.0
+            elif kind.value == "triangular":
+                s, e = sorted([start.value, end.value])
+                param.description = "mode"
+                param.disabled = False
+                param.min = float(s)
+                param.max = float(e)
+                param.step = 1.0
+                param.value = (param.min + param.max) / 2.0  # midpoint
+            else:  # normal
+                param.description = "std dev"
+                param.disabled = False
+                param.min = 0.02
+                param.max = 1
+                param.step = 0.01
+                param.value = 0.15
+
+        _with_param_unobserved(_apply)
+
+    def _code_generator():
+        s, e = sorted([start.value, end.value])
+        k = kind.value
+        p = None if param.disabled else float(param.value)
+        code = (
+            "td = easy_timedelta_distribution(\n"
+            f"    start={s},\n"
+            f"    end={e},\n"
+            f"    resolution='{resolution.value}',\n"
+            f"    steps={int(steps.value)},\n"
+            f"    kind='{k}'"
+        )
+        if p is not None:
+            code += f",\n    param={p}"
+        code += "\n)"
+        return code
+
+    def _code_manual():
+        d = _parse_num_list(dates_text.value)
+        a = _parse_num_list(amounts_text.value)
+        unit = manual_unit.value
+        d_str = ", ".join(str(int(x)) for x in d)
+        a_str = ", ".join(str(float(x)) for x in a)
+        return (
+            f"date = np.array([{d_str}], dtype='timedelta64[{unit}]')\n"
+            f"amount = np.array([{a_str}], dtype=float)\n"
+            "td = TemporalDistribution(date=date, amount=amount)"
+        )
+
+    def _copy_code_to_clipboard(_):
+        try:
+            code = _code_generator() if mode.value == "Generator" else _code_manual()
+            display(Javascript(f"navigator.clipboard.writeText(`{code}`)"))
+            status.value = "✅ Code copied to clipboard!"
+        except Exception as exc:
+            status.value = f"Error: {exc}"
+
+    # ---------- Updates ----------
+    def _on_kind_change(_):
+        _reset_param_for_kind()
+        refresh_preview()
+
+    def _on_start_end_change(_):
+        _reset_param_for_kind()
+        refresh_preview()
+
+    for w in (start, end):
+        w.observe(_on_start_end_change, names="value")
+    kind.observe(_on_kind_change, names="value")
+    for w in (resolution, steps):
+        w.observe(refresh_preview, names="value")
+    param.observe(
+        refresh_preview, names="value"
+    )  # reattached in _with_param_unobserved
+    for w in (mode, manual_unit, dates_text, amounts_text):
+        w.observe(refresh_preview, names="value")
+    copy_btn.on_click(_copy_code_to_clipboard)
+
+    # Initial state
+    _reset_param_for_kind()
+    refresh_preview()
+
+    # ---------- UI ----------
+    gen_box = VBox([HBox([start, end, resolution]), HBox([steps, kind, param])])
+    man_box = VBox([manual_unit, dates_text, amounts_text])
+
+    # Keep steps.max synced to end for nicer defaults
+    def _sync_steps_max(_=None):
+        new_max = max(steps.min, end.value + 1)
+        if steps.max != new_max:
+            steps.max = new_max
+        steps.value = min(steps.value, steps.max)
+
+    _sync_steps_max()
+    end.observe(_sync_steps_max, names="value")
+
+    def _layout_children():
+        return [
+            mode,
+            gen_box if mode.value == "Generator" else man_box,
+            HBox([copy_btn, status]),
+            plot_out,
+        ]
+
+    container = VBox(_layout_children())
+
+    def _mode_refresh(_):
+        container.children = _layout_children()
+        if mode.value == "Generator":
+            _reset_param_for_kind()
+        refresh_preview()
+
+    mode.observe(_mode_refresh, names="value")
+
+    return container
