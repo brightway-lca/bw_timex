@@ -476,7 +476,7 @@ def add_temporal_distribution_to_exchange(
 
 def interactive_td_widget():
     """
-    Create an interactive ipywidget for drafting temporal distributions and copying them to the
+    Create an interactive ipywidget for drafting and visualizing temporal distributions and copying them to the
     clipboard.
 
     For use in jupyter notebooks.
