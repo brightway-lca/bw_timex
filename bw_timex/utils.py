@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
 
@@ -18,6 +19,7 @@ from ipywidgets import (
     IntSlider,
     IntText,
     Label,
+    Layout,
     Output,
     Textarea,
     ToggleButtons,
@@ -527,19 +529,57 @@ def interactive_td_widget():
         value="Y",
         description="resolution",
     )
-    dates_text = Textarea(value="0, 2, 4, 6, 8, 10", description="dates")
-    amounts_text = Textarea(value="0.1, 0.1, 0.2, 0.2, 0.2, 0.2", description="amounts")
+    dates_text = Textarea(
+        value="0, 2, 4, 6, 8, 10",
+        description="dates",
+        layout=Layout(width="100%", min_height="70px"),
+    )
+    amounts_text = Textarea(
+        value="0.1, 0.1, 0.2, 0.2, 0.2, 0.2",
+        description="amounts",
+        layout=Layout(width="100%", min_height="70px"),
+    )
+
+    for widget in (start, end, resolution, steps, param, manual_unit):
+        widget.style.description_width = "initial"
+
+    steps.layout = Layout(width="220px")
+    param.layout = Layout(width="220px")
+    start.layout = Layout(width="160px")
+    end.layout = Layout(width="160px")
+    resolution.layout = Layout(width="180px")
+    manual_unit.layout = Layout(width="220px")
 
     copy_btn = Button(description="Copy TD code", button_style="success")
+    copy_import_btn = Button(description="Copy TD + imports", button_style="")
+    copy_btn.layout = Layout(width="160px")
+    copy_import_btn.layout = Layout(width="200px")
     status = Label(value="")
-    plot_out = Output()
+    status.layout = Layout(margin="0 0 0 8px")
+    plot_out = Output(layout=Layout(width="100%"))
 
     # ---------- Helpers ----------
-    def _parse_num_list(txt):
+    def _parse_num_list(txt: str, label: str) -> List[float]:
         parts = [p for p in txt.replace(",", " ").split() if p]
-        return [
-            float(p) if (("." in p) or ("e" in p.lower())) else int(p) for p in parts
-        ]
+        if not parts:
+            raise ValueError(f"{label} cannot be empty.")
+
+        values = []
+        for p in parts:
+            try:
+                if ("." in p) or ("e" in p.lower()):
+                    values.append(float(p))
+                else:
+                    values.append(int(p))
+            except ValueError as exc:
+                raise ValueError(f"Could not parse '{p}' in {label}.") from exc
+        return values
+
+    def _format_number(value: float) -> str:
+        as_float = float(value)
+        if np.isfinite(as_float) and as_float.is_integer():
+            return str(int(as_float))
+        return (f"{as_float:.6f}").rstrip("0").rstrip(".")
 
     def _make_td_generator():
         return easy_timedelta_distribution(
@@ -552,12 +592,16 @@ def interactive_td_widget():
         )
 
     def _make_td_manual():
-        d = _parse_num_list(dates_text.value)
-        a = _parse_num_list(amounts_text.value)
+        d = _parse_num_list(dates_text.value, "dates")
+        a = _parse_num_list(amounts_text.value, "amounts")
         if len(d) != len(a):
             raise ValueError("dates and amounts must have the same length.")
+        if not d:
+            raise ValueError("Provide at least one date and amount.")
         date = np.array(d, dtype=f"timedelta64[{manual_unit.value}]")
         amount = np.array(a, dtype=float)
+        if np.any(np.isnan(amount)):
+            raise ValueError("Amounts must be numeric values.")
         return TemporalDistribution(date=date, amount=amount)
 
     def _current_td():
@@ -595,29 +639,56 @@ def interactive_td_widget():
 
     def _reset_param_for_kind():
         def _apply():
+            s, e = sorted([start.value, end.value])
+            span = abs(e - s)
+
+            def _set_slider_value(target: float) -> None:
+                bounded = min(max(target, param.min), param.max)
+                step = param.step or 0
+                if step <= 0:
+                    param.value = bounded
+                    return
+                base = param.min
+                ticks = round((bounded - base) / step)
+                param.value = base + ticks * step
+
             if kind.value == "uniform":
                 param.description = "param"
                 param.disabled = True
-                # set bounds first, then value last
                 param.min = 0.1
                 param.max = 50.0
                 param.step = 0.1
                 param.value = 1.0
-            elif kind.value == "triangular":
-                s, e = sorted([start.value, end.value])
+                param.layout.display = "none"
+                return
+
+            if kind.value == "triangular":
                 param.description = "mode"
-                param.disabled = False
-                param.min = float(s)
-                param.max = float(e)
-                param.step = 1.0
-                param.value = (param.min + param.max) / 2.0  # midpoint
-            else:  # normal
-                param.description = "std dev"
-                param.disabled = False
-                param.min = 0.02
-                param.max = 1
-                param.step = 0.01
-                param.value = 0.15
+                if s == e:
+                    param.disabled = True
+                    exact_value = float(s)
+                    param.min = exact_value
+                    param.max = exact_value
+                    param.step = 1.0
+                    param.value = exact_value
+                else:
+                    param.disabled = False
+                    param.min = float(s)
+                    param.max = float(e)
+                    param.step = max((param.max - param.min) / 20.0, 0.01)
+                    _set_slider_value((param.min + param.max) / 2.0)
+                param.layout.display = ""
+                return
+
+            # normal
+            param.description = "std dev"
+            param.disabled = False
+            span = max(span, 1)
+            param.min = 0.02
+            param.max = max(span / 2.0, 0.5)
+            param.step = max(param.max / 100.0, 0.01)
+            _set_slider_value(param.max / 3.0)
+            param.layout.display = ""
 
         _with_param_unobserved(_apply)
 
@@ -634,27 +705,45 @@ def interactive_td_widget():
             f"    kind='{k}'"
         )
         if p is not None:
-            code += f",\n    param={p}"
+            code += f",\n    param={_format_number(p)}"
         code += "\n)"
         return code
 
     def _code_manual():
-        d = _parse_num_list(dates_text.value)
-        a = _parse_num_list(amounts_text.value)
+        d = _parse_num_list(dates_text.value, "dates")
+        a = _parse_num_list(amounts_text.value, "amounts")
         unit = manual_unit.value
         d_str = ", ".join(str(int(x)) for x in d)
-        a_str = ", ".join(str(float(x)) for x in a)
+        a_str = ", ".join(_format_number(x) for x in a)
         return (
             f"date = np.array([{d_str}], dtype='timedelta64[{unit}]')\n"
             f"amount = np.array([{a_str}], dtype=float)\n"
             "td = TemporalDistribution(date=date, amount=amount)"
         )
 
-    def _copy_code_to_clipboard(_):
+    def _build_code(include_imports: bool = False) -> str:
+        body = _code_generator() if mode.value == "Generator" else _code_manual()
+        if not include_imports:
+            return body
+
+        if mode.value == "Generator":
+            imports = [
+                "from bw_temporalis import easy_timedelta_distribution",
+            ]
+        else:
+            imports = [
+                "import numpy as np",
+                "from bw_temporalis import TemporalDistribution",
+            ]
+
+        return "\n".join(imports + ["", body])
+
+    def _copy_code(include_imports: bool) -> None:
         try:
-            code = _code_generator() if mode.value == "Generator" else _code_manual()
-            display(Javascript(f"navigator.clipboard.writeText(`{code}`)"))
-            status.value = "✅ Code copied to clipboard!"
+            code = _build_code(include_imports=include_imports)
+            display(Javascript(f"navigator.clipboard.writeText({json.dumps(code)})"))
+            suffix = " + imports" if include_imports else ""
+            status.value = f"✅ Code{suffix} copied to clipboard!"
         except Exception as exc:
             status.value = f"Error: {exc}"
 
@@ -677,15 +766,25 @@ def interactive_td_widget():
     )  # reattached in _with_param_unobserved
     for w in (mode, manual_unit, dates_text, amounts_text):
         w.observe(refresh_preview, names="value")
-    copy_btn.on_click(_copy_code_to_clipboard)
+    copy_btn.on_click(lambda _: _copy_code(include_imports=False))
+    copy_import_btn.on_click(lambda _: _copy_code(include_imports=True))
 
     # Initial state
     _reset_param_for_kind()
     refresh_preview()
 
     # ---------- UI ----------
-    gen_box = VBox([HBox([start, end, resolution]), HBox([steps, kind, param])])
-    man_box = VBox([manual_unit, dates_text, amounts_text])
+    gen_box = VBox(
+        [
+            HBox([start, end, resolution], layout=Layout(gap="10px")),
+            HBox([steps, param], layout=Layout(gap="10px")),
+        ],
+        layout=Layout(gap="10px"),
+    )
+    man_box = VBox(
+        [manual_unit, dates_text, amounts_text],
+        layout=Layout(gap="8px", width="100%"),
+    )
 
     # Keep steps.max synced to end for nicer defaults
     def _sync_steps_max(_=None):
@@ -697,15 +796,28 @@ def interactive_td_widget():
     _sync_steps_max()
     end.observe(_sync_steps_max, names="value")
 
+    buttons_box = HBox(
+        [copy_btn, copy_import_btn, status],
+        layout=Layout(align_items="center", gap="10px"),
+    )
+
     def _layout_children():
+        if mode.value == "Generator":
+            return [
+                mode,
+                kind,
+                gen_box,
+                buttons_box,
+                plot_out,
+            ]
         return [
             mode,
-            gen_box if mode.value == "Generator" else man_box,
-            HBox([copy_btn, status]),
+            man_box,
+            buttons_box,
             plot_out,
         ]
 
-    container = VBox(_layout_children())
+    container = VBox(_layout_children(), layout=Layout(gap="12px", width="100%"))
 
     def _mode_refresh(_):
         container.children = _layout_children()
