@@ -476,8 +476,8 @@ def add_temporal_distribution_to_exchange(
 
 def interactive_td_widget():
     """
-    Create an interactive ipywidget for drafting and visualizing temporal distributions and copying them to the
-    clipboard.
+    Create an interactive ipywidget for drafting and visualizing temporal distributions and copying 
+    them to the clipboard.
 
     For use in jupyter notebooks.
 
@@ -500,7 +500,7 @@ def interactive_td_widget():
         description="resolution",
     )
     steps = IntSlider(
-        value=10, min=2, max=20, step=1, description="steps", continuous_update=False
+        value=11, min=2, max=11, step=1, description="steps", continuous_update=False
     )
     kind = ToggleButtons(
         options=["uniform", "triangular", "normal"], value="uniform", description="kind"
@@ -788,13 +788,13 @@ def interactive_td_widget():
 
     # Keep steps.max synced to end for nicer defaults
     def _sync_steps_max(_=None):
-        new_max = max(steps.min, end.value + 1)
+        new_max = abs(end.value - start.value) + 1
         if steps.max != new_max:
             steps.max = new_max
-        steps.value = steps.max
 
     _sync_steps_max()
     end.observe(_sync_steps_max, names="value")
+    start.observe(_sync_steps_max, names="value")
 
     buttons_box = HBox(
         [copy_btn, copy_import_btn, status],
