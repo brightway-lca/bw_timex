@@ -96,6 +96,7 @@ class TimelineBuilder:
             if node_id not in self.node_collections["first_level_background_static"]
         }
 
+        logger.info("Traversing supply chain graph...")
         self.edge_extractor = EdgeExtractor(
             base_lca,
             starting_datetime=self.starting_datetime,
@@ -138,6 +139,7 @@ class TimelineBuilder:
         pd.DataFrame
             A timeline with grouped, time-explicit edges and temporal_market_shares to background databases.
         """
+        logger.info("Building timeline...")
 
         # check if database names match with databases in BW project
         self.check_database_names()
