@@ -613,9 +613,10 @@ def interactive_td_widget():
     def _draw_graph(td: TemporalDistribution):
         with plot_out:
             plot_out.clear_output(wait=True)
-            plt.figure(figsize=(7, 3))
+            fig = plt.figure(figsize=(7, 3))
             td.graph(style="default", resolution=_current_resolution_for_graph())
             plt.show()
+            plt.close(fig)
         status.value = (
             f"OK · steps={len(td.amount)} · sum(amount)={float(np.sum(td.amount)):.6f}"
         )
