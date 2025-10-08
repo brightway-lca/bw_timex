@@ -5,6 +5,7 @@ from typing import Callable, List, Optional, Union
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sb
 from bw2data.backends import ActivityDataset as AD
 from bw2data.backends.proxies import Exchange
 from bw2data.backends.schema import ExchangeDataset
@@ -828,5 +829,225 @@ def interactive_td_widget():
         refresh_preview()
 
     mode.observe(_mode_refresh, names="value")
+
+    return container
+
+
+def interactive_dynamic_lcia_widget(tlca):
+    """
+    Create an interactive ipywidget for visualizing dynamic LCIA results with interactive controls.
+
+    Takes a TimexLCA object that has already completed lci() and creates an interactive interface 
+    to explore different dynamic LCIA parameters and visualize the results.
+
+    For use in jupyter notebooks.
+
+    Parameters
+    ----------
+    tlca : TimexLCA
+        A TimexLCA object that has already run build_timeline() and lci().
+
+    Returns
+    -------
+    ipywidgets.VBox
+        Interactive widget for dynamic LCIA visualization.
+
+    Raises
+    ------
+    AttributeError
+        If the TimexLCA object hasn't run lci() yet.
+
+    Example
+    -------
+    >>> from bw_timex import TimexLCA
+    >>> from bw_timex.utils import interactive_dynamic_lcia_widget
+    >>> tlca = TimexLCA(demand, method, database_dates)
+    >>> tlca.build_timeline()
+    >>> tlca.lci()
+    >>> interactive_dynamic_lcia_widget(tlca)
+    """
+    # Validation
+    if not hasattr(tlca, "dynamic_inventory"):
+        raise AttributeError(
+            "Dynamic inventory not yet calculated. Call TimexLCA.lci(build_dynamic_biosphere=True) first."
+        )
+
+    # ---------- Controls ----------
+    metric = ToggleButtons(
+        options=["radiative_forcing", "GWP"],
+        value="radiative_forcing",
+        description="Metric",
+    )
+
+    time_horizon = IntSlider(
+        value=100,
+        min=10,
+        max=500,
+        step=10,
+        description="Time horizon (years)",
+        continuous_update=False,
+        style={"description_width": "initial"},
+    )
+
+    fixed_time_horizon = ToggleButtons(
+        options=[("Floating", False), ("Fixed", True)],
+        value=False,
+        description="Time horizon type",
+    )
+
+    # Plot options
+    cumsum = ToggleButtons(
+        options=[("Instantaneous", False), ("Cumulative", True)],
+        value=False,
+        description="Display mode",
+    )
+
+    sum_emissions_within_activity = ToggleButtons(
+        options=[("By flow", False), ("Sum by activity", True)],
+        value=False,
+        description="Emission grouping",
+    )
+
+    sum_activities = ToggleButtons(
+        options=[("By activity", False), ("Sum all", True)],
+        value=False,
+        description="Activity grouping",
+    )
+
+    # Status and output
+    status = Label(value="")
+    plot_out = Output(layout=Layout(width="100%", height="500px"))
+
+    # ---------- Helpers ----------
+    def _run_dynamic_lcia_and_plot(*_):
+        """Run dynamic LCIA with current parameters and plot results."""
+        with plot_out:
+            plot_out.clear_output(wait=True)
+            try:
+                status.value = "⏳ Calculating dynamic LCIA..."
+
+                # Run dynamic LCIA
+                tlca.dynamic_lcia(
+                    metric=metric.value,
+                    time_horizon=time_horizon.value,
+                    fixed_time_horizon=fixed_time_horizon.value,
+                )
+
+                # Create plot
+                fig = plt.figure(figsize=(14, 6))
+
+                # Get metric ylabel
+                metric_ylabels = {
+                    "radiative_forcing": "radiative forcing [W/m²]",
+                    "GWP": f"GWP{tlca.current_time_horizon} [kg CO₂-eq]",
+                }
+
+                # Fetch the inventory to use in plotting, modify based on flags
+                plot_data = tlca.characterized_inventory.copy()
+
+                if cumsum.value:
+                    plot_data["amount_sum"] = plot_data["amount"].cumsum()
+                    amount = "amount_sum"
+                else:
+                    amount = "amount"
+
+                if sum_emissions_within_activity.value:
+                    plot_data = (
+                        plot_data.groupby(["date", "activity"]).sum().reset_index()
+                    )
+                    plot_data["amount_sum"] = plot_data["amount"].cumsum()
+
+                if sum_activities.value:
+                    plot_data = plot_data.groupby("date").sum().reset_index()
+                    plot_data["amount_sum"] = plot_data["amount"].cumsum()
+                    plot_data["activity_label"] = "All activities"
+                else:  # plotting activities separate
+                    activity_name_cache = {}
+                    for activity in plot_data["activity"].unique():
+                        if activity not in activity_name_cache:
+                            activity_name_cache[activity] = resolve_temporalized_node_name(
+                                tlca.activity_time_mapping.reversed[activity][0][1]
+                            )
+                    plot_data["activity_label"] = plot_data["activity"].map(
+                        activity_name_cache
+                    )
+
+                # Plotting
+                axes = sb.scatterplot(
+                    x="date", y=amount, hue="activity_label", data=plot_data
+                )
+
+                # Determine y-axis limit flexibly
+                if plot_data[amount].min() < 0:
+                    ymin = plot_data[amount].min() * 1.1
+                else:
+                    ymin = 0
+
+                axes.set_axisbelow(True)
+                axes.set_ylim(bottom=ymin)
+                axes.set_ylabel(metric_ylabels[tlca.current_metric])
+                axes.set_xlabel("time")
+
+                handles, labels = axes.get_legend_handles_labels()
+                axes.legend(handles[::-1], labels[::-1])
+                plt.grid(True)
+                plt.tight_layout()
+                plt.show()
+                plt.close(fig)
+
+                # Update status with score
+                dynamic_score = tlca.dynamic_score
+                status.value = f"✅ Dynamic score: {dynamic_score:.6e}"
+
+            except Exception as exc:
+                status.value = f"❌ Error: {exc}"
+                import traceback
+
+                traceback.print_exc()
+
+    # ---------- Updates ----------
+    for w in (
+        metric,
+        time_horizon,
+        fixed_time_horizon,
+        cumsum,
+        sum_emissions_within_activity,
+        sum_activities,
+    ):
+        w.observe(_run_dynamic_lcia_and_plot, names="value")
+
+    # Initial plot
+    _run_dynamic_lcia_and_plot()
+
+    # ---------- UI ----------
+    lcia_controls = VBox(
+        [
+            Label(value="Dynamic LCIA Parameters:", style={"font_weight": "bold"}),
+            metric,
+            time_horizon,
+            fixed_time_horizon,
+        ],
+        layout=Layout(gap="10px"),
+    )
+
+    plot_controls = VBox(
+        [
+            Label(value="Plot Options:", style={"font_weight": "bold"}),
+            cumsum,
+            sum_emissions_within_activity,
+            sum_activities,
+        ],
+        layout=Layout(gap="10px"),
+    )
+
+    controls_box = HBox(
+        [lcia_controls, plot_controls],
+        layout=Layout(gap="20px"),
+    )
+
+    container = VBox(
+        [controls_box, status, plot_out],
+        layout=Layout(gap="12px", width="100%"),
+    )
 
     return container
