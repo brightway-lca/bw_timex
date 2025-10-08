@@ -91,4 +91,26 @@ tlca.plot_dynamic_characterized_inventory()
 ```
 <br />
 
+## Interactive Dynamic LCIA Widget
+
+For interactive exploration of dynamic LCIA results in Jupyter notebooks, `bw_timex` provides an interactive widget that allows you to adjust parameters on-the-fly and visualize results in real-time:
+
+```python
+from bw_timex.utils import interactive_dynamic_lcia_widget
+
+interactive_dynamic_lcia_widget(tlca)
+```
+
+This widget provides interactive controls for:
+- **Metric selection**: Choose between `radiative_forcing` and `GWP`
+- **Time horizon**: Adjust the time horizon (10-500 years)
+- **Time horizon type**: Choose between floating (from emission time) or fixed (from functional unit)
+- **Display mode**: Toggle between instantaneous and cumulative impacts
+- **Emission grouping**: View by individual flows or sum by activity
+- **Activity grouping**: View by activity or sum all activities
+
+The widget automatically recalculates and updates the plot whenever you change any parameter, making it easy to explore different scenarios and understand how your choices affect the results.
+
+<br />
+
 For most of the functions we used here, there are numerous optional arguments and settings you can tweak. We explore some of them in our other [Examples](../examples/index.md), but when in doubt check out our [docstrings](../api/index), which provide information also for the more advanced settings - so please browse through them as needed ☀️
