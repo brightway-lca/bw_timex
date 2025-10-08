@@ -67,7 +67,7 @@ class TimexLCA:
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and
         dynamic characterization. These are provided for radiative forcing and GWP but can also be
         user-defined.
-    
+
 
     Example
     -------
