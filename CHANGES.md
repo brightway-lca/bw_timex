@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+* Added `interactive_dynamic_lcia_widget()` function to `bw_timex.utils` for interactive exploration of dynamic LCIA results in Jupyter notebooks. The widget provides real-time controls for metric selection (radiative_forcing/GWP), time horizon adjustment, and various plot options.
 
 ## [0.3.1] - 2025-03-31
 * Fixed an issue with non-unitary production exchanges
