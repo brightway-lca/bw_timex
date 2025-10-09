@@ -6,11 +6,11 @@
 </h1>
 
 [![Read the Docs](https://img.shields.io/readthedocs/timex?label=documentation)](https://docs.brightway.dev/projects/bw-timex/en/latest/)
+[![tests](https://img.shields.io/github/actions/workflow/status/brightway-lca/bw_timex/python-test.yml?label=tests)](https://github.com/brightway-lca/bw_timex/actions/workflows/python-test.yml)
 [![PyPI - Version](https://img.shields.io/pypi/v/bw-timex?color=%2300549f)](https://pypi.org/project/bw-timex/)
 [![Conda Version](https://img.shields.io/conda/v/diepers/bw_timex?label=conda)](https://anaconda.org/diepers/bw_timex)
-[![Conda - License](https://img.shields.io/conda/l/diepers/bw_timex)](https://github.com/brightway-lca/bw_timex/blob/main/LICENSE)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb)
-[![CI/CD tests](https://github.com/brightway-lca/bw_timex/actions/workflows/python-test.yml/badge.svg)](https://github.com/brightway-lca/bw_timex/actions/workflows/python-test.yml)
+[![Conda - License](https://img.shields.io/conda/l/diepers/bw_timex)](https://github.com/brightway-lca/bw_timex/blob/main/LICENSE)
 
 This is a python package for [time-explicit Life Cycle Assessment](https://docs.brightway.dev/projects/bw-timex/en/latest/content/theory.html#terminology) that helps you assess the environmental impacts of products and processes over time. `bw_timex` builds on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
 
