@@ -35,7 +35,6 @@ from .timeline_builder import TimelineBuilder
 from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
-    resolve_temporalized_node_name,
     round_datetime,
 )
 
@@ -146,6 +145,12 @@ class TimexLCA:
             bd.backends.ActivityDataset.database << list(self.database_dates.keys())
         )
         self.nodes = {node.id: bd.backends.Activity(node) for node in all_nodes}
+        
+        # Build a cache mapping activity code to name for efficient lookups
+        # This avoids repeated database queries in plotting and labeling functions
+        self._activity_code_to_name_cache = {
+            node["code"]: node["name"] for node in self.nodes.values()
+        }
 
     ########################################
     # Main functions to be called by users #
@@ -1431,6 +1436,28 @@ class TimexLCA:
 
         return df
 
+    def get_activity_name_from_time_mapped_id(self, time_mapped_id: int) -> str:
+        """
+        Get the activity name for a time-mapped activity ID.
+        Uses the pre-built code-to-name cache for efficient lookups.
+        
+        Parameters
+        ----------
+        time_mapped_id : int
+            The time-mapped activity ID from activity_time_mapping
+            
+        Returns
+        -------
+        str
+            The name of the activity
+        """
+        # Extract the code from the activity_time_mapping
+        # Structure: time_mapped_id -> (('database', 'code'), time)
+        ((_, code), _) = self.activity_time_mapping.reversed[time_mapped_id]
+        
+        # Use the pre-built cache for O(1) lookup instead of database query
+        return self._activity_code_to_name_cache.get(code, code)
+
     def create_labelled_dynamic_inventory_dataframe(self) -> pd.DataFrame:
         """
         Returns the dynamic_inventory_df with comprehensible labels for flows and activities instead
@@ -1456,13 +1483,11 @@ class TimexLCA:
         df = self.dynamic_inventory_df.copy()
         df["flow"] = df["flow"].apply(lambda x: bd.get_node(id=x)["name"])
 
-        activity_name_cache = {}
-
-        for activity in df["activity"].unique():
-            if activity not in activity_name_cache:
-                activity_name_cache[activity] = resolve_temporalized_node_name(
-                    self.activity_time_mapping.reversed[activity][0][1]
-                )
+        # Build activity name cache efficiently using pre-built code-to-name cache
+        activity_name_cache = {
+            activity: self.get_activity_name_from_time_mapped_id(activity)
+            for activity in df["activity"].unique()
+        }
 
         df["activity"] = df["activity"].map(activity_name_cache)
 
@@ -1560,14 +1585,11 @@ class TimexLCA:
             plot_data["activity_label"] = "All activities"
 
         else:  # plotting activities separate
-
-            activity_name_cache = {}
-
-            for activity in plot_data["activity"].unique():
-                if activity not in activity_name_cache:
-                    activity_name_cache[activity] = resolve_temporalized_node_name(
-                        self.activity_time_mapping.reversed[activity][0][1]
-                    )
+            # Build activity name cache efficiently using pre-built code-to-name cache
+            activity_name_cache = {
+                activity: self.get_activity_name_from_time_mapped_id(activity)
+                for activity in plot_data["activity"].unique()
+            }
 
             plot_data["activity_label"] = plot_data["activity"].map(activity_name_cache)
 
