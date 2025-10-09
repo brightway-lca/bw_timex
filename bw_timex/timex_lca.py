@@ -66,7 +66,7 @@ class TimexLCA:
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and
         dynamic characterization. These are provided for radiative forcing and GWP but can also be
         user-defined.
-    
+
 
     Example
     -------
@@ -111,6 +111,8 @@ class TimexLCA:
                 Dictionary mapping database names to dates.
         """
 
+        logger.info("Initializing TimexLCA object...")
+
         self.demand = demand
         self.method = method
         self.database_dates = database_dates
@@ -131,20 +133,12 @@ class TimexLCA:
             k: v for k, v in self.database_dates.items() if isinstance(v, datetime)
         }
 
+        logger.info("Collecting node infos...")
         # Create some collections of nodes that will be useful down the line, e.g. all nodes from
         # the background databases that link to foreground nodes.
         self.create_node_collections()
 
         self.interdatabase_activity_mapping = InterDatabaseMapping()
-
-        # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
-        # background databases in the LCA. We need all the IDs for the time mapping dict.
-        fu, data_objs, remapping = self.prepare_base_lca_inputs(
-            demand=self.demand, method=self.method
-        )
-        self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
-        self.base_lca.lci()
-        self.base_lca.lcia()
 
         # Getting all nodes from the databases for faster lookup later
         all_nodes = bd.backends.ActivityDataset.select().where(
@@ -235,6 +229,17 @@ class TimexLCA:
         self.cutoff = cutoff
         self.max_calc = max_calc
 
+        logger.info("Calculating base LCA...")
+        # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
+        # background databases in the LCA. We need all the IDs for the time mapping dict.
+        fu, data_objs, remapping = self.prepare_base_lca_inputs(
+            demand=self.demand, method=self.method
+        )
+        self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
+        self.base_lca.lci()
+        self.base_lca.lcia()
+
+        logger.info("Creating activity time mapping...")
         # Create a time mapping dict that maps each activity to a activity_time_mapping_id in the
         # format (('database', 'code'), datetime_as_integer): time_mapping_id)
         self.activity_time_mapping = TimeMappingDict(
@@ -352,6 +357,7 @@ class TimexLCA:
         )
 
         if expand_technosphere:
+            logger.info("Expanding matrices...")
             self.datapackage = self.build_datapackage()
             data_obs = self.data_objs + self.datapackage
             self.expanded_technosphere = True  # set flag for later static lcia usage
@@ -370,6 +376,7 @@ class TimexLCA:
             remapping_dicts=self.remapping,
         )
 
+        logger.info("Calculating dynamic inventory...")
         if not build_dynamic_biosphere:
             self.lca.lci()
         else:  # building dynamic biosphere
