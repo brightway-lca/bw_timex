@@ -279,12 +279,10 @@ def plot_characterized_inventory_as_waterfall(
         time_res_dict[lca_obj.temporal_grouping]
     )  # TODO make temporal resolution flexible
 
-    # Optimized activity label fetching
+    # Optimized activity label fetching using the TimexLCA's built-in method
     unique_activities = plot_data["activity"].unique()
     activity_labels = {
-        idx: resolve_temporalized_node_name(
-            lca_obj.activity_time_mapping.reversed[idx][0][1]
-        )
+        idx: lca_obj.get_activity_name_from_time_mapped_id(idx)
         for idx in unique_activities
     }
     plot_data["activity_label"] = plot_data["activity"].map(activity_labels)
