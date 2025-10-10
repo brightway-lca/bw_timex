@@ -57,7 +57,6 @@ autoapi_ignore = [
     "*tests.py",
     "*validation.py",
     "*version.py",
-    "*.rst",
     "*.yml",
     "*.md",
     "*.json",

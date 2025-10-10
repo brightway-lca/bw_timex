@@ -35,7 +35,6 @@ from .timeline_builder import TimelineBuilder
 from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
-    resolve_temporalized_node_name,
     round_datetime,
 )
 
@@ -67,7 +66,7 @@ class TimexLCA:
      3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and
         dynamic characterization. These are provided for radiative forcing and GWP but can also be
         user-defined.
-    
+
 
     Example
     -------
@@ -112,6 +111,8 @@ class TimexLCA:
                 Dictionary mapping database names to dates.
         """
 
+        logger.info("Initializing TimexLCA object...")
+
         self.demand = demand
         self.method = method
         self.database_dates = database_dates
@@ -132,26 +133,24 @@ class TimexLCA:
             k: v for k, v in self.database_dates.items() if isinstance(v, datetime)
         }
 
+        logger.info("Collecting node infos...")
         # Create some collections of nodes that will be useful down the line, e.g. all nodes from
         # the background databases that link to foreground nodes.
         self.create_node_collections()
 
         self.interdatabase_activity_mapping = InterDatabaseMapping()
 
-        # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
-        # background databases in the LCA. We need all the IDs for the time mapping dict.
-        fu, data_objs, remapping = self.prepare_base_lca_inputs(
-            demand=self.demand, method=self.method
-        )
-        self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
-        self.base_lca.lci()
-        self.base_lca.lcia()
-
         # Getting all nodes from the databases for faster lookup later
         all_nodes = bd.backends.ActivityDataset.select().where(
             bd.backends.ActivityDataset.database << list(self.database_dates.keys())
         )
         self.nodes = {node.id: bd.backends.Activity(node) for node in all_nodes}
+        
+        # Build a cache mapping activity code to name for efficient lookups
+        # This avoids repeated database queries in plotting and labeling functions
+        self._activity_code_to_name_cache = {
+            node["code"]: node["name"] for node in self.nodes.values()
+        }
 
     ########################################
     # Main functions to be called by users #
@@ -230,6 +229,17 @@ class TimexLCA:
         self.cutoff = cutoff
         self.max_calc = max_calc
 
+        logger.info("Calculating base LCA...")
+        # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
+        # background databases in the LCA. We need all the IDs for the time mapping dict.
+        fu, data_objs, remapping = self.prepare_base_lca_inputs(
+            demand=self.demand, method=self.method
+        )
+        self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
+        self.base_lca.lci()
+        self.base_lca.lcia()
+
+        logger.info("Creating activity time mapping...")
         # Create a time mapping dict that maps each activity to a activity_time_mapping_id in the
         # format (('database', 'code'), datetime_as_integer): time_mapping_id)
         self.activity_time_mapping = TimeMappingDict(
@@ -347,6 +357,7 @@ class TimexLCA:
         )
 
         if expand_technosphere:
+            logger.info("Expanding matrices...")
             self.datapackage = self.build_datapackage()
             data_obs = self.data_objs + self.datapackage
             self.expanded_technosphere = True  # set flag for later static lcia usage
@@ -365,6 +376,7 @@ class TimexLCA:
             remapping_dicts=self.remapping,
         )
 
+        logger.info("Calculating dynamic inventory...")
         if not build_dynamic_biosphere:
             self.lca.lci()
         else:  # building dynamic biosphere
@@ -1424,6 +1436,28 @@ class TimexLCA:
 
         return df
 
+    def get_activity_name_from_time_mapped_id(self, time_mapped_id: int) -> str:
+        """
+        Get the activity name for a time-mapped activity ID.
+        Uses the pre-built code-to-name cache for efficient lookups.
+        
+        Parameters
+        ----------
+        time_mapped_id : int
+            The time-mapped activity ID from activity_time_mapping
+            
+        Returns
+        -------
+        str
+            The name of the activity
+        """
+        # Extract the code from the activity_time_mapping
+        # Structure: time_mapped_id -> (('database', 'code'), time)
+        ((_, code), _) = self.activity_time_mapping.reversed[time_mapped_id]
+        
+        # Use the pre-built cache for O(1) lookup instead of database query
+        return self._activity_code_to_name_cache.get(code, code)
+
     def create_labelled_dynamic_inventory_dataframe(self) -> pd.DataFrame:
         """
         Returns the dynamic_inventory_df with comprehensible labels for flows and activities instead
@@ -1449,13 +1483,11 @@ class TimexLCA:
         df = self.dynamic_inventory_df.copy()
         df["flow"] = df["flow"].apply(lambda x: bd.get_node(id=x)["name"])
 
-        activity_name_cache = {}
-
-        for activity in df["activity"].unique():
-            if activity not in activity_name_cache:
-                activity_name_cache[activity] = resolve_temporalized_node_name(
-                    self.activity_time_mapping.reversed[activity][0][1]
-                )
+        # Build activity name cache efficiently using pre-built code-to-name cache
+        activity_name_cache = {
+            activity: self.get_activity_name_from_time_mapped_id(activity)
+            for activity in df["activity"].unique()
+        }
 
         df["activity"] = df["activity"].map(activity_name_cache)
 
@@ -1553,14 +1585,11 @@ class TimexLCA:
             plot_data["activity_label"] = "All activities"
 
         else:  # plotting activities separate
-
-            activity_name_cache = {}
-
-            for activity in plot_data["activity"].unique():
-                if activity not in activity_name_cache:
-                    activity_name_cache[activity] = resolve_temporalized_node_name(
-                        self.activity_time_mapping.reversed[activity][0][1]
-                    )
+            # Build activity name cache efficiently using pre-built code-to-name cache
+            activity_name_cache = {
+                activity: self.get_activity_name_from_time_mapped_id(activity)
+                for activity in plot_data["activity"].unique()
+            }
 
             plot_data["activity_label"] = plot_data["activity"].map(activity_name_cache)
 
