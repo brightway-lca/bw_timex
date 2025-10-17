@@ -390,6 +390,12 @@ class AllEdgeExtractor:
             # Create initial temporal distribution
             initial_td = self.t0 * demand_amount
             
+            # Create td_producer as TemporalDistribution
+            td_producer_fu = TemporalDistribution(
+                date=np.array([0], dtype="timedelta64[Y]"),
+                amount=np.array([demand_amount]),
+            )
+            
             # Add functional unit edge to timeline
             timeline.append(
                 Edge(
@@ -398,7 +404,7 @@ class AllEdgeExtractor:
                     leaf=False,
                     consumer=self.unique_id,
                     producer=activity_id,
-                    td_producer=demand_amount,
+                    td_producer=td_producer_fu,
                     td_consumer=self.t0,
                     abs_td_producer=self.t0,
                     abs_td_consumer=None,
@@ -459,7 +465,9 @@ class AllEdgeExtractor:
                 calc_count += 1
                 
                 # Get producer activity ID
-                producer_id = self.activity_dict.reversed[row_idx]
+                producer_id = self.activity_dict.reversed.get(row_idx)
+                if producer_id is None:
+                    continue
                 
                 # Normalize by reference production
                 normalized_amount = amount / ref_production
