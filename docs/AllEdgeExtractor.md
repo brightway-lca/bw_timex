@@ -20,7 +20,38 @@
 
 ## Usage
 
-### Basic Usage
+### Using with TimexLCA (Recommended)
+
+The easiest way to use `AllEdgeExtractor` is through the `TimexLCA.build_timeline()` method with the `use_all_edge_extractor` parameter:
+
+```python
+from bw_timex import TimexLCA
+from datetime import datetime
+
+# Set up your demand and method
+demand = {('my_foreground_database', 'my_process'): 1}
+method = ("some_method_family", "some_category", "some_method")
+database_dates = {
+    'my_background_database_one': datetime.strptime("2020", "%Y"),
+    'my_background_database_two': datetime.strptime("2030", "%Y"),
+    'my_foreground_database': 'dynamic'
+}
+
+# Create TimexLCA instance
+tlca = TimexLCA(demand, method, database_dates)
+
+# Build timeline using AllEdgeExtractor (faster for small foregrounds)
+tlca.build_timeline(
+    starting_datetime="2024-01-01",
+    use_all_edge_extractor=True  # <-- Enable AllEdgeExtractor
+)
+
+# Continue with your analysis
+tlca.lci()
+tlca.static_lcia()
+```
+
+### Basic Usage (Direct)
 
 ```python
 from bw_timex.edge_extractor import AllEdgeExtractor
@@ -44,26 +75,26 @@ extractor = AllEdgeExtractor(
 edge_timeline = extractor.build_edge_timeline()
 ```
 
-### Drop-in Replacement in TimelineBuilder
+### Using in TimelineBuilder
 
-`AllEdgeExtractor` can potentially be used as a drop-in replacement for `EdgeExtractor` in `TimelineBuilder`. The interface is compatible:
+`AllEdgeExtractor` is now integrated into `TimelineBuilder` and can be enabled via the `use_all_edge_extractor` parameter:
 
 ```python
-# In TimelineBuilder.__init__, you could replace:
-# self.edge_extractor = EdgeExtractor(...)
+from bw_timex.timeline_builder import TimelineBuilder
 
-# With:
-self.edge_extractor = AllEdgeExtractor(
+timeline_builder = TimelineBuilder(
     base_lca,
-    starting_datetime=self.starting_datetime,
+    starting_datetime=starting_datetime,
     edge_filter_function=edge_filter_function,
-    cutoff=self.cutoff,
-    max_calc=self.max_calc,
-    static_activity_indices=set(static_background_activity_ids),
+    database_dates=database_dates,
+    database_dates_static=database_dates_static,
+    activity_time_mapping=activity_time_mapping,
+    node_collections=node_collections,
+    nodes=nodes,
+    temporal_grouping="year",
+    use_all_edge_extractor=True  # <-- Enable AllEdgeExtractor
 )
 ```
-
-Note: This would require importing `AllEdgeExtractor` instead of `EdgeExtractor` in the timeline_builder module.
 
 ## Performance
 
@@ -71,6 +102,20 @@ For smaller foreground systems (< 100 processes), `AllEdgeExtractor` can provide
 1. LCA score calculations during traversal
 2. Heap operations for priority management
 3. The overhead of inheriting from TemporalisLCA
+
+## When to Use AllEdgeExtractor
+
+### Use AllEdgeExtractor when:
+- Your foreground system is small (< 100 processes)
+- You need to traverse the entire foreground anyway
+- You want faster graph traversal without LCA overhead
+- Your system doesn't benefit from impact-based pruning
+
+### Use EdgeExtractor (default) when:
+- Your supply chain is large and complex
+- You want to skip low-impact branches
+- You need accurate edge type detection
+- Priority-based traversal provides meaningful speedup
 
 ## Limitations
 

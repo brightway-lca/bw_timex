@@ -164,6 +164,7 @@ class TimexLCA:
         edge_filter_function: Callable = None,
         cutoff: float = 1e-9,
         max_calc: int = 2000,
+        use_all_edge_extractor: bool = False,
         *args,
         **kwargs,
     ) -> pd.DataFrame:
@@ -193,6 +194,10 @@ class TimexLCA:
         max_calc: float, optional
             The maximum number of calculations to be performed by the graph traversal. Default is
             2000.
+        use_all_edge_extractor: bool, optional
+            If True, uses `AllEdgeExtractor` for full graph traversal without priority-first 
+            approach. This can provide better performance for smaller foreground systems by 
+            avoiding LCA calculations during traversal. Default is False (uses `EdgeExtractor`).
         *args : iterable
             Positional arguments for the graph traversal, for `bw_temporalis.TemporalisLCA` passed
             to the `EdgeExtractor` class, which inherits from `TemporalisLCA`. See `bw_temporalis`
@@ -266,6 +271,7 @@ class TimexLCA:
             self.interpolation_type,
             self.cutoff,
             self.max_calc,
+            use_all_edge_extractor,
             *args,
             **kwargs,
         )

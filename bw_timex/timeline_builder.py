@@ -8,7 +8,7 @@ from bw2calc import LCA
 from bw2data.configuration import labels
 from loguru import logger
 
-from .edge_extractor import Edge, EdgeExtractor
+from .edge_extractor import AllEdgeExtractor, Edge, EdgeExtractor
 from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
@@ -21,9 +21,13 @@ class TimelineBuilder:
     """
     Class for building a process timeline based on the temporal distributions of their exchanges.
 
-    First, the `EdgeExtractor` does a priority-first graph traversal and extracts a timeline of
-    exchanges (edge_timeline) with temporal information. Identical edges within temporal grouping
-    (e.g. year, month, day, hour) are then grouped and the amount of exchanges is summed up.
+    The `EdgeExtractor` or `AllEdgeExtractor` performs graph traversal and extracts a timeline of
+    exchanges (edge_timeline) with temporal information. By default, `EdgeExtractor` does a 
+    priority-first graph traversal. Alternatively, `AllEdgeExtractor` can be used for full graph 
+    traversal without prioritization, which can be faster for smaller foreground systems.
+    
+    Identical edges within temporal grouping (e.g. year, month, day, hour) are then grouped and 
+    the amount of exchanges is summed up.
     """
 
     def __init__(
@@ -40,6 +44,7 @@ class TimelineBuilder:
         interpolation_type: str = "linear",
         cutoff: float = 1e-9,
         max_calc: int = 2000,
+        use_all_edge_extractor: bool = False,
         *args,
         **kwargs,
     ) -> None:
@@ -70,6 +75,9 @@ class TimelineBuilder:
             The cutoff value for the graph traversal. Default is 1e-9.
         max_calc:
             The maximum number of calculations to be performed by the graph traversal. Default is 2000.
+        use_all_edge_extractor: bool, optional
+            If True, uses AllEdgeExtractor for full graph traversal without priority-first approach.
+            Default is False (uses EdgeExtractor).
         args:   Variable length argument list
             Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA. Here, things like the further settings for graph traversal can be set. For details, see bw_temporalis.TemporalisLCA.
         kwargs: Arbitrary keyword arguments
@@ -97,16 +105,29 @@ class TimelineBuilder:
         }
 
         logger.info("Traversing supply chain graph...")
-        self.edge_extractor = EdgeExtractor(
-            base_lca,
-            starting_datetime=self.starting_datetime,
-            *args,
-            edge_filter_function=edge_filter_function,
-            cutoff=self.cutoff,
-            max_calc=self.max_calc,
-            static_activity_indices=set(static_background_activity_ids),
-            **kwargs,
-        )
+        if use_all_edge_extractor:
+            logger.info("Using AllEdgeExtractor (full graph traversal without priority-first)")
+            self.edge_extractor = AllEdgeExtractor(
+                base_lca,
+                starting_datetime=self.starting_datetime,
+                edge_filter_function=edge_filter_function,
+                cutoff=self.cutoff,
+                max_calc=self.max_calc,
+                static_activity_indices=set(static_background_activity_ids),
+                **kwargs,
+            )
+        else:
+            logger.info("Using EdgeExtractor (priority-first graph traversal)")
+            self.edge_extractor = EdgeExtractor(
+                base_lca,
+                starting_datetime=self.starting_datetime,
+                *args,
+                edge_filter_function=edge_filter_function,
+                cutoff=self.cutoff,
+                max_calc=self.max_calc,
+                static_activity_indices=set(static_background_activity_ids),
+                **kwargs,
+            )
         self.edge_timeline = self.edge_extractor.build_edge_timeline()
 
     def build_timeline(self) -> pd.DataFrame:
