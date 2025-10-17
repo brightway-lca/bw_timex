@@ -336,9 +336,24 @@ class AllEdgeExtractor:
         visited_activities = set()  # Track visited activities
         
         # Initialize with functional unit
-        for activity_id, demand_amount in self.lca.demand.items():
+        # Handle demand - could be dict or array
+        if hasattr(self.lca, 'demand') and isinstance(self.lca.demand, dict):
+            demand_dict = self.lca.demand
+        else:
+            # Construct demand dict from demand_array if needed
+            demand_dict = {}
+            if hasattr(self.lca, 'demand_array'):
+                for idx, amount in enumerate(self.lca.demand_array):
+                    if amount != 0:
+                        activity_id = self.activity_dict.reversed.get(idx)
+                        if activity_id:
+                            demand_dict[activity_id] = amount
+        
+        for activity_id, demand_amount in demand_dict.items():
             # Get the matrix index for this activity
-            matrix_idx = self.activity_dict[activity_id]
+            matrix_idx = self.activity_dict.get(activity_id)
+            if matrix_idx is None:
+                continue
             
             # Create initial temporal distribution
             initial_td = self.t0 * demand_amount
