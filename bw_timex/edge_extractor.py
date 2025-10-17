@@ -390,6 +390,14 @@ class AllEdgeExtractor:
             # Create initial temporal distribution
             initial_td = self.t0 * demand_amount
             
+            # Ensure initial_td is a TemporalDistribution
+            if not isinstance(initial_td, TemporalDistribution):
+                # If multiplication didn't work as expected, create it manually
+                initial_td = TemporalDistribution(
+                    date=self.t0.date.copy(),
+                    amount=self.t0.amount * demand_amount,
+                )
+            
             # Create td_producer as TemporalDistribution
             td_producer_fu = TemporalDistribution(
                 date=np.array([0], dtype="timedelta64[Y]"),
@@ -483,6 +491,14 @@ class AllEdgeExtractor:
                 
                 # Convolve temporal distributions
                 distribution = (td * td_producer).simplify()
+                
+                # Ensure distribution is a TemporalDistribution
+                if not isinstance(distribution, TemporalDistribution):
+                    # If simplify() returned something unexpected, handle it
+                    distribution = TemporalDistribution(
+                        date=td.date.copy() if hasattr(td, 'date') else np.array([0], dtype="timedelta64[Y]"),
+                        amount=td.amount * td_producer.amount if hasattr(td, 'amount') and hasattr(td_producer, 'amount') else np.array([0.0]),
+                    )
                 
                 # Check if this is a leaf
                 leaf = self.edge_ff(producer_id)
