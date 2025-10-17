@@ -20,6 +20,8 @@
 
 ## Usage
 
+### Basic Usage
+
 ```python
 from bw_timex.edge_extractor import AllEdgeExtractor
 from bw2calc import LCA
@@ -41,6 +43,27 @@ extractor = AllEdgeExtractor(
 # Build edge timeline
 edge_timeline = extractor.build_edge_timeline()
 ```
+
+### Drop-in Replacement in TimelineBuilder
+
+`AllEdgeExtractor` can potentially be used as a drop-in replacement for `EdgeExtractor` in `TimelineBuilder`. The interface is compatible:
+
+```python
+# In TimelineBuilder.__init__, you could replace:
+# self.edge_extractor = EdgeExtractor(...)
+
+# With:
+self.edge_extractor = AllEdgeExtractor(
+    base_lca,
+    starting_datetime=self.starting_datetime,
+    edge_filter_function=edge_filter_function,
+    cutoff=self.cutoff,
+    max_calc=self.max_calc,
+    static_activity_indices=set(static_background_activity_ids),
+)
+```
+
+Note: This would require importing `AllEdgeExtractor` instead of `EdgeExtractor` in the timeline_builder module.
 
 ## Performance
 

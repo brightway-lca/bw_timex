@@ -260,6 +260,38 @@ class AllEdgeExtractor:
     
     Unlike EdgeExtractor, this class does NOT inherit from TemporalisLCA.
     Instead, it builds directly on top of a bw2calc.LCA object.
+    
+    Example
+    -------
+    >>> from bw_timex.edge_extractor import AllEdgeExtractor
+    >>> from bw2calc import LCA
+    >>> from bw_temporalis import TemporalDistribution
+    >>> import numpy as np
+    >>> 
+    >>> # Prepare LCA
+    >>> lca = LCA(demand={my_activity: 1}, ...)
+    >>> lca.lci()
+    >>> 
+    >>> # Create starting temporal distribution
+    >>> t0 = TemporalDistribution(
+    ...     date=np.array(['2024-01-01'], dtype='datetime64[s]'),
+    ...     amount=np.array([1.0])
+    ... )
+    >>> 
+    >>> # Create extractor
+    >>> extractor = AllEdgeExtractor(
+    ...     lca=lca,
+    ...     starting_datetime=t0,
+    ...     cutoff=1e-9,
+    ...     max_calc=2000
+    ... )
+    >>> 
+    >>> # Build timeline
+    >>> edge_timeline = extractor.build_edge_timeline()
+    
+    See Also
+    --------
+    EdgeExtractor : Priority-first graph traversal with LCA calculations
     """
 
     def __init__(
