@@ -4,6 +4,7 @@ from numbers import Number
 from typing import Callable
 
 import numpy as np
+from bw2calc import LCA
 from bw_temporalis import TemporalDistribution, TemporalisLCA
 
 datetime_type = np.dtype("datetime64[s]")
@@ -225,6 +226,275 @@ class EdgeExtractor(TemporalisLCA):
             return td_consumer
 
         # Else, if both consumer and producer have a td (absolute and relative, respectively) join to TDs
+        if isinstance(td_producer, TemporalDistribution) and isinstance(
+            td_consumer, TemporalDistribution
+        ):
+            if not (td_consumer.date.dtype == datetime_type):
+                raise ValueError(
+                    f"`td_consumer.date` must have dtype `datetime64[s]`, but got `{td_consumer.date.dtype}`"
+                )
+            if not (td_producer.date.dtype == timedelta_type):
+                raise ValueError(
+                    f"`td_producer.date` must have dtype `timedelta64[s]`, but got `{td_producer.date.dtype}`"
+                )
+            date = (
+                td_consumer.date.reshape((-1, 1)) + td_producer.date.reshape((1, -1))
+            ).ravel()
+            amount = np.array(len(td_consumer) * [td_producer.amount]).ravel()
+            return TemporalDistribution(date, amount)
+        else:
+            raise ValueError(
+                f"Can't join TemporalDistribution and something else: Trying with {type(td_consumer.date)} and {type(td_producer.date)}"
+            )
+
+
+class AllEdgeExtractor:
+    """
+    Alternative to EdgeExtractor that traverses the entire supply chain graph
+    without priority-first approach and without calculating LCA impacts.
+    
+    This class provides faster graph traversal for smaller foregrounds by
+    simply convolving temporal distributions of edges and yielding the
+    absolute occurrence of all edges, without the overhead of LCA calculations
+    and prioritization.
+    
+    Unlike EdgeExtractor, this class does NOT inherit from TemporalisLCA.
+    Instead, it builds directly on top of a bw2calc.LCA object.
+    """
+
+    def __init__(
+        self, 
+        lca: LCA,
+        starting_datetime: TemporalDistribution,
+        edge_filter_function: Callable = None,
+        static_activity_indices: set = None,
+        cutoff: float = 1e-9,
+        max_calc: int = 2000,
+        **kwargs
+    ) -> None:
+        """
+        Initialize the AllEdgeExtractor.
+        
+        Parameters
+        ----------
+        lca : LCA
+            A static LCA object that provides the technosphere matrix and
+            activity mappings for the supply chain traversal.
+        starting_datetime : TemporalDistribution
+            The temporal distribution representing the functional unit timing.
+        edge_filter_function : Callable, optional
+            A callable that filters edges based on activity ID. If not provided,
+            a function that always returns False is used.
+        static_activity_indices : set, optional
+            Set of activity indices to skip during traversal.
+        cutoff : float, optional
+            Cutoff threshold for edge amounts. Default is 1e-9.
+        max_calc : int, optional
+            Maximum number of edges to process. Default is 2000.
+        **kwargs : dict
+            Additional keyword arguments for compatibility.
+        """
+        self.lca = lca
+        self.t0 = starting_datetime
+        
+        if edge_filter_function:
+            self.edge_ff = edge_filter_function
+        else:
+            self.edge_ff = lambda x: False
+        
+        self.static_activity_indices = static_activity_indices or set()
+        self.cutoff = cutoff
+        self.max_calc = max_calc
+        
+        # Get mappings from LCA object
+        self.activity_dict = lca.dicts.activity
+        self.technosphere_matrix = lca.technosphere_matrix.tocsr()
+        
+        # Unique ID for functional unit (consumer in edge timeline)
+        self.unique_id = -1
+        
+    def build_edge_timeline(self) -> list:
+        """
+        Traverse the entire supply chain graph and create a timeline of edges.
+        
+        Unlike EdgeExtractor's priority-first approach, this method traverses
+        all edges in the supply chain without prioritization based on LCA scores.
+        It simply convolves temporal distributions and tracks the absolute
+        occurrence of all edges.
+        
+        The traversal uses a simple queue (FIFO) instead of a priority queue,
+        processing all edges without calculating cumulative scores or impacts.
+        
+        Returns
+        -------
+        list
+            A list of Edge instances with timestamps and amounts, and ids of
+            producing and consuming activities.
+        """
+        timeline = []
+        queue = []  # Simple queue for breadth-first traversal
+        visited_activities = set()  # Track visited activities
+        
+        # Initialize with functional unit
+        for activity_id, demand_amount in self.lca.demand.items():
+            # Get the matrix index for this activity
+            matrix_idx = self.activity_dict[activity_id]
+            
+            # Create initial temporal distribution
+            initial_td = self.t0 * demand_amount
+            
+            # Add functional unit edge to timeline
+            timeline.append(
+                Edge(
+                    edge_type="production",
+                    distribution=initial_td,
+                    leaf=False,
+                    consumer=self.unique_id,
+                    producer=activity_id,
+                    td_producer=demand_amount,
+                    td_consumer=self.t0,
+                    abs_td_producer=self.t0,
+                    abs_td_consumer=None,
+                )
+            )
+            
+            # Add to queue for processing
+            queue.append({
+                'activity_id': activity_id,
+                'matrix_idx': matrix_idx,
+                'td': initial_td,
+                'td_relative': TemporalDistribution(
+                    date=np.array([0], dtype="timedelta64[Y]"),
+                    amount=np.array([demand_amount]),
+                ),
+                'abs_td': self.t0,
+            })
+        
+        calc_count = 0
+        
+        # Process queue
+        while queue and calc_count < self.max_calc:
+            current = queue.pop(0)
+            activity_id = current['activity_id']
+            matrix_idx = current['matrix_idx']
+            td = current['td']
+            td_relative = current['td_relative']
+            abs_td = current['abs_td']
+            
+            # Skip if already visited
+            if matrix_idx in visited_activities:
+                continue
+            
+            visited_activities.add(matrix_idx)
+            
+            # Skip if filtered or static
+            if self.edge_ff(activity_id) or activity_id in self.static_activity_indices:
+                continue
+            
+            # Get reference production amount (diagonal element)
+            ref_production = abs(self.technosphere_matrix[matrix_idx, matrix_idx])
+            if ref_production == 0:
+                ref_production = 1.0
+            
+            # Get all inputs to this activity (column in technosphere matrix)
+            # Process column of technosphere matrix
+            col = self.technosphere_matrix.getcol(matrix_idx).tocoo()
+            
+            for row_idx, amount in zip(col.row, col.data):
+                # Skip diagonal (production exchange)
+                if row_idx == matrix_idx:
+                    continue
+                
+                # Skip near-zero amounts
+                if abs(amount) < self.cutoff:
+                    continue
+                
+                calc_count += 1
+                
+                # Get producer activity ID
+                producer_id = self.activity_dict.reversed[row_idx]
+                
+                # Normalize by reference production
+                normalized_amount = amount / ref_production
+                
+                # Create temporal distribution for this edge
+                if isinstance(normalized_amount, Number):
+                    td_producer = TemporalDistribution(
+                        date=np.array([0], dtype="timedelta64[Y]"),
+                        amount=np.array([normalized_amount]),
+                    )
+                else:
+                    td_producer = normalized_amount
+                
+                # Convolve temporal distributions
+                distribution = (td * td_producer).simplify()
+                
+                # Check if this is a leaf
+                leaf = self.edge_ff(producer_id)
+                
+                # Calculate absolute temporal distribution
+                abs_td_producer = self.join_datetime_and_timedelta_distributions(
+                    td_producer, abs_td
+                )
+                
+                # Determine edge type (simplified - would need more info for accurate type)
+                edge_type = "technosphere"
+                
+                # Add edge to timeline
+                timeline.append(
+                    Edge(
+                        edge_type=edge_type,
+                        distribution=distribution,
+                        leaf=leaf,
+                        consumer=activity_id,
+                        producer=producer_id,
+                        td_producer=td_producer,
+                        td_consumer=td_relative,
+                        abs_td_producer=abs_td_producer,
+                        abs_td_consumer=abs_td,
+                    )
+                )
+                
+                # Add to queue if not a leaf
+                if not leaf:
+                    queue.append({
+                        'activity_id': producer_id,
+                        'matrix_idx': row_idx,
+                        'td': distribution,
+                        'td_relative': td_producer,
+                        'abs_td': abs_td_producer,
+                    })
+        
+        return timeline
+    
+    def join_datetime_and_timedelta_distributions(
+        self, td_producer: TemporalDistribution, td_consumer: TemporalDistribution
+    ) -> TemporalDistribution:
+        """
+        Join a datetime TemporalDistribution with a timedelta TemporalDistribution.
+        
+        This method is identical to the one in EdgeExtractor to ensure
+        compatibility with the timeline building process.
+        
+        Parameters
+        ----------
+        td_producer : TemporalDistribution
+            TemporalDistribution of the producer (timedelta).
+        td_consumer : TemporalDistribution
+            TemporalDistribution of the consumer (datetime).
+        
+        Returns
+        -------
+        TemporalDistribution
+            A new TemporalDistribution combining both.
+        """
+        # If producer has no TD, return consumer's TD
+        if isinstance(td_consumer, TemporalDistribution) and isinstance(
+            td_producer, Number
+        ):
+            return td_consumer
+        
+        # Join both TDs
         if isinstance(td_producer, TemporalDistribution) and isinstance(
             td_consumer, TemporalDistribution
         ):

@@ -1,5 +1,5 @@
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
-from .edge_extractor import EdgeExtractor
+from .edge_extractor import AllEdgeExtractor, EdgeExtractor
 from .helper_classes import SetList
 from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
