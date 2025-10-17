@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2025-10-12
+* Updated dependency on dynamic_characterization to >=1.2.0
+
 ## [0.3.2] - 2025-10-09
 * Added `bw_timex.utils.interactive_td_widget` for drafting and visualizing temporal distributions in jupyter notebooks
 * Improved caching for activity name lookup
