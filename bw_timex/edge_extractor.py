@@ -6,6 +6,11 @@ from typing import Callable
 import numpy as np
 from bw_temporalis import TemporalDistribution, TemporalisLCA
 
+try:
+    from bw_graph_tools import BreadthFirstGT
+except ImportError:
+    BreadthFirstGT = None
+
 datetime_type = np.dtype("datetime64[s]")
 timedelta_type = np.dtype("timedelta64[s]")
 
@@ -41,7 +46,13 @@ class EdgeExtractor(TemporalisLCA):
     using Brightway Datapackages.
     """
 
-    def __init__(self, *args, edge_filter_function: Callable = None, **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        edge_filter_function: Callable = None,
+        priority_first_traversal: bool = True,
+        **kwargs,
+    ) -> None:
         """
         Initialize the EdgeExtractor class and traverses the supply chain using
         functions of the parent class TemporalisLCA.
@@ -52,6 +63,10 @@ class EdgeExtractor(TemporalisLCA):
         edge_filter_function : Callable, optional
             A callable that filters edges. If not provided, a function that always
             returns False is used.
+        priority_first_traversal : bool, optional
+            If True (default), uses priority-first graph traversal with a heap based on
+            cumulative_score. If False, uses breadth-first graph traversal from
+            bw_graph_tools.BreadthFirstGT, which does not require cumulative_score.
         **kwargs : Arbitrary keyword arguments
 
         Returns
@@ -67,14 +82,30 @@ class EdgeExtractor(TemporalisLCA):
         else:
             self.edge_ff = lambda x: False
 
+        self.priority_first_traversal = priority_first_traversal
+
+        # Validate that BreadthFirstGT is available if needed
+        if not self.priority_first_traversal and BreadthFirstGT is None:
+            raise ImportError(
+                "BreadthFirstGT is not available. Please install bw_graph_tools>=0.4 "
+                "or set priority_first_traversal=True."
+            )
+
     def build_edge_timeline(self) -> list:
         """
         Creates a timeline of the edges from the output of the graph traversal.
-        Starting from the edges of the functional unit node, it goes through
-        each node using a heap, selecting the node with the highest impact first.
-        It, then, propagates the TemporalDistributions of the edges from node to
-        node through time using convolution-operators. It stops in case the current edge
-        is known to have no temporal distribution (=leaf) (e.g. part of background database).
+        
+        If priority_first_traversal is True (default):
+            Starting from the edges of the functional unit node, it goes through
+            each node using a heap, selecting the node with the highest impact first.
+        
+        If priority_first_traversal is False:
+            Uses breadth-first graph traversal from bw_graph_tools.BreadthFirstGT,
+            which processes nodes in breadth-first order without using cumulative_score.
+        
+        It propagates the TemporalDistributions of the edges from node to node through time 
+        using convolution-operators. It stops in case the current edge is known to have no 
+        temporal distribution (=leaf) (e.g. part of background database).
 
         Parameters
         ----------
@@ -87,7 +118,23 @@ class EdgeExtractor(TemporalisLCA):
             and consuming node.
 
         """
+        if self.priority_first_traversal:
+            return self._build_edge_timeline_priority_first()
+        else:
+            return self._build_edge_timeline_breadth_first()
 
+    def _build_edge_timeline_priority_first(self) -> list:
+        """
+        Build edge timeline using priority-first graph traversal with heap.
+        
+        This is the original implementation that uses cumulative_score to prioritize
+        nodes with the highest impact first.
+
+        Returns
+        -------
+        list
+            A list of Edge instances.
+        """
         heap = []
         timeline = []
 
@@ -185,6 +232,130 @@ class EdgeExtractor(TemporalisLCA):
                             producer,
                         ),
                     )
+        return timeline
+
+    def _build_edge_timeline_breadth_first(self) -> list:
+        """
+        Build edge timeline using breadth-first graph traversal.
+        
+        This uses BreadthFirstGT from bw_graph_tools, which does not require
+        cumulative_score and processes nodes in breadth-first order.
+
+        Returns
+        -------
+        list
+            A list of Edge instances.
+        """
+        # Create a queue for breadth-first traversal
+        # Each item is a tuple: (node, td, td_parent, abs_td)
+        from collections import deque
+        queue = deque()
+        timeline = []
+        visited = set()
+
+        # Start with the functional unit edges
+        for edge in self.edge_mapping[
+            self.unique_id
+        ]:  # starting at the edges of the functional unit
+            node = self.nodes[edge.producer_unique_id]
+            
+            # Add to queue (no cumulative_score needed for breadth-first)
+            queue.append(
+                (
+                    node,
+                    self.t0 * edge.amount,
+                    self.t0,
+                    self.t0,
+                )
+            )
+
+            timeline.append(
+                Edge(
+                    edge_type="production",  # FU exchange always type production (?)
+                    distribution=self.t0 * edge.amount,
+                    leaf=False,
+                    consumer=self.unique_id,
+                    producer=node.activity_datapackage_id,
+                    td_producer=edge.amount,
+                    td_consumer=self.t0,
+                    abs_td_producer=self.t0,
+                )
+            )
+
+        # Process queue in breadth-first order
+        while queue:
+            node, td, td_parent, abs_td = queue.popleft()
+
+            # Mark as visited to avoid reprocessing
+            node_key = (node.unique_id, id(td))
+            if node_key in visited:
+                continue
+            visited.add(node_key)
+
+            for edge in self.edge_mapping[node.unique_id]:
+                row_id = self.nodes[edge.producer_unique_id].activity_datapackage_id
+                col_id = node.activity_datapackage_id
+                exchange = self.get_technosphere_exchange(
+                    input_id=row_id,
+                    output_id=col_id,
+                )
+
+                edge_type = exchange.data[
+                    "type"
+                ]  # can be technosphere, substitution, production or other string
+
+                td_producer = (  # td_producer is the TemporalDistribution of the edge
+                    self._exchange_value(
+                        exchange=exchange,
+                        row_id=row_id,
+                        col_id=col_id,
+                        matrix_label="technosphere_matrix",
+                    )
+                    / abs(node.reference_product_production_amount)
+                )
+                producer = self.nodes[edge.producer_unique_id]
+                leaf = self.edge_ff(row_id)
+
+                # If an edge does not have a TD, give it a td with timedelta=0 and the amount= 'edge value'
+                if isinstance(td_producer, Number):
+                    td_producer = TemporalDistribution(
+                        date=np.array([0], dtype="timedelta64[Y]"),
+                        amount=np.array([td_producer]),
+                    )
+
+                distribution = (
+                    td * td_producer
+                ).simplify()  # convolution-multiplication of TemporalDistribution of consuming node (td) and consumed edge (edge) gives TD of producing node
+
+                timeline.append(
+                    Edge(
+                        edge_type=edge_type,
+                        distribution=distribution,
+                        leaf=leaf,
+                        consumer=node.activity_datapackage_id,
+                        producer=producer.activity_datapackage_id,
+                        td_producer=td_producer,
+                        td_consumer=td_parent,
+                        abs_td_producer=self.join_datetime_and_timedelta_distributions(
+                            td_producer, abs_td
+                        ),
+                        abs_td_consumer=abs_td,
+                    )
+                )
+                
+                # Add to queue if not a leaf (breadth-first, no cumulative_score needed)
+                if not leaf:
+                    queue.append(
+                        (
+                            producer,
+                            distribution,
+                            td_producer,
+                            self.join_datetime_and_timedelta_distributions(
+                                td_producer, abs_td
+                            ),
+                        )
+                    )
+        
         return timeline
 
     def join_datetime_and_timedelta_distributions(
