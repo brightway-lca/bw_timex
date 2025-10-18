@@ -74,6 +74,10 @@ class TimelineBuilder:
             Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA. Here, things like the further settings for graph traversal can be set. For details, see bw_temporalis.TemporalisLCA.
         kwargs: Arbitrary keyword arguments
             Keyword arguments passed to the EdgeExtractor which inherits from TemporalisLCA.
+            Notable kwargs:
+            - priority_first_traversal (bool): If True (default), uses priority-first graph traversal
+              with a heap based on cumulative_score. If False, uses breadth-first graph traversal,
+              which does not require cumulative_score.
         """
         self.base_lca = base_lca
         self.starting_datetime = starting_datetime
