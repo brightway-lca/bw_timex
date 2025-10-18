@@ -238,8 +238,8 @@ class EdgeExtractor(TemporalisLCA):
         """
         Build edge timeline using breadth-first graph traversal.
         
-        This uses BreadthFirstGT from bw_graph_tools, which does not require
-        cumulative_score and processes nodes in breadth-first order.
+        This processes nodes in breadth-first order without using cumulative_score,
+        making it suitable for use when nodes don't have cumulative_score attributes.
 
         Returns
         -------
@@ -251,7 +251,6 @@ class EdgeExtractor(TemporalisLCA):
         from collections import deque
         queue = deque()
         timeline = []
-        visited = set()
 
         # Start with the functional unit edges
         for edge in self.edge_mapping[
@@ -285,12 +284,6 @@ class EdgeExtractor(TemporalisLCA):
         # Process queue in breadth-first order
         while queue:
             node, td, td_parent, abs_td = queue.popleft()
-
-            # Mark as visited to avoid reprocessing
-            node_key = (node.unique_id, id(td))
-            if node_key in visited:
-                continue
-            visited.add(node_key)
 
             for edge in self.edge_mapping[node.unique_id]:
                 row_id = self.nodes[edge.producer_unique_id].activity_datapackage_id
