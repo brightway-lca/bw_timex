@@ -54,11 +54,15 @@ class TestClass_Grouping:
     def test_daily_resolution_score(self):
 
         # first change TD in database to daily (although not strictly necessary)
+        print("Databases present:", bd.databases)
+        print("setting fu again")
         self.fu = bd.get_node(database="foreground", code="A")
+        print("Got fu:", self.fu)
 
         for exc in self.fu.exchanges():
             if exc.input["name"] == "B":
-                exc["temporal_distribution"] = TemporalDistribution(
+                print("Modifying TD of exchange:", exc)
+                td = TemporalDistribution(
                     np.array(
                         [
                             -15,
@@ -68,8 +72,13 @@ class TestClass_Grouping:
                         dtype="timedelta64[D]",
                     ),
                     np.array([1 / 3, 1 / 3, 1 / 3]),
-                )
+                ).to_json()
+                print("New TD:", td)
+                exc["temporal_distribution"] = td
+                print("Assigned TD to exchange of type:", type(td))
                 exc.save()
+                print("Modified TD of exchange:", exc)
+                print(exc["temporal_distribution"])
 
         database_dates = {
             "db_2022": datetime.strptime(

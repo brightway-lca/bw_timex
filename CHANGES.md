@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+* Added `priority_first_traversal` parameter to `EdgeExtractor` to support breadth-first graph traversal as an alternative to the default priority-first traversal. When set to `False`, uses breadth-first traversal which does not require `cumulative_score` attributes on nodes. This can be useful when working with graph traversal results from `bw_graph_tools.BreadthFirstGT`.
+
 ## [0.3.3] - 2025-10-12
 * Updated dependency on dynamic_characterization to >=1.2.0
 
