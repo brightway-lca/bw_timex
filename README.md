@@ -38,7 +38,7 @@ Still unsure if you need time-explicit LCA? Overwhelmed by all the options? [Che
 ## 📚 Citation
 If `bw_timex` supports your scientific work, please consider citing our companion publications:
 - The conceptual framework and formalization of time-explicit LCA are described in our [methodology paper](https://doi.org/10.1007/s11367-025-02539-3)
-- The implementation of this methodology in `bw_timex` is covered by our [JOSS paper (preprint)](https://github.com/openjournals/joss-papers/blob/joss.07981/joss.07981/10.21105.joss.07981.pdf)
+- The implementation of this methodology in `bw_timex` is covered by our [JOSS paper (under review)](https://github.com/openjournals/joss-papers/blob/joss.07981/joss.07981/10.21105.joss.07981.pdf)
 
 ## 🤝 Contributing
 We welcome contributions! If you have suggestions or want to fix a bug, please:
