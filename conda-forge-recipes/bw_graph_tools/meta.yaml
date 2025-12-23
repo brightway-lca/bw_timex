@@ -1,0 +1,58 @@
+{% set name = "bw_graph_tools" %}
+{% set version = "0.6" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  sha256: 15ca2c056ba00499a8f4319b740499fae91b519dea5e776067d95a313817acf1
+
+build:
+  noarch: python
+  number: 0
+  script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.9
+    - pip
+    - setuptools
+  run:
+    - python >=3.9
+    - bw2calc >=2.0
+    - bw2data >=4.0
+    - bw_processing
+    - matrix_utils
+    - numpy <3
+    - pydantic
+    - scipy
+
+test:
+  imports:
+    - bw_graph_tools
+  requires:
+    - pip
+  commands:
+    - pip check
+
+about:
+  home: https://github.com/brightway-lca/bw_graph_tools
+  summary: Graph traversal class and utilities for Brightway LCA
+  description: |
+    bw_graph_tools provides tools for supply chain graph traversal in the
+    Brightway LCA framework. It includes a NewNodeEachVisitGraphTraversal
+    class for distinguishing different paths to the same object and
+    convolving temporal distributions, along with functions for guessing
+    production exchanges and finding paths between nodes.
+  license: BSD-3-Clause
+  license_family: BSD
+  license_file: LICENSE
+  doc_url: https://github.com/brightway-lca/bw_graph_tools
+  dev_url: https://github.com/brightway-lca/bw_graph_tools
+
+extra:
+  recipe-maintainers:
+    - cmutel
+    - TimoDiepers

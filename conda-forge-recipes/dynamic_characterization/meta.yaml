@@ -1,0 +1,54 @@
+{% set name = "dynamic_characterization" %}
+{% set version = "1.2.0" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  sha256: 271f2cf321a1ec88a35320b3619c3a2194100275f42226a3a8acaf1848189f2b
+
+build:
+  noarch: python
+  number: 0
+  script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.9
+    - pip
+    - setuptools
+  run:
+    - python >=3.9
+    - bw2data
+    - numpy
+    - pandas
+    - loguru
+
+test:
+  imports:
+    - dynamic_characterization
+  requires:
+    - pip
+  commands:
+    - pip check
+
+about:
+  home: https://github.com/brightway-lca/dynamic_characterization
+  summary: Dynamic characterization functions for life cycle inventories
+  description: |
+    dynamic_characterization provides a collection of functions for
+    characterizing life cycle inventories with temporal information.
+    It enables dynamic characterization of Life Cycle Inventories using
+    temporal data, offering characterization functions for environmental
+    flows including greenhouse gases from IPCC AR6 Chapter 7 data.
+  license: BSD-3-Clause
+  license_family: BSD
+  license_file: LICENSE
+  doc_url: https://github.com/brightway-lca/dynamic_characterization
+  dev_url: https://github.com/brightway-lca/dynamic_characterization
+
+extra:
+  recipe-maintainers:
+    - TimoDiepers

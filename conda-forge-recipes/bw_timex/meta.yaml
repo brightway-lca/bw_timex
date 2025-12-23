@@ -1,0 +1,62 @@
+{% set name = "bw_timex" %}
+{% set version = "0.3.3" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  sha256: 6b1a98be0436d1bf417f93ebb9f2f8f502e957f15e17229191e4180f1a04dfae
+
+build:
+  noarch: python
+  number: 0
+  script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.11
+    - pip
+    - setuptools >=68.0
+  run:
+    - python >=3.11
+    - bw2calc >=2.3
+    - bw2data >=4.5
+    - bw_graph_tools >=0.4
+    - bw_temporalis >=1.1
+    - dynamic_characterization >=1.2.0
+    - numpy
+    - pandas
+    - tqdm
+    - matplotlib-base
+    - seaborn
+    - loguru
+    - ipython
+    - ipywidgets
+
+test:
+  imports:
+    - bw_timex
+  requires:
+    - pip
+  commands:
+    - pip check
+
+about:
+  home: https://github.com/brightway-lca/bw_timex
+  summary: Time-explicit Life Cycle Assessment
+  description: |
+    bw_timex is a Python package for time-explicit Life Cycle Assessment (LCA).
+    It extends the Brightway LCA framework with capabilities for dynamic and
+    prospective LCA calculations, allowing users to account for temporal aspects
+    in environmental assessments.
+  license: BSD-3-Clause
+  license_family: BSD
+  license_file: LICENSE
+  doc_url: https://docs.brightway.dev/projects/bw-timex/
+  dev_url: https://github.com/brightway-lca/bw_timex
+
+extra:
+  recipe-maintainers:
+    - TimoDiepers
