@@ -94,3 +94,6 @@ def process_at_base_database_time_db():
             (("biosphere", "CO2"), 1),
         ]
     )
+    
+    for db in bd.databases:
+        bd.Database(db).process()

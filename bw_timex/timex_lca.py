@@ -1161,8 +1161,9 @@ class TimexLCA:
         }
 
         demand_dependent_database_names = set()
+        demand_dependent_database_names.update(demand_database_names)
         for db in demand_database_names:
-            demand_dependent_database_names.update(bd.Database(db).find_dependents())
+            demand_dependent_database_names.update(bd.Database(db).find_graph_dependents())
 
         demand_dependent_background_database_names = (
             demand_dependent_database_names & self.database_dates_static.keys()
@@ -1182,7 +1183,6 @@ class TimexLCA:
 
         first_level_background_static = set()
         foreground_db = bd.Database(list(demand_database_names)[0])
-
         for node_id in foreground:
             node = foreground_db.get(id=node_id)
             for exc in chain(node.technosphere(), node.substitution()):

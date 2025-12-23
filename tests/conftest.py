@@ -4,5 +4,7 @@ from .fixtures.process_at_base_database_time_db_fixture import (
     process_at_base_database_time_db,
 )
 from .fixtures.substitution_db_fixture import substitution_db
-from .fixtures.temporal_grouping_fixture import temporal_grouping_db
+from .fixtures.temporal_grouping_fixture import temporal_grouping_db_monthly
+from .fixtures.temporal_grouping_fixture import temporal_grouping_db_daily
+from .fixtures.temporal_grouping_fixture import temporal_grouping_db_hourly
 from .fixtures.vehicle_db_fixture import vehicle_db

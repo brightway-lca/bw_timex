@@ -161,6 +161,10 @@ def wastes_db():
             (("biosphere", "CO2"), 1),
         ]
     )
+    
+    for db in bd.databases:
+        bd.Database(db).register()
+        bd.Database(db).process()
 
 
 def test_signs_fu_to_car_to_treatment(wastes_db):

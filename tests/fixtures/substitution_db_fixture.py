@@ -121,3 +121,7 @@ def substitution_db():
             (("bio", "CO2"), 1),
         ]
     )
+        
+    for db in bd.databases:
+        bd.Database(db).register()
+        bd.Database(db).process()
