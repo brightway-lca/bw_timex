@@ -18,7 +18,7 @@
 
 :::{tab-item} Linux, Windows, or MacOS (x64)
 
-1. Create a new Conda environment (in this example named `timex`):
+1. Create a new Conda environment with `bw_timex`:
 
 ```console
 conda create -n timex -c conda-forge -c cmutel -c diepers bw_timex
