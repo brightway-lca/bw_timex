@@ -109,7 +109,7 @@ def temporal_grouping_db_monthly():
             (("bio", "CO2"), 1),
         ]
     )
-        
+
     for db in bd.databases:
         bd.Database(db).register()
         bd.Database(db).process()
@@ -219,7 +219,7 @@ def temporal_grouping_db_daily():
             (("bio", "CO2"), 1),
         ]
     )
-        
+
     for db in bd.databases:
         bd.Database(db).register()
         bd.Database(db).process()
@@ -329,7 +329,7 @@ def temporal_grouping_db_hourly():
             (("bio", "CO2"), 1),
         ]
     )
-        
+
     for db in bd.databases:
         bd.Database(db).register()
         bd.Database(db).process()

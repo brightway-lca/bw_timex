@@ -13,6 +13,7 @@ from bw_temporalis import TemporalDistribution
 
 from bw_timex import TimexLCA
 
+
 @pytest.mark.usefixtures("temporal_grouping_db_monthly")
 def test_monthly_resolution_score():
 
@@ -40,7 +41,8 @@ def test_monthly_resolution_score():
     expected_score = 1 / 3 * 15 + 1 / 6 * 15 + 1 / 6 * 10 + 1 / 3 * 10
 
     assert tlca.static_score == expected_score
-    
+
+
 @pytest.mark.usefixtures("temporal_grouping_db_daily")
 def test_daily_resolution_score():
 
@@ -71,6 +73,7 @@ def test_daily_resolution_score():
     expected_score = 1 / 3 * 15 + 2 / 9 * 15 + 1 / 9 * 10 + 1 / 3 * 10
 
     assert tlca.static_score == pytest.approx(expected_score, rel=0.00005)
+
 
 @pytest.mark.usefixtures("temporal_grouping_db_hourly")
 def test_hourly_resolution_score():
