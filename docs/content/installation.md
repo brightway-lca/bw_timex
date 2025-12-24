@@ -18,7 +18,7 @@
 
 :::{tab-item} Linux, Windows, or MacOS (x64)
 
-1. Create a new Conda environment (in this example named `timex`):
+1. Create a new Conda environment with `bw_timex`:
 
 ```console
 conda create -n timex -c conda-forge -c cmutel -c diepers bw_timex
@@ -44,7 +44,7 @@ conda install -c conda-forge jupyterlab
 Brightway runs on the new Apple Silicon ARM architecture. However, the super-fast linear algebra software library `pypardiso` is not compatible with the ARM processor architecture. To avoid critical errors during instruction that would break core functionality, a different version of Brightway (`brightway_nosolver`) and a different linear algebra software library (`scikit-umfpack`) must be installed.
 ```
 
-1. Create a new Conda environment (in this example named `timex`):
+1. Create a new Conda environment with `bw_timex`:
 
 ```
 conda create -n timex -c conda-forge -c cmutel -c diepers bw_timex brightway25_nosolver scikit-umfpack
