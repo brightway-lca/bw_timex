@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-01-05
+* Fixed compatibility with latest Brightway versions
+
 ## [0.3.3] - 2025-10-12
 * Updated dependency on dynamic_characterization to >=1.2.0
 
