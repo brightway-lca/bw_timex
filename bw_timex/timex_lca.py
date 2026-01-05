@@ -145,7 +145,7 @@ class TimexLCA:
             bd.backends.ActivityDataset.database << list(self.database_dates.keys())
         )
         self.nodes = {node.id: bd.backends.Activity(node) for node in all_nodes}
-        
+
         # Build a cache mapping activity code to name for efficient lookups
         # This avoids repeated database queries in plotting and labeling functions
         self._activity_code_to_name_cache = {
@@ -1161,8 +1161,11 @@ class TimexLCA:
         }
 
         demand_dependent_database_names = set()
+        demand_dependent_database_names.update(demand_database_names)
         for db in demand_database_names:
-            demand_dependent_database_names.update(bd.Database(db).find_dependents())
+            demand_dependent_database_names.update(
+                bd.Database(db).find_graph_dependents()
+            )
 
         demand_dependent_background_database_names = (
             demand_dependent_database_names & self.database_dates_static.keys()
@@ -1182,7 +1185,6 @@ class TimexLCA:
 
         first_level_background_static = set()
         foreground_db = bd.Database(list(demand_database_names)[0])
-
         for node_id in foreground:
             node = foreground_db.get(id=node_id)
             for exc in chain(node.technosphere(), node.substitution()):
@@ -1440,12 +1442,12 @@ class TimexLCA:
         """
         Get the activity name for a time-mapped activity ID.
         Uses the pre-built code-to-name cache for efficient lookups.
-        
+
         Parameters
         ----------
         time_mapped_id : int
             The time-mapped activity ID from activity_time_mapping
-            
+
         Returns
         -------
         str
@@ -1454,7 +1456,7 @@ class TimexLCA:
         # Extract the code from the activity_time_mapping
         # Structure: time_mapped_id -> (('database', 'code'), time)
         ((_, code), _) = self.activity_time_mapping.reversed[time_mapped_id]
-        
+
         # Use the pre-built cache for O(1) lookup instead of database query
         return self._activity_code_to_name_cache.get(code, code)
 
