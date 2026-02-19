@@ -165,6 +165,7 @@ class TimexLCA:
         cutoff: float = 1e-9,
         max_calc: int = 2000,
         graph_traversal: str = "priority",
+        background_traversal_depth: int = 0,
         *args,
         **kwargs,
     ) -> pd.DataFrame:
@@ -198,6 +199,10 @@ class TimexLCA:
             The graph traversal algorithm to use. Default is 'priority' (priority-first,
             using bw_temporalis TemporalisLCA). Alternative is 'bfs' (breadth-first search,
             independent of TemporalisLCA, avoids per-subgraph LCA overhead).
+        background_traversal_depth : int, optional
+            Maximum depth for traversing into background databases when exchanges have
+            temporal distributions. Default is 0 (current behavior: skip all background
+            edges). Set to 1, 2, etc. to traverse deeper. Only works with graph_traversal='bfs'.
         *args : iterable
             Positional arguments for the graph traversal, for `bw_temporalis.TemporalisLCA` passed
             to the `EdgeExtractor` class, which inherits from `TemporalisLCA`. See `bw_temporalis`
@@ -272,6 +277,7 @@ class TimexLCA:
             self.cutoff,
             self.max_calc,
             graph_traversal=graph_traversal,
+            background_traversal_depth=background_traversal_depth,
             *args,
             **kwargs,
         )

@@ -41,6 +41,7 @@ class TimelineBuilder:
         cutoff: float = 1e-9,
         max_calc: int = 2000,
         graph_traversal: str = "priority",
+        background_traversal_depth: int = 0,
         *args,
         **kwargs,
     ) -> None:
@@ -88,6 +89,7 @@ class TimelineBuilder:
         self.interpolation_type = interpolation_type
         self.cutoff = cutoff
         self.max_calc = max_calc
+        self.background_traversal_depth = background_traversal_depth
 
         # Finding indices of activities from the connected background databases that are known to be static, i.e. have no temporal distributions connecting to them.
         # These will be be skipped in the graph traversal.
@@ -105,6 +107,7 @@ class TimelineBuilder:
                 edge_filter_function=edge_filter_function,
                 cutoff=self.cutoff,
                 static_activity_indices=set(static_background_activity_ids),
+                background_traversal_depth=background_traversal_depth,
             )
         elif graph_traversal == "priority":
             self.edge_extractor = EdgeExtractor(
@@ -122,6 +125,12 @@ class TimelineBuilder:
                 f"Unknown graph_traversal '{graph_traversal}'. Use 'priority' or 'bfs'."
             )
         self.edge_timeline = self.edge_extractor.build_edge_timeline()
+
+        # Store background TD producers for temporal market creation
+        if hasattr(self.edge_extractor, 'background_td_producers'):
+            self.background_td_producers = self.edge_extractor.background_td_producers
+        else:
+            self.background_td_producers = set()
 
     def build_timeline(self) -> pd.DataFrame:
         """
@@ -575,7 +584,10 @@ class TimelineBuilder:
             Dictionary with the name of databases and interpolation weights.
         """
 
-        if row["producer"] in self.node_collections["first_level_background_static"]:
+        if (
+            row["producer"] in self.node_collections["first_level_background_static"]
+            or row["producer"] in self.background_td_producers
+        ):
             return {
                 self.reversed_database_dates[x]: v
                 for x, v in row["temporal_market_shares"].items()

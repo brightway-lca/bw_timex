@@ -273,11 +273,14 @@ class EdgeExtractionBFS:
         edge_filter_function: Callable = None,
         cutoff: float = 1e-9,
         static_activity_indices: set[int] | None = None,
+        background_traversal_depth: int = 0,
     ) -> None:
         self.lca_object = lca_object
         self.edge_ff = edge_filter_function if edge_filter_function else lambda x: False
         self.cutoff = cutoff
         self.static_activity_indices = static_activity_indices or set()
+        self.background_traversal_depth = background_traversal_depth
+        self.background_td_producers = set()
 
         if isinstance(starting_datetime, str):
             if starting_datetime == "now":
@@ -371,9 +374,50 @@ class EdgeExtractionBFS:
             inputs.append(input_id)
         return inputs
 
+    def _get_background_technosphere_inputs_with_td(
+        self, activity_id: int
+    ) -> list[tuple[int, object, str]]:
+        """
+        For a background activity, look up its exchanges in the database
+        and return only those technosphere inputs that have temporal distributions.
+
+        Returns list of (input_id, td_scaled_by_amount, edge_type) tuples.
+        """
+        import bw2data as bd
+
+        node = bd.get_node(id=activity_id)
+        production_amount = self._get_production_amount(activity_id)
+        results = []
+
+        for exc in node.technosphere():
+            td_raw = exc.get("temporal_distribution")
+            if td_raw is None:
+                continue
+
+            if isinstance(td_raw, str) and "__loader__" in td_raw:
+                data = json.loads(td_raw)
+                td_raw = loader_registry[data["__loader__"]](data)
+
+            if not isinstance(td_raw, TemporalDistribution):
+                continue
+
+            input_id = exc.input.id
+            edge_type = exc.get("type", "technosphere")
+            sign = -1 if edge_type in ("generic consumption", "technosphere") else 1
+            amount = sign * exc["amount"]
+
+            td_producer = (td_raw * amount) / abs(production_amount)
+            results.append((input_id, td_producer, edge_type))
+
+        return results
+
     def build_edge_timeline(self) -> list:
         """
         BFS traversal of the supply chain, extracting temporal edges.
+
+        Supports depth-tracked traversal into background databases
+        when background_traversal_depth > 0. Only follows edges that
+        have temporal distributions.
 
         Returns a list of Edge instances compatible with the existing
         EdgeExtractor output format.
@@ -406,11 +450,67 @@ class EdgeExtractionBFS:
                 )
             )
 
-            queue.append((fu_id, td, self.t0, self.t0, abs(fu_amount)))
+            queue.append((fu_id, td, self.t0, self.t0, abs(fu_amount), 0))
 
         while queue:
-            node_id, td, td_parent, abs_td, supply = queue.popleft()
+            node_id, td, td_parent, abs_td, supply, bg_depth = queue.popleft()
 
+            is_background_node = self.edge_ff(node_id) or node_id in self.static_activity_indices
+
+            # Background node within depth limit: look up TD-bearing exchanges from DB
+            if is_background_node and bg_depth < self.background_traversal_depth:
+                bg_inputs = self._get_background_technosphere_inputs_with_td(node_id)
+
+                for input_id, td_producer, edge_type in bg_inputs:
+                    if isinstance(td_producer, Number):
+                        td_producer = TemporalDistribution(
+                            date=np.array([0], dtype="timedelta64[Y]"),
+                            amount=np.array([td_producer]),
+                        )
+
+                    distribution = (td * td_producer).simplify()
+                    abs_td_producer = _join_datetime_and_timedelta_distributions(
+                        td_producer, abs_td
+                    )
+
+                    self.background_td_producers.add(input_id)
+
+                    timeline.append(
+                        Edge(
+                            edge_type=edge_type,
+                            distribution=distribution,
+                            leaf=True,
+                            consumer=node_id,
+                            producer=input_id,
+                            td_producer=td_producer,
+                            td_consumer=td_parent,
+                            abs_td_producer=abs_td_producer,
+                            abs_td_consumer=abs_td,
+                        )
+                    )
+
+                    # Enqueue for further depth if input is also background and within limit
+                    if (
+                        input_id in self.static_activity_indices
+                        and bg_depth + 1 < self.background_traversal_depth
+                    ):
+                        if isinstance(td_producer, TemporalDistribution):
+                            edge_supply = abs(td_producer.amount.sum())
+                        else:
+                            edge_supply = abs(td_producer)
+                        new_supply = supply * edge_supply
+                        if new_supply >= self.cutoff * total_demand:
+                            queue.append((
+                                input_id,
+                                distribution,
+                                td_producer,
+                                abs_td_producer,
+                                new_supply,
+                                bg_depth + 1,
+                            ))
+                continue  # skip normal processing for this background node
+
+            # Normal foreground processing (existing logic, unchanged)
             production_amount = self._get_production_amount(node_id)
             input_ids = self._get_technosphere_inputs(node_id)
 
@@ -462,6 +562,22 @@ class EdgeExtractionBFS:
                         td_producer,
                         abs_td_producer,
                         new_supply,
+                        bg_depth,
+                    ))
+                elif (
+                    leaf
+                    and self.background_traversal_depth > 0
+                    and bg_depth < self.background_traversal_depth
+                    and new_supply >= self.cutoff * total_demand
+                ):
+                    # Enqueue background leaf nodes for depth-tracked traversal
+                    queue.append((
+                        input_id,
+                        distribution,
+                        td_producer,
+                        abs_td_producer,
+                        new_supply,
+                        bg_depth,
                     ))
 
         return timeline
