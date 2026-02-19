@@ -8,7 +8,7 @@ from bw2calc import LCA
 from bw2data.configuration import labels
 from loguru import logger
 
-from .edge_extractor import Edge, EdgeExtractionBFS, EdgeExtractor
+from .edge_extractor import Edge, EdgeExtractorBFS, EdgeExtractor
 from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
@@ -99,7 +99,7 @@ class TimelineBuilder:
 
         logger.info("Traversing supply chain graph...")
         if graph_traversal == "bfs":
-            self.edge_extractor = EdgeExtractionBFS(
+            self.edge_extractor = EdgeExtractorBFS(
                 lca_object=base_lca,
                 starting_datetime=self.starting_datetime,
                 edge_filter_function=edge_filter_function,

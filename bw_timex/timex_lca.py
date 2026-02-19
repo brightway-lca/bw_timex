@@ -196,7 +196,7 @@ class TimexLCA:
             2000.
         graph_traversal : str, optional
             The graph traversal algorithm to use. Default is 'priority' (priority-first,
-            using bw_temporalis TemporalisLCA). Alternative is 'bfs' (breadth-first search,
+            using bw_temporalis TemporalisLCA). Alternative is 'bfs' (Breadth-First-Search,
             independent of TemporalisLCA, avoids per-subgraph LCA overhead).
         *args : iterable
             Positional arguments for the graph traversal, for `bw_temporalis.TemporalisLCA` passed

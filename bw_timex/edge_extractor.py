@@ -252,15 +252,16 @@ class EdgeExtractor(TemporalisLCA):
             )
 
 
-class EdgeExtractionBFS:
+class EdgeExtractorBFS:
     """
-    BFS-based graph traversal for extracting temporal edges from the supply chain.
+    Breadth-First-Search (BFS) graph traversal for extracting temporal edges from
+    the supply chain.
 
     Unlike EdgeExtractor (which inherits from TemporalisLCA and uses priority-first
     traversal with per-subgraph LCA calculations), this class works directly with
-    the technosphere matrix from a bw2calc LCA object and traverses using
-    breadth-first search. This avoids the overhead of computing individual subgraph
-    LCAs for priority ordering.
+    the technosphere matrix from a bw2calc LCA object and traverses using BFS.
+    This avoids the overhead of computing individual subgraph LCAs for priority
+    ordering.
 
     Returns the same list[Edge] format as EdgeExtractor, so all downstream code
     (TimelineBuilder, MatrixModifier, etc.) works unchanged.
@@ -373,7 +374,8 @@ class EdgeExtractionBFS:
 
     def build_edge_timeline(self) -> list:
         """
-        BFS traversal of the supply chain, extracting temporal edges.
+        Breadth-First-Search (BFS) traversal of the supply chain, extracting
+        temporal edges.
 
         Returns a list of Edge instances compatible with the existing
         EdgeExtractor output format.
