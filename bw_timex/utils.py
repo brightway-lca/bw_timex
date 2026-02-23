@@ -472,6 +472,36 @@ def add_temporal_distribution_to_exchange(
     logger.info(f"Added temporal distribution to exchange {exchange}.")
 
 
+def add_temporal_evolution_to_exchange(
+    temporal_evolution_factors: dict = None,
+    temporal_evolution_amounts: dict = None,
+    **kwargs,
+):
+    """Add temporal evolution data to an exchange specified by kwargs.
+
+    Parameters
+    ----------
+    temporal_evolution_factors : dict, optional
+        Dictionary mapping datetime keys to scaling factors.
+    temporal_evolution_amounts : dict, optional
+        Dictionary mapping datetime keys to absolute amounts.
+    **kwargs :
+        Arguments to specify an exchange (same as get_exchange).
+
+    Returns
+    -------
+    None
+        The exchange is saved with the temporal evolution data.
+    """
+    exchange = get_exchange(**kwargs)
+    if temporal_evolution_factors is not None:
+        exchange["temporal_evolution_factors"] = temporal_evolution_factors
+    if temporal_evolution_amounts is not None:
+        exchange["temporal_evolution_amounts"] = temporal_evolution_amounts
+    exchange.save()
+    logger.info(f"Added temporal evolution to exchange {exchange}.")
+
+
 def interactive_td_widget():
     """
     Create an interactive ipywidget for drafting and visualizing temporal distributions and copying 
@@ -828,3 +858,50 @@ def interactive_td_widget():
     mode.observe(_mode_refresh, names="value")
 
     return container
+
+
+def get_temporal_evolution_factor(
+    temporal_evolution: dict,
+    target_date: datetime,
+) -> float:
+    """Linearly interpolate a scaling factor for a given date from a temporal evolution dict.
+
+    Parameters
+    ----------
+    temporal_evolution : dict or None
+        Dictionary mapping datetime keys to float scaling factors.
+        If None or empty, returns 1.0 (no scaling).
+    target_date : datetime
+        The calendar date to look up the factor for.
+
+    Returns
+    -------
+    float
+        The interpolated scaling factor. Clamped to the nearest boundary
+        value for dates outside the specified range.
+    """
+    if not temporal_evolution:
+        return 1.0
+
+    sorted_dates = sorted(temporal_evolution.keys())
+
+    if len(sorted_dates) == 1:
+        return temporal_evolution[sorted_dates[0]]
+
+    # Clamp: below minimum
+    if target_date <= sorted_dates[0]:
+        return temporal_evolution[sorted_dates[0]]
+
+    # Clamp: above maximum
+    if target_date >= sorted_dates[-1]:
+        return temporal_evolution[sorted_dates[-1]]
+
+    # Find surrounding dates and interpolate
+    for i in range(len(sorted_dates) - 1):
+        lower = sorted_dates[i]
+        upper = sorted_dates[i + 1]
+        if lower <= target_date <= upper:
+            weight = (target_date - lower).total_seconds() / (upper - lower).total_seconds()
+            return temporal_evolution[lower] * (1 - weight) + temporal_evolution[upper] * weight
+
+    return 1.0  # fallback

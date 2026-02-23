@@ -164,7 +164,8 @@ class TimelineBuilder:
 
         # Explode datetime and amount columns: each row with multiple dates and amounts is exploded into multiple rows with one date and one amount
         edges_df = edges_df.explode(["consumer_date", "producer_date", "amount"])
-        edges_df.drop_duplicates(inplace=True)
+        dedup_cols = [c for c in edges_df.columns if c != "temporal_evolution"]
+        edges_df.drop_duplicates(subset=dedup_cols, inplace=True)
         edges_df = edges_df[edges_df["amount"] != 0]
 
         # For the Functional Unit: set consumer date = producer date as it occurs at the same time
@@ -197,7 +198,7 @@ class TimelineBuilder:
                     "consumer",
                 ]
             )
-            .agg({"amount": "sum"})
+            .agg({"amount": "sum", "temporal_evolution": "first"})
             .reset_index()
         )
 
@@ -271,6 +272,7 @@ class TimelineBuilder:
                 "consumer_name",
                 "amount",
                 "temporal_market_shares",
+                "temporal_evolution",
             ]
         ]
 
@@ -319,6 +321,7 @@ class TimelineBuilder:
             "producer_date": edge.abs_td_producer.date,
             "amount": edge.abs_td_producer.amount,
             "edge_type": edge.edge_type,
+            "temporal_evolution": edge.temporal_evolution,
         }
 
     def adjust_sign_of_amount_based_on_edge_type(self, edge_type):

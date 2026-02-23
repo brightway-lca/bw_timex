@@ -256,3 +256,56 @@ database_dates = {
 :::{note}
 You can use whatever data source you want for the time-specific process data. A nice package from the Brightway cosmos that can help you is [premise](https://premise.readthedocs.io/en/latest/introduction.html).
 :::
+
+## Temporal evolution of foreground exchanges (optional)
+
+The approaches above handle temporal variation in the *background* system — different database snapshots for different points in time. But what if a *foreground* exchange itself changes over time? For example, an industrial process might become more energy-efficient over the years, so its electricity consumption per unit of output decreases.
+
+`bw_timex` supports this via **temporal evolution** attributes on exchanges. These are optional — if you don't add them, exchange amounts remain constant over time as before.
+
+There are two ways to specify temporal evolution:
+
+**Scaling factors** — multiply the base exchange amount by a time-dependent factor:
+
+```python
+from datetime import datetime
+
+exchange["temporal_evolution_factors"] = {
+    datetime(2020, 1, 1): 1.0,   # 100% of base amount in 2020
+    datetime(2030, 1, 1): 0.75,  # 75% of base amount in 2030
+    datetime(2040, 1, 1): 0.6,   # 60% of base amount in 2040
+}
+```
+
+**Absolute amounts** — directly specify the exchange amount at each point in time:
+
+```python
+exchange["temporal_evolution_amounts"] = {
+    datetime(2020, 1, 1): 60,   # 60 MJ in 2020
+    datetime(2030, 1, 1): 45,   # 45 MJ in 2030
+    datetime(2040, 1, 1): 36,   # 36 MJ in 2040
+}
+```
+
+For dates between the specified points, values are linearly interpolated. For dates outside the range, the nearest boundary value is used. If both attributes are present on the same exchange, `temporal_evolution_amounts` takes precedence.
+
+A convenience function is available to add temporal evolution to an existing exchange:
+
+```python
+from bw_timex.utils import add_temporal_evolution_to_exchange
+
+add_temporal_evolution_to_exchange(
+    temporal_evolution_factors={
+        datetime(2020, 1, 1): 1.0,
+        datetime(2030, 1, 1): 0.75,
+    },
+    input_code="B",
+    input_database="background",
+    output_code="A",
+    output_database="foreground",
+)
+```
+
+:::{note}
+Temporal evolution only applies to foreground exchanges. Background process evolution is handled by the database interpolation mechanism described above.
+:::

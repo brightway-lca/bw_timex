@@ -9,4 +9,8 @@ from .fixtures.temporal_grouping_fixture import (
     temporal_grouping_db_hourly,
     temporal_grouping_db_monthly,
 )
+from .fixtures.temporal_evolution_db_fixture import (
+    temporal_evolution_amounts_db,
+    temporal_evolution_db,
+)
 from .fixtures.vehicle_db_fixture import vehicle_db

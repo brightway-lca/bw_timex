@@ -30,6 +30,7 @@ class Edge:
     td_consumer: TemporalDistribution
     abs_td_producer: TemporalDistribution = None
     abs_td_consumer: TemporalDistribution = None
+    temporal_evolution: dict = None
 
 
 class EdgeExtractor(TemporalisLCA):
@@ -134,6 +135,19 @@ class EdgeExtractor(TemporalisLCA):
                     "type"
                 ]  # can be technosphere, substitution, production or other string
 
+                # Extract temporal evolution data from exchange
+                temporal_evolution = None
+                exc_data = exchange.data
+                if exc_data.get("temporal_evolution_amounts") is not None:
+                    base_amount = exc_data["amount"]
+                    if base_amount != 0:
+                        temporal_evolution = {
+                            k: v / abs(base_amount)
+                            for k, v in exc_data["temporal_evolution_amounts"].items()
+                        }
+                elif exc_data.get("temporal_evolution_factors") is not None:
+                    temporal_evolution = exc_data["temporal_evolution_factors"]
+
                 td_producer = (  # td_producer is the TemporalDistribution of the edge
                     self._exchange_value(
                         exchange=exchange,
@@ -170,6 +184,7 @@ class EdgeExtractor(TemporalisLCA):
                             td_producer, abs_td
                         ),
                         abs_td_consumer=abs_td,
+                        temporal_evolution=temporal_evolution,
                     )
                 )
                 if not leaf:
