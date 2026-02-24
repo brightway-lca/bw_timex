@@ -287,7 +287,7 @@ exchange["temporal_evolution_amounts"] = {
 }
 ```
 
-For dates between the specified points, values are linearly interpolated. For dates outside the range, the nearest boundary value is used. If both attributes are present on the same exchange, `temporal_evolution_amounts` takes precedence.
+For dates between the specified points, values are linearly interpolated. For dates outside the range, the nearest boundary value is used. You can specify either `temporal_evolution_amounts` or `temporal_evolution_amounts` for the same exchange, but not both.
 
 A convenience function is available to add temporal evolution to an existing exchange:
 
