@@ -138,14 +138,25 @@ class EdgeExtractor(TemporalisLCA):
                 # Extract temporal evolution data from exchange
                 temporal_evolution = None
                 exc_data = exchange.data
-                if exc_data.get("temporal_evolution_amounts") is not None:
+                has_amounts = exc_data.get("temporal_evolution_amounts") is not None
+                has_factors = exc_data.get("temporal_evolution_factors") is not None
+
+                if has_amounts and has_factors:
+                    raise ValueError(
+                        f"Exchange from {exc_data.get('input')} to "
+                        f"{exc_data.get('output', node.key)} has both "
+                        f"'temporal_evolution_amounts' and 'temporal_evolution_factors'. "
+                        f"These are mutually exclusive — use one or the other."
+                    )
+
+                if has_amounts:
                     base_amount = exc_data["amount"]
                     if base_amount != 0:
                         temporal_evolution = {
                             k: v / abs(base_amount)
                             for k, v in exc_data["temporal_evolution_amounts"].items()
                         }
-                elif exc_data.get("temporal_evolution_factors") is not None:
+                elif has_factors:
                     temporal_evolution = exc_data["temporal_evolution_factors"]
 
                 td_producer = (  # td_producer is the TemporalDistribution of the edge

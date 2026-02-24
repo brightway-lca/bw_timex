@@ -257,7 +257,7 @@ database_dates = {
 You can use whatever data source you want for the time-specific process data. A nice package from the Brightway cosmos that can help you is [premise](https://premise.readthedocs.io/en/latest/introduction.html).
 :::
 
-## Temporal evolution of foreground exchanges (optional)
+## Temporal evolution of foreground exchanges (`bw_timex>0.3.4`)
 
 The approaches above handle temporal variation in the *background* system — different database snapshots for different points in time. But what if a *foreground* exchange itself changes over time? For example, an industrial process might become more energy-efficient over the years, so its electricity consumption per unit of output decreases.
 

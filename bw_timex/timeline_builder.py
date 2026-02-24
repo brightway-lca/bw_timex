@@ -164,6 +164,13 @@ class TimelineBuilder:
 
         # Explode datetime and amount columns: each row with multiple dates and amounts is exploded into multiple rows with one date and one amount
         edges_df = edges_df.explode(["consumer_date", "producer_date", "amount"])
+
+        # Create a hashable key from temporal_evolution dicts for dedup and groupby
+        # (dicts are unhashable, so we need a hashable proxy column)
+        edges_df["_te_key"] = edges_df["temporal_evolution"].apply(
+            lambda d: tuple(sorted(d.items())) if isinstance(d, dict) else None
+        )
+
         dedup_cols = [c for c in edges_df.columns if c != "temporal_evolution"]
         edges_df.drop_duplicates(subset=dedup_cols, inplace=True)
         edges_df = edges_df[edges_df["amount"] != 0]
@@ -196,10 +203,13 @@ class TimelineBuilder:
                     "consumer_grouping_time",
                     "producer",
                     "consumer",
-                ]
+                    "_te_key",
+                ],
+                dropna=False,
             )
             .agg({"amount": "sum", "temporal_evolution": "first"})
             .reset_index()
+            .drop(columns=["_te_key"])
         )
 
         # convert grouping times, which was only used as intermediate variable, back to datetime

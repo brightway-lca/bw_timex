@@ -493,6 +493,11 @@ def add_temporal_evolution_to_exchange(
     None
         The exchange is saved with the temporal evolution data.
     """
+    if temporal_evolution_factors is not None and temporal_evolution_amounts is not None:
+        raise ValueError(
+            "'temporal_evolution_factors' and 'temporal_evolution_amounts' are "
+            "mutually exclusive — use one or the other."
+        )
     exchange = get_exchange(**kwargs)
     if temporal_evolution_factors is not None:
         exchange["temporal_evolution_factors"] = temporal_evolution_factors

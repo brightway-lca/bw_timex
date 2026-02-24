@@ -61,6 +61,22 @@ class TestGetTemporalEvolutionFactor:
         assert get_temporal_evolution_factor(None, datetime(2025, 1, 1)) == 1.0
 
 
+from bw_timex.utils import add_temporal_evolution_to_exchange
+
+
+class TestMutualExclusivity:
+    """Tests that temporal_evolution_factors and temporal_evolution_amounts are mutually exclusive."""
+
+    def test_helper_rejects_both(self):
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            add_temporal_evolution_to_exchange(
+                temporal_evolution_factors={datetime(2020, 1, 1): 1.0},
+                temporal_evolution_amounts={datetime(2020, 1, 1): 10.0},
+                input_code="dummy",
+                output_code="dummy",
+            )
+
+
 import bw2data as bd
 import numpy as np
 from bw2data.tests import bw2test
