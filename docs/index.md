@@ -8,7 +8,7 @@ This package enables you to account for:
 - **Variable** and/or **evolving** supply chains & technologies (e.g., increasing shares of renewable electricity or higher process efficiencies in the future)
 - **Timing of emissions** (by applying dynamic characterization functions)
 
-You can define temporal distributions for process and emission exchanges, which are then automatically propagated through the supply chain and mapped to corresponding time-explicit databases. Optionally, you can also define the temporal evolution of processes and emission exchanges, which applies a time-dependent modification to the exchange amounts compared to the original amounts. The resulting time-explicit LCI reflects the current technology status within the production system at the actual time of each process. Also, `bw_timex` keeps track of the timing of emissions, which means that you can apply dynamic characterization functions.
+You can define temporal distributions for process and emission exchanges, which are then automatically propagated through the supply chain and mapped to corresponding time-specific background databases. In addition, you can also define the temporal evolution of processes and emission exchanges, which applies a time-dependent modification to the exchange amounts compared to the original amounts. The resulting time-explicit LCI reflects the current technology status within the production system at the actual time of each process. Also, `bw_timex` keeps track of the timing of emissions, which means that you can apply dynamic characterization functions.
 
 ## 💡 Use Cases
 `bw_timex` is ideal for cases with:
