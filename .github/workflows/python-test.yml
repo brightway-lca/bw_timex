@@ -36,40 +36,19 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest] # , windows-latest, macos-latest
-        py-version: ["3.10", "3.11", "3.12"]
+        py-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v5
 
-      # Set up Miniconda
-      - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          python-version: ${{ matrix.py-version }}
-          miniconda-version: "latest"  # Ensure Miniconda is installed
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
 
-      # Create the conda environment
-      - name: Create conda environment
-        run: conda create -n timex -c conda-forge -c cmutel -c diepers brightway25 bw_temporalis dynamic_characterization matplotlib seaborn
+      - name: Set up Python ${{ matrix.py-version }}
+        run: uv python install ${{ matrix.py-version }}
 
-      # Install testing dependencies from pyproject.toml
-      - name: Install testing dependencies
-        run: |
-          source $(conda info --base)/etc/profile.d/conda.sh
-          conda activate timex
-          pip install .[testing]
+      - name: Install dependencies
+        run: uv sync --extra testing
 
-      # Verify the environment
-      - name: Check conda environment
-        run: |
-          source $(conda info --base)/etc/profile.d/conda.sh
-          conda activate timex
-          conda info
-          conda list
-
-      # Test with pytest
       - name: Test with pytest
-        run: |
-          source $(conda info --base)/etc/profile.d/conda.sh
-          conda activate timex
-          pytest
+        run: uv run pytest
