@@ -214,3 +214,67 @@ class TestClass_EV:
         assert self.tlca.static_score == pytest.approx(
             expected_timex_score, abs=0.5
         )  # allow for some rounding errors
+
+
+@pytest.mark.usefixtures("vehicle_db")
+class TestClass_EV_BFS:
+    """Test the BFS graph traversal produces compatible results."""
+
+    @pytest.fixture(autouse=True)
+    def setup_method(self, vehicle_db):
+        self.electric_vehicle = bd.get_node(database="foreground", code="EV")
+
+        self.database_dates = {
+            "db_2020": datetime.strptime("2020", "%Y"),
+            "db_2030": datetime.strptime("2030", "%Y"),
+            "db_2040": datetime.strptime("2040", "%Y"),
+            "foreground": "dynamic",
+        }
+
+        self.tlca = TimexLCA(
+            demand={self.electric_vehicle.key: 1},
+            method=("GWP", "example"),
+            database_dates=self.database_dates,
+        )
+
+        self.tlca.build_timeline(
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+            graph_traversal="bfs",
+        )
+        self.tlca.lci()
+        self.tlca.static_lcia()
+
+    def test_bfs_timeline_not_empty(self):
+        assert len(self.tlca.timeline) > 0
+
+    def test_bfs_has_same_producers(self):
+        tlca_priority = TimexLCA(
+            demand={self.electric_vehicle.key: 1},
+            method=("GWP", "example"),
+            database_dates=self.database_dates,
+        )
+        tlca_priority.build_timeline(
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+            graph_traversal="priority",
+        )
+
+        bfs_producers = set(self.tlca.timeline["producer"].unique())
+        priority_producers = set(tlca_priority.timeline["producer"].unique())
+        assert bfs_producers == priority_producers
+
+    def test_bfs_static_lcia_score(self):
+        tlca_priority = TimexLCA(
+            demand={self.electric_vehicle.key: 1},
+            method=("GWP", "example"),
+            database_dates=self.database_dates,
+        )
+        tlca_priority.build_timeline(
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+            graph_traversal="priority",
+        )
+        tlca_priority.lci()
+        tlca_priority.static_lcia()
+
+        assert self.tlca.static_score == pytest.approx(
+            tlca_priority.static_score, rel=1e-3
+        )

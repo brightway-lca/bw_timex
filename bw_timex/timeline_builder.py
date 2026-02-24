@@ -8,7 +8,7 @@ from bw2calc import LCA
 from bw2data.configuration import labels
 from loguru import logger
 
-from .edge_extractor import Edge, EdgeExtractor
+from .edge_extractor import Edge, EdgeExtractorBFS, EdgeExtractor
 from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
@@ -40,6 +40,7 @@ class TimelineBuilder:
         interpolation_type: str = "linear",
         cutoff: float = 1e-9,
         max_calc: int = 2000,
+        graph_traversal: str = "priority",
         *args,
         **kwargs,
     ) -> None:
@@ -97,16 +98,29 @@ class TimelineBuilder:
         }
 
         logger.info("Traversing supply chain graph...")
-        self.edge_extractor = EdgeExtractor(
-            base_lca,
-            starting_datetime=self.starting_datetime,
-            *args,
-            edge_filter_function=edge_filter_function,
-            cutoff=self.cutoff,
-            max_calc=self.max_calc,
-            static_activity_indices=set(static_background_activity_ids),
-            **kwargs,
-        )
+        if graph_traversal == "bfs":
+            self.edge_extractor = EdgeExtractorBFS(
+                lca_object=base_lca,
+                starting_datetime=self.starting_datetime,
+                edge_filter_function=edge_filter_function,
+                cutoff=self.cutoff,
+                static_activity_indices=set(static_background_activity_ids),
+            )
+        elif graph_traversal == "priority":
+            self.edge_extractor = EdgeExtractor(
+                base_lca,
+                starting_datetime=self.starting_datetime,
+                *args,
+                edge_filter_function=edge_filter_function,
+                cutoff=self.cutoff,
+                max_calc=self.max_calc,
+                static_activity_indices=set(static_background_activity_ids),
+                **kwargs,
+            )
+        else:
+            raise ValueError(
+                f"Unknown graph_traversal '{graph_traversal}'. Use 'priority' or 'bfs'."
+            )
         self.edge_timeline = self.edge_extractor.build_edge_timeline()
 
     def build_timeline(self) -> pd.DataFrame:
