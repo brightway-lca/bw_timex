@@ -2,6 +2,7 @@ from datetime import datetime
 from functools import partial
 from itertools import chain
 from typing import Callable, Optional
+from collections.abc import Mapping
 
 import bw2data as bd
 import matplotlib.pyplot as plt
@@ -124,7 +125,11 @@ class TimexLCA:
             )
             self.database_dates = {key[0]: "dynamic" for key in demand.keys()}
 
+      
+
         self.check_format_database_dates()
+
+        self.check_demand_exists()
 
         # Create static_only dict that excludes dynamic processes that will be exploded later.
         # This way we only have the "background databases" that we can later link to from the dates
@@ -1110,6 +1115,75 @@ class TimexLCA:
             indexed_demand = None
 
         return indexed_demand, data_objs, remapping_dicts
+    
+    def check_demand_exists(self) -> None:
+        """
+        Checks that the demand is provided in the correct format, that the demand activities
+        exist in the current Brightway2 project, and that they belong to a database marked
+        as 'dynamic' in database_dates.
+        
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+            raises an error if the demand activities do not exist in the Brightway project 
+            or if they are not in the 'dynamic' database.
+       
+        """
+
+        dynamic_databases = {db for db, value in self.database_dates.items() if value == "dynamic"}
+
+        if not isinstance(self.demand, Mapping):
+            raise ValueError("Demand must be a dictionary")
+
+        for key in self.demand:
+            if isinstance(key, int): # integer id
+                if not bd.backends.ActivityDataset.select().where(
+                    bd.backends.ActivityDataset.id == key
+                ).exists():
+                    raise ValueError(
+                        f"Demand with id '{key}' does not exist in the Brightway2 project {bd.projects.current}."
+                    )
+                db_name = bd.backends.ActivityDataset.get(bd.backends.ActivityDataset.id == key).database
+
+            elif isinstance(key, bd.Node): # node object
+                try:
+                    current_node = bd.backends.ActivityDataset.get(
+                        bd.backends.ActivityDataset.database == key["database"],
+                        bd.backends.ActivityDataset.code == key["code"]
+                    )
+                    if current_node.id != key.id:
+                        raise ValueError
+                except (bd.backends.ActivityDataset.DoesNotExist, ValueError):
+                    raise ValueError(
+                        f"Demand '{key}' does not exist in the Brightway2 project '{bd.projects.current}'."
+                    )
+                db_name = key["database"]
+           
+            elif isinstance(key, tuple) and len(key) == 2: # (database, code) tuple
+                try:
+                    current_node = bd.backends.ActivityDataset.get(
+                        bd.backends.ActivityDataset.database == key[0],
+                        bd.backends.ActivityDataset.code == key[1]
+                    )
+                except bd.backends.ActivityDataset.DoesNotExist:
+                    raise ValueError(
+                        f"Demand '{key}' does not exist in the Brightway2 project '{bd.projects.current}'."
+                    )
+                db_name = key[0]
+
+            else: 
+                raise ValueError(
+                    f"Unknown demand key format: {key}"
+                )
+
+            if db_name not in dynamic_databases:
+                raise ValueError(
+                    f"Demand '{key}' is in database '{db_name}', which is not marked 'dynamic' in the database_dates. Please check. Dynamic databases are {dynamic_databases}."
+                )
 
     def check_format_database_dates(self) -> None:
         """
