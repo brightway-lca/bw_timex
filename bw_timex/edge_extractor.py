@@ -484,13 +484,15 @@ class EdgeExtractorBFS:
                 new_supply = supply * edge_supply / abs(production_amount)
 
                 if not leaf and new_supply >= self.cutoff * total_demand:
-                    queue.append((
-                        input_id,
-                        distribution,
-                        td_producer,
-                        abs_td_producer,
-                        new_supply,
-                    ))
+                    queue.append(
+                        (
+                            input_id,
+                            distribution,
+                            td_producer,
+                            abs_td_producer,
+                            new_supply,
+                        )
+                    )
 
         return timeline
 

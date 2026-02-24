@@ -8,7 +8,7 @@ from bw2calc import LCA
 from bw2data.configuration import labels
 from loguru import logger
 
-from .edge_extractor import Edge, EdgeExtractorBFS, EdgeExtractor
+from .edge_extractor import Edge, EdgeExtractor, EdgeExtractorBFS
 from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
@@ -210,6 +210,7 @@ class TimelineBuilder:
         )
 
         # group unique pair of consumer and producer with the same grouping times
+        # _te_key ensures exchanges with different temporal_evolution dicts stay separate
         grouped_edges = (
             edges_df.groupby(
                 [
@@ -221,10 +222,14 @@ class TimelineBuilder:
                 ],
                 dropna=False,
             )
-            .agg({"amount": "sum", "temporal_evolution": "first"})
+            .agg({"amount": "sum"})
             .reset_index()
-            .drop(columns=["_te_key"])
         )
+        # Reconstruct temporal_evolution dicts from the hashable _te_key
+        grouped_edges["temporal_evolution"] = grouped_edges["_te_key"].apply(
+            lambda k: dict(k) if isinstance(k, tuple) else None
+        )
+        grouped_edges.drop(columns=["_te_key"], inplace=True)
 
         # convert grouping times, which was only used as intermediate variable, back to datetime
         grouped_edges["date_producer"] = grouped_edges["producer_grouping_time"].apply(
