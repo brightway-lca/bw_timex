@@ -125,11 +125,18 @@ class TimexLCA:
             )
             self.database_dates = {key[0]: "dynamic" for key in demand.keys()}
 
-      
 
         self.check_format_database_dates()
 
-        self.check_demand_exists()
+        logger.info("Calculating base LCA...")
+        # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
+        # background databases in the LCA. We need all the IDs for the time mapping dict.
+        fu, data_objs, remapping = self.prepare_base_lca_inputs(
+            demand=self.demand, method=self.method
+        )
+        self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
+        self.base_lca.lci()
+        self.base_lca.lcia()
 
         # Create static_only dict that excludes dynamic processes that will be exploded later.
         # This way we only have the "background databases" that we can later link to from the dates
@@ -238,16 +245,6 @@ class TimexLCA:
         self.interpolation_type = interpolation_type
         self.cutoff = cutoff
         self.max_calc = max_calc
-
-        logger.info("Calculating base LCA...")
-        # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
-        # background databases in the LCA. We need all the IDs for the time mapping dict.
-        fu, data_objs, remapping = self.prepare_base_lca_inputs(
-            demand=self.demand, method=self.method
-        )
-        self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
-        self.base_lca.lci()
-        self.base_lca.lcia()
 
         logger.info("Creating activity time mapping...")
         # Create a time mapping dict that maps each activity to a activity_time_mapping_id in the
@@ -930,6 +927,7 @@ class TimexLCA:
         remapping_dicts = None
 
         demand_database_names = list(self.database_dates.keys())
+        dynamic_database_names = list(db for db, value in self.database_dates.items() if value == "dynamic")
 
         if demand_database_names:
             database_names = set.union(
@@ -982,6 +980,15 @@ class TimexLCA:
         else:
             indexed_demand = None
 
+        for act in demand: 
+            if not isinstance(act, bd.Node): 
+                act = bd.get_activity(act)
+                 
+            if act["database"] not in dynamic_database_names:
+                raise ValueError(
+                    f"Demand activity {act} from database {act['database']}: This database is not marked as 'dynamic' in database_dates. Please check."
+                )
+            
         return indexed_demand, data_objs, remapping_dicts
 
     def prepare_bw_timex_inputs(
@@ -1116,75 +1123,6 @@ class TimexLCA:
 
         return indexed_demand, data_objs, remapping_dicts
     
-    def check_demand_exists(self) -> None:
-        """
-        Checks that the demand is provided in the correct format, that the demand activities
-        exist in the current Brightway2 project, and that they belong to a database marked
-        as 'dynamic' in database_dates.
-        
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-            raises an error if the demand activities do not exist in the Brightway project 
-            or if they are not in the 'dynamic' database.
-       
-        """
-
-        dynamic_databases = {db for db, value in self.database_dates.items() if value == "dynamic"}
-
-        if not isinstance(self.demand, Mapping):
-            raise ValueError("Demand must be a dictionary")
-
-        for key in self.demand:
-            if isinstance(key, int): # integer id
-                if not bd.backends.ActivityDataset.select().where(
-                    bd.backends.ActivityDataset.id == key
-                ).exists():
-                    raise ValueError(
-                        f"Demand with id '{key}' does not exist in the Brightway2 project {bd.projects.current}."
-                    )
-                db_name = bd.backends.ActivityDataset.get(bd.backends.ActivityDataset.id == key).database
-
-            elif isinstance(key, bd.Node): # node object
-                try:
-                    current_node = bd.backends.ActivityDataset.get(
-                        bd.backends.ActivityDataset.database == key["database"],
-                        bd.backends.ActivityDataset.code == key["code"]
-                    )
-                    if current_node.id != key.id:
-                        raise ValueError
-                except (bd.backends.ActivityDataset.DoesNotExist, ValueError):
-                    raise ValueError(
-                        f"Demand '{key}' does not exist in the Brightway2 project '{bd.projects.current}'."
-                    )
-                db_name = key["database"]
-           
-            elif isinstance(key, tuple) and len(key) == 2: # (database, code) tuple
-                try:
-                    current_node = bd.backends.ActivityDataset.get(
-                        bd.backends.ActivityDataset.database == key[0],
-                        bd.backends.ActivityDataset.code == key[1]
-                    )
-                except bd.backends.ActivityDataset.DoesNotExist:
-                    raise ValueError(
-                        f"Demand '{key}' does not exist in the Brightway2 project '{bd.projects.current}'."
-                    )
-                db_name = key[0]
-
-            else: 
-                raise ValueError(
-                    f"Unknown demand key format: {key}"
-                )
-
-            if db_name not in dynamic_databases:
-                raise ValueError(
-                    f"Demand '{key}' is in database '{db_name}', which is not marked 'dynamic' in the database_dates. Please check. Dynamic databases are {dynamic_databases}."
-                )
-
     def check_format_database_dates(self) -> None:
         """
         Checks that the database_dates is provided by the user in the correct format
