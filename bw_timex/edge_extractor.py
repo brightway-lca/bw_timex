@@ -35,6 +35,7 @@ class Edge:
     td_consumer: TemporalDistribution
     abs_td_producer: TemporalDistribution = None
     abs_td_consumer: TemporalDistribution = None
+    temporal_evolution: dict = None
 
 
 class EdgeExtractor(TemporalisLCA):
@@ -139,6 +140,30 @@ class EdgeExtractor(TemporalisLCA):
                     "type"
                 ]  # can be technosphere, substitution, production or other string
 
+                # Extract temporal evolution data from exchange
+                temporal_evolution = None
+                exc_data = exchange.data
+                has_amounts = exc_data.get("temporal_evolution_amounts") is not None
+                has_factors = exc_data.get("temporal_evolution_factors") is not None
+
+                if has_amounts and has_factors:
+                    raise ValueError(
+                        f"Exchange from {exc_data.get('input')} to "
+                        f"{exc_data.get('output', node.key)} has both "
+                        f"'temporal_evolution_amounts' and 'temporal_evolution_factors'. "
+                        f"These are mutually exclusive — use one or the other."
+                    )
+
+                if has_amounts:
+                    base_amount = exc_data["amount"]
+                    if base_amount != 0:
+                        temporal_evolution = {
+                            k: v / abs(base_amount)
+                            for k, v in exc_data["temporal_evolution_amounts"].items()
+                        }
+                elif has_factors:
+                    temporal_evolution = exc_data["temporal_evolution_factors"]
+
                 td_producer = (  # td_producer is the TemporalDistribution of the edge
                     self._exchange_value(
                         exchange=exchange,
@@ -175,6 +200,7 @@ class EdgeExtractor(TemporalisLCA):
                             td_producer, abs_td
                         ),
                         abs_td_consumer=abs_td,
+                        temporal_evolution=temporal_evolution,
                     )
                 )
                 if not leaf:
@@ -458,13 +484,15 @@ class EdgeExtractorBFS:
                 new_supply = supply * edge_supply / abs(production_amount)
 
                 if not leaf and new_supply >= self.cutoff * total_demand:
-                    queue.append((
-                        input_id,
-                        distribution,
-                        td_producer,
-                        abs_td_producer,
-                        new_supply,
-                    ))
+                    queue.append(
+                        (
+                            input_id,
+                            distribution,
+                            td_producer,
+                            abs_td_producer,
+                            new_supply,
+                        )
+                    )
 
         return timeline
 

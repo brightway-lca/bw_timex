@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from .helper_classes import InterDatabaseMapping
+from .utils import get_temporal_evolution_factor
 
 
 class MatrixModifier:
@@ -236,6 +237,13 @@ class MatrixModifier:
         scaled_amount = row.amount * abs(
             production_exchange_amount
         )  # abs value used for scaling to preserve the sign of the exchange
+
+        # Apply temporal evolution scaling if present
+        if hasattr(row, "temporal_evolution") and row.temporal_evolution is not None:
+            factor = get_temporal_evolution_factor(
+                row.temporal_evolution, row.date_producer
+            )
+            scaled_amount *= factor
 
         # Add entry between exploded consumer and exploded producer (not in background database)
         datapackage.add_persistent_vector(

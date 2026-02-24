@@ -101,10 +101,9 @@ Note how both the dates and the amounts of the output distribution get scaled.
 
 To convolute all the temporal information from the supply chain graph, `bw_timex` uses the graph traversal from
 [bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main). An in-depth
-description of how this works is available in the [brightway-docs](https://docs.brightway.dev/en/latest/content/theory/graph_traversal.html). In short,
-it is a best-first supply chain graph traversal, following the most
+description of how this works is available in the [brightway-docs](https://docs.brightway.dev/en/latest/content/theory/graph_traversal.html). The default is a best-first supply chain graph traversal, following the most
 impactful node in the graph based on the static pre-calculated LCIA score
-for a chosen impact category. Several input arguments for the graph traversal,
+for a chosen impact category. A breadth-first traversal is an optional alternative. Several input arguments for the graph traversal,
 such as maximum calculation count or cut-off, can be passed to the `TimexLCA`
 instance.
 
@@ -114,6 +113,36 @@ At each process, the graph traversal uses convolution to combine the
 temporal distributions of the process and the exchange it consumes into
 the resulting combined temporal distribution of the upstream producer
 of the exchange.
+
+
+
+## Temporal evolution in the foreground system
+`bw_timex` (>0.3.4) allows you to also implement time-dependent modifications to the foreground exchanges. This optional feature is useful if you want to simulate changes in the foreground system over time, such as technological learning, efficiency improvements or changing market structures. Such changes are not covered by the linking to time-specific background processes. 
+
+You can specify temporal evolution attributes on exchanges using either time-dependent scaling factors or absolute amounts. `bw_timex`, then, adjusts the base exchange amount based on the timing of the process, interpolating if needed between closest available scaling data. For scaling factors, it will multiply the base exchange amount with the time-specific scaling factor and for absolute amounts, it will directly set the value to the time-specific amount. These modified time-specific exchange amounts are then used throughout the rest of the `timexLCA`. 
+
+This temporal evolution of exchanges is optional, and if no temporal evolution is given, the exchange amounts remain constant over time.
+
+````{admonition} Example: temporal evolution
+:class: admonition-example
+Foreground exchange amounts can be modified with a dictionary of either time-dependent scaling factors or absolute amounts:
+
+```python
+from datetime import datetime
+
+exchange["temporal_evolution_factors"] = {
+    datetime(2020, 1, 1): 1.0,   # 100% of base amount in 2020
+    datetime(2030, 1, 1): 0.75,  # 75% of base amount in 2030
+    datetime(2040, 1, 1): 0.6,   # 60% of base amount in 2040
+}
+
+exchange["temporal_evolution_amounts"] = {
+    datetime(2020, 1, 1): 60,   # 60 MJ in 2020
+    datetime(2030, 1, 1): 45,   # 45 MJ in 2030
+    datetime(2040, 1, 1): 36,   # 36 MJ in 2040
+}
+```
+````
 
 ## Building the process timeline
 
@@ -131,7 +160,7 @@ to the temporal resolution of the available databases.
 :class: admonition-example
 
 Let's consider the following system: a process A consumes an
-exchange b from a process B. Both A and B emit CO<sub>2</sub>. The emission of CO<sub>2</sub> from B decreases in the future. All exchanges occur at a certain point in time, relative to process A, which takes place "now" (2024).
+exchange b from a process B. Both A and B emit CO<sub>2</sub>. The emission of CO<sub>2</sub> from B decreases in the future. All exchanges occur at a certain point in time, relative to process A, which takes place "now" (2024). This example does not contain include temporal evolution of foregound exchanges.
 ```{mermaid}
 flowchart LR
 subgraph background[" "]

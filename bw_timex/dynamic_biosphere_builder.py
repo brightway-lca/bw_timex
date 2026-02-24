@@ -6,7 +6,7 @@ from bw_temporalis import TemporalDistribution
 from scipy import sparse as sp
 
 from .helper_classes import SetList
-from .utils import convert_date_string_to_datetime
+from .utils import convert_date_string_to_datetime, get_temporal_evolution_factor
 
 
 class DynamicBiosphereBuilder:
@@ -169,6 +169,13 @@ class DynamicBiosphereBuilder:
                 ).date
                 date = td_producer[0]
 
+                # Get temporal evolution factor for this timestamp
+                temporal_evolution_factor = 1.0
+                if hasattr(row, "temporal_evolution") and row.temporal_evolution is not None:
+                    temporal_evolution_factor = get_temporal_evolution_factor(
+                        row.temporal_evolution, time_in_datetime
+                    )
+
                 if original_db == "temporalized":
                     act = bd.get_node(code=original_code)
                 else:
@@ -184,6 +191,7 @@ class DynamicBiosphereBuilder:
                             dates = td_producer  # datetime array, same time as producer
                             values = [
                                 exc["amount"]
+                                * temporal_evolution_factor
                                 * td_values[
                                     np.argmin(
                                         np.abs(
@@ -196,11 +204,11 @@ class DynamicBiosphereBuilder:
                         else:
                             # we can add a datetime of len(1) to a timedelta of len(N) easily
                             dates = td_producer + td_dates
-                            values = exc["amount"] * td_values
+                            values = exc["amount"] * temporal_evolution_factor * td_values
 
                     else:  # exchange has no TD
                         dates = td_producer  # datetime array, same time as producer
-                        values = [exc["amount"]]
+                        values = [exc["amount"] * temporal_evolution_factor]
 
                     # Add entries to dynamic bio matrix
                     for date, amount in zip(dates, values):

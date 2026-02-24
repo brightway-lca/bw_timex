@@ -8,7 +8,7 @@ from bw2calc import LCA
 from bw2data.configuration import labels
 from loguru import logger
 
-from .edge_extractor import Edge, EdgeExtractorBFS, EdgeExtractor
+from .edge_extractor import Edge, EdgeExtractor, EdgeExtractorBFS
 from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
@@ -178,7 +178,15 @@ class TimelineBuilder:
 
         # Explode datetime and amount columns: each row with multiple dates and amounts is exploded into multiple rows with one date and one amount
         edges_df = edges_df.explode(["consumer_date", "producer_date", "amount"])
-        edges_df.drop_duplicates(inplace=True)
+
+        # Create a hashable key from temporal_evolution dicts for dedup and groupby
+        # (dicts are unhashable, so we need a hashable proxy column)
+        edges_df["_te_key"] = edges_df["temporal_evolution"].apply(
+            lambda d: tuple(sorted(d.items())) if isinstance(d, dict) else None
+        )
+
+        dedup_cols = [c for c in edges_df.columns if c != "temporal_evolution"]
+        edges_df.drop_duplicates(subset=dedup_cols, inplace=True)
         edges_df = edges_df[edges_df["amount"] != 0]
 
         # For the Functional Unit: set consumer date = producer date as it occurs at the same time
@@ -202,6 +210,7 @@ class TimelineBuilder:
         )
 
         # group unique pair of consumer and producer with the same grouping times
+        # _te_key ensures exchanges with different temporal_evolution dicts stay separate
         grouped_edges = (
             edges_df.groupby(
                 [
@@ -209,11 +218,18 @@ class TimelineBuilder:
                     "consumer_grouping_time",
                     "producer",
                     "consumer",
-                ]
+                    "_te_key",
+                ],
+                dropna=False,
             )
             .agg({"amount": "sum"})
             .reset_index()
         )
+        # Reconstruct temporal_evolution dicts from the hashable _te_key
+        grouped_edges["temporal_evolution"] = grouped_edges["_te_key"].apply(
+            lambda k: dict(k) if isinstance(k, tuple) else None
+        )
+        grouped_edges.drop(columns=["_te_key"], inplace=True)
 
         # convert grouping times, which was only used as intermediate variable, back to datetime
         grouped_edges["date_producer"] = grouped_edges["producer_grouping_time"].apply(
@@ -285,6 +301,7 @@ class TimelineBuilder:
                 "consumer_name",
                 "amount",
                 "temporal_market_shares",
+                "temporal_evolution",
             ]
         ]
 
@@ -333,6 +350,7 @@ class TimelineBuilder:
             "producer_date": edge.abs_td_producer.date,
             "amount": edge.abs_td_producer.amount,
             "edge_type": edge.edge_type,
+            "temporal_evolution": edge.temporal_evolution,
         }
 
     def adjust_sign_of_amount_based_on_edge_type(self, edge_type):
