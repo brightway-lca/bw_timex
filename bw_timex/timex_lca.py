@@ -2,6 +2,7 @@ from datetime import datetime
 from functools import partial
 from itertools import chain
 from typing import Callable, Optional
+from collections.abc import Mapping
 
 import bw2data as bd
 import matplotlib.pyplot as plt
@@ -124,7 +125,18 @@ class TimexLCA:
             )
             self.database_dates = {key[0]: "dynamic" for key in demand.keys()}
 
+
         self.check_format_database_dates()
+
+        logger.info("Calculating base LCA...")
+        # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
+        # background databases in the LCA. We need all the IDs for the time mapping dict.
+        fu, data_objs, remapping = self.prepare_base_lca_inputs(
+            demand=self.demand, method=self.method
+        )
+        self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
+        self.base_lca.lci()
+        self.base_lca.lcia()
 
         # Create static_only dict that excludes dynamic processes that will be exploded later.
         # This way we only have the "background databases" that we can later link to from the dates
@@ -233,16 +245,6 @@ class TimexLCA:
         self.interpolation_type = interpolation_type
         self.cutoff = cutoff
         self.max_calc = max_calc
-
-        logger.info("Calculating base LCA...")
-        # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
-        # background databases in the LCA. We need all the IDs for the time mapping dict.
-        fu, data_objs, remapping = self.prepare_base_lca_inputs(
-            demand=self.demand, method=self.method
-        )
-        self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
-        self.base_lca.lci()
-        self.base_lca.lcia()
 
         logger.info("Creating activity time mapping...")
         # Create a time mapping dict that maps each activity to a activity_time_mapping_id in the
@@ -925,6 +927,7 @@ class TimexLCA:
         remapping_dicts = None
 
         demand_database_names = list(self.database_dates.keys())
+        dynamic_database_names = list(db for db, value in self.database_dates.items() if value == "dynamic")
 
         if demand_database_names:
             database_names = set.union(
@@ -977,6 +980,15 @@ class TimexLCA:
         else:
             indexed_demand = None
 
+        for act in demand: 
+            if not isinstance(act, bd.Node): 
+                act = bd.get_activity(act)
+                 
+            if act["database"] not in dynamic_database_names:
+                raise ValueError(
+                    f"Demand activity {act} from database {act['database']}: This database is not marked as 'dynamic' in database_dates. Please check."
+                )
+            
         return indexed_demand, data_objs, remapping_dicts
 
     def prepare_bw_timex_inputs(
@@ -1110,7 +1122,7 @@ class TimexLCA:
             indexed_demand = None
 
         return indexed_demand, data_objs, remapping_dicts
-
+    
     def check_format_database_dates(self) -> None:
         """
         Checks that the database_dates is provided by the user in the correct format
