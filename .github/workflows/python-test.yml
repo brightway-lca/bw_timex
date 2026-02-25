@@ -57,5 +57,6 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.py-version == '3.13'
         uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage.xml
-          fail_ci_if_error: false
+          fail_ci_if_error: true
