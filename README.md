@@ -10,8 +10,9 @@
 [![codecov](https://codecov.io/gh/brightway-lca/bw_timex/graph/badge.svg)](https://codecov.io/gh/brightway-lca/bw_timex)
 [![PyPI - Version](https://img.shields.io/pypi/v/bw-timex?color=%2300549f)](https://pypi.org/project/bw-timex/)
 [![Conda Version](https://img.shields.io/conda/v/diepers/bw_timex?label=conda)](https://anaconda.org/diepers/bw_timex)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb)
 [![Conda - License](https://img.shields.io/conda/l/diepers/bw_timex)](https://github.com/brightway-lca/bw_timex/blob/main/LICENSE)
+[![status](https://joss.theoj.org/papers/eb9021af0207b86e02439768a4841670/status.svg)](https://joss.theoj.org/papers/eb9021af0207b86e02439768a4841670)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb)
 
 This is a python package for [time-explicit Life Cycle Assessment](https://docs.brightway.dev/projects/bw-timex/en/latest/content/theory.html#terminology) that helps you assess the environmental impacts of products and processes over time. `bw_timex` builds on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
 
