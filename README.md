@@ -7,6 +7,7 @@
 
 [![Read the Docs](https://img.shields.io/readthedocs/timex?label=documentation)](https://docs.brightway.dev/projects/bw-timex/en/latest/)
 [![tests](https://img.shields.io/github/actions/workflow/status/brightway-lca/bw_timex/python-test.yml?label=tests)](https://github.com/brightway-lca/bw_timex/actions/workflows/python-test.yml)
+[![codecov](https://codecov.io/gh/brightway-lca/bw_timex/graph/badge.svg)](https://codecov.io/gh/brightway-lca/bw_timex)
 [![PyPI - Version](https://img.shields.io/pypi/v/bw-timex?color=%2300549f)](https://pypi.org/project/bw-timex/)
 [![Conda Version](https://img.shields.io/conda/v/diepers/bw_timex?label=conda)](https://anaconda.org/diepers/bw_timex)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb)
