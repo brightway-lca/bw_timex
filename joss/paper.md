@@ -31,7 +31,7 @@ affiliations:
   - name: Technology Assessment Group, Laboratory for Energy Analysis, Center for Nuclear Engineering and Sciences & Center for Energy and Environmental Sciences, Paul Scherrer Institut (PSI), Villigen PSI, Switzerland
     index: 4
 
-date: 01 January 2025
+date: 25 February 2026
 bibliography: paper.bib
 ---
 
@@ -63,7 +63,6 @@ The documentation of the `bw_timex` package, including installation instructions
 
 # Acknowledgements
 
-We thank Chris Mutel for his help in adapting the graph traversal algorithm. This work received funding from the European Union’s Horizon Europe Research and Innovation Programme ForestPaths (ID No 101056755) and from the ETH Board in the framework of the Joint Initiative SCENE, Swiss Center of Excellence on Net Zero Emissions.
-
+We thank Chris Mutel for his help in adapting the graph traversal algorithm. This work received funding from ForestPaths, which is funded by European Union’s Horizon Europe Research and Innovation Programme (101036849) and United Kingdom Research and Innovation Council (UKRI) (101056755). This work received funding from the ETH Board in the framework of the Joint Initiative SCENE, Swiss Center of Excellence on Net Zero Emissions.
 
 # References
