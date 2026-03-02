@@ -223,7 +223,7 @@ testing = [
 requires-dist = [
     { name = "bw-graph-tools", specifier = ">0.4" },
     { name = "bw-temporalis", specifier = ">=1.1" },
-    { name = "bw2calc", specifier = "==2.3.2" },
+    { name = "bw2calc", specifier = "==2.4.0" },
     { name = "bw2data", specifier = "==4.5.4" },
     { name = "dynamic-characterization", specifier = ">=1.2.0" },
     { name = "ipython" },
@@ -253,7 +253,7 @@ provides-extras = ["testing", "dev", "docs"]
 
 [[package]]
 name = "bw2calc"
-version = "2.3.2"
+version = "2.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bw-processing" },
@@ -266,9 +266,9 @@ dependencies = [
     { name = "stats-arrays" },
     { name = "xarray" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/af/65/e685d28496a0bd96914475dcedd7c02f7f2584c897fd6730862bd59c154b/bw2calc-2.3.2.tar.gz", hash = "sha256:0bf18d2b1e270e88f2e1ee4ccbd1a3191bcbb8d1f8507c25fbb9590fb719d751", size = 54555, upload-time = "2026-01-26T10:47:13.397Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1a/61/c7d67e6491787f49ded6bcde5b4bc50c1a87d0bc9394645543eeaad8ebc1/bw2calc-2.4.0.tar.gz", hash = "sha256:5c2f26291dc7946dbc0338e87bac53677857e73a6016baf3e42775280cde97ce", size = 56885, upload-time = "2026-02-27T14:37:44.159Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/04/94/5bdfb5aefb95129f95212da097813211e6d54c337fec6c0140fd82908089/bw2calc-2.3.2-py3-none-any.whl", hash = "sha256:f6821a0cd906dd80f3de32427d9894831d81273c57d923563e4c1b858e62e3ac", size = 35144, upload-time = "2026-01-26T10:47:11.729Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/cc/977d543fc497e6f9152b8b2040418322a0ee8e307ecf59a329ca993ca6ff/bw2calc-2.4.0-py3-none-any.whl", hash = "sha256:0791bcd026479ece65625015d7a1b465a56c1a9d568dc2ca1e4c256eac074f7f", size = 37219, upload-time = "2026-02-27T14:37:42.912Z" },
 ]
 
 [[package]]
@@ -1602,7 +1602,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
