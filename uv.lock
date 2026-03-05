@@ -224,7 +224,7 @@ requires-dist = [
     { name = "bw-graph-tools", specifier = ">0.4" },
     { name = "bw-temporalis", specifier = ">=1.1" },
     { name = "bw2calc", specifier = "==2.4.0" },
-    { name = "bw2data", specifier = "==4.5.4" },
+    { name = "bw2data", specifier = "==4.6" },
     { name = "dynamic-characterization", specifier = ">=1.2.0" },
     { name = "ipython" },
     { name = "ipython", marker = "extra == 'docs'" },
@@ -273,7 +273,7 @@ wheels = [
 
 [[package]]
 name = "bw2data"
-version = "4.5.4"
+version = "4.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "blinker" },
@@ -298,9 +298,9 @@ dependencies = [
     { name = "voluptuous" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/90/cd/176af8d0823f56f35e337a392f2acf732a381ff7b3a03836ad3dfe882c47/bw2data-4.5.4.tar.gz", hash = "sha256:eaf7cca29bf8ee6ffa961b691f09d6e96b5be9c790fb49e6a6f5e366afc94249", size = 98975, upload-time = "2025-12-05T12:40:17.418Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/f4/d16d0eb64ab15425b1a066a859ce05bb30ef67ac727e978087ceaff35fda/bw2data-4.6.tar.gz", hash = "sha256:b5225da8c701be03c6e1727813b7a36f856d245cf2eb973a7495fc8ababfeece", size = 99228, upload-time = "2026-03-04T21:49:28.352Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/da/59/49160d7d48f2fbc89057c92f1bde4464c8f772d382ccf02abcf1d8a69bcc/bw2data-4.5.4-py3-none-any.whl", hash = "sha256:61b229bcbc76fe64e493ce25256c43e335f3b9a9860902ae74a4992fa2c68c21", size = 105224, upload-time = "2025-12-05T12:40:15.712Z" },
+    { url = "https://files.pythonhosted.org/packages/61/d2/400a120fac9a0f0f6733c0cb0789617b5aff32d721105dd28a569138bf7f/bw2data-4.6-py3-none-any.whl", hash = "sha256:6be3930e47f82be942e4deb40c8f349e4c4ae6299963bb710faa6739d1bba35b", size = 105518, upload-time = "2026-03-04T21:49:26.756Z" },
 ]
 
 [[package]]
@@ -1590,11 +1590,11 @@ wheels = [
 
 [[package]]
 name = "peewee"
-version = "4.0.0"
+version = "4.0.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/37/e3/98ed8ab20f26d429f61b3d5d455c52ac88ba343444fbcf7154374111eb3e/peewee-4.0.0.tar.gz", hash = "sha256:bc2722abf32a8074362c346fc8a95f2d34a9587873e81025b6429676c32044b6", size = 686951, upload-time = "2026-02-20T15:38:50.312Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bd/a0/307e09edfae54f103d66b54d82fdfd22cfc25e733731c97173f4ec661fc3/peewee-4.0.1.tar.gz", hash = "sha256:beb1a173a52952a4d69197ca36408166740b2ced339c0e8159617c3fa1e1c4da", size = 700753, upload-time = "2026-03-01T17:26:56.125Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/40/89664cce41f4bedab105d705885cbb152d7bd85ce0facbf0ec02e90eb02a/peewee-4.0.0-py3-none-any.whl", hash = "sha256:6de14ff11ab50c3152dc1d4e12628c1b28c1e03ff4e4213e463429bfcd7340b6", size = 139317, upload-time = "2026-02-20T15:38:48.519Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/99/0f8d9e46df9812ab31dadb07ba304c3ff6d6076bf19a67f4d046790be2e1/peewee-4.0.1-py3-none-any.whl", hash = "sha256:10afaa02c9f6d0f2dfe0f5b9007075c985eb141ab740a8831e37be2a61b3595c", size = 139369, upload-time = "2026-03-01T17:26:54.597Z" },
 ]
 
 [[package]]
