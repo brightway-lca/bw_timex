@@ -173,7 +173,7 @@ def round_datetime(date: datetime, resolution: str) -> datetime:
 def add_flows_to_characterization_functions(
     flows: Union[str, List[str]],
     func: Callable,
-    characterization_functions: Optional[dict] = dict(),
+    characterization_functions: Optional[dict] = None,
 ) -> dict:
     """
     Add a new flow or a list of flows to the available characterization functions.
@@ -193,6 +193,9 @@ def add_flows_to_characterization_functions(
     dict
         Updated characterization function dictionary with the new flow(s) and function(s).
     """
+
+    if characterization_functions is None:
+        characterization_functions = {}
 
     # Check if the input is a single flow (str) or a list of flows (List[str])
     if isinstance(flows, str):
@@ -493,7 +496,10 @@ def add_temporal_evolution_to_exchange(
     None
         The exchange is saved with the temporal evolution data.
     """
-    if temporal_evolution_factors is not None and temporal_evolution_amounts is not None:
+    if (
+        temporal_evolution_factors is not None
+        and temporal_evolution_amounts is not None
+    ):
         raise ValueError(
             "'temporal_evolution_factors' and 'temporal_evolution_amounts' are "
             "mutually exclusive — use one or the other."
@@ -509,7 +515,7 @@ def add_temporal_evolution_to_exchange(
 
 def interactive_td_widget():
     """
-    Create an interactive ipywidget for drafting and visualizing temporal distributions and copying 
+    Create an interactive ipywidget for drafting and visualizing temporal distributions and copying
     them to the clipboard.
 
     For use in jupyter notebooks.
@@ -906,7 +912,12 @@ def get_temporal_evolution_factor(
         lower = sorted_dates[i]
         upper = sorted_dates[i + 1]
         if lower <= target_date <= upper:
-            weight = (target_date - lower).total_seconds() / (upper - lower).total_seconds()
-            return temporal_evolution[lower] * (1 - weight) + temporal_evolution[upper] * weight
+            weight = (target_date - lower).total_seconds() / (
+                upper - lower
+            ).total_seconds()
+            return (
+                temporal_evolution[lower] * (1 - weight)
+                + temporal_evolution[upper] * weight
+            )
 
     return 1.0  # fallback

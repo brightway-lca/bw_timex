@@ -453,7 +453,7 @@ class TimelineBuilder:
                 lambda x: self.find_closest_date(x, dates_list)
             )
 
-        if self.interpolation_type == "linear":
+        elif self.interpolation_type == "linear":
             tl_df["temporal_market_shares"] = tl_df["date_producer"].apply(
                 lambda x: self.get_weights_for_interpolation_between_nearest_years(
                     x, dates_list, interpolation_type
