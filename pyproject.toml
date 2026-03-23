@@ -30,14 +30,14 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "bw2calc==2.4.0",
-    "bw2data==4.6",
-    "bw_graph_tools>0.4",
+    "bw2calc>=2.4",
+    "bw2data>=4.6",
+    "bw_graph_tools>=0.4",
     "numpy",
     "pandas",
     "tqdm",
     "bw_temporalis>=1.1",
-    "dynamic_characterization>=1.2.0",
+    "dynamic_characterization>=1.3",
     "matplotlib",
     "seaborn",
     "loguru",
