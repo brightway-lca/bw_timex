@@ -419,3 +419,63 @@ class TestTimexLCAEdgeCases:
         for shares in tlca.timeline["temporal_market_shares"].dropna():
             assert len(shares) == 1
             assert list(shares.values()) == [1]
+
+    def test_no_database_dates_defaults_to_dynamic(self):
+        """Test that omitting database_dates auto-detects from demand (lines 122-126)."""
+        fu = bd.get_node(database="foreground", code="A")
+        tlca = TimexLCA(
+            demand={fu.key: 1},
+            method=("GWP", "example"),
+            database_dates=None,
+        )
+        # Should auto-populate with demand database marked as dynamic
+        assert "foreground" in tlca.database_dates
+        assert tlca.database_dates["foreground"] == "dynamic"
+
+    def test_demand_not_in_dynamic_db_raises(self):
+        """Test error when demand activity's db is not marked dynamic (line 988)."""
+        fu = bd.get_node(database="foreground", code="A")
+        with pytest.raises(ValueError, match="not marked as 'dynamic'"):
+            TimexLCA(
+                demand={fu.key: 1},
+                method=("GWP", "example"),
+                database_dates={
+                    "foreground": datetime.strptime("2024", "%Y"),
+                    "db_2024": datetime.strptime("2024", "%Y"),
+                },
+            )
+
+    def test_dynamic_lcia_fixed_time_horizon(self):
+        """Test dynamic_lcia with fixed_time_horizon=True (lines 628-634)."""
+        fu = bd.get_node(database="foreground", code="A")
+        co2 = bd.get_node(database="bio", code="CO2")
+        database_dates = {
+            "db_2022": datetime.strptime("2022", "%Y"),
+            "db_2024": datetime.strptime("2024", "%Y"),
+            "foreground": "dynamic",
+        }
+        tlca = TimexLCA(
+            demand={fu.key: 1},
+            method=("GWP", "example"),
+            database_dates=database_dates,
+        )
+        tlca.build_timeline(
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+        )
+        tlca.lci(expand_technosphere=True, build_dynamic_biosphere=True)
+
+        def simple_rf(row, time_horizon):
+            return CharacterizedRow(
+                date=row.date, amount=row.amount, flow=row.flow, activity=row.activity
+            )
+
+        char_funcs = {co2.id: simple_rf}
+        result = tlca.dynamic_lcia(
+            metric="radiative_forcing",
+            time_horizon=100,
+            fixed_time_horizon=True,
+            characterization_functions=char_funcs,
+        )
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) > 0
+        assert isinstance(tlca.dynamic_score, float)
