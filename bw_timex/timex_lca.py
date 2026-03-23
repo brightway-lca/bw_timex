@@ -954,9 +954,6 @@ class TimexLCA:
         remapping_dicts = None
 
         demand_database_names = list(self.database_dates.keys())
-        dynamic_database_names = list(
-            db for db, value in self.database_dates.items() if value == "dynamic"
-        )
 
         if demand_database_names:
             database_names = set.union(
@@ -1008,15 +1005,6 @@ class TimexLCA:
             indexed_demand = {get_id(k): v for k, v in demand.items()}
         else:
             indexed_demand = None
-
-        for act in demand:
-            if not isinstance(act, bd.Node):
-                act = bd.get_activity(act)
-
-            if act["database"] not in dynamic_database_names:
-                raise ValueError(
-                    f"Demand activity {act} from database {act['database']}: This database is not marked as 'dynamic' in database_dates. Please check."
-                )
 
         return indexed_demand, data_objs, remapping_dicts
 

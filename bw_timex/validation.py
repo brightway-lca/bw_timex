@@ -67,6 +67,24 @@ class TimexLCAInputs(BaseModel):
                 )
         return v
 
+    @model_validator(mode="after")
+    def validate_demand_in_dynamic_databases(self) -> "TimexLCAInputs":
+        if self.database_dates is None:
+            return self
+        dynamic_database_names = [
+            db for db, value in self.database_dates.items() if value == "dynamic"
+        ]
+        for act in self.demand:
+            if not isinstance(act, bd.Node):
+                act = bd.get_activity(act)
+            if act["database"] not in dynamic_database_names:
+                raise ValueError(
+                    f"Demand activity {act} from database {act['database']}: "
+                    f"This database is not marked as 'dynamic' in database_dates. "
+                    f"Please check."
+                )
+        return self
+
 
 class BuildTimelineInputs(BaseModel):
     """Validates inputs to TimexLCA.build_timeline"""
