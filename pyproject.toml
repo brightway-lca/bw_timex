@@ -43,6 +43,7 @@ dependencies = [
     "loguru",
     "ipython",
     "ipywidgets",
+    "pydantic>=2.0",
 ]
 
 [project.urls]

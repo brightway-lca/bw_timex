@@ -1,8 +1,8 @@
+from collections.abc import Mapping
 from datetime import datetime
 from functools import partial
 from itertools import chain
 from typing import Callable, Optional
-from collections.abc import Mapping
 
 import bw2data as bd
 import matplotlib.pyplot as plt
@@ -37,6 +37,13 @@ from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
     round_datetime,
+)
+from .validation import (
+    BuildTimelineInputs,
+    DynamicLCIAInputs,
+    LCIInputs,
+    PlotDynamicInventoryInputs,
+    TimexLCAInputs,
 )
 
 
@@ -125,8 +132,9 @@ class TimexLCA:
             )
             self.database_dates = {key[0]: "dynamic" for key in demand.keys()}
 
-
-        self.check_format_database_dates()
+        TimexLCAInputs(
+            demand=self.demand, method=self.method, database_dates=self.database_dates
+        )
 
         logger.info("Calculating base LCA...")
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
@@ -197,7 +205,7 @@ class TimexLCA:
         interpolation_type : str, optional
             Type of interpolation when sourcing the new producers in the time-mapped background
             databases. Default is 'linear', which means linear interpolation between the closest 2
-            databases, other options are 'closest', which selects only the closest database.
+            databases, other options are 'nearest' (or 'closest'), which selects only the closest database.
         edge_filter_function : Callable, optional
             Function to skip edges in the graph traversal. Default is to skip all edges within
             background databases.
@@ -229,6 +237,17 @@ class TimexLCA:
         bw_timex.timeline_builder.TimelineBuilder: Class that builds the timeline.
 
         """
+        validated = BuildTimelineInputs(
+            starting_datetime=starting_datetime,
+            temporal_grouping=temporal_grouping,
+            interpolation_type=interpolation_type,
+            edge_filter_function=edge_filter_function,
+            cutoff=cutoff,
+            max_calc=max_calc,
+            graph_traversal=graph_traversal,
+        )
+        interpolation_type = validated.interpolation_type
+
         if edge_filter_function is None:
             logger.info(
                 "No edge filter function provided. Skipping all edges in background databases."
@@ -341,15 +360,13 @@ class TimexLCA:
             Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
 
+        LCIInputs(
+            build_dynamic_biosphere=build_dynamic_biosphere,
+            expand_technosphere=expand_technosphere,
+        )
+
         if hasattr(self, "dynamic_inventory"):
             del self.dynamic_inventory
-
-        if not expand_technosphere and not build_dynamic_biosphere:
-            raise ValueError(
-                "Currently, it is not possible to skip the construction of the dynamic \
-                biosphere when building the inventories from the timeline.\
-                Please either set build_dynamic_biosphere=True or expand_technosphere=True"
-            )
 
         if not hasattr(self, "timeline"):
             raise AttributeError(
@@ -578,6 +595,16 @@ class TimexLCA:
         --------
         dynamic_characterization: Package handling the dynamic characterization: https://dynamic-characterization.readthedocs.io/en/latest/
         """
+
+        DynamicLCIAInputs(
+            metric=metric,
+            time_horizon=time_horizon,
+            fixed_time_horizon=fixed_time_horizon,
+            time_horizon_start=time_horizon_start,
+            characterization_functions=characterization_functions,
+            characterization_function_co2=characterization_function_co2,
+            use_disaggregated_lci=use_disaggregated_lci,
+        )
 
         if not hasattr(self, "dynamic_inventory"):
             raise AttributeError(
@@ -927,7 +954,6 @@ class TimexLCA:
         remapping_dicts = None
 
         demand_database_names = list(self.database_dates.keys())
-        dynamic_database_names = list(db for db, value in self.database_dates.items() if value == "dynamic")
 
         if demand_database_names:
             database_names = set.union(
@@ -980,15 +1006,6 @@ class TimexLCA:
         else:
             indexed_demand = None
 
-        for act in demand: 
-            if not isinstance(act, bd.Node): 
-                act = bd.get_activity(act)
-                 
-            if act["database"] not in dynamic_database_names:
-                raise ValueError(
-                    f"Demand activity {act} from database {act['database']}: This database is not marked as 'dynamic' in database_dates. Please check."
-                )
-            
         return indexed_demand, data_objs, remapping_dicts
 
     def prepare_bw_timex_inputs(
@@ -1122,32 +1139,6 @@ class TimexLCA:
             indexed_demand = None
 
         return indexed_demand, data_objs, remapping_dicts
-    
-    def check_format_database_dates(self) -> None:
-        """
-        Checks that the database_dates is provided by the user in the correct format
-        and that the databases are available in the Brightway2 project.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-            raises an error if the format is not correct or the databases are not available.
-
-        """
-        for database, value in self.database_dates.items():
-            if not (value == "dynamic" or isinstance(value, datetime)):
-                raise ValueError(
-                    f"Warning: The timestamp {value} is neither 'dynamic' nor a datetime object. Check the format of the database_dates."
-                )
-
-            if database not in bd.databases:
-                raise ValueError(
-                    f"Database '{database}' not available in the Brightway2 project."
-                )
 
     def create_node_collections(self) -> None:
         """
@@ -1530,6 +1521,8 @@ class TimexLCA:
         None
             shows a plot
         """
+        PlotDynamicInventoryInputs(bio_flows=bio_flows, cumulative=cumulative)
+
         plt.figure(figsize=(14, 6))
 
         filtered_df = self.dynamic_inventory_df[
