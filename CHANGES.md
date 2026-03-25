@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 * Added breadth first graph traversal option ([#159](https://github.com/brightway-lca/bw_timex/pull/159))
 * Added support for foreground evolution ([#164](https://github.com/brightway-lca/bw_timex/pull/164))
+* Added validation of user inputs via pydantic ([#181](https://github.com/brightway-lca/bw_timex/pull/181))
 
 ## [0.3.4] - 2026-01-05
 * Fixed compatibility with latest Brightway versions
