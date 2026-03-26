@@ -22,7 +22,7 @@ authors:
     affiliation: 4
 
 affiliations:
-  - name: Institute of Technical Thermodynamics, RWTH Aachen University, Germany
+  - name: Institute of Technical Thermodynamics (LTT), RWTH Aachen University, Germany
     index: 1
   - name: Institute of Environmental Sciences (CML), Leiden University, The Netherlands
     index: 2
@@ -31,7 +31,7 @@ affiliations:
   - name: Technology Assessment Group, Laboratory for Energy Analysis, Center for Nuclear Engineering and Sciences & Center for Energy and Environmental Sciences, Paul Scherrer Institut (PSI), Villigen PSI, Switzerland
     index: 4
 
-date: 25 February 2026
+date: 26 March 2026
 bibliography: paper.bib
 ---
 
