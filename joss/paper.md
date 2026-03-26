@@ -69,6 +69,6 @@ The documentation of the `bw_timex` package, including installation instructions
 
 # Acknowledgements
 
-We thank Chris Mutel for his help in adapting the graph traversal algorithm. This work received funding from ForestPaths, which is funded by European Union’s Horizon Europe Research and Innovation Programme (101036849) and United Kingdom Research and Innovation Council (UKRI) (101056755). This work received funding from the ETH Board in the framework of the Joint Initiative SCENE, Swiss Center of Excellence on Net Zero Emissions.
+We thank Chris Mutel for his help in adapting the graph traversal algorithm. Amelie Müller received funding from ForestPaths, which is funded by European Union’s Horizon Europe Research and Innovation Programme (101056755) and United Kingdom Research and Innovation Council (UKRI) (10040816). Arthur Jakobs received funding from the ETH Board in the framework of the Joint Initiative SCENE, Swiss Center of Excellence on Net Zero Emissions.
 
 # References
