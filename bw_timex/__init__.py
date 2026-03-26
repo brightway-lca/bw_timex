@@ -10,4 +10,4 @@ from .utils import (
     get_temporal_evolution_factor,
 )
 
-__version__ = "0.3.4"
+__version__ = "1.0.0"
