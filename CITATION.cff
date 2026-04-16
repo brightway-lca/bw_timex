@@ -1,0 +1,40 @@
+cff-version: "1.2.0"
+authors:
+- family-names: Diepers
+  given-names: Timo
+  orcid: "https://orcid.org/0009-0002-8566-8618"
+- family-names: Müller
+  given-names: Amelie
+  orcid: "https://orcid.org/0000-0001-5609-5609"
+- family-names: Jakobs
+  given-names: Arthur
+  orcid: "https://orcid.org/0000-0003-0825-2184"
+doi: 10.5281/zenodo.19230937
+message: If you use this software, please cite our article in the
+  Journal of Open Source Software.
+preferred-citation:
+  authors:
+  - family-names: Diepers
+    given-names: Timo
+    orcid: "https://orcid.org/0009-0002-8566-8618"
+  - family-names: Müller
+    given-names: Amelie
+    orcid: "https://orcid.org/0000-0001-5609-5609"
+  - family-names: Jakobs
+    given-names: Arthur
+    orcid: "https://orcid.org/0000-0003-0825-2184"
+  date-published: 2026-04-16
+  doi: 10.21105/joss.09621
+  issn: 2475-9066
+  issue: 120
+  journal: Journal of Open Source Software
+  publisher:
+    name: Open Journals
+  start: 9621
+  title: "bw_timex: A Python Package for Time-Explicit Life Cycle
+    Assessment"
+  type: article
+  url: "https://joss.theoj.org/papers/10.21105/joss.09621"
+  volume: 11
+title: "bw_timex: A Python Package for Time-Explicit Life Cycle
+  Assessment"
