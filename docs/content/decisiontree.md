@@ -43,3 +43,17 @@ flowchart TD
     BackgroundDecision -- "no" --> CodeDynamicLCIA
     BackgroundDecision -- "yes" --> CodeDisaggregatedLCIA
 ```
+
+## Modeling paradigm option: chimaera vs explicit process/product
+
+`bw_timex` now supports both Brightway modeling paradigms when looking up production amounts during timeline scaling and matrix expansion:
+
+- **Chimaera** (`processwithreferenceproduct`): production comes from `rp_exchange()`.
+- **Explicit** (`process` + `product`): production comes from explicit `type="production"` exchanges from process to product.
+
+### Which pattern should I use for cohort timing?
+
+- If you model with **chimaera** activities, place cohort timing on an intermediary technosphere edge (as in the original EV fleet notebook).
+- If you model with **explicit process/product** nodes, place cohort timing directly on the process→product production edge.
+
+The explicit option avoids structural placeholder activities and makes production timing a first-class part of the graph topology.
