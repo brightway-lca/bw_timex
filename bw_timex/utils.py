@@ -35,6 +35,51 @@ time_res_mapping_strftime = {
 }
 
 
+def get_reference_product_production_amount(
+    node, *, reference_product=None, lca=None
+) -> float:
+    """Return a node's production amount in a paradigm-agnostic way.
+
+    Supports chimaera activities via ``rp_exchange`` and explicit process/product
+    setups via production exchanges.
+    """
+    if isinstance(node, (int, np.integer)):
+        if lca is None:
+            raise ValueError("`lca` is required when `node` is an activity id.")
+        node = lca.dicts.activity.reversed[lca.dicts.activity[node]]
+
+    if hasattr(node, "rp_exchange"):
+        rp_exc = node.rp_exchange()
+        if rp_exc is not None:
+            return rp_exc.amount
+
+    productions = list(node.production())
+    if not productions:
+        raise ValueError(
+            f"Could not determine production amount for node `{node}`: no production exchanges found."
+        )
+
+    if reference_product is not None:
+        ref_id = (
+            reference_product.id
+            if hasattr(reference_product, "id")
+            else int(reference_product)
+        )
+        for exc in productions:
+            if exc.input.id == ref_id:
+                return exc.amount
+        raise ValueError(
+            f"Could not find production exchange from `{node}` to reference product id `{ref_id}`."
+        )
+
+    if len(productions) == 1:
+        return productions[0].amount
+
+    raise ValueError(
+        f"Node `{node}` has multiple production exchanges; pass `reference_product` to disambiguate."
+    )
+
+
 def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") -> int:
     """
     Converts a datetime object to an integer for a given temporal resolution `time_res`
