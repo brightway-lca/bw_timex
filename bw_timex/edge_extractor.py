@@ -11,6 +11,8 @@ from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import ExchangeDataset as ED
 from bw_temporalis import TemporalDistribution, TemporalisLCA, loader_registry
 
+from .utils import get_reference_product_production_amount
+
 datetime_type = np.dtype("datetime64[s]")
 timedelta_type = np.dtype("timedelta64[s]")
 
@@ -175,7 +177,7 @@ class EdgeExtractor(TemporalisLCA):
                         col_id=col_id,
                         matrix_label="technosphere_matrix",
                     )
-                    / abs(node.reference_product_production_amount)
+                    / abs(get_reference_product_production_amount(node.activity))
                 )
                 producer = self.nodes[edge.producer_unique_id]
                 leaf = self.edge_ff(row_id)
@@ -382,10 +384,11 @@ class EdgeExtractorBFS:
         return amount, edge_type
 
     def _get_production_amount(self, activity_id: int) -> float:
-        """Get the reference product production amount (diagonal of tech matrix)."""
-        product_idx = self.lca_object.dicts.product[activity_id]
-        col_idx = self.lca_object.dicts.activity[activity_id]
-        return self.tech_matrix_csc[product_idx, col_idx]
+        """Get the reference product production amount."""
+        activity = self.lca_object.dicts.activity.reversed[
+            self.lca_object.dicts.activity[activity_id]
+        ]
+        return get_reference_product_production_amount(activity)
 
     def _get_technosphere_inputs(self, activity_id: int) -> list[int]:
         """Get all technosphere input activity IDs for a given activity."""
