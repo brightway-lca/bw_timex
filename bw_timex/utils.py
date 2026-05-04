@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
 
+import bw2data as bd
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -44,9 +45,7 @@ def get_reference_product_production_amount(
     setups via production exchanges.
     """
     if isinstance(node, (int, np.integer)):
-        if lca is None:
-            raise ValueError("`lca` is required when `node` is an activity id.")
-        node = lca.dicts.activity.reversed[lca.dicts.activity[node]]
+        node = bd.get_activity(id=int(node))
 
     if hasattr(node, "rp_exchange"):
         rp_exc = node.rp_exchange()

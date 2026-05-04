@@ -1117,7 +1117,7 @@ class TimexLCA:
                 {
                     self.activity_time_mapping[
                         (
-                            bd.get_node(id=bd.get_id(k)).key,
+                            self._resolve_demand_to_process_key(k),
                             self.demand_timing[bd.get_id(k)],
                         )
                     ]: v
@@ -1129,7 +1129,7 @@ class TimexLCA:
             indexed_demand = {
                 self.activity_time_mapping[
                     (
-                        ("temporalized", bd.get_node(id=bd.get_id(k))["code"]),
+                        ("temporalized", self._resolve_demand_to_process_key(k)[1]),
                         self.demand_timing[bd.get_id(k)],
                     )
                 ]: v
@@ -1329,11 +1329,11 @@ class TimexLCA:
 
     def create_demand_timing(self) -> dict:
         """
-        Generate a dictionary that maps producer (key) to timing (value) for the demands in the
-        product system. It searches the timeline for those rows that contain the functional units
-        (demand-processes as producer and -1 as consumer) and returns the time of the demand as an
-        integer. Time of demand can have flexible resolution (year=YYYY, month=YYYYMM, day=YYYYMMDD,
-        hour=YYYYMMDDHH) defined in `temporal_grouping`.
+        Generate a dictionary that maps demand id (key) to timing (value) for the demands in the
+        product system. It searches the timeline for the FU rows (consumer == -1) and looks up the
+        timing of the producing process. For demands keyed by an explicit product node, the producer
+        in the timeline is the process producing that product, so we resolve the product → process
+        relationship via the production exchange.
 
         Parameters
         ----------
@@ -1342,17 +1342,51 @@ class TimexLCA:
         Returns
         -------
         dict
-            Dictionary mapping producer ids to reference timing for the specified demands.
+            Dictionary mapping demand ids to reference timing for the specified demands.
         """
-        demand_ids = [bd.get_activity(key).id for key in self.demand.keys()]
-        demand_rows = self.timeline[
-            self.timeline["producer"].isin(demand_ids)
-            & (self.timeline["consumer"] == -1)
-        ]
+        process_id_by_demand_id = {
+            bd.get_activity(key).id: self._resolve_demand_to_process_id(key)
+            for key in self.demand.keys()
+        }
+        fu_rows = self.timeline[self.timeline["consumer"] == -1]
+        timing_by_process_id = {
+            row.producer: row.hash_producer for row in fu_rows.itertuples()
+        }
         self.demand_timing = {
-            row.producer: row.hash_producer for row in demand_rows.itertuples()
+            demand_id: timing_by_process_id[process_id]
+            for demand_id, process_id in process_id_by_demand_id.items()
+            if process_id in timing_by_process_id
         }
         return self.demand_timing
+
+    def _resolve_demand_to_process_id(self, key) -> int:
+        """Return the id of the process producing ``key``.
+
+        For demands keyed by a process node this is the demand id itself. For demands keyed by a
+        product node (explicit process/product paradigm) we look up the process via the production
+        exchange targeting that product.
+        """
+        node = bd.get_activity(key) if not hasattr(key, "id") else key
+        if node.get("type") != "product":
+            return node.id
+        for exc in node.upstream(kinds=["production"]):
+            return exc.output.id
+        raise ValueError(
+            f"Could not resolve product `{node}` to its producing process: no production "
+            "exchange targets it."
+        )
+
+    def _resolve_demand_to_process_key(self, key):
+        """Return the (database, code) key of the process producing ``key``."""
+        node = bd.get_activity(key) if not hasattr(key, "id") else key
+        if node.get("type") != "product":
+            return node.key
+        for exc in node.upstream(kinds=["production"]):
+            return exc.output.key
+        raise ValueError(
+            f"Could not resolve product `{node}` to its producing process: no production "
+            "exchange targets it."
+        )
 
     ######################################
     # For creating human-friendly output #
