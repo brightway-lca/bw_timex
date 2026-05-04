@@ -75,6 +75,10 @@ docs = [
   "sphinx-autobuild"
 ]
 
+mfa = [
+    "flodym",
+]
+
 [tool.setuptools]
 license-files = ["LICENSE"]
 package-data = {bw_timex = ["*.md", "*.txt", "data/*.json"]}

@@ -11,6 +11,11 @@ from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import ExchangeDataset as ED
 from bw_temporalis import TemporalDistribution, TemporalisLCA, loader_registry
 
+from .utils import get_reference_product_production_amount
+
+if not hasattr(np, "in1d"):
+    np.in1d = np.isin
+
 datetime_type = np.dtype("datetime64[s]")
 timedelta_type = np.dtype("timedelta64[s]")
 
@@ -36,6 +41,7 @@ class Edge:
     abs_td_producer: TemporalDistribution = None
     abs_td_consumer: TemporalDistribution = None
     temporal_evolution: dict = None
+    temporal_evolution_reference: str = "producer"
 
 
 class EdgeExtractor(TemporalisLCA):
@@ -101,13 +107,56 @@ class EdgeExtractor(TemporalisLCA):
             self.unique_id
         ]:  # starting at the edges of the functional unit
             node = self.nodes[edge.producer_unique_id]
+            td_producer = edge.amount
+            initial_distribution = self.t0 * edge.amount
+            abs_td_producer = self.t0
+            abs_td_consumer = None
+
+            row_id = self.lca_object.dicts.product.reversed[edge.product_index]
+            col_id = node.activity_datapackage_id
+            exchange = self.get_technosphere_exchange(input_id=row_id, output_id=col_id)
+
+            # In the explicit process/product paradigm, the demanded product is produced
+            # by an off-diagonal production edge. A TD on that edge distributes the
+            # process invocation itself before the process inputs are traversed.
+            if (
+                row_id != col_id
+                and hasattr(exchange, "data")
+                and exchange.data.get("type") == "production"
+            ):
+                production_amount = abs(
+                    get_reference_product_production_amount(
+                        col_id, reference_product=row_id, lca=self.lca_object
+                    )
+                )
+                td_producer = (
+                    self._exchange_value(
+                        exchange=exchange,
+                        row_id=row_id,
+                        col_id=col_id,
+                        matrix_label="technosphere_matrix",
+                    )
+                    / production_amount
+                    * edge.amount
+                )
+                if isinstance(td_producer, Number):
+                    td_producer = TemporalDistribution(
+                        date=np.array([0], dtype="timedelta64[Y]"),
+                        amount=np.array([td_producer]),
+                    )
+                initial_distribution = (self.t0 * td_producer).simplify()
+                abs_td_producer = self.join_datetime_and_timedelta_distributions(
+                    td_producer, self.t0
+                )
+                abs_td_consumer = self.t0
+
             heappush(
                 heap,
                 (
                     1 / node.cumulative_score,
-                    self.t0 * edge.amount,
+                    initial_distribution,
                     self.t0,
-                    self.t0,
+                    abs_td_producer,
                     node,
                 ),
             )
@@ -115,13 +164,14 @@ class EdgeExtractor(TemporalisLCA):
             timeline.append(
                 Edge(
                     edge_type="production",  # FU exchange always type production (?)
-                    distribution=self.t0 * edge.amount,
+                    distribution=initial_distribution,
                     leaf=False,
                     consumer=self.unique_id,
                     producer=node.activity_datapackage_id,
-                    td_producer=edge.amount,
+                    td_producer=td_producer,
                     td_consumer=self.t0,
-                    abs_td_producer=self.t0,
+                    abs_td_producer=abs_td_producer,
+                    abs_td_consumer=abs_td_consumer,
                 )
             )
 
@@ -131,10 +181,17 @@ class EdgeExtractor(TemporalisLCA):
             for edge in self.edge_mapping[node.unique_id]:
                 row_id = self.nodes[edge.producer_unique_id].activity_datapackage_id
                 col_id = node.activity_datapackage_id
+                product_id = self.lca_object.dicts.product.reversed[edge.product_index]
                 exchange = self.get_technosphere_exchange(
-                    input_id=row_id,
+                    input_id=product_id,
                     output_id=col_id,
                 )
+                if not hasattr(exchange, "data"):
+                    exchange = self.get_technosphere_exchange(
+                        input_id=row_id,
+                        output_id=col_id,
+                    )
+                    product_id = row_id
 
                 edge_type = exchange.data[
                     "type"
@@ -163,15 +220,22 @@ class EdgeExtractor(TemporalisLCA):
                         }
                 elif has_factors:
                     temporal_evolution = exc_data["temporal_evolution_factors"]
+                temporal_evolution_reference = exc_data.get(
+                    "temporal_evolution_reference", "producer"
+                )
 
                 td_producer = (  # td_producer is the TemporalDistribution of the edge
                     self._exchange_value(
                         exchange=exchange,
-                        row_id=row_id,
+                        row_id=product_id,
                         col_id=col_id,
                         matrix_label="technosphere_matrix",
                     )
-                    / abs(node.reference_product_production_amount)
+                    / abs(
+                        get_reference_product_production_amount(
+                            node.activity_datapackage_id, lca=self.lca_object
+                        )
+                    )
                 )
                 producer = self.nodes[edge.producer_unique_id]
                 leaf = self.edge_ff(row_id)
@@ -182,6 +246,38 @@ class EdgeExtractor(TemporalisLCA):
                         date=np.array([0], dtype="timedelta64[Y]"),
                         amount=np.array([td_producer]),
                     )
+
+                if product_id != row_id:
+                    production_exchange = self.get_technosphere_exchange(
+                        input_id=product_id,
+                        output_id=row_id,
+                    )
+                    if (
+                        hasattr(production_exchange, "data")
+                        and production_exchange.data.get("type") == "production"
+                    ):
+                        production_amount = abs(
+                            get_reference_product_production_amount(
+                                row_id,
+                                reference_product=product_id,
+                                lca=self.lca_object,
+                            )
+                        )
+                        production_td = (
+                            self._exchange_value(
+                                exchange=production_exchange,
+                                row_id=product_id,
+                                col_id=row_id,
+                                matrix_label="technosphere_matrix",
+                            )
+                            / production_amount
+                        )
+                        if isinstance(production_td, Number):
+                            production_td = TemporalDistribution(
+                                date=np.array([0], dtype="timedelta64[Y]"),
+                                amount=np.array([production_td]),
+                            )
+                        td_producer = (td_producer * production_td).simplify()
 
                 distribution = (
                     td * td_producer
@@ -201,6 +297,7 @@ class EdgeExtractor(TemporalisLCA):
                         ),
                         abs_td_consumer=abs_td,
                         temporal_evolution=temporal_evolution,
+                        temporal_evolution_reference=temporal_evolution_reference,
                     )
                 )
                 if not leaf:
@@ -377,10 +474,11 @@ class EdgeExtractorBFS:
         return amount, edge_type
 
     def _get_production_amount(self, activity_id: int) -> float:
-        """Get the reference product production amount (diagonal of tech matrix)."""
-        product_idx = self.lca_object.dicts.product[activity_id]
-        col_idx = self.lca_object.dicts.activity[activity_id]
-        return self.tech_matrix_csc[product_idx, col_idx]
+        """Get the reference product production amount."""
+        activity = self.lca_object.dicts.activity.reversed[
+            self.lca_object.dicts.activity[activity_id]
+        ]
+        return get_reference_product_production_amount(activity)
 
     def _get_technosphere_inputs(self, activity_id: int) -> list[int]:
         """Get all technosphere input activity IDs for a given activity."""
