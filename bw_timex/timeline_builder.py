@@ -303,6 +303,7 @@ class TimelineBuilder:
                 "amount",
                 "temporal_market_shares",
                 "temporal_evolution",
+                "temporal_evolution_reference",
             ]
         ]
 

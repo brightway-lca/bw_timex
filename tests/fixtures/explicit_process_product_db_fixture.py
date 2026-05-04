@@ -44,8 +44,8 @@ def explicit_process_product_db():
     )
 
     td = TemporalDistribution(
-        date=[np.timedelta64(0, "Y"), np.timedelta64(1, "Y")],
-        amount=[0.6, 0.4],
+        date=np.array([0, 1], dtype="timedelta64[Y]"),
+        amount=np.array([0.6, 0.4]),
     )
 
     bd.Database("foreground").write(
@@ -53,6 +53,7 @@ def explicit_process_product_db():
             ("foreground", "fleet_driving_process"): {
                 "name": "fleet driving process",
                 "unit": "unit",
+                "location": "GLO",
                 "type": "process",
                 "exchanges": [
                     {
@@ -71,6 +72,7 @@ def explicit_process_product_db():
             ("foreground", "fleet_driving_product"): {
                 "name": "fleet driving product",
                 "unit": "unit",
+                "location": "GLO",
                 "type": "product",
                 "exchanges": [],
             },

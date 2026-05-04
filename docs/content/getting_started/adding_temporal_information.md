@@ -104,6 +104,19 @@ bd.Method(("our", "method")).write(
 
 Now, if you want to consider time in your LCA, you need to somehow add temporal information. For time-explicit LCA, we consider two kinds of temporal information, that will be discussed in the following.
 
+:::{note}
+Brightway can represent inventory data either with separate process and product nodes or with
+chimaera process+product nodes. See the Brightway inventory overview on
+[processes, products, and something in between](https://docs.brightway.dev/en/latest/content/overview/inventory.html#processes-products-and-something-in-between).
+
+This getting-started page uses the common chimaera style, where Process A is also its reference
+product. The temporal concepts below also apply to explicit process/product models; the main
+difference is where output-side timing can be attached. If you want to represent several
+production-time groups of the same product, you can do this in either paradigm. In a chimaera
+model, this timing is often represented with an intermediary foreground edge. In an explicit
+model, it can live directly on the process→product production edge.
+:::
+
 ## Temporal distributions
 To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges. To carry the temporal information, we use the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class is a *container for a series of amount spread over time*, so it tells you what share of an exchange happens at what point in time. So, let's include this information in our production system - first visually:
 ```{mermaid}
@@ -289,7 +302,57 @@ exchange["temporal_evolution_amounts"] = {
 
 For dates between the specified points, values are linearly interpolated. For dates outside the range, the nearest boundary value is used. You can specify either `temporal_evolution_factors` or `temporal_evolution_amounts` for the same exchange, but not both.
 
-This mechanism can represent **vintage-specific efficiency** if the exchange is evaluated at the vintage timestamp. For example, with factors `{2025: 1.0, 2030: 1.1}`, a unit produced in 2025 uses the 2025 factor and a unit produced in 2030 uses the 2030 factor (with interpolation in-between). If a single foreground exchange represents a mixed fleet over multiple vintages, that one exchange still has just one amount at each event time; to model distinct vintages explicitly, create separate exchanges or processes per cohort (e.g., EV_2025, EV_2030) and assign their temporal distributions accordingly.
+This mechanism can represent **production-version-specific efficiency** if the exchange is
+evaluated at the timestamp of the process/product version. Here, "version" means the production or
+design date that fixes a foreground exchange amount. This fixed production/design date is often
+called a **vintage**. For example, with factors `{2025: 1.0, 2030: 1.1}`, a unit produced in
+2025 uses the 2025 vintage factor and a unit produced in 2030 uses the 2030 vintage factor (with
+interpolation in-between). If a single foreground exchange represents a mixed fleet over multiple
+production years, that one exchange still has just one amount at each event time; to model distinct
+production-time groups explicitly, create separate exchanges or processes for each group (e.g.,
+EV_2025, EV_2030) and assign their temporal distributions accordingly.
+
+### Choosing `temporal_evolution_reference`
+
+Temporal evolution factors need a timestamp. In a time-explicit foreground exchange, `bw_timex` can carry two relevant timestamps:
+
+- `date_consumer`: when the consuming foreground process instance exists. If the model splits a
+  product into production-time groups, read this as the **process/product version date** of the
+  process using the exchange. In fleet and stock models, this is usually the **vintage**.
+- `date_producer`: when the exchanged input/output event actually happens. Read this as the **calendar event date** of the exchange.
+
+Use `temporal_evolution_reference="consumer"` when the exchange amount is a property of the
+consuming process or product version. The factor is locked to `date_consumer`.
+
+Examples:
+
+- A vehicle built in 2025 keeps its 2025 electricity consumption per km when it drives in 2035.
+- A building built in 2020 keeps its 2020 insulation standard during later operation.
+- A 2030 production line needs less material because of its design, and keeps that efficiency for all later maintenance or use-phase exchanges.
+
+Use `temporal_evolution_reference="producer"` when the exchange amount is a property of the calendar year in which the exchange happens. The factor follows `date_producer`.
+
+Examples:
+
+- A maintenance operation uses less solvent in 2035 because maintenance practice improved by then, regardless of when the serviced asset was built.
+- A foreground repair process becomes more efficient over calendar time.
+- A foreground input is reduced by a retrofit or operational learning that applies to all active product/process versions in that year.
+
+Rule of thumb:
+
+```text
+Is the change a property of the foreground process/product version date?
+-> use consumer
+
+Is the change a property of the calendar year when the exchange happens?
+-> use producer
+```
+
+This choice is independent of whether you model with chimaera nodes or explicit process/product
+nodes. Explicit process/product models can make the distinction easier to see because a product can
+have a production-edge temporal distribution, creating clear product/process version dates. Chimaera
+models can represent the same idea by adding a foreground intermediary activity whose exchange
+creates those version dates.
 
 A convenience function is available to add temporal evolution to an existing exchange:
 
@@ -301,6 +364,7 @@ add_temporal_evolution_to_exchange(
         datetime(2020, 1, 1): 1.0,
         datetime(2030, 1, 1): 0.75,
     },
+    temporal_evolution_reference="consumer",
     input_code="B",
     input_database="background",
     output_code="A",
