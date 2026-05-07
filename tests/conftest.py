@@ -15,3 +15,4 @@ from .fixtures.temporal_evolution_db_fixture import (
     temporal_evolution_db,
 )
 from .fixtures.vehicle_db_fixture import vehicle_db
+from .fixtures.vehicle_explicit_db_fixture import vehicle_explicit_db
