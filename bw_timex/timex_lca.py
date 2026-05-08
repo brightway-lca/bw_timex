@@ -1114,27 +1114,10 @@ class TimexLCA:
 
         if demands:
             indexed_demand = [
-                {
-                    self.activity_time_mapping[
-                        (
-                            self._resolve_demand_to_process_key(k),
-                            self.demand_timing[bd.get_id(k)],
-                        )
-                    ]: v
-                    for k, v in dct.items()
-                }
-                for dct in demands
+                self._build_indexed_demand(dct) for dct in demands
             ]
         elif demand:
-            indexed_demand = {
-                self.activity_time_mapping[
-                    (
-                        ("temporalized", self._resolve_demand_to_process_key(k)[1]),
-                        self.demand_timing[bd.get_id(k)],
-                    )
-                ]: v
-                for k, v in demand.items()
-            }
+            indexed_demand = self._build_indexed_demand(demand)
         else:
             indexed_demand = None
 
@@ -1358,6 +1341,47 @@ class TimexLCA:
             if process_id in timing_by_process_id
         }
         return self.demand_timing
+
+    def _build_indexed_demand(self, demand_dict) -> dict:
+        """Map a demand dict to time-mapped producer ids, distributed across
+        every install-vintage cohort produced by an output-side temporal
+        distribution.
+
+        Each FU row in the timeline corresponds to one cohort of the demand's
+        producing process; ``row.amount`` is the cohort's share of the
+        original demand value. Summing the FU rows reproduces the user's
+        demand magnitude while preserving the cohort split, so that
+        downstream matrix-modifier logic (which keys temporal markets by
+        ``time_mapped_producer``) routes each cohort's inputs to the
+        appropriate background database.
+        """
+        if not hasattr(self, "timeline"):
+            raise AttributeError(
+                "Timeline not yet built. Call TimexLCA.build_timeline() first."
+            )
+
+        fu_rows = self.timeline[self.timeline["consumer"] == -1]
+        indexed = {}
+        for k, v in demand_dict.items():
+            process_id = self._resolve_demand_to_process_id(k)
+            cohort_rows = fu_rows[fu_rows["producer"] == process_id]
+            if cohort_rows.empty:
+                raise ValueError(
+                    f"No functional-unit rows in timeline for demand `{k}` "
+                    f"(process id {process_id}). Did you call build_timeline?"
+                )
+            cohort_total = float(cohort_rows["amount"].sum())
+            if cohort_total == 0:
+                raise ValueError(
+                    f"Functional-unit rows for demand `{k}` sum to zero amount."
+                )
+            scale = float(v) / cohort_total
+            for row in cohort_rows.itertuples():
+                indexed[row.time_mapped_producer] = (
+                    indexed.get(row.time_mapped_producer, 0.0)
+                    + float(row.amount) * scale
+                )
+        return indexed
 
     def _resolve_demand_to_process_id(self, key) -> int:
         """Return the id of the process producing ``key``.

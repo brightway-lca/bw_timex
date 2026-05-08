@@ -287,7 +287,9 @@ def test_explicit_product_output_td_convolves_with_input_td():
     ]
     assert set(evolved_rows["date_consumer"].dt.year) == {2030, 2032}
     assert set(evolved_rows["temporal_evolution_reference"]) == {"consumer"}
-    assert tlca_with_process_version_evolution.static_score == pytest.approx(2.0)
+    # Cohort 2030 (weight 0.6, cop 1.0) → 0.6 * 8 * 1.0 * 0.5 = 2.4
+    # Cohort 2032 (weight 0.4, cop 0.5) → 0.4 * 8 * 0.5 * 0.5 = 0.8
+    assert tlca_with_process_version_evolution.static_score == pytest.approx(3.2)
 
 
 def test_multilayer_explicit_process_product_chain_with_evolution():
@@ -371,3 +373,128 @@ def test_multilayer_explicit_process_product_chain_with_evolution():
     ) == pytest.approx(observed_component_timeline)
     assert set(evolved_component_rows["temporal_evolution_reference"]) == {"consumer"}
     assert evolved_tlca.static_score == pytest.approx(4.0)
+
+
+def test_multi_vintage_demand_splits_across_cohorts():
+    """Two install-year cohorts each draw from a different background database.
+
+    With install-year RTD = [2025: 0.5, 2035: 0.5] and the use-phase happening
+    at the install year, cohort 2025 should source electricity from
+    `electricity_market_2025` and cohort 2035 from `electricity_market_2035`.
+    The fleet score must therefore be the demand-weighted mix of both
+    backgrounds, not just one of them.
+    """
+    bd.projects.set_current("__test_multi_vintage_demand_split__")
+    bd.databases.clear()
+    bd.methods.clear()
+
+    bd.Database("bio").write(
+        {("bio", "co2"): {"name": "carbon dioxide", "unit": "kg", "type": "emission"}}
+    )
+    for db_name, co2_per_kwh in [
+        ("electricity_market_2025", 0.40),
+        ("electricity_market_2035", 0.10),
+    ]:
+        bd.Database(db_name).write(
+            {
+                (db_name, "elec"): {
+                    "name": "electricity market",
+                    "reference product": "electricity",
+                    "location": "DE",
+                    "unit": "kWh",
+                    "exchanges": [
+                        {
+                            "amount": 1,
+                            "type": "production",
+                            "input": (db_name, "elec"),
+                        },
+                        {
+                            "amount": co2_per_kwh,
+                            "type": "biosphere",
+                            "input": ("bio", "co2"),
+                        },
+                    ],
+                },
+            }
+        )
+    bd.Method(("GWP", "example")).write([(("bio", "co2"), 1.0)])
+
+    td_install = TemporalDistribution(
+        date=np.array([0, 10], dtype="timedelta64[Y]"),
+        amount=np.array([0.5, 0.5]),
+    )
+    td_use_at_install = TemporalDistribution(
+        date=np.array([0], dtype="timedelta64[Y]"),
+        amount=np.array([1.0]),
+    )
+
+    bd.Database("foreground").write(
+        {
+            ("foreground", "unit_product"): {
+                "name": "unit product",
+                "type": "product",
+                "unit": "unit",
+                "location": "DE",
+                "exchanges": [],
+            },
+            ("foreground", "unit_lifecycle"): {
+                "name": "unit lifecycle",
+                "type": "process",
+                "unit": "unit",
+                "location": "DE",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("foreground", "unit_product"),
+                        "temporal_distribution": td_install,
+                    },
+                    {
+                        "amount": 1.0,
+                        "type": "technosphere",
+                        "input": ("electricity_market_2025", "elec"),
+                        "temporal_distribution": td_use_at_install,
+                    },
+                ],
+            },
+        }
+    )
+    for db in bd.databases:
+        bd.Database(db).process()
+
+    product = bd.get_node(database="foreground", code="unit_product")
+    database_dates = {
+        "electricity_market_2025": datetime(2025, 1, 1),
+        "electricity_market_2035": datetime(2035, 1, 1),
+        "foreground": "dynamic",
+    }
+    tlca = TimexLCA(
+        demand={product.key: 1},
+        method=("GWP", "example"),
+        database_dates=database_dates,
+    )
+    tlca.build_timeline(
+        starting_datetime=datetime(2025, 1, 1),
+        temporal_grouping="year",
+    )
+    tlca.lci()
+    tlca.static_lcia()
+
+    fu_rows = tlca.timeline[tlca.timeline["consumer"] == -1].sort_values(
+        "date_producer"
+    )
+    assert fu_rows["date_producer"].dt.year.tolist() == [2025, 2035]
+    assert fu_rows["amount"].tolist() == pytest.approx([0.5, 0.5])
+
+    elec_rows = tlca.timeline[
+        tlca.timeline["producer_name"] == "electricity market"
+    ].sort_values("date_consumer")
+    assert elec_rows["date_consumer"].dt.year.tolist() == [2025, 2035]
+    assert [
+        row.temporal_market_shares for row in elec_rows.itertuples()
+    ] == [
+        {"electricity_market_2025": 1.0},
+        {"electricity_market_2035": 1.0},
+    ]
+
+    assert tlca.static_score == pytest.approx(0.5 * 0.40 + 0.5 * 0.10)
