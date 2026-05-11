@@ -169,3 +169,30 @@ def test_demand_tds_propagate_to_edge_extractor():
     stored = ex.demand_tds[node.id]
     assert isinstance(stored, TemporalDistribution)
     assert list(stored.amount) == [60.0, 40.0]
+
+
+def test_absolute_td_demand_produces_one_fu_row_per_entry():
+    node, dbdates = _make_chimaera_project("__test_td_demand_abs_fu_rows__")
+    td = TemporalDistribution(
+        date=np.array(["2025-01-01", "2030-01-01"], dtype="datetime64[s]"),
+        amount=np.array([60.0, 40.0]),
+    )
+    tlca = TimexLCA(
+        demand={node.key: td},
+        method=("GWP", "example"),
+        database_dates=dbdates,
+    )
+    tlca.build_timeline(
+        starting_datetime=datetime(2025, 1, 1),
+        temporal_grouping="year",
+    )
+    fu_rows = tlca.timeline[tlca.timeline["consumer"] == -1].sort_values(
+        "date_producer"
+    )
+    assert fu_rows["date_producer"].dt.year.tolist() == [2025, 2030]
+    assert fu_rows["amount"].tolist() == pytest.approx([60.0, 40.0])
+
+    tlca.lci()
+    tlca.static_lcia()
+    # 100 units × 2 kg/unit × 0.5 kg CO2/kg = 100.
+    assert tlca.static_score == pytest.approx(100.0)

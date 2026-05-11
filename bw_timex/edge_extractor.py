@@ -1,4 +1,5 @@
 import json
+import warnings
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
@@ -18,6 +19,37 @@ if not hasattr(np, "in1d"):
 
 datetime_type = np.dtype("datetime64[s]")
 timedelta_type = np.dtype("timedelta64[s]")
+
+
+def _seed_td_from_demand(
+    demand_tds: dict,
+    fu_key_id: int,
+    fallback_t0: "TemporalDistribution",
+) -> "TemporalDistribution":
+    """Return the seed TD to use for an FU edge.
+
+    When ``fu_key_id`` (a product id or a process id) is registered in
+    ``demand_tds``, return a TD whose dates are the demand TD's dates and
+    whose amounts are normalised so that ``seed * edge_amount`` reproduces
+    the original demand TD amounts (because the FU-seeding code multiplies
+    the seed by ``edge.amount`` which equals ``sum(td.amount)`` when the
+    base LCA was given the scalar projection).
+
+    Falls back to ``fallback_t0`` (single-date TD with amount 1) when no
+    demand TD is registered for ``fu_key_id`` or when the registered TD
+    has zero total amount.
+    """
+    td = demand_tds.get(fu_key_id)
+    if td is None:
+        return fallback_t0
+    amounts = np.asarray(td.amount, dtype=float)
+    total = amounts.sum()
+    if total == 0:
+        return fallback_t0
+    return TemporalDistribution(
+        date=np.asarray(td.date),
+        amount=amounts / total,
+    )
 
 
 @dataclass
@@ -92,6 +124,26 @@ class EdgeExtractor(TemporalisLCA):
 
         self.demand_tds = demand_tds or {}
 
+    def _seed_td_for_fu_edge(self, fu_key_id: int) -> "TemporalDistribution":
+        return _seed_td_from_demand(self.demand_tds, fu_key_id, self.t0)
+
+    @staticmethod
+    def _has_output_td(exchange) -> bool:
+        """Return True if the exchange has a non-empty
+        ``temporal_distribution`` attribute."""
+        for accessor in (
+            lambda e: e.get("temporal_distribution"),
+            lambda e: e.data.get("temporal_distribution") if hasattr(e, "data") else None,
+            lambda e: e._data.get("temporal_distribution") if hasattr(e, "_data") else None,
+        ):
+            try:
+                td = accessor(exchange)
+            except Exception:
+                td = None
+            if td is not None and isinstance(td, TemporalDistribution) and len(td.amount) > 0:
+                return True
+        return False
+
     def build_edge_timeline(self) -> list:
         """
         Creates a timeline of the edges from the output of the graph traversal.
@@ -120,23 +172,50 @@ class EdgeExtractor(TemporalisLCA):
             self.unique_id
         ]:  # starting at the edges of the functional unit
             node = self.nodes[edge.producer_unique_id]
-            td_producer = edge.amount
-            initial_distribution = self.t0 * edge.amount
-            abs_td_producer = self.t0
-            abs_td_consumer = None
-
             row_id = self.lca_object.dicts.product.reversed[edge.product_index]
             col_id = node.activity_datapackage_id
+
+            seed_td = self._seed_td_for_fu_edge(row_id)
+
+            # initial_distribution: datetime TD with actual demand amounts
+            # (seed_td is normalised; * edge.amount restores the absolute scale).
+            initial_distribution = seed_td * edge.amount
+            abs_td_producer = initial_distribution  # dates+amounts for timeline row
+            # Wrap scalar demand as a 1-entry timedelta TD so that
+            # TimelineBuilder.extract_edge_data can call len(td_producer) and
+            # build consumer_date arrays that match producer_date/amount lengths.
+            if isinstance(edge.amount, Number):
+                td_producer = TemporalDistribution(
+                    date=np.array([0], dtype="timedelta64[Y]"),
+                    amount=np.array([edge.amount]),
+                )
+            else:
+                td_producer = edge.amount
+            # For FU edges (consumer == -1) consumer_date is overwritten with
+            # producer_date later in TimelineBuilder, but the arrays must have
+            # matching lengths for pandas .explode().  Use seed_td so that the
+            # consumer_date column has the same length as producer_date/amount.
+            abs_td_consumer = seed_td
+
             exchange = self.get_technosphere_exchange(input_id=row_id, output_id=col_id)
 
-            # In the explicit process/product paradigm, the demanded product is produced
-            # by an off-diagonal production edge. A TD on that edge distributes the
-            # process invocation itself before the process inputs are traversed.
+            # In the explicit process/product paradigm, the demanded product is
+            # produced by an off-diagonal production edge. A TD on that edge
+            # distributes the process invocation itself before the process
+            # inputs are traversed.
             if (
                 row_id != col_id
                 and hasattr(exchange, "data")
                 and exchange.data.get("type") == "production"
             ):
+                if row_id in self.demand_tds and self._has_output_td(exchange):
+                    warnings.warn(
+                        f"Demand TD and output-side production temporal_distribution "
+                        f"are both present on product id {row_id}. "
+                        f"Convolving them; resulting FU schedule = cross product.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
                 production_amount = abs(
                     get_reference_product_production_amount(
                         col_id, reference_product=row_id, lca=self.lca_object
@@ -157,18 +236,18 @@ class EdgeExtractor(TemporalisLCA):
                         date=np.array([0], dtype="timedelta64[Y]"),
                         amount=np.array([td_producer]),
                     )
-                initial_distribution = (self.t0 * td_producer).simplify()
+                initial_distribution = (seed_td * td_producer).simplify()
                 abs_td_producer = self.join_datetime_and_timedelta_distributions(
-                    td_producer, self.t0
+                    td_producer, seed_td
                 )
-                abs_td_consumer = self.t0
+                abs_td_consumer = seed_td
 
             heappush(
                 heap,
                 (
                     1 / node.cumulative_score,
                     initial_distribution,
-                    self.t0,
+                    seed_td,
                     abs_td_producer,
                     node,
                 ),
@@ -182,7 +261,7 @@ class EdgeExtractor(TemporalisLCA):
                     consumer=self.unique_id,
                     producer=node.activity_datapackage_id,
                     td_producer=td_producer,
-                    td_consumer=self.t0,
+                    td_consumer=seed_td,
                     abs_td_producer=abs_td_producer,
                     abs_td_consumer=abs_td_consumer,
                 )

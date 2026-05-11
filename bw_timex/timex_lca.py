@@ -1389,7 +1389,12 @@ class TimexLCA:
                 raise ValueError(
                     f"Functional-unit rows for demand `{k}` sum to zero amount."
                 )
-            scale = float(v) / cohort_total
+            v_scalar = (
+                float(np.asarray(v.amount).sum())
+                if isinstance(v, TemporalDistribution)
+                else float(v)
+            )
+            scale = v_scalar / cohort_total
             for row in cohort_rows.itertuples():
                 indexed[row.time_mapped_producer] = (
                     indexed.get(row.time_mapped_producer, 0.0)
