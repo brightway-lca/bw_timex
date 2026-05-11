@@ -511,6 +511,9 @@ class EdgeExtractorBFS:
         self.tech_matrix_csc = self.lca_object.technosphere_matrix.tocsc()
         self._ad_cache = {}
 
+    def _seed_td_for_fu_edge(self, fu_key_id: int) -> "TemporalDistribution":
+        return _seed_td_from_demand(self.demand_tds, fu_key_id, self.t0)
+
     def _get_activity_dataset(self, activity_id: int) -> AD:
         if activity_id not in self._ad_cache:
             self._ad_cache[activity_id] = AD.get(AD.id == activity_id)
@@ -611,7 +614,18 @@ class EdgeExtractorBFS:
 
         for fu_id in fu_activity_ids:
             fu_amount = demand_array[self.lca_object.dicts.activity[fu_id]]
-            td = self.t0 * fu_amount
+            seed_td = self._seed_td_for_fu_edge(fu_id)
+            td = seed_td * fu_amount
+            # Wrap scalar demand as a 1-entry timedelta TD so that
+            # TimelineBuilder.extract_edge_data can call len(td_producer) and
+            # build consumer_date arrays that match producer_date/amount lengths.
+            if isinstance(fu_amount, Number):
+                td_producer = TemporalDistribution(
+                    date=np.array([0], dtype="timedelta64[Y]"),
+                    amount=np.array([fu_amount]),
+                )
+            else:
+                td_producer = fu_amount
 
             timeline.append(
                 Edge(
@@ -620,13 +634,14 @@ class EdgeExtractorBFS:
                     leaf=False,
                     consumer=-1,
                     producer=fu_id,
-                    td_producer=fu_amount,
-                    td_consumer=self.t0,
-                    abs_td_producer=self.t0,
+                    td_producer=td_producer,
+                    td_consumer=seed_td,
+                    abs_td_producer=td,
+                    abs_td_consumer=td,
                 )
             )
 
-            queue.append((fu_id, td, self.t0, self.t0, abs(fu_amount)))
+            queue.append((fu_id, td, seed_td, td, abs(fu_amount)))
 
         while queue:
             node_id, td, td_parent, abs_td, supply = queue.popleft()
