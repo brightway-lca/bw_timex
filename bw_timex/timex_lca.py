@@ -239,6 +239,8 @@ class TimexLCA:
         bw_timex.timeline_builder.TimelineBuilder: Class that builds the timeline.
 
         """
+        user_supplied_starting_datetime = isinstance(starting_datetime, datetime)
+
         validated = BuildTimelineInputs(
             starting_datetime=starting_datetime,
             temporal_grouping=temporal_grouping,
@@ -278,16 +280,30 @@ class TimexLCA:
         # Doing this here because we need the temporal grouping for consistent time resolution.
         self.add_static_activities_to_activity_time_mapping()
 
+        relative_demand_keys = [
+            k
+            for k, v in self.demand.items()
+            if isinstance(v, TemporalDistribution)
+            and np.asarray(v.date).dtype.kind == "m"
+        ]
+        if relative_demand_keys and not user_supplied_starting_datetime:
+            raise ValueError(
+                f"demand TDs with relative (timedelta64) dates require an "
+                f"explicit starting_datetime in build_timeline. "
+                f"Affected demand keys: {relative_demand_keys}."
+            )
+
         demand_tds = {}
         for k, v in self.demand.items():
             if isinstance(v, TemporalDistribution):
+                v_abs = self._to_absolute_td(v, self.starting_datetime)
                 product_id = bd.get_id(k)
-                demand_tds[product_id] = v
+                process_id = self._resolve_demand_to_process_id(k)
                 # Also key by the producing-process id so the BFS extractor's
                 # activity-id-based lookup finds the TD even for explicit
                 # paradigm where product id != process id.
-                process_id = self._resolve_demand_to_process_id(k)
-                demand_tds[process_id] = v
+                demand_tds[product_id] = v_abs
+                demand_tds[process_id] = v_abs
 
         # Create timeline builder that does the graph traversal (similar to bw_temporalis) and
         # extracts all edges with their temporal information. Can later be used to build a timeline
@@ -1417,6 +1433,27 @@ class TimexLCA:
             else:
                 result[k] = float(v)
         return result
+
+    @staticmethod
+    def _to_absolute_td(td: TemporalDistribution, starting_datetime: datetime) -> TemporalDistribution:
+        """Convert a TD whose dates are relative (``timedelta64[*]``) to one
+        whose dates are absolute (``datetime64[s]``), anchored at
+        ``starting_datetime``. Absolute TDs are returned unchanged.
+        """
+        date = np.asarray(td.date)
+        if date.dtype.kind == "M":
+            return td
+        if date.dtype.kind != "m":
+            raise ValueError(
+                f"demand TD date dtype must be datetime64 or timedelta64, "
+                f"got {date.dtype}."
+            )
+        anchor = np.datetime64(starting_datetime).astype("datetime64[s]")
+        absolute_dates = (anchor + date).astype("datetime64[s]")
+        return TemporalDistribution(
+            date=absolute_dates,
+            amount=np.asarray(td.amount, dtype=float),
+        )
 
     def _resolve_demand_to_process_id(self, key) -> int:
         """Return the id of the process producing ``key``.

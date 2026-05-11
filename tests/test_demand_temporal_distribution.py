@@ -224,3 +224,42 @@ def test_absolute_td_demand_bfs_path():
     tlca.lci()
     tlca.static_lcia()
     assert tlca.static_score == pytest.approx(100.0)
+
+
+def test_relative_td_demand_requires_starting_datetime():
+    node, dbdates = _make_chimaera_project("__test_td_demand_rel_requires_sdt__")
+    td = TemporalDistribution(
+        date=np.array([0, 5], dtype="timedelta64[Y]"),
+        amount=np.array([60.0, 40.0]),
+    )
+    tlca = TimexLCA(
+        demand={node.key: td},
+        method=("GWP", "example"),
+        database_dates=dbdates,
+    )
+    with pytest.raises(ValueError, match="starting_datetime"):
+        tlca.build_timeline(starting_datetime="now")
+
+
+def test_relative_td_demand_matches_absolute_equivalent():
+    """A relative-date demand TD anchored at 2025-01-01 should produce the
+    same timeline as the absolute-date equivalent."""
+    node, dbdates = _make_chimaera_project("__test_td_demand_rel_eq_abs__")
+    td_rel = TemporalDistribution(
+        date=np.array([0, 5], dtype="timedelta64[Y]"),
+        amount=np.array([60.0, 40.0]),
+    )
+    tlca = TimexLCA(
+        demand={node.key: td_rel},
+        method=("GWP", "example"),
+        database_dates=dbdates,
+    )
+    tlca.build_timeline(
+        starting_datetime=datetime(2025, 1, 1),
+        temporal_grouping="year",
+    )
+    fu_rows = tlca.timeline[tlca.timeline["consumer"] == -1].sort_values(
+        "date_producer"
+    )
+    assert fu_rows["date_producer"].dt.year.tolist() == [2025, 2030]
+    assert fu_rows["amount"].tolist() == pytest.approx([60.0, 40.0])
