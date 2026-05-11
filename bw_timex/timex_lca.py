@@ -137,19 +137,12 @@ class TimexLCA:
             demand=self.demand, method=self.method, database_dates=self.database_dates
         )
 
+        self._scalar_demand = self._compute_scalar_demand(self.demand)
         logger.info("Calculating base LCA...")
-        # For the static base LCA we need numeric demand values. When the user
-        # supplies a TemporalDistribution as the demand value, use the sum of
-        # its amounts as the scalar proxy so that the graph traversal covers the
-        # full supply chain at the correct magnitude.
-        base_demand = {
-            k: float(v.amount.sum()) if isinstance(v, TemporalDistribution) else v
-            for k, v in self.demand.items()
-        }
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
         # background databases in the LCA. We need all the IDs for the time mapping dict.
         fu, data_objs, remapping = self.prepare_base_lca_inputs(
-            demand=base_demand, method=self.method
+            demand=self._scalar_demand, method=self.method
         )
         self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
         self.base_lca.lci()
@@ -1391,6 +1384,22 @@ class TimexLCA:
                     + float(row.amount) * scale
                 )
         return indexed
+
+    @staticmethod
+    def _compute_scalar_demand(demand: dict) -> dict:
+        """Reduce a demand dict whose values may be scalars or
+        ``TemporalDistribution`` instances to a plain ``{key: float}`` dict
+        suitable for ``bw2calc.LCA``.
+
+        A TD value contributes ``float(sum(td.amount))``.
+        """
+        result = {}
+        for k, v in demand.items():
+            if isinstance(v, TemporalDistribution):
+                result[k] = float(np.asarray(v.amount).sum())
+            else:
+                result[k] = float(v)
+        return result
 
     def _resolve_demand_to_process_id(self, key) -> int:
         """Return the id of the process producing ``key``.

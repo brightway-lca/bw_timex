@@ -127,3 +127,24 @@ def test_demand_td_wrong_dtype_rejected():
             method=("GWP", "example"),
             database_dates=dbdates,
         )
+
+
+def test_demand_td_static_base_score_matches_scalar_sum():
+    """Static base score for demand={p: TD} == bw2calc.LCA({p: sum(TD.amount)})."""
+    node, dbdates = _make_chimaera_project("__test_td_demand_base_parity__")
+    td = TemporalDistribution(
+        date=np.array(["2025-01-01", "2030-01-01"], dtype="datetime64[s]"),
+        amount=np.array([60.0, 40.0]),
+    )
+
+    slca = bc.LCA({node.key: 100.0}, method=("GWP", "example"))
+    slca.lci()
+    slca.lcia()
+
+    tlca = TimexLCA(
+        demand={node.key: td},
+        method=("GWP", "example"),
+        database_dates=dbdates,
+    )
+    assert tlca.base_lca.score == pytest.approx(slca.score)
+    assert tlca._scalar_demand == {node.key: 100.0}
