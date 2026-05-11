@@ -41,6 +41,7 @@ class TimelineBuilder:
         cutoff: float = 1e-9,
         max_calc: int = 2000,
         graph_traversal: str = "priority",
+        demand_tds: dict | None = None,
         *args,
         **kwargs,
     ) -> None:
@@ -88,6 +89,7 @@ class TimelineBuilder:
         self.interpolation_type = interpolation_type
         self.cutoff = cutoff
         self.max_calc = max_calc
+        self.demand_tds = demand_tds or {}
 
         # Finding indices of activities from the connected background databases that are known to be static, i.e. have no temporal distributions connecting to them.
         # These will be be skipped in the graph traversal.
@@ -105,6 +107,7 @@ class TimelineBuilder:
                 edge_filter_function=edge_filter_function,
                 cutoff=self.cutoff,
                 static_activity_indices=set(static_background_activity_ids),
+                demand_tds=self.demand_tds,
             )
         elif graph_traversal == "priority":
             self.edge_extractor = EdgeExtractor(
@@ -115,6 +118,7 @@ class TimelineBuilder:
                 cutoff=self.cutoff,
                 max_calc=self.max_calc,
                 static_activity_indices=set(static_background_activity_ids),
+                demand_tds=self.demand_tds,
                 **kwargs,
             )
         else:

@@ -278,6 +278,17 @@ class TimexLCA:
         # Doing this here because we need the temporal grouping for consistent time resolution.
         self.add_static_activities_to_activity_time_mapping()
 
+        demand_tds = {}
+        for k, v in self.demand.items():
+            if isinstance(v, TemporalDistribution):
+                product_id = bd.get_id(k)
+                demand_tds[product_id] = v
+                # Also key by the producing-process id so the BFS extractor's
+                # activity-id-based lookup finds the TD even for explicit
+                # paradigm where product id != process id.
+                process_id = self._resolve_demand_to_process_id(k)
+                demand_tds[process_id] = v
+
         # Create timeline builder that does the graph traversal (similar to bw_temporalis) and
         # extracts all edges with their temporal information. Can later be used to build a timeline
         # with the TimelineBuilder.build_timeline() method.
@@ -295,6 +306,7 @@ class TimexLCA:
             self.cutoff,
             self.max_calc,
             graph_traversal=graph_traversal,
+            demand_tds=demand_tds,
             *args,
             **kwargs,
         )

@@ -148,3 +148,24 @@ def test_demand_td_static_base_score_matches_scalar_sum():
     )
     assert tlca.base_lca.score == pytest.approx(slca.score)
     assert tlca._scalar_demand == {node.key: 100.0}
+
+
+def test_demand_tds_propagate_to_edge_extractor():
+    """Smoke test: the demand TD dict reaches the EdgeExtractor."""
+    node, dbdates = _make_chimaera_project("__test_td_demand_plumbing__")
+    td = TemporalDistribution(
+        date=np.array(["2025-01-01", "2030-01-01"], dtype="datetime64[s]"),
+        amount=np.array([60.0, 40.0]),
+    )
+    tlca = TimexLCA(
+        demand={node.key: td},
+        method=("GWP", "example"),
+        database_dates=dbdates,
+    )
+    tlca.build_timeline(starting_datetime=datetime(2025, 1, 1))
+    ex = tlca.timeline_builder.edge_extractor
+    assert isinstance(ex.demand_tds, dict)
+    assert node.id in ex.demand_tds
+    stored = ex.demand_tds[node.id]
+    assert isinstance(stored, TemporalDistribution)
+    assert list(stored.amount) == [60.0, 40.0]

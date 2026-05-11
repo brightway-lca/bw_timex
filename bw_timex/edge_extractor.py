@@ -53,7 +53,13 @@ class EdgeExtractor(TemporalisLCA):
     using Brightway Datapackages.
     """
 
-    def __init__(self, *args, edge_filter_function: Callable = None, **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        edge_filter_function: Callable = None,
+        demand_tds: dict | None = None,
+        **kwargs,
+    ) -> None:
         """
         Initialize the EdgeExtractor class and traverses the supply chain using
         functions of the parent class TemporalisLCA.
@@ -64,6 +70,11 @@ class EdgeExtractor(TemporalisLCA):
         edge_filter_function : Callable, optional
             A callable that filters edges. If not provided, a function that always
             returns False is used.
+        demand_tds : dict[int, TemporalDistribution] | None, optional
+            Mapping from product/process id (resolved demand key) to a
+            ``TemporalDistribution`` whose dates are absolute (``datetime64[*]``).
+            Reserved for FU-seed substitution; populated by
+            ``TimexLCA.build_timeline``. ``None`` is equivalent to empty.
         **kwargs : Arbitrary keyword arguments
 
         Returns
@@ -78,6 +89,8 @@ class EdgeExtractor(TemporalisLCA):
             self.edge_ff = edge_filter_function
         else:
             self.edge_ff = lambda x: False
+
+        self.demand_tds = demand_tds or {}
 
     def build_edge_timeline(self) -> list:
         """
@@ -397,11 +410,13 @@ class EdgeExtractorBFS:
         edge_filter_function: Callable = None,
         cutoff: float = 1e-9,
         static_activity_indices: set[int] | None = None,
+        demand_tds: dict | None = None,
     ) -> None:
         self.lca_object = lca_object
         self.edge_ff = edge_filter_function if edge_filter_function else lambda x: False
         self.cutoff = cutoff
         self.static_activity_indices = static_activity_indices or set()
+        self.demand_tds = demand_tds or {}
 
         if isinstance(starting_datetime, str):
             if starting_datetime == "now":
