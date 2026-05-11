@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sb
 from bw2calc import LCA
+from bw_temporalis import TemporalDistribution
 from bw2data import (
     Database,
     Method,
@@ -137,10 +138,18 @@ class TimexLCA:
         )
 
         logger.info("Calculating base LCA...")
+        # For the static base LCA we need numeric demand values. When the user
+        # supplies a TemporalDistribution as the demand value, use the sum of
+        # its amounts as the scalar proxy so that the graph traversal covers the
+        # full supply chain at the correct magnitude.
+        base_demand = {
+            k: float(v.amount.sum()) if isinstance(v, TemporalDistribution) else v
+            for k, v in self.demand.items()
+        }
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
         # background databases in the LCA. We need all the IDs for the time mapping dict.
         fu, data_objs, remapping = self.prepare_base_lca_inputs(
-            demand=self.demand, method=self.method
+            demand=base_demand, method=self.method
         )
         self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
         self.base_lca.lci()

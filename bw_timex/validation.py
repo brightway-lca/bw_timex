@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Callable, Literal, Optional, Union
 
 import bw2data as bd
+import numpy as np
 from bw_temporalis import TemporalDistribution
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -21,10 +22,28 @@ class TimexLCAInputs(BaseModel):
         if not v:
             raise ValueError("demand must be a non-empty dictionary.")
         for key, value in v.items():
-            if not isinstance(value, (int, float)):
-                raise ValueError(
-                    f"demand values must be numeric, got {type(value).__name__} for key {key}."
-                )
+            if isinstance(value, (int, float)):
+                continue
+            if isinstance(value, TemporalDistribution):
+                date_kind = value.date.dtype.kind
+                if date_kind not in ("M", "m"):
+                    raise ValueError(
+                        f"demand TD for key {key} must have date dtype "
+                        f"datetime64 or timedelta64, got {value.date.dtype}."
+                    )
+                if len(value.amount) == 0:
+                    raise ValueError(
+                        f"demand TD for key {key} must have at least one entry."
+                    )
+                if np.any(np.asarray(value.amount) < 0):
+                    raise ValueError(
+                        f"demand TD for key {key} must have non-negative amounts."
+                    )
+                continue
+            raise ValueError(
+                f"demand values must be numeric or TemporalDistribution, "
+                f"got {type(value).__name__} for key {key}."
+            )
         return v
 
     @field_validator("method")
