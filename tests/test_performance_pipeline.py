@@ -3,6 +3,7 @@ from datetime import datetime
 
 import bw2data as bd
 import pytest
+from dynamic_characterization.classes import CharacterizedRow
 
 from bw_timex import TimexLCA
 
@@ -35,7 +36,18 @@ def _run_pipeline_and_get_metrics(
         graph_traversal="auto",
     )
     tlca.lci(expand_technosphere=True, build_dynamic_biosphere=True)
-    tlca.dynamic_lcia(metric="GWP")
+
+    co2 = bd.get_node(database="bio", code="CO2")
+
+    def simple_rf(row, time_horizon):
+        return CharacterizedRow(
+            date=row.date, amount=row.amount, flow=row.flow, activity=row.activity
+        )
+
+    tlca.dynamic_lcia(
+        metric="radiative_forcing",
+        characterization_functions={co2.id: simple_rf},
+    )
     return tlca.get_performance_report()
 
 

@@ -552,7 +552,7 @@ class TimelineBuilder:
         self,
         reference_date: datetime,
         dates_list: tuple[datetime, ...],
-        interpolation_type: str = "linear",
+        interpolation_type: str = None,
     ) -> dict:
         """
         Find the nearest dates (lower and higher) for a given date from a list of dates
@@ -572,6 +572,7 @@ class TimelineBuilder:
         dict
             Dictionary with datetimes of the available closest databases as keys and the weights for interpolation as values.
         """
+        interpolation_type = interpolation_type or self.interpolation_type
         position = bisect_left(dates_list, reference_date)
 
         if position < len(dates_list) and dates_list[position] == reference_date:

@@ -382,7 +382,8 @@ class DynamicBiosphereBuilder:
         """
 
         key = (row, col)
-        self._matrix_entries[key] = self._matrix_entries.get(key, 0.0) + amount
+        if key not in self._matrix_entries:
+            self._matrix_entries[key] = amount
 
     def get_biosphere_exchanges(self, original_db, original_code):
         """Return cached biosphere exchanges for a producer."""
