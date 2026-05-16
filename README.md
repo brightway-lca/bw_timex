@@ -47,6 +47,11 @@ We welcome contributions! If you have suggestions or want to fix a bug, please:
 - [Open an Issue](https://github.com/brightway-lca/bw_timex/issues)
 - [Send a Pull Request](https://github.com/brightway-lca/bw_timex/pulls)
 
+## ⚡ Performance regression tracking
+- `TimexLCA` now captures runtime and peak-memory metrics for staged execution (`build_timeline`, `lci`, `calculate_dynamic_inventory`, `dynamic_lcia`).
+- Retrieve the latest stage metrics with `TimexLCA.get_performance_report()`.
+- CI includes a performance regression gate (`tests/test_performance_pipeline.py`) with configurable thresholds through `BW_TIMEX_PERF_*` environment variables.
+
 ## 💬 Support
 If you have any questions or need help, do not hesitate to contact us:
 - Timo Diepers ([timo.diepers@ltt.rwth-aachen.de](mailto:timo.diepers@ltt.rwth-aachen.de))

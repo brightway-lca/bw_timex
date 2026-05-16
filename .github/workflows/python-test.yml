@@ -53,6 +53,18 @@ jobs:
       - name: Test with pytest
         run: uv run pytest --cov-report xml
 
+      - name: Performance regression gate
+        if: matrix.os == 'ubuntu-latest' && matrix.py-version == '3.13'
+        env:
+          BW_TIMEX_ENABLE_PERF_TESTS: "1"
+          BW_TIMEX_PERF_SMALL_TOTAL_SEC: "120"
+          BW_TIMEX_PERF_SMALL_PEAK_MB: "1024"
+          BW_TIMEX_PERF_MEDIUM_TOTAL_SEC: "180"
+          BW_TIMEX_PERF_MEDIUM_PEAK_MB: "1536"
+          BW_TIMEX_PERF_LARGE_TOTAL_SEC: "240"
+          BW_TIMEX_PERF_LARGE_PEAK_MB: "2048"
+        run: uv run pytest tests/test_performance_pipeline.py --maxfail=1
+
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.py-version == '3.13'
         uses: codecov/codecov-action@v6

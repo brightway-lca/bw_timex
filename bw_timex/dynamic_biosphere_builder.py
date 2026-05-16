@@ -98,10 +98,8 @@ class DynamicBiosphereBuilder:
         self.database_dates_static = database_dates_static
         self.timeline = timeline
         self.interdatabase_activity_mapping = interdatabase_activity_mapping
-        self.rows = []
-        self.cols = []
-        self.values = []
-        self.unique_rows_cols = set()  # To keep track of (row, col) pairs
+        self._matrix_entries = {}  # (row, col) -> amount
+        self._activity_biosphere_exchange_cache = {}
         self.temporal_market_cols = []  # To keep track of temporal market columns
 
     def build_dynamic_biosphere_matrix(
@@ -176,12 +174,7 @@ class DynamicBiosphereBuilder:
                         row.temporal_evolution, time_in_datetime
                     )
 
-                if original_db == "temporalized":
-                    act = bd.get_node(code=original_code)
-                else:
-                    act = bd.get_node(database=original_db, code=original_code)
-
-                for exc in act.biosphere():
+                for exc in self.get_biosphere_exchanges(original_db, original_code):
                     if exc.get("temporal_distribution"):
                         td_dates = exc["temporal_distribution"].date
                         td_values = exc["temporal_distribution"].amount
@@ -215,7 +208,7 @@ class DynamicBiosphereBuilder:
 
                         # first create a row index for the tuple (bioflow_id, date)
                         time_mapped_matrix_idx = self.biosphere_time_mapping.add(
-                            (exc.input.id, date)
+                            (exc["input_id"], date)
                         )
 
                         # populate lists with which sparse matrix is constructed
@@ -289,9 +282,20 @@ class DynamicBiosphereBuilder:
         else:
             ncols = len(self.timeline)
 
-        shape = (max(self.rows) + 1, ncols)
+        if not self._matrix_entries:
+            return sp.csr_matrix((0, ncols)), temporal_market_lcis
+
+        rows = []
+        cols = []
+        values = []
+        for (row, col), amount in self._matrix_entries.items():
+            rows.append(row)
+            cols.append(col)
+            values.append(amount)
+
+        shape = (max(rows) + 1, ncols)
         dynamic_biosphere_matrix = sp.coo_matrix(
-            (self.values, (self.rows, self.cols)), shape
+            (values, (rows, cols)), shape
         )
         dynamic_biosphere_matrix = dynamic_biosphere_matrix.tocsr()
 
@@ -377,9 +381,23 @@ class DynamicBiosphereBuilder:
 
         """
 
-        if (row, col) not in self.unique_rows_cols:
-            self.rows.append(row)
-            self.cols.append(col)
-            self.values.append(amount)
+        key = (row, col)
+        self._matrix_entries[key] = self._matrix_entries.get(key, 0.0) + amount
 
-            self.unique_rows_cols.add((row, col))
+    def get_biosphere_exchanges(self, original_db, original_code):
+        """Return cached biosphere exchanges for a producer."""
+        cache_key = (original_db, original_code)
+        if cache_key not in self._activity_biosphere_exchange_cache:
+            if original_db == "temporalized":
+                act = bd.get_node(code=original_code)
+            else:
+                act = bd.get_node(database=original_db, code=original_code)
+            self._activity_biosphere_exchange_cache[cache_key] = [
+                {
+                    "input_id": exc.input.id,
+                    "amount": exc["amount"],
+                    "temporal_distribution": exc.get("temporal_distribution"),
+                }
+                for exc in act.biosphere()
+            ]
+        return self._activity_biosphere_exchange_cache[cache_key]

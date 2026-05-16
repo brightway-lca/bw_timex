@@ -101,6 +101,15 @@ class TimelineBuilder:
         }
 
         logger.info("Traversing supply chain graph...")
+        if graph_traversal == "auto":
+            tech_nnz = self.base_lca.technosphere_matrix.nnz
+            graph_traversal = "bfs" if tech_nnz > 50_000 else "priority"
+            logger.info(
+                "Auto-selected graph traversal '{}' based on technosphere sparsity (nnz={}).",
+                graph_traversal,
+                tech_nnz,
+            )
+
         if graph_traversal == "bfs":
             self.edge_extractor = EdgeExtractorBFS(
                 lca_object=base_lca,
@@ -122,7 +131,7 @@ class TimelineBuilder:
             )
         else:
             raise ValueError(
-                f"Unknown graph_traversal '{graph_traversal}'. Use 'priority' or 'bfs'."
+                f"Unknown graph_traversal '{graph_traversal}'. Use 'priority', 'bfs', or 'auto'."
             )
         self.edge_timeline = self.edge_extractor.build_edge_timeline()
 
@@ -234,22 +243,29 @@ class TimelineBuilder:
         )
         grouped_edges.drop(columns=["_te_key"], inplace=True)
 
-        # convert grouping times, which was only used as intermediate variable, back to datetime
-        grouped_edges["date_producer"] = grouped_edges["producer_grouping_time"].apply(
-            lambda x: convert_date_string_to_datetime(self.temporal_grouping, x)
+        # Convert grouping times to datetime with a unique-value cache to avoid repeated parsing
+        unique_grouping_strings = set(grouped_edges["producer_grouping_time"]).union(
+            set(grouped_edges["consumer_grouping_time"])
         )
-        grouped_edges["date_consumer"] = grouped_edges["consumer_grouping_time"].apply(
-            lambda x: convert_date_string_to_datetime(self.temporal_grouping, x)
+        datetime_cache = {
+            value: convert_date_string_to_datetime(self.temporal_grouping, value)
+            for value in unique_grouping_strings
+        }
+
+        grouped_edges["date_producer"] = grouped_edges["producer_grouping_time"].map(
+            datetime_cache
+        )
+        grouped_edges["date_consumer"] = grouped_edges["consumer_grouping_time"].map(
+            datetime_cache
         )
 
         # add dates as integers as hashes to the DataFrame
-        grouped_edges["hash_producer"] = grouped_edges["date_producer"].apply(
-            lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
-        )
-
-        grouped_edges["hash_consumer"] = grouped_edges["date_consumer"].apply(
-            lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
-        )
+        hash_cache = {
+            dt: extract_date_as_integer(dt, time_res=self.temporal_grouping)
+            for dt in datetime_cache.values()
+        }
+        grouped_edges["hash_producer"] = grouped_edges["date_producer"].map(hash_cache)
+        grouped_edges["hash_consumer"] = grouped_edges["date_consumer"].map(hash_cache)
 
         # add new processes to activity_time_mapping
         for row in grouped_edges.itertuples():
@@ -457,13 +473,13 @@ class TimelineBuilder:
 
         unique_producer_dates = tl_df["date_producer"].unique()
 
-        if self.interpolation_type == "nearest":
+        if interpolation_type == "nearest":
             interpolation_weights = {
                 date: self.find_closest_date(date, sorted_dates)
                 for date in unique_producer_dates
             }
 
-        elif self.interpolation_type == "linear":
+        elif interpolation_type == "linear":
             interpolation_weights = {
                 date: self.get_weights_for_interpolation_between_nearest_years(
                     date, sorted_dates, interpolation_type
@@ -582,7 +598,7 @@ class TimelineBuilder:
         closest_lower = dates_list[position - 1]
         closest_higher = dates_list[position]
 
-        if self.interpolation_type == "linear":
+        if interpolation_type == "linear":
             weight = int((reference_date - closest_lower).total_seconds()) / int(
                 (closest_higher - closest_lower).total_seconds()
             )
