@@ -1,7 +1,6 @@
 from collections.abc import Mapping
 from datetime import datetime
 from functools import partial
-from itertools import chain
 from typing import Callable, Optional
 
 import bw2data as bd
@@ -1193,12 +1192,20 @@ class TimexLCA:
         self.node_collections["foreground"] = foreground
 
         first_level_background_static = set()
-        foreground_db = bd.Database(list(demand_database_names)[0])
-        for node_id in foreground:
-            node = foreground_db.get(id=node_id)
-            for exc in chain(node.technosphere(), node.substitution()):
-                if exc.input["database"] in demand_dependent_background_database_names:
-                    first_level_background_static.add(exc.input.id)
+        for db_name in demand_database_names:
+            for node in bd.Database(db_name):
+                for exc in node.technosphere():
+                    if (
+                        exc.input["database"]
+                        in demand_dependent_background_database_names
+                    ):
+                        first_level_background_static.add(exc.input.id)
+                for exc in node.substitution():
+                    if (
+                        exc.input["database"]
+                        in demand_dependent_background_database_names
+                    ):
+                        first_level_background_static.add(exc.input.id)
 
         self.node_collections["first_level_background_static"] = (
             first_level_background_static

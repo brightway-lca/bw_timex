@@ -261,19 +261,21 @@ class TimelineBuilder:
             )
 
         # store the ids from the time_mapping in DataFrame
-        grouped_edges["time_mapped_producer"] = grouped_edges.apply(
-            lambda row: self.get_time_mapping_key(row.producer, row.hash_producer),
-            axis=1,
-        )
+        grouped_edges["time_mapped_producer"] = [
+            self.get_time_mapping_key(producer, hash_producer)
+            for producer, hash_producer in zip(
+                grouped_edges["producer"], grouped_edges["hash_producer"]
+            )
+        ]
 
-        grouped_edges["time_mapped_consumer"] = grouped_edges.apply(
-            lambda row: (
-                self.get_time_mapping_key(row.consumer, row.hash_consumer)
-                if row.consumer != -1
-                else -1
-            ),
-            axis=1,
-        )
+        grouped_edges["time_mapped_consumer"] = [
+            self.get_time_mapping_key(consumer, hash_consumer)
+            if consumer != -1
+            else -1
+            for consumer, hash_consumer in zip(
+                grouped_edges["consumer"], grouped_edges["hash_consumer"]
+            )
+        ]
 
         # Add temporal_market_shares to background databases to the DataFrame
         grouped_edges = self.add_column_temporal_market_shares_to_timeline(
@@ -282,12 +284,12 @@ class TimelineBuilder:
         )
 
         # Retrieve producer and consumer names
-        grouped_edges["producer_name"] = grouped_edges.producer.apply(
-            lambda x: self.nodes[x]["name"]
-        )
-        grouped_edges["consumer_name"] = grouped_edges.consumer.apply(
-            self.get_consumer_name
-        )
+        grouped_edges["producer_name"] = [
+            self.nodes[producer]["name"] for producer in grouped_edges["producer"]
+        ]
+        grouped_edges["consumer_name"] = [
+            self.get_consumer_name(consumer) for consumer in grouped_edges["consumer"]
+        ]
 
         # Reorder columns
         grouped_edges = grouped_edges[
@@ -477,11 +479,16 @@ class TimelineBuilder:
         first_level_background_static = self.node_collections[
             "first_level_background_static"
         ]
-        tl_df["temporal_market_shares"] = [
-            {
+        remapped_interpolation_weights = {
+            producer_date: {
                 self.reversed_database_dates[date]: share
-                for date, share in interpolation_weights[producer_date].items()
+                for date, share in weights.items()
             }
+            for producer_date, weights in interpolation_weights.items()
+        }
+
+        tl_df["temporal_market_shares"] = [
+            remapped_interpolation_weights[producer_date]
             if producer in first_level_background_static
             else None
             for producer, producer_date in zip(tl_df["producer"], tl_df["date_producer"])
