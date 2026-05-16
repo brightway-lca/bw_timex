@@ -555,7 +555,7 @@ class TimelineBuilder:
             return {dates_list[position]: 1}
 
         if position == 0:
-            if not self._logged_reference_date_below_range:
+            if not getattr(self, "_logged_reference_date_below_range", False):
                 logger.info(
                     "Reference date {} is lower than all provided dates. Data will be taken from the closest higher year.",
                     reference_date,
@@ -564,7 +564,7 @@ class TimelineBuilder:
             return {dates_list[0]: 1}
 
         if position == len(dates_list):
-            if not self._logged_reference_date_above_range:
+            if not getattr(self, "_logged_reference_date_above_range", False):
                 logger.info(
                     "Reference date {} is higher than all provided dates. Data will be taken from the closest lower year.",
                     reference_date,
