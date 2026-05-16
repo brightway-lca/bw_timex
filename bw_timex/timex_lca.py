@@ -1186,14 +1186,11 @@ class TimexLCA:
         }
         self.node_collections["background"] = background
 
-        foreground = {
-            node.id for db in demand_database_names for node in bd.Database(db)
-        }
-        self.node_collections["foreground"] = foreground
-
         first_level_background_static = set()
+        foreground = set()
         for db_name in demand_database_names:
             for node in bd.Database(db_name):
+                foreground.add(node.id)
                 for exc in node.technosphere():
                     if (
                         exc.input["database"]
@@ -1207,6 +1204,7 @@ class TimexLCA:
                     ):
                         first_level_background_static.add(exc.input.id)
 
+        self.node_collections["foreground"] = foreground
         self.node_collections["first_level_background_static"] = (
             first_level_background_static
         )
@@ -1319,18 +1317,26 @@ class TimexLCA:
         None
             adds the static activities to the `activity_time_mapping`
         """
+        static_db_time_mapping = {
+            db: extract_date_as_integer(time, self.temporal_grouping)
+            for db, time in self.database_dates.items()
+            if isinstance(time, datetime)
+        }
+        dynamic_db_time_mapping = {
+            db: time for db, time in self.database_dates.items() if isinstance(time, str)
+        }
+
         for idx in self.base_lca.dicts.activity.keys():  # activity ids
             key = self.base_lca.remapping_dicts["activity"][idx]  # ('database', 'code')
-            time = self.database_dates[
-                key[0]
-            ]  # datetime (or 'dynamic' for foreground processes)
-            if isinstance(time, str):  # if 'dynamic', just add the string
-                self.activity_time_mapping.add((key, time), unique_id=idx)
-            elif isinstance(time, datetime):
+            db_name = key[0]
+            if db_name in dynamic_db_time_mapping:
                 self.activity_time_mapping.add(
-                    (key, extract_date_as_integer(time, self.temporal_grouping)),
-                    unique_id=idx,
-                )  # if datetime, map to the date as integer
+                    (key, dynamic_db_time_mapping[db_name]), unique_id=idx
+                )
+            elif db_name in static_db_time_mapping:
+                self.activity_time_mapping.add(
+                    (key, static_db_time_mapping[db_name]), unique_id=idx
+                )
             else:
                 raise ValueError(f"Time of activity {key} is neither datetime nor str.")
 
