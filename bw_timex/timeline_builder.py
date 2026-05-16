@@ -1,3 +1,4 @@
+from bisect import bisect_left
 from datetime import datetime, timedelta
 from typing import Callable, KeysView, Union
 
@@ -88,6 +89,8 @@ class TimelineBuilder:
         self.interpolation_type = interpolation_type
         self.cutoff = cutoff
         self.max_calc = max_calc
+        self._logged_reference_date_below_range = False
+        self._logged_reference_date_above_range = False
 
         # Finding indices of activities from the connected background databases that are known to be static, i.e. have no temporal distributions connecting to them.
         # These will be be skipped in the graph traversal.
@@ -441,6 +444,8 @@ class TimelineBuilder:
         if "date_producer" not in list(tl_df.columns):
             raise ValueError("The timeline does not contain dates.")
 
+        sorted_dates = tuple(sorted(dates_list))
+
         # create reversed dict {date: database} with only static "background" db's
         self.reversed_database_dates = {
             v: k
@@ -448,30 +453,43 @@ class TimelineBuilder:
             if isinstance(v, datetime)
         }
 
+        unique_producer_dates = tl_df["date_producer"].unique()
+
         if self.interpolation_type == "nearest":
-            tl_df["temporal_market_shares"] = tl_df["date_producer"].apply(
-                lambda x: self.find_closest_date(x, dates_list)
-            )
+            interpolation_weights = {
+                date: self.find_closest_date(date, sorted_dates)
+                for date in unique_producer_dates
+            }
 
         elif self.interpolation_type == "linear":
-            tl_df["temporal_market_shares"] = tl_df["date_producer"].apply(
-                lambda x: self.get_weights_for_interpolation_between_nearest_years(
-                    x, dates_list, interpolation_type
+            interpolation_weights = {
+                date: self.get_weights_for_interpolation_between_nearest_years(
+                    date, sorted_dates, interpolation_type
                 )
-            )
+                for date in unique_producer_dates
+            }
 
         else:
             raise ValueError(
                 f"Sorry, but {interpolation_type} interpolation is not available yet."
             )
 
-        tl_df["temporal_market_shares"] = tl_df.apply(
-            self.add_interpolation_weights_at_intersection_to_background, axis=1
-        )  # add the weights to the timeline for processes at intersection
+        first_level_background_static = self.node_collections[
+            "first_level_background_static"
+        ]
+        tl_df["temporal_market_shares"] = [
+            {
+                self.reversed_database_dates[date]: share
+                for date, share in interpolation_weights[producer_date].items()
+            }
+            if producer in first_level_background_static
+            else None
+            for producer, producer_date in zip(tl_df["producer"], tl_df["date_producer"])
+        ]
 
         return tl_df
 
-    def find_closest_date(self, target: datetime, dates: KeysView[datetime]) -> dict:
+    def find_closest_date(self, target: datetime, dates: tuple[datetime, ...]) -> dict:
         """
         Find the closest date to the target in the dates list.
 
@@ -492,18 +510,25 @@ class TimelineBuilder:
         if not dates:
             return None
 
-        # Sort the dates
-        dates = sorted(dates)
-
-        # Use min function with a key based on the absolute difference between the target and each date
-        closest = min(dates, key=lambda date: abs(target - date))
+        position = bisect_left(dates, target)
+        if position == 0:
+            closest = dates[0]
+        elif position == len(dates):
+            closest = dates[-1]
+        else:
+            lower_date = dates[position - 1]
+            higher_date = dates[position]
+            if abs(target - lower_date) <= abs(higher_date - target):
+                closest = lower_date
+            else:
+                closest = higher_date
 
         return {closest: 1}
 
     def get_weights_for_interpolation_between_nearest_years(
         self,
         reference_date: datetime,
-        dates_list: KeysView[datetime],
+        dates_list: tuple[datetime, ...],
         interpolation_type: str = "linear",
     ) -> dict:
         """
@@ -524,43 +549,31 @@ class TimelineBuilder:
         dict
             Dictionary with datetimes of the available closest databases as keys and the weights for interpolation as values.
         """
-        dates_list = sorted(dates_list)
+        position = bisect_left(dates_list, reference_date)
 
-        diff_dates_list = [reference_date - x for x in dates_list]
+        if position < len(dates_list) and dates_list[position] == reference_date:
+            return {dates_list[position]: 1}
 
-        if timedelta(0) in diff_dates_list:  # date of process == date of database
-            exact_match = dates_list[diff_dates_list.index(timedelta(0))]
-            return {exact_match: 1}
+        if position == 0:
+            if not self._logged_reference_date_below_range:
+                logger.info(
+                    "Reference date {} is lower than all provided dates. Data will be taken from the closest higher year.",
+                    reference_date,
+                )
+                self._logged_reference_date_below_range = True
+            return {dates_list[0]: 1}
 
-        closest_lower = None
-        closest_higher = None
+        if position == len(dates_list):
+            if not self._logged_reference_date_above_range:
+                logger.info(
+                    "Reference date {} is higher than all provided dates. Data will be taken from the closest lower year.",
+                    reference_date,
+                )
+                self._logged_reference_date_above_range = True
+            return {dates_list[-1]: 1}
 
-        # select the closest lower and higher dates of the database in regards to the date of process
-        for date in dates_list:
-            if date < reference_date:
-                if (
-                    closest_lower is None
-                    or reference_date - date < reference_date - closest_lower
-                ):
-                    closest_lower = date
-            elif date > reference_date:
-                if (
-                    closest_higher is None
-                    or date - reference_date < closest_higher - reference_date
-                ):
-                    closest_higher = date
-
-        if closest_lower is None:
-            logger.info(
-                f"Reference date {reference_date} is lower than all provided dates. Data will be taken from the closest higher year.",
-            )
-            return {closest_higher: 1}
-
-        if closest_higher is None:
-            logger.info(
-                f"Reference date {reference_date} is higher than all provided dates. Data will be taken from the closest lower year.",
-            )
-            return {closest_lower: 1}
+        closest_lower = dates_list[position - 1]
+        closest_higher = dates_list[position]
 
         if self.interpolation_type == "linear":
             weight = int((reference_date - closest_lower).total_seconds()) / int(
