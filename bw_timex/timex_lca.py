@@ -31,7 +31,6 @@ from scipy import sparse
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import InterDatabaseMapping, TimeMappingDict
 from .matrix_modifier import MatrixModifier
-from .performance import ExecutionContext
 from .timeline_builder import TimelineBuilder
 from .utils import (
     convert_date_string_to_datetime,
@@ -102,7 +101,6 @@ class TimexLCA:
         demand: dict,
         method: tuple,
         database_dates: dict = None,
-        performance_mode: str = "full",
     ) -> None:
         """
         Instantiating a `TimexLCA` object calculates a static LCA, initializes time mappings
@@ -126,7 +124,6 @@ class TimexLCA:
         self.demand = demand
         self.method = method
         self.database_dates = database_dates
-        self.performance_mode = performance_mode
 
         if not self.database_dates:
             logger.info(
@@ -174,9 +171,6 @@ class TimexLCA:
         self._activity_code_to_name_cache = {
             node["code"]: node["name"] for node in self.nodes.values()
         }
-        self.execution_context = ExecutionContext(
-            demand=self.demand, method=self.method, database_dates=self.database_dates
-        )
         self._last_timeline_build_key = None
         self._cached_timeline = None
         self._default_edge_filter_function = None
@@ -247,97 +241,96 @@ class TimexLCA:
         bw_timex.timeline_builder.TimelineBuilder: Class that builds the timeline.
 
         """
-        with self.execution_context.track_stage("build_timeline"):
-            validated = BuildTimelineInputs(
-                starting_datetime=starting_datetime,
-                temporal_grouping=temporal_grouping,
-                interpolation_type=interpolation_type,
-                edge_filter_function=edge_filter_function,
-                cutoff=cutoff,
-                max_calc=max_calc,
-                graph_traversal=graph_traversal,
-            )
-            interpolation_type = validated.interpolation_type
-            graph_traversal = validated.graph_traversal
+        validated = BuildTimelineInputs(
+            starting_datetime=starting_datetime,
+            temporal_grouping=temporal_grouping,
+            interpolation_type=interpolation_type,
+            edge_filter_function=edge_filter_function,
+            cutoff=cutoff,
+            max_calc=max_calc,
+            graph_traversal=graph_traversal,
+        )
+        interpolation_type = validated.interpolation_type
+        graph_traversal = validated.graph_traversal
 
-            timeline_cache_key = (
-                str(validated.starting_datetime),
-                temporal_grouping,
-                interpolation_type,
-                cutoff,
-                max_calc,
-                graph_traversal,
-                "default" if edge_filter_function is None else id(edge_filter_function),
-            )
-            if timeline_cache_key == self._last_timeline_build_key:
-                self.timeline = self._cached_timeline
-                return self.timeline[
-                    [
-                        "date_producer",
-                        "producer_name",
-                        "date_consumer",
-                        "consumer_name",
-                        "amount",
-                        "temporal_market_shares",
-                    ]
+        timeline_cache_key = (
+            str(validated.starting_datetime),
+            temporal_grouping,
+            interpolation_type,
+            cutoff,
+            max_calc,
+            graph_traversal,
+            "default" if edge_filter_function is None else id(edge_filter_function),
+        )
+        if timeline_cache_key == self._last_timeline_build_key:
+            self.timeline = self._cached_timeline
+            return self.timeline[
+                [
+                    "date_producer",
+                    "producer_name",
+                    "date_consumer",
+                    "consumer_name",
+                    "amount",
+                    "temporal_market_shares",
                 ]
+            ]
 
-            if edge_filter_function is None:
-                logger.info(
-                    "No edge filter function provided. Skipping all edges in background databases."
-                )
-                if self._default_edge_filter_function is None:
-                    skippable = set()
-                    for db in self.database_dates_static.keys():
-                        skippable.update(node.id for node in bd.Database(db))
-                    self._default_edge_filter_function = skippable.__contains__
-                self.edge_filter_function = self._default_edge_filter_function
-            else:
-                self.edge_filter_function = edge_filter_function
-
-            self.starting_datetime = starting_datetime
-            self.temporal_grouping = temporal_grouping
-            self.interpolation_type = interpolation_type
-            self.cutoff = cutoff
-            self.max_calc = max_calc
-
-            logger.info("Creating activity time mapping...")
-            # Create a time mapping dict that maps each activity to a activity_time_mapping_id in the
-            # format (('database', 'code'), datetime_as_integer): time_mapping_id)
-            self.activity_time_mapping = TimeMappingDict(
-                start_id=bd.backends.ActivityDataset.select(fn.MAX(AD.id)).scalar() + 1
-            )  # making sure we get unique ids by counting up from the highest current activity id
-
-            # pre-populate the activity time mapping dict with the static activities.
-            # Doing this here because we need the temporal grouping for consistent time resolution.
-            self.add_static_activities_to_activity_time_mapping()
-
-            # Create timeline builder that does the graph traversal (similar to bw_temporalis) and
-            # extracts all edges with their temporal information. Can later be used to build a timeline
-            # with the TimelineBuilder.build_timeline() method.
-            self.timeline_builder = TimelineBuilder(
-                self.base_lca,
-                self.starting_datetime,
-                self.edge_filter_function,
-                self.database_dates,
-                self.database_dates_static,
-                self.activity_time_mapping,
-                self.node_collections,
-                self.nodes,
-                self.temporal_grouping,
-                self.interpolation_type,
-                self.cutoff,
-                self.max_calc,
-                graph_traversal=graph_traversal,
-                *args,
-                **kwargs,
+        if edge_filter_function is None:
+            logger.info(
+                "No edge filter function provided. Skipping all edges in background databases."
             )
+            if self._default_edge_filter_function is None:
+                skippable = set()
+                for db in self.database_dates_static.keys():
+                    skippable.update(node.id for node in bd.Database(db))
+                self._default_edge_filter_function = skippable.__contains__
+            self.edge_filter_function = self._default_edge_filter_function
+        else:
+            self.edge_filter_function = edge_filter_function
 
-            self.timeline = self.timeline_builder.build_timeline()
-            self.add_interdatabase_activity_mapping_from_timeline()
-            self._last_timeline_build_key = timeline_cache_key
-            self._cached_timeline = self.timeline
-            self._dynamic_lcia_inventory_cache.clear()
+        self.starting_datetime = starting_datetime
+        self.temporal_grouping = temporal_grouping
+        self.interpolation_type = interpolation_type
+        self.cutoff = cutoff
+        self.max_calc = max_calc
+
+        logger.info("Creating activity time mapping...")
+        # Create a time mapping dict that maps each activity to a activity_time_mapping_id in the
+        # format (('database', 'code'), datetime_as_integer): time_mapping_id)
+        self.activity_time_mapping = TimeMappingDict(
+            start_id=bd.backends.ActivityDataset.select(fn.MAX(AD.id)).scalar() + 1
+        )  # making sure we get unique ids by counting up from the highest current activity id
+
+        # pre-populate the activity time mapping dict with the static activities.
+        # Doing this here because we need the temporal grouping for consistent time resolution.
+        self.add_static_activities_to_activity_time_mapping()
+
+        # Create timeline builder that does the graph traversal (similar to bw_temporalis) and
+        # extracts all edges with their temporal information. Can later be used to build a timeline
+        # with the TimelineBuilder.build_timeline() method.
+        self.timeline_builder = TimelineBuilder(
+            self.base_lca,
+            self.starting_datetime,
+            self.edge_filter_function,
+            self.database_dates,
+            self.database_dates_static,
+            self.activity_time_mapping,
+            self.node_collections,
+            self.nodes,
+            self.temporal_grouping,
+            self.interpolation_type,
+            self.cutoff,
+            self.max_calc,
+            graph_traversal=graph_traversal,
+            *args,
+            **kwargs,
+        )
+
+        self.timeline = self.timeline_builder.build_timeline()
+        self.add_interdatabase_activity_mapping_from_timeline()
+        self._last_timeline_build_key = timeline_cache_key
+        self._cached_timeline = self.timeline
+        self._dynamic_lcia_inventory_cache.clear()
 
         return self.timeline[
             [
@@ -398,60 +391,59 @@ class TimexLCA:
             Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
 
-        with self.execution_context.track_stage("lci"):
-            LCIInputs(
-                build_dynamic_biosphere=build_dynamic_biosphere,
-                expand_technosphere=expand_technosphere,
+        LCIInputs(
+            build_dynamic_biosphere=build_dynamic_biosphere,
+            expand_technosphere=expand_technosphere,
+        )
+
+        if hasattr(self, "dynamic_inventory"):
+            del self.dynamic_inventory
+
+        if not hasattr(self, "timeline"):
+            raise AttributeError(
+                "Timeline not yet built. Call TimexLCA.build_timeline() first."
             )
 
-            if hasattr(self, "dynamic_inventory"):
-                del self.dynamic_inventory
+        # mapping of the demand id to demand time
+        self.demand_timing = self.create_demand_timing()
 
-            if not hasattr(self, "timeline"):
-                raise AttributeError(
-                    "Timeline not yet built. Call TimexLCA.build_timeline() first."
-                )
+        self.fu, self.data_objs, self.remapping = self.prepare_bw_timex_inputs(
+            demand=self.demand,
+            method=self.method,
+        )
 
-            # mapping of the demand id to demand time
-            self.demand_timing = self.create_demand_timing()
-
-            self.fu, self.data_objs, self.remapping = self.prepare_bw_timex_inputs(
-                demand=self.demand,
-                method=self.method,
+        if expand_technosphere:
+            logger.info("Expanding matrices...")
+            self.datapackage = self.build_datapackage()
+            data_obs = self.data_objs + self.datapackage
+            self.expanded_technosphere = True  # set flag for later static lcia usage
+        else:  # setup for timeline approach
+            logger.warning(
+                "Building the dynamic inventory directly from the timeline. This feature is under development.\
+                Use at your own risk... and check your results! Disaggregated lci is not yet implemented."
             )
+            self.collect_temporalized_processes_from_timeline()
+            data_obs = self.data_objs
+            self.expanded_technosphere = False  # set flag for later lcia usage
 
+        self.lca = LCA(
+            self.fu,
+            data_objs=data_obs,
+            remapping_dicts=self.remapping,
+        )
+
+        logger.info("Calculating dynamic inventory...")
+        if not build_dynamic_biosphere:
+            self.lca.lci()
+        else:  # building dynamic biosphere
             if expand_technosphere:
-                logger.info("Expanding matrices...")
-                self.datapackage = self.build_datapackage()
-                data_obs = self.data_objs + self.datapackage
-                self.expanded_technosphere = True  # set flag for later static lcia usage
-            else:  # setup for timeline approach
-                logger.warning(
-                    "Building the dynamic inventory directly from the timeline. This feature is under development.\
-                    Use at your own risk... and check your results! Disaggregated lci is not yet implemented."
-                )
-                self.collect_temporalized_processes_from_timeline()
-                data_obs = self.data_objs
-                self.expanded_technosphere = False  # set flag for later lcia usage
-
-            self.lca = LCA(
-                self.fu,
-                data_objs=data_obs,
-                remapping_dicts=self.remapping,
-            )
-
-            logger.info("Calculating dynamic inventory...")
-            if not build_dynamic_biosphere:
-                self.lca.lci()
-            else:  # building dynamic biosphere
-                if expand_technosphere:
-                    self.lca.lci(factorize=True)
-                    self.calculate_dynamic_inventory(expand_technosphere=True)
-                    # to get back the original LCI - necessary because we do some redo_lci's in the
-                    # dynamic inventory calculation
-                    self.lca.redo_lci(self.fu)
-                else:
-                    self.calculate_dynamic_inventory(expand_technosphere=False)
+                self.lca.lci(factorize=True)
+                self.calculate_dynamic_inventory(expand_technosphere=True)
+                # to get back the original LCI - necessary because we do some redo_lci's in the
+                # dynamic inventory calculation
+                self.lca.redo_lci(self.fu)
+            else:
+                self.calculate_dynamic_inventory(expand_technosphere=False)
 
     def disaggregate_background_lci(self) -> None:
         """
@@ -636,88 +628,87 @@ class TimexLCA:
         dynamic_characterization: Package handling the dynamic characterization: https://dynamic-characterization.readthedocs.io/en/latest/
         """
 
-        with self.execution_context.track_stage("dynamic_lcia"):
-            DynamicLCIAInputs(
-                metric=metric,
-                time_horizon=time_horizon,
-                fixed_time_horizon=fixed_time_horizon,
-                time_horizon_start=time_horizon_start,
-                characterization_functions=characterization_functions,
-                characterization_function_co2=characterization_function_co2,
-                use_disaggregated_lci=use_disaggregated_lci,
+        DynamicLCIAInputs(
+            metric=metric,
+            time_horizon=time_horizon,
+            fixed_time_horizon=fixed_time_horizon,
+            time_horizon_start=time_horizon_start,
+            characterization_functions=characterization_functions,
+            characterization_function_co2=characterization_function_co2,
+            use_disaggregated_lci=use_disaggregated_lci,
+        )
+
+        if not hasattr(self, "dynamic_inventory"):
+            raise AttributeError(
+                "Dynamic lci not yet calculated. Call TimexLCA.lci(build_dynamic_biosphere=True) first."
             )
 
-            if not hasattr(self, "dynamic_inventory"):
-                raise AttributeError(
-                    "Dynamic lci not yet calculated. Call TimexLCA.lci(build_dynamic_biosphere=True) first."
+        self.current_metric = metric
+        self.current_time_horizon = time_horizon
+
+        if use_disaggregated_lci:
+            if not self.expanded_technosphere:
+                raise NotImplementedError(
+                    "Currently the disaggregation of background processes is only possible if the \
+                        expanded matrix has been built. Please call TimexLCA.lci(expand_technosphere=True) first."
                 )
+            # Check if disaggregated inventory is available
+            # otherwise disaggregate the background LCI
+            if not hasattr(self, "dynamic_inventory_disaggregated"):
+                logger.info("Disaggregating background LCI...")
+                self.disaggregate_background_lci()
+                logger.info("Background LCI's disaggregated.")
+            dynamic_inventory_df = self.dynamic_inventory_disaggregated_df
 
-            self.current_metric = metric
-            self.current_time_horizon = time_horizon
+        else:
+            dynamic_inventory_df = self.dynamic_inventory_df
 
-            if use_disaggregated_lci:
-                if not self.expanded_technosphere:
-                    raise NotImplementedError(
-                        "Currently the disaggregation of background processes is only possible if the \
-                            expanded matrix has been built. Please call TimexLCA.lci(expand_technosphere=True) first."
-                    )
-                # Check if disaggregated inventory is available
-                # otherwise disaggregate the background LCI
-                if not hasattr(self, "dynamic_inventory_disaggregated"):
-                    logger.info("Disaggregating background LCI...")
-                    self.disaggregate_background_lci()
-                    logger.info("Background LCI's disaggregated.")
-                dynamic_inventory_df = self.dynamic_inventory_disaggregated_df
-
-            else:
-                dynamic_inventory_df = self.dynamic_inventory_df
-
-            cache_key = ("disaggregated" if use_disaggregated_lci else "aggregate")
-            if cache_key not in self._dynamic_lcia_inventory_cache:
-                inventory_rounded = dynamic_inventory_df.copy()
-                inventory_rounded.date = round_datetime_series_to_year(
-                    inventory_rounded.date
-                )
-                self._dynamic_lcia_inventory_cache[cache_key] = (
-                    inventory_rounded.groupby(inventory_rounded.columns.tolist())
-                    .sum()
-                    .reset_index()
-                )
-
-            # Set a default for inventory_in_time_horizon using the full dynamic_inventory_df
-            inventory_in_time_horizon = self._dynamic_lcia_inventory_cache[cache_key]
-
-            # Calculate the latest considered impact date
-            t0_date = pd.Timestamp(self.timeline_builder.edge_extractor.t0.date[0])
-            latest_considered_impact = t0_date + pd.DateOffset(years=time_horizon)
-
-            # Update inventory_in_time_horizon if a fixed time horizon is used
-            if fixed_time_horizon:
-                last_emission = dynamic_inventory_df.date.max()
-                if latest_considered_impact < last_emission:
-                    logger.warning(
-                        "An emission occurs outside of the specified time horizon and will not be \
-                            characterized. Please make sure this is intended."
-                    )
-                    inventory_in_time_horizon = dynamic_inventory_df[
-                        dynamic_inventory_df.date <= latest_considered_impact
-                    ]
-
-            if not time_horizon_start:
-                time_horizon_start = t0_date
-
-            self.characterized_inventory = characterize(
-                dynamic_inventory_df=inventory_in_time_horizon,
-                metric=metric,
-                characterization_functions=characterization_functions,
-                base_lcia_method=self.method,
-                time_horizon=time_horizon,
-                fixed_time_horizon=fixed_time_horizon,
-                time_horizon_start=time_horizon_start,
-                characterization_function_co2=characterization_function_co2,
+        cache_key = ("disaggregated" if use_disaggregated_lci else "aggregate")
+        if cache_key not in self._dynamic_lcia_inventory_cache:
+            inventory_rounded = dynamic_inventory_df.copy()
+            inventory_rounded.date = round_datetime_series_to_year(
+                inventory_rounded.date
+            )
+            self._dynamic_lcia_inventory_cache[cache_key] = (
+                inventory_rounded.groupby(inventory_rounded.columns.tolist())
+                .sum()
+                .reset_index()
             )
 
-            return self.characterized_inventory
+        # Set a default for inventory_in_time_horizon using the full dynamic_inventory_df
+        inventory_in_time_horizon = self._dynamic_lcia_inventory_cache[cache_key]
+
+        # Calculate the latest considered impact date
+        t0_date = pd.Timestamp(self.timeline_builder.edge_extractor.t0.date[0])
+        latest_considered_impact = t0_date + pd.DateOffset(years=time_horizon)
+
+        # Update inventory_in_time_horizon if a fixed time horizon is used
+        if fixed_time_horizon:
+            last_emission = dynamic_inventory_df.date.max()
+            if latest_considered_impact < last_emission:
+                logger.warning(
+                    "An emission occurs outside of the specified time horizon and will not be \
+                        characterized. Please make sure this is intended."
+                )
+                inventory_in_time_horizon = dynamic_inventory_df[
+                    dynamic_inventory_df.date <= latest_considered_impact
+                ]
+
+        if not time_horizon_start:
+            time_horizon_start = t0_date
+
+        self.characterized_inventory = characterize(
+            dynamic_inventory_df=inventory_in_time_horizon,
+            metric=metric,
+            characterization_functions=characterization_functions,
+            base_lcia_method=self.method,
+            time_horizon=time_horizon,
+            fixed_time_horizon=fixed_time_horizon,
+            time_horizon_start=time_horizon_start,
+            characterization_function_co2=characterization_function_co2,
+        )
+
+        return self.characterized_inventory
 
     ###################
     # Core properties #
@@ -818,46 +809,45 @@ class TimexLCA:
         bw_timex.dynamic_biosphere_builder.DynamicBiosphereBuilder: Class for creating the dynamic biosphere matrix and inventory.
         """
 
-        with self.execution_context.track_stage("calculate_dynamic_inventory"):
-            if not hasattr(self, "lca"):
-                raise AttributeError(
-                    "Time-explicit LCA object does not exist. Call TimexLCA.lci() first."
-                )
+        if not hasattr(self, "lca"):
+            raise AttributeError(
+                "Time-explicit LCA object does not exist. Call TimexLCA.lci() first."
+            )
 
-            self.biosphere_time_mapping = TimeMappingDict(start_id=0)
+        self.biosphere_time_mapping = TimeMappingDict(start_id=0)
 
-            self.dynamic_biosphere_builder = DynamicBiosphereBuilder(
-                self.lca,
-                self.activity_time_mapping,
-                self.biosphere_time_mapping,
-                self.demand_timing,
-                self.node_collections,
-                self.temporal_grouping,
-                self.database_dates,
-                self.database_dates_static,
-                self.timeline,
-                self.interdatabase_activity_mapping,
+        self.dynamic_biosphere_builder = DynamicBiosphereBuilder(
+            self.lca,
+            self.activity_time_mapping,
+            self.biosphere_time_mapping,
+            self.demand_timing,
+            self.node_collections,
+            self.temporal_grouping,
+            self.database_dates,
+            self.database_dates_static,
+            self.timeline,
+            self.interdatabase_activity_mapping,
+            expand_technosphere=expand_technosphere,
+        )
+        self.dynamic_biosphere_matrix, self.temporal_market_lcis = (
+            self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(
                 expand_technosphere=expand_technosphere,
             )
-            self.dynamic_biosphere_matrix, self.temporal_market_lcis = (
-                self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(
-                    expand_technosphere=expand_technosphere,
-                )
-            )
+        )
 
-            # Build the dynamic inventory
-            count = len(self.dynamic_biosphere_builder.dynamic_supply_array)
-            # diagonalization of supply array keeps the dimension of the process, which we want to pass
-            # as additional information to the dynamic inventory dict
-            diagonal_supply_array = sparse.spdiags(
-                [self.dynamic_biosphere_builder.dynamic_supply_array], [0], count, count
-            )
-            self.dynamic_inventory = self.dynamic_biosphere_matrix @ diagonal_supply_array
+        # Build the dynamic inventory
+        count = len(self.dynamic_biosphere_builder.dynamic_supply_array)
+        # diagonalization of supply array keeps the dimension of the process, which we want to pass
+        # as additional information to the dynamic inventory dict
+        diagonal_supply_array = sparse.spdiags(
+            [self.dynamic_biosphere_builder.dynamic_supply_array], [0], count, count
+        )
+        self.dynamic_inventory = self.dynamic_biosphere_matrix @ diagonal_supply_array
 
-            self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(
-                expand_technosphere
-            )
-            self._dynamic_lcia_inventory_cache.clear()
+        self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(
+            expand_technosphere
+        )
+        self._dynamic_lcia_inventory_cache.clear()
 
     def create_dynamic_inventory_dataframe(
         self,
@@ -929,17 +919,6 @@ class TimexLCA:
         df.date = df.date.astype("datetime64[s]")
 
         return df.sort_values(by=["date", "amount"], ascending=[True, False])
-
-    def get_performance_report(self) -> dict[str, dict[str, float]]:
-        """
-        Return runtime and peak-memory measurements of staged computation.
-
-        Returns
-        -------
-        dict
-            Mapping stage name to {"elapsed_seconds", "peak_memory_mb"}.
-        """
-        return self.execution_context.serialize_metrics()
 
     #############
     # For setup #

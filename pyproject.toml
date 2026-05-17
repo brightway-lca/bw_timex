@@ -99,9 +99,6 @@ norecursedirs = [
     ".tox"
 ]
 testpaths = ["tests/*.py"]
-markers = [
-    "performance: performance-regression tests with runtime and memory thresholds",
-]
 
 [tool.devpi.upload]
 # Options for the devpi: PyPI server and packaging tool
