@@ -58,6 +58,20 @@ class TestTimexLCAProperties:
         with pytest.raises(ValueError, match="not possible to skip"):
             self.tlca.lci(expand_technosphere=False, build_dynamic_biosphere=False)
 
+    def test_lci_with_stale_timeline_raises_helpful_error(self):
+        self.tlca.build_timeline(
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+        )
+        self.tlca.timeline = self.tlca.timeline[
+            self.tlca.timeline["consumer"] != -1
+        ].copy()
+
+        with pytest.raises(
+            ValueError,
+            match="Brightway database or demand nodes changed after build_timeline",
+        ):
+            self.tlca.lci()
+
 
 # ─── Tests for labelling / dataframe methods ───
 

@@ -37,6 +37,7 @@ from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
     round_datetime,
+    round_datetime_series_to_year,
 )
 from .validation import (
     BuildTimelineInputs,
@@ -674,8 +675,8 @@ class TimexLCA:
             cache_key = ("disaggregated" if use_disaggregated_lci else "aggregate")
             if cache_key not in self._dynamic_lcia_inventory_cache:
                 inventory_rounded = dynamic_inventory_df.copy()
-                inventory_rounded.date = inventory_rounded.date.apply(
-                    partial(round_datetime, resolution="year")
+                inventory_rounded.date = round_datetime_series_to_year(
+                    inventory_rounded.date
                 )
                 self._dynamic_lcia_inventory_cache[cache_key] = (
                     inventory_rounded.groupby(inventory_rounded.columns.tolist())
@@ -1405,11 +1406,25 @@ class TimexLCA:
         dict
             Dictionary mapping producer ids to reference timing for the specified demands.
         """
-        demand_ids = [bd.get_activity(key).id for key in self.demand.keys()]
+        demand_ids = [bd.get_id(key) for key in self.demand.keys()]
         demand_rows = self.timeline[
             self.timeline["producer"].isin(demand_ids)
             & (self.timeline["consumer"] == -1)
         ]
+
+        missing_demand_ids = sorted(set(demand_ids) - set(demand_rows["producer"]))
+        if missing_demand_ids:
+            functional_unit_producers = sorted(
+                set(self.timeline.loc[self.timeline["consumer"] == -1, "producer"])
+            )
+            raise ValueError(
+                "Could not find functional-unit timing rows for demand id(s) "
+                f"{missing_demand_ids}. The existing timeline contains functional-unit "
+                f"producer id(s) {functional_unit_producers}. This usually means the "
+                "Brightway database or demand nodes changed after build_timeline(); "
+                "recreate the TimexLCA object and rebuild the timeline before calling lci()."
+            )
+
         self.demand_timing = {
             row.producer: row.hash_producer for row in demand_rows.itertuples()
         }
