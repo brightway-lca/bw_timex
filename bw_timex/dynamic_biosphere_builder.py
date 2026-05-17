@@ -174,16 +174,18 @@ class DynamicBiosphereBuilder:
                         row.temporal_evolution, time_in_datetime
                     )
 
-                for exc in self.get_biosphere_exchanges(original_db, original_code):
-                    if exc.get("temporal_distribution"):
-                        td_dates = exc["temporal_distribution"].date
-                        td_values = exc["temporal_distribution"].amount
+                for input_id, exc_amount, temporal_distribution in (
+                    self.get_biosphere_exchanges(original_db, original_code)
+                ):
+                    if temporal_distribution:
+                        td_dates = temporal_distribution.date
+                        td_values = temporal_distribution.amount
                         # If the biosphere flows have an absolute TD, this means we have to look up
                         # the biosphere flow for the activity time (td_producer)
                         if isinstance(td_dates[0], np.datetime64):
                             dates = td_producer  # datetime array, same time as producer
                             values = [
-                                exc["amount"]
+                                exc_amount
                                 * temporal_evolution_factor
                                 * td_values[
                                     np.argmin(
@@ -197,18 +199,18 @@ class DynamicBiosphereBuilder:
                         else:
                             # we can add a datetime of len(1) to a timedelta of len(N) easily
                             dates = td_producer + td_dates
-                            values = exc["amount"] * temporal_evolution_factor * td_values
+                            values = exc_amount * temporal_evolution_factor * td_values
 
                     else:  # exchange has no TD
                         dates = td_producer  # datetime array, same time as producer
-                        values = [exc["amount"] * temporal_evolution_factor]
+                        values = [exc_amount * temporal_evolution_factor]
 
                     # Add entries to dynamic bio matrix
                     for date, amount in zip(dates, values):
 
                         # first create a row index for the tuple (bioflow_id, date)
                         time_mapped_matrix_idx = self.biosphere_time_mapping.add(
-                            (exc["input_id"], date)
+                            (input_id, date)
                         )
 
                         # populate lists with which sparse matrix is constructed
@@ -394,11 +396,7 @@ class DynamicBiosphereBuilder:
             else:
                 act = bd.get_node(database=original_db, code=original_code)
             self._activity_biosphere_exchange_cache[cache_key] = [
-                {
-                    "input_id": exc.input.id,
-                    "amount": exc["amount"],
-                    "temporal_distribution": exc.get("temporal_distribution"),
-                }
+                (exc.input.id, exc["amount"], exc.get("temporal_distribution"))
                 for exc in act.biosphere()
             ]
         return self._activity_biosphere_exchange_cache[cache_key]

@@ -177,6 +177,9 @@ class TimexLCA:
             demand=self.demand, method=self.method, database_dates=self.database_dates
         )
         self._last_timeline_build_key = None
+        self._cached_timeline = None
+        self._default_edge_filter_function = None
+        self._dynamic_lcia_inventory_cache = {}
 
     ########################################
     # Main functions to be called by users #
@@ -263,13 +266,10 @@ class TimexLCA:
                 cutoff,
                 max_calc,
                 graph_traversal,
-                edge_filter_function is None,
+                "default" if edge_filter_function is None else id(edge_filter_function),
             )
-            if (
-                timeline_cache_key == self._last_timeline_build_key
-                and "build_timeline" in self.execution_context.stage_outputs
-            ):
-                self.timeline = self.execution_context.stage_outputs["build_timeline"]
+            if timeline_cache_key == self._last_timeline_build_key:
+                self.timeline = self._cached_timeline
                 return self.timeline[
                     [
                         "date_producer",
@@ -285,10 +285,12 @@ class TimexLCA:
                 logger.info(
                     "No edge filter function provided. Skipping all edges in background databases."
                 )
-                skippable = []
-                for db in self.database_dates_static.keys():
-                    skippable.extend([node.id for node in bd.Database(db)])
-                self.edge_filter_function = lambda x: x in skippable
+                if self._default_edge_filter_function is None:
+                    skippable = set()
+                    for db in self.database_dates_static.keys():
+                        skippable.update(node.id for node in bd.Database(db))
+                    self._default_edge_filter_function = skippable.__contains__
+                self.edge_filter_function = self._default_edge_filter_function
             else:
                 self.edge_filter_function = edge_filter_function
 
@@ -333,7 +335,8 @@ class TimexLCA:
             self.timeline = self.timeline_builder.build_timeline()
             self.add_interdatabase_activity_mapping_from_timeline()
             self._last_timeline_build_key = timeline_cache_key
-            self.execution_context.stage_outputs["build_timeline"] = self.timeline
+            self._cached_timeline = self.timeline
+            self._dynamic_lcia_inventory_cache.clear()
 
         return self.timeline[
             [
@@ -541,6 +544,7 @@ class TimexLCA:
         self.dynamic_inventory_disaggregated_df = (
             self.create_dynamic_inventory_dataframe(use_disaggregated_lci=True)
         )
+        self._dynamic_lcia_inventory_cache.clear()
 
     def static_lcia(self) -> None:
         """
@@ -667,20 +671,20 @@ class TimexLCA:
             else:
                 dynamic_inventory_df = self.dynamic_inventory_df
 
-            # Set a default for inventory_in_time_horizon using the full dynamic_inventory_df
-            inventory_in_time_horizon = dynamic_inventory_df
-
-            # Round dates to nearest year and sum up emissions for each year
-            inventory_in_time_horizon.date = inventory_in_time_horizon.date.apply(
-                partial(round_datetime, resolution="year")
-            )
-            inventory_in_time_horizon = (
-                inventory_in_time_horizon.groupby(
-                    inventory_in_time_horizon.columns.tolist()
+            cache_key = ("disaggregated" if use_disaggregated_lci else "aggregate")
+            if cache_key not in self._dynamic_lcia_inventory_cache:
+                inventory_rounded = dynamic_inventory_df.copy()
+                inventory_rounded.date = inventory_rounded.date.apply(
+                    partial(round_datetime, resolution="year")
                 )
-                .sum()
-                .reset_index()
-            )
+                self._dynamic_lcia_inventory_cache[cache_key] = (
+                    inventory_rounded.groupby(inventory_rounded.columns.tolist())
+                    .sum()
+                    .reset_index()
+                )
+
+            # Set a default for inventory_in_time_horizon using the full dynamic_inventory_df
+            inventory_in_time_horizon = self._dynamic_lcia_inventory_cache[cache_key]
 
             # Calculate the latest considered impact date
             t0_date = pd.Timestamp(self.timeline_builder.edge_extractor.t0.date[0])
@@ -852,6 +856,7 @@ class TimexLCA:
             self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(
                 expand_technosphere
             )
+            self._dynamic_lcia_inventory_cache.clear()
 
     def create_dynamic_inventory_dataframe(
         self,
