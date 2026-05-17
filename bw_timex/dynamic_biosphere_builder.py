@@ -100,6 +100,7 @@ class DynamicBiosphereBuilder:
         self.interdatabase_activity_mapping = interdatabase_activity_mapping
         self._matrix_entries = {}  # (row, col) -> amount
         self._activity_biosphere_exchange_cache = {}
+        self._background_unit_lci_cache = {}
         self.temporal_market_cols = []  # To keep track of temporal market columns
 
     def build_dynamic_biosphere_matrix(
@@ -137,7 +138,6 @@ class DynamicBiosphereBuilder:
             with the time-mapped-activity id as key.
         """
 
-        lci_dict = {}
         temporal_market_lcis = {}
 
         for row in self.timeline.itertuples():
@@ -234,18 +234,12 @@ class DynamicBiosphereBuilder:
 
                 if demand:
                     for act, amount in demand.items():
-                        # check if lci already calculated for this activity
-                        if not act in lci_dict.keys():
-                            self.lca_obj.redo_lci({act: 1})
-                            #  biosphere flows by activity of background supply chain emissions.
-                            # Rows are bioflows. Columns are activities.
-                            # save for reuse in dict
-                            lci_dict[act] = self.lca_obj.inventory
+                        unit_lci = self.get_background_unit_lci(act)
                         # add lci of both background activities of the temporal market and save total lci
                         if idx not in temporal_market_lcis.keys():
-                            temporal_market_lcis[idx] = lci_dict[act] * amount
+                            temporal_market_lcis[idx] = unit_lci * amount
                         else:
-                            temporal_market_lcis[idx] += lci_dict[act] * amount
+                            temporal_market_lcis[idx] += unit_lci * amount
 
                     aggregated_inventory = temporal_market_lcis[idx].sum(axis=1)
 
@@ -400,3 +394,31 @@ class DynamicBiosphereBuilder:
                 for exc in act.biosphere()
             ]
         return self._activity_biosphere_exchange_cache[cache_key]
+
+    def get_background_unit_lci(self, act):
+        """
+        Return unit background LCI matrix for an activity, cached by process identity.
+
+        Background activities can occur repeatedly with different exchange amounts.
+        Reusing the unit LCI avoids repeated `redo_lci` solves for equivalent processes.
+        """
+        cache_key = self.get_background_lci_cache_key(act)
+        if cache_key not in self._background_unit_lci_cache:
+            self.lca_obj.redo_lci({act: 1})
+            self._background_unit_lci_cache[cache_key] = self.lca_obj.inventory
+        return self._background_unit_lci_cache[cache_key]
+
+    def get_background_lci_cache_key(self, act):
+        """Build a stable cache key for background unit LCI reuse."""
+        mapping = self.activity_time_mapping.reversed.get(act)
+        if mapping is None:
+            return ("activity_id", act)
+
+        process_key, _ = mapping
+        if isinstance(process_key, tuple):
+            db, code = process_key
+            if db == "temporalized":
+                return ("temporalized", code)
+            return ("db_code", db, code)
+
+        return ("activity_id", act)

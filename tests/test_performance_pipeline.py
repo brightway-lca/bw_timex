@@ -1,11 +1,15 @@
 import os
 from datetime import datetime
+from time import perf_counter
 
 import bw2data as bd
+import numpy as np
 import pytest
 from dynamic_characterization.classes import CharacterizedRow
+from scipy import sparse
 
 from bw_timex import TimexLCA
+from bw_timex.dynamic_biosphere_builder import DynamicBiosphereBuilder
 
 
 pytestmark = pytest.mark.skipif(
@@ -62,6 +66,28 @@ def _assert_stage_metrics_present(metrics: dict) -> None:
     for stage in required_stages:
         assert metrics[stage]["elapsed_seconds"] >= 0
         assert metrics[stage]["peak_memory_mb"] >= 0
+
+
+class _FakeMapping:
+    def __init__(self, reversed_mapping):
+        self.reversed = reversed_mapping
+
+
+class _FakeLCA:
+    def __init__(self):
+        self.redo_calls = 0
+        self.inventory = sparse.csr_matrix(([1.0], ([0], [0])), shape=(1, 1))
+
+    def redo_lci(self, _demand):
+        self.redo_calls += 1
+
+
+def _legacy_per_activity_cache_benchmark(activities, unit_inventory):
+    cache = {}
+    for act in activities:
+        if act not in cache:
+            cache[act] = unit_inventory
+    return len(cache)
 
 
 @pytest.mark.usefixtures("temporal_grouping_db_monthly")
@@ -122,3 +148,33 @@ def test_performance_baseline_large(vehicle_db):
     peak_memory_mb = max(stage["peak_memory_mb"] for stage in metrics.values())
     assert total_seconds <= _env_float("BW_TIMEX_PERF_LARGE_TOTAL_SEC", 240.0)
     assert peak_memory_mb <= _env_float("BW_TIMEX_PERF_LARGE_PEAK_MB", 2048.0)
+
+
+def test_background_unit_lci_cache_benchmark():
+    activity_count = int(_env_float("BW_TIMEX_PERF_BG_ACTIVITY_COUNT", 5000))
+    activities = list(range(activity_count))
+
+    fake_lca = _FakeLCA()
+    builder = DynamicBiosphereBuilder.__new__(DynamicBiosphereBuilder)
+    builder.lca_obj = fake_lca
+    builder.activity_time_mapping = _FakeMapping(
+        {
+            act: (("db_2020", "shared_background_process"), np.datetime64(act, "Y"))
+            for act in activities
+        }
+    )
+    builder._background_unit_lci_cache = {}
+
+    legacy_start = perf_counter()
+    legacy_unique = _legacy_per_activity_cache_benchmark(activities, fake_lca.inventory)
+    _ = perf_counter() - legacy_start
+
+    new_start = perf_counter()
+    for act in activities:
+        builder.get_background_unit_lci(act)
+    _ = perf_counter() - new_start
+
+    assert legacy_unique == activity_count
+    assert fake_lca.redo_calls == 1
+    assert len(builder._background_unit_lci_cache) == 1
+    assert legacy_unique / fake_lca.redo_calls >= activity_count
