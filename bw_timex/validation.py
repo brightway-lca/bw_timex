@@ -97,7 +97,7 @@ class BuildTimelineInputs(BaseModel):
     edge_filter_function: Optional[Callable] = None
     cutoff: float = Field(default=1e-9, gt=0)
     max_calc: int = Field(default=2000, gt=0)
-    graph_traversal: Literal["priority", "bfs", "auto"] = "priority"
+    graph_traversal: Literal["priority", "bfs"] = "priority"
 
     @field_validator("starting_datetime")
     @classmethod

@@ -101,15 +101,6 @@ class TimelineBuilder:
         }
 
         logger.info("Traversing supply chain graph...")
-        if graph_traversal == "auto":
-            tech_nnz = self.base_lca.technosphere_matrix.nnz
-            graph_traversal = "bfs" if tech_nnz > 50_000 else "priority"
-            logger.info(
-                "Auto-selected graph traversal '{}' based on technosphere sparsity (nnz={}).",
-                graph_traversal,
-                tech_nnz,
-            )
-
         if graph_traversal == "bfs":
             self.edge_extractor = EdgeExtractorBFS(
                 lca_object=base_lca,
@@ -131,7 +122,7 @@ class TimelineBuilder:
             )
         else:
             raise ValueError(
-                f"Unknown graph_traversal '{graph_traversal}'. Use 'priority', 'bfs', or 'auto'."
+                f"Unknown graph_traversal '{graph_traversal}'. Use 'priority' or 'bfs'."
             )
         self.edge_timeline = self.edge_extractor.build_edge_timeline()
 

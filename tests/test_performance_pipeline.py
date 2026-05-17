@@ -33,7 +33,7 @@ def _run_pipeline_and_get_metrics(
     tlca.build_timeline(
         starting_datetime=starting_datetime,
         temporal_grouping="year",
-        graph_traversal="auto",
+        graph_traversal="priority",
     )
     tlca.lci(expand_technosphere=True, build_dynamic_biosphere=True)
 

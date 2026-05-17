@@ -223,8 +223,7 @@ class TimexLCA:
         graph_traversal : str, optional
             The graph traversal algorithm to use. Default is 'priority' (priority-first,
             using bw_temporalis TemporalisLCA). Alternative is 'bfs' (Breadth-First-Search,
-            independent of TemporalisLCA, avoids per-subgraph LCA overhead). Option 'auto'
-            chooses between 'priority' and 'bfs' based on technosphere sparsity.
+            independent of TemporalisLCA, avoids per-subgraph LCA overhead).
         *args : iterable
             Positional arguments for the graph traversal, for `bw_temporalis.TemporalisLCA` passed
             to the `EdgeExtractor` class, which inherits from `TemporalisLCA`. See `bw_temporalis`
@@ -256,13 +255,6 @@ class TimexLCA:
             )
             interpolation_type = validated.interpolation_type
             graph_traversal = validated.graph_traversal
-
-            if (
-                self.performance_mode == "speed"
-                and graph_traversal == "priority"
-                and self.base_lca.technosphere_matrix.nnz > 50_000
-            ):
-                graph_traversal = "auto"
 
             timeline_cache_key = (
                 str(validated.starting_datetime),
