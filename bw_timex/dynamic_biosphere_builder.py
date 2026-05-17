@@ -361,8 +361,8 @@ class DynamicBiosphereBuilder:
 
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
         """
-        Adds an entry to a list of row, col and values, which are then used to construct the
-        dynamic biosphere matrix. Only unique entries are added, i.e. if the same row and
+        Adds an entry to the internal matrix-entry mapping, which is then used to construct
+        the dynamic biosphere matrix. Only unique entries are added, i.e. if the same row and
         col index already exists, the value is not added again.
 
         Parameters
@@ -377,7 +377,7 @@ class DynamicBiosphereBuilder:
         Returns
         -------
         None
-            the lists of row, col and values are updated
+            the internal matrix-entry mapping is updated
 
         """
 

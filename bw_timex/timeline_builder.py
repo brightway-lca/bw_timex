@@ -552,7 +552,7 @@ class TimelineBuilder:
         self,
         reference_date: datetime,
         dates_list: tuple[datetime, ...],
-        interpolation_type: str = None,
+        interpolation_type: str | None = None,
     ) -> dict:
         """
         Find the nearest dates (lower and higher) for a given date from a list of dates
