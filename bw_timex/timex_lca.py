@@ -175,6 +175,7 @@ class TimexLCA:
         self._cached_timeline = None
         self._default_edge_filter_function = None
         self._dynamic_lcia_inventory_cache = {}
+        self._background_unit_lci_cache = {}
 
     ########################################
     # Main functions to be called by users #
@@ -828,6 +829,7 @@ class TimexLCA:
             self.timeline,
             self.interdatabase_activity_mapping,
             expand_technosphere=expand_technosphere,
+            background_unit_lci_cache=self._background_unit_lci_cache,
         )
         self.dynamic_biosphere_matrix, self.temporal_market_lcis = (
             self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(

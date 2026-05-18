@@ -27,6 +27,7 @@ class DynamicBiosphereBuilder:
         timeline: pd.DataFrame,
         interdatabase_activity_mapping: SetList,
         expand_technosphere: bool = True,
+        background_unit_lci_cache: dict | None = None,
     ) -> None:
         """
         Initializes the DynamicBiosphereBuilder object.
@@ -100,7 +101,9 @@ class DynamicBiosphereBuilder:
         self.interdatabase_activity_mapping = interdatabase_activity_mapping
         self._matrix_entries = {}  # (row, col) -> amount
         self._activity_biosphere_exchange_cache = {}
-        self._background_unit_lci_cache = {}
+        self._background_unit_lci_cache = (
+            background_unit_lci_cache if background_unit_lci_cache is not None else {}
+        )
         self.temporal_market_cols = []  # To keep track of temporal market columns
 
     def build_dynamic_biosphere_matrix(
