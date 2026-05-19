@@ -219,6 +219,7 @@ class TimelineBuilder:
                     "producer",
                     "consumer",
                     "_te_key",
+                    "temporal_evolution_reference",
                 ],
                 dropna=False,
             )
@@ -302,6 +303,7 @@ class TimelineBuilder:
                 "amount",
                 "temporal_market_shares",
                 "temporal_evolution",
+                "temporal_evolution_reference",
             ]
         ]
 
@@ -351,6 +353,7 @@ class TimelineBuilder:
             "amount": edge.abs_td_producer.amount,
             "edge_type": edge.edge_type,
             "temporal_evolution": edge.temporal_evolution,
+            "temporal_evolution_reference": edge.temporal_evolution_reference,
         }
 
     def adjust_sign_of_amount_based_on_edge_type(self, edge_type):

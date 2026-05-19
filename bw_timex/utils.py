@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
 
+import bw2data as bd
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -33,6 +34,49 @@ time_res_mapping_strftime = {
     "day": "%Y%m%d",
     "hour": "%Y%m%d%H",
 }
+
+
+def get_reference_product_production_amount(
+    node, *, reference_product=None, lca=None
+) -> float:
+    """Return a node's production amount in a paradigm-agnostic way.
+
+    Supports chimaera activities via ``rp_exchange`` and explicit process/product
+    setups via production exchanges.
+    """
+    if isinstance(node, (int, np.integer)):
+        node = bd.get_activity(id=int(node))
+
+    if hasattr(node, "rp_exchange"):
+        rp_exc = node.rp_exchange()
+        if rp_exc is not None:
+            return rp_exc.amount
+
+    productions = list(node.production())
+    if not productions:
+        raise ValueError(
+            f"Could not determine production amount for node `{node}`: no production exchanges found."
+        )
+
+    if reference_product is not None:
+        ref_id = (
+            reference_product.id
+            if hasattr(reference_product, "id")
+            else int(reference_product)
+        )
+        for exc in productions:
+            if exc.input.id == ref_id:
+                return exc.amount
+        raise ValueError(
+            f"Could not find production exchange from `{node}` to reference product id `{ref_id}`."
+        )
+
+    if len(productions) == 1:
+        return productions[0].amount
+
+    raise ValueError(
+        f"Node `{node}` has multiple production exchanges; pass `reference_product` to disambiguate."
+    )
 
 
 def extract_date_as_integer(dt_obj: datetime, time_res: Optional[str] = "year") -> int:
@@ -481,6 +525,7 @@ def add_temporal_distribution_to_exchange(
 def add_temporal_evolution_to_exchange(
     temporal_evolution_factors: dict = None,
     temporal_evolution_amounts: dict = None,
+    temporal_evolution_reference: str = "producer",
     **kwargs,
 ):
     """Add temporal evolution data to an exchange specified by kwargs.
@@ -491,6 +536,8 @@ def add_temporal_evolution_to_exchange(
         Dictionary mapping datetime keys to scaling factors.
     temporal_evolution_amounts : dict, optional
         Dictionary mapping datetime keys to absolute amounts.
+    temporal_evolution_reference : {"producer", "consumer"}, optional
+        Whether temporal evolution is evaluated at producer or consumer timestamps.
     **kwargs :
         Arguments to specify an exchange (same as get_exchange).
 
@@ -504,12 +551,14 @@ def add_temporal_evolution_to_exchange(
     TemporalEvolutionExchangeInputs(
         temporal_evolution_factors=temporal_evolution_factors,
         temporal_evolution_amounts=temporal_evolution_amounts,
+        temporal_evolution_reference=temporal_evolution_reference,
     )
     exchange = get_exchange(**kwargs)
     if temporal_evolution_factors is not None:
         exchange["temporal_evolution_factors"] = temporal_evolution_factors
     if temporal_evolution_amounts is not None:
         exchange["temporal_evolution_amounts"] = temporal_evolution_amounts
+    exchange["temporal_evolution_reference"] = temporal_evolution_reference
     exchange.save()
     logger.info(f"Added temporal evolution to exchange {exchange}.")
 
