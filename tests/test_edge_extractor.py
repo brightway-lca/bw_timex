@@ -1,7 +1,5 @@
 """Tests for edge_extractor functions that don't require a full BW database."""
 
-from numbers import Number
-
 import numpy as np
 import pytest
 from bw_temporalis import TemporalDistribution
@@ -31,6 +29,19 @@ class TestJoinDatetimeAndTimedeltaDistributions:
         assert isinstance(result, TemporalDistribution)
         assert len(result.date) == 4  # 2 consumer x 2 producer
         assert result.date.dtype == np.dtype("datetime64[s]")
+        np.testing.assert_array_equal(
+            result.date,
+            np.array(
+                [
+                    "2024-01-01",
+                    "2024-12-31",
+                    "2024-06-01",
+                    "2025-06-01",
+                ],
+                dtype="datetime64[s]",
+            ),
+        )
+        np.testing.assert_array_equal(result.amount, np.array([0.5, 0.5, 0.5, 0.5]))
 
     def test_wrong_consumer_dtype_raises(self):
         td_consumer = TemporalDistribution(
@@ -44,17 +55,34 @@ class TestJoinDatetimeAndTimedeltaDistributions:
         with pytest.raises(ValueError, match="datetime64"):
             _join_datetime_and_timedelta_distributions(td_producer, td_consumer)
 
-    def test_wrong_producer_dtype_raises(self):
+    def test_absolute_producer_td_is_broadcast_to_consumer_dates(self):
         td_consumer = TemporalDistribution(
-            np.array(["2024-01-01"], dtype="datetime64[s]"),
-            np.array([1.0]),
+            np.array(["2024-01-01", "2024-06-01"], dtype="datetime64[s]"),
+            np.array([1.0, 1.0]),
         )
         td_producer = TemporalDistribution(
-            np.array(["2024-06-01"], dtype="datetime64[s]"),
-            np.array([0.5]),
+            np.array(["2025-01-01", "2025-06-01"], dtype="datetime64[s]"),
+            np.array([0.25, 0.75]),
         )
-        with pytest.raises(ValueError, match="timedelta64"):
-            _join_datetime_and_timedelta_distributions(td_producer, td_consumer)
+        result = _join_datetime_and_timedelta_distributions(td_producer, td_consumer)
+        assert isinstance(result, TemporalDistribution)
+        assert len(result.date) == 4  # 2 consumer x 2 producer
+        assert result.date.dtype == np.dtype("datetime64[s]")
+        np.testing.assert_array_equal(
+            result.date,
+            np.array(
+                [
+                    "2025-01-01",
+                    "2025-06-01",
+                    "2025-01-01",
+                    "2025-06-01",
+                ],
+                dtype="datetime64[s]",
+            ),
+        )
+        np.testing.assert_array_equal(
+            result.amount, np.array([0.25, 0.75, 0.25, 0.75])
+        )
 
     def test_invalid_types_raises(self):
         td_consumer = TemporalDistribution(

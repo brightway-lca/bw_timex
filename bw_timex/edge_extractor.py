@@ -411,8 +411,9 @@ class EdgeExtractor(TemporalisLCA):
         self, td_producer: TemporalDistribution, td_consumer: TemporalDistribution
     ) -> TemporalDistribution:
         """
-        Joins a datetime TemporalDistribution (td_producer) with a timedelta
-        TemporalDistribution (td_consumer) to create a new TemporalDistribution.
+        Joins a relative or absolute TemporalDistribution (td_producer) with an
+        absolute TemporalDistribution (td_consumer) to create a new
+        TemporalDistribution.
 
         If the producer does not have a TemporalDistribution, the consumer's
         TemporalDistribution is returned to continue the timeline.
@@ -421,9 +422,11 @@ class EdgeExtractor(TemporalisLCA):
         Parameters
         ----------
         td_producer : TemporalDistribution
-            TemporalDistribution of the producer. Expected to be a datetime TemporalDistribution.
+            TemporalDistribution of the producer. Expected to be a timedelta or
+            datetime TemporalDistribution.
         td_consumer : TemporalDistribution
-            TemporalDistribution of the consumer. Expected to be a timedelta TemporalDistribution.
+            TemporalDistribution of the consumer. Expected to be a datetime
+            TemporalDistribution.
 
         Returns
         -------
@@ -435,36 +438,10 @@ class EdgeExtractor(TemporalisLCA):
         ------
         ValueError
             If the dtype of `td_consumer.date` is not `datetime64[s]` or the dtype
-            of `td_producer.date` is not `timedelta64[s]`.
+            of `td_producer.date` is neither `datetime64[s]` nor `timedelta64[s]`.
 
         """
-        # if an edge does not have a TD, then return the consumer_td so that the timeline continues
-        if isinstance(td_consumer, TemporalDistribution) and isinstance(
-            td_producer, Number
-        ):
-            return td_consumer
-
-        # Else, if both consumer and producer have a td (absolute and relative, respectively) join to TDs
-        if isinstance(td_producer, TemporalDistribution) and isinstance(
-            td_consumer, TemporalDistribution
-        ):
-            if not (td_consumer.date.dtype == datetime_type):
-                raise ValueError(
-                    f"`td_consumer.date` must have dtype `datetime64[s]`, but got `{td_consumer.date.dtype}`"
-                )
-            if not (td_producer.date.dtype == timedelta_type):
-                raise ValueError(
-                    f"`td_producer.date` must have dtype `timedelta64[s]`, but got `{td_producer.date.dtype}`"
-                )
-            date = (
-                td_consumer.date.reshape((-1, 1)) + td_producer.date.reshape((1, -1))
-            ).ravel()
-            amount = np.array(len(td_consumer) * [td_producer.amount]).ravel()
-            return TemporalDistribution(date, amount)
-        else:
-            raise ValueError(
-                f"Can't join TemporalDistribution and something else: Trying with {type(td_consumer.date)} and {type(td_producer.date)}"
-            )
+        return _join_datetime_and_timedelta_distributions(td_producer, td_consumer)
 
 
 class EdgeExtractorBFS:
@@ -709,8 +686,8 @@ def _join_datetime_and_timedelta_distributions(
     td_consumer: TemporalDistribution,
 ) -> TemporalDistribution:
     """
-    Join a timedelta TemporalDistribution (td_producer) with a datetime
-    TemporalDistribution (td_consumer).
+    Join a relative or absolute TemporalDistribution (td_producer) with an
+    absolute TemporalDistribution (td_consumer).
 
     If the producer does not have a TemporalDistribution, the consumer's
     TemporalDistribution is returned. If both have TDs, they are joined
@@ -729,14 +706,19 @@ def _join_datetime_and_timedelta_distributions(
                 f"`td_consumer.date` must have dtype `datetime64[s]`, "
                 f"but got `{td_consumer.date.dtype}`"
             )
-        if not (td_producer.date.dtype == timedelta_type):
+        if td_producer.date.dtype == timedelta_type:
+            date = (
+                td_consumer.date.reshape((-1, 1))
+                + td_producer.date.reshape((1, -1))
+            ).ravel()
+        elif td_producer.date.dtype == datetime_type:
+            date = np.array(len(td_consumer) * [td_producer.date]).ravel()
+        else:
             raise ValueError(
-                f"`td_producer.date` must have dtype `timedelta64[s]`, "
+                f"`td_producer.date` must have dtype `datetime64[s]` "
+                f"or `timedelta64[s]`, "
                 f"but got `{td_producer.date.dtype}`"
             )
-        date = (
-            td_consumer.date.reshape((-1, 1)) + td_producer.date.reshape((1, -1))
-        ).ravel()
         amount = np.array(len(td_consumer) * [td_producer.amount]).ravel()
         return TemporalDistribution(date, amount)
     else:
