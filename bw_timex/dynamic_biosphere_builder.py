@@ -27,6 +27,7 @@ class DynamicBiosphereBuilder:
         timeline: pd.DataFrame,
         interdatabase_activity_mapping: SetList,
         expand_technosphere: bool = True,
+        background_unit_lci_cache: dict | None = None,
     ) -> None:
         """
         Initializes the DynamicBiosphereBuilder object.
@@ -98,10 +99,11 @@ class DynamicBiosphereBuilder:
         self.database_dates_static = database_dates_static
         self.timeline = timeline
         self.interdatabase_activity_mapping = interdatabase_activity_mapping
-        self.rows = []
-        self.cols = []
-        self.values = []
-        self.unique_rows_cols = set()  # To keep track of (row, col) pairs
+        self._matrix_entries = {}  # (row, col) -> amount
+        self._activity_biosphere_exchange_cache = {}
+        self._background_unit_lci_cache = (
+            background_unit_lci_cache if background_unit_lci_cache is not None else {}
+        )
         self.temporal_market_cols = []  # To keep track of temporal market columns
 
     def build_dynamic_biosphere_matrix(
@@ -139,7 +141,6 @@ class DynamicBiosphereBuilder:
             with the time-mapped-activity id as key.
         """
 
-        lci_dict = {}
         temporal_market_lcis = {}
 
         for row in self.timeline.itertuples():
@@ -176,21 +177,18 @@ class DynamicBiosphereBuilder:
                         row.temporal_evolution, time_in_datetime
                     )
 
-                if original_db == "temporalized":
-                    act = bd.get_node(code=original_code)
-                else:
-                    act = bd.get_node(database=original_db, code=original_code)
-
-                for exc in act.biosphere():
-                    if exc.get("temporal_distribution"):
-                        td_dates = exc["temporal_distribution"].date
-                        td_values = exc["temporal_distribution"].amount
+                for input_id, exc_amount, temporal_distribution in (
+                    self.get_biosphere_exchanges(original_db, original_code)
+                ):
+                    if temporal_distribution:
+                        td_dates = temporal_distribution.date
+                        td_values = temporal_distribution.amount
                         # If the biosphere flows have an absolute TD, this means we have to look up
                         # the biosphere flow for the activity time (td_producer)
                         if isinstance(td_dates[0], np.datetime64):
                             dates = td_producer  # datetime array, same time as producer
                             values = [
-                                exc["amount"]
+                                exc_amount
                                 * temporal_evolution_factor
                                 * td_values[
                                     np.argmin(
@@ -204,18 +202,18 @@ class DynamicBiosphereBuilder:
                         else:
                             # we can add a datetime of len(1) to a timedelta of len(N) easily
                             dates = td_producer + td_dates
-                            values = exc["amount"] * temporal_evolution_factor * td_values
+                            values = exc_amount * temporal_evolution_factor * td_values
 
                     else:  # exchange has no TD
                         dates = td_producer  # datetime array, same time as producer
-                        values = [exc["amount"] * temporal_evolution_factor]
+                        values = [exc_amount * temporal_evolution_factor]
 
                     # Add entries to dynamic bio matrix
                     for date, amount in zip(dates, values):
 
                         # first create a row index for the tuple (bioflow_id, date)
                         time_mapped_matrix_idx = self.biosphere_time_mapping.add(
-                            (exc.input.id, date)
+                            (input_id, date)
                         )
 
                         # populate lists with which sparse matrix is constructed
@@ -239,18 +237,12 @@ class DynamicBiosphereBuilder:
 
                 if demand:
                     for act, amount in demand.items():
-                        # check if lci already calculated for this activity
-                        if not act in lci_dict.keys():
-                            self.lca_obj.redo_lci({act: 1})
-                            #  biosphere flows by activity of background supply chain emissions.
-                            # Rows are bioflows. Columns are activities.
-                            # save for reuse in dict
-                            lci_dict[act] = self.lca_obj.inventory
+                        unit_lci = self.get_background_unit_lci(act)
                         # add lci of both background activities of the temporal market and save total lci
                         if idx not in temporal_market_lcis.keys():
-                            temporal_market_lcis[idx] = lci_dict[act] * amount
+                            temporal_market_lcis[idx] = unit_lci * amount
                         else:
-                            temporal_market_lcis[idx] += lci_dict[act] * amount
+                            temporal_market_lcis[idx] += unit_lci * amount
 
                     aggregated_inventory = temporal_market_lcis[idx].sum(axis=1)
 
@@ -289,9 +281,20 @@ class DynamicBiosphereBuilder:
         else:
             ncols = len(self.timeline)
 
-        shape = (max(self.rows) + 1, ncols)
+        if not self._matrix_entries:
+            return sp.csr_matrix((0, ncols)), temporal_market_lcis
+
+        rows = []
+        cols = []
+        values = []
+        for (row, col), amount in self._matrix_entries.items():
+            rows.append(row)
+            cols.append(col)
+            values.append(amount)
+
+        shape = (max(rows) + 1, ncols)
         dynamic_biosphere_matrix = sp.coo_matrix(
-            (self.values, (self.rows, self.cols)), shape
+            (values, (rows, cols)), shape
         )
         dynamic_biosphere_matrix = dynamic_biosphere_matrix.tocsr()
 
@@ -357,8 +360,8 @@ class DynamicBiosphereBuilder:
 
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
         """
-        Adds an entry to a list of row, col and values, which are then used to construct the
-        dynamic biosphere matrix. Only unique entries are added, i.e. if the same row and
+        Adds an entry to the internal matrix-entry mapping, which is then used to construct
+        the dynamic biosphere matrix. Only unique entries are added, i.e. if the same row and
         col index already exists, the value is not added again.
 
         Parameters
@@ -373,13 +376,52 @@ class DynamicBiosphereBuilder:
         Returns
         -------
         None
-            the lists of row, col and values are updated
+            the internal matrix-entry mapping is updated
 
         """
 
-        if (row, col) not in self.unique_rows_cols:
-            self.rows.append(row)
-            self.cols.append(col)
-            self.values.append(amount)
+        key = (row, col)
+        if key not in self._matrix_entries:
+            self._matrix_entries[key] = amount
 
-            self.unique_rows_cols.add((row, col))
+    def get_biosphere_exchanges(self, original_db, original_code):
+        """Return cached biosphere exchanges for a producer."""
+        cache_key = (original_db, original_code)
+        if cache_key not in self._activity_biosphere_exchange_cache:
+            if original_db == "temporalized":
+                act = bd.get_node(code=original_code)
+            else:
+                act = bd.get_node(database=original_db, code=original_code)
+            self._activity_biosphere_exchange_cache[cache_key] = [
+                (exc.input.id, exc["amount"], exc.get("temporal_distribution"))
+                for exc in act.biosphere()
+            ]
+        return self._activity_biosphere_exchange_cache[cache_key]
+
+    def get_background_unit_lci(self, act):
+        """
+        Return unit background LCI matrix for an activity, cached by process identity.
+
+        Background activities can occur repeatedly with different exchange amounts.
+        Reusing the unit LCI avoids repeated `redo_lci` solves for equivalent processes.
+        """
+        cache_key = self.get_background_lci_cache_key(act)
+        if cache_key not in self._background_unit_lci_cache:
+            self.lca_obj.redo_lci({act: 1})
+            self._background_unit_lci_cache[cache_key] = self.lca_obj.inventory
+        return self._background_unit_lci_cache[cache_key]
+
+    def get_background_lci_cache_key(self, act):
+        """Build a stable cache key for background unit LCI reuse."""
+        mapping = self.activity_time_mapping.reversed.get(act)
+        if mapping is None:
+            return ("activity_id", act)
+
+        process_key, _ = mapping
+        if isinstance(process_key, tuple):
+            db, code = process_key
+            if db == "temporalized":
+                return ("temporalized", code)
+            return ("db_code", db, code)
+
+        return ("activity_id", act)

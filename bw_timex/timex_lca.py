@@ -1,7 +1,6 @@
 from collections.abc import Mapping
 from datetime import datetime
 from functools import partial
-from itertools import chain
 from typing import Callable, Optional
 
 import bw2data as bd
@@ -37,6 +36,7 @@ from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
     round_datetime,
+    round_datetime_series_to_year,
 )
 from .validation import (
     BuildTimelineInputs,
@@ -171,6 +171,11 @@ class TimexLCA:
         self._activity_code_to_name_cache = {
             node["code"]: node["name"] for node in self.nodes.values()
         }
+        self._last_timeline_build_key = None
+        self._cached_timeline = None
+        self._default_edge_filter_function = None
+        self._dynamic_lcia_inventory_cache = {}
+        self._background_unit_lci_cache = {}
 
     ########################################
     # Main functions to be called by users #
@@ -247,15 +252,40 @@ class TimexLCA:
             graph_traversal=graph_traversal,
         )
         interpolation_type = validated.interpolation_type
+        graph_traversal = validated.graph_traversal
+
+        timeline_cache_key = (
+            str(validated.starting_datetime),
+            temporal_grouping,
+            interpolation_type,
+            cutoff,
+            max_calc,
+            graph_traversal,
+            "default" if edge_filter_function is None else id(edge_filter_function),
+        )
+        if timeline_cache_key == self._last_timeline_build_key:
+            self.timeline = self._cached_timeline
+            return self.timeline[
+                [
+                    "date_producer",
+                    "producer_name",
+                    "date_consumer",
+                    "consumer_name",
+                    "amount",
+                    "temporal_market_shares",
+                ]
+            ]
 
         if edge_filter_function is None:
             logger.info(
                 "No edge filter function provided. Skipping all edges in background databases."
             )
-            skippable = []
-            for db in self.database_dates_static.keys():
-                skippable.extend([node.id for node in bd.Database(db)])
-            self.edge_filter_function = lambda x: x in skippable
+            if self._default_edge_filter_function is None:
+                skippable = set()
+                for db in self.database_dates_static.keys():
+                    skippable.update(node.id for node in bd.Database(db))
+                self._default_edge_filter_function = skippable.__contains__
+            self.edge_filter_function = self._default_edge_filter_function
         else:
             self.edge_filter_function = edge_filter_function
 
@@ -298,8 +328,10 @@ class TimexLCA:
         )
 
         self.timeline = self.timeline_builder.build_timeline()
-
         self.add_interdatabase_activity_mapping_from_timeline()
+        self._last_timeline_build_key = timeline_cache_key
+        self._cached_timeline = self.timeline
+        self._dynamic_lcia_inventory_cache.clear()
 
         return self.timeline[
             [
@@ -506,6 +538,7 @@ class TimexLCA:
         self.dynamic_inventory_disaggregated_df = (
             self.create_dynamic_inventory_dataframe(use_disaggregated_lci=True)
         )
+        self._dynamic_lcia_inventory_cache.clear()
 
     def static_lcia(self) -> None:
         """
@@ -631,20 +664,20 @@ class TimexLCA:
         else:
             dynamic_inventory_df = self.dynamic_inventory_df
 
-        # Set a default for inventory_in_time_horizon using the full dynamic_inventory_df
-        inventory_in_time_horizon = dynamic_inventory_df
-
-        # Round dates to nearest year and sum up emissions for each year
-        inventory_in_time_horizon.date = inventory_in_time_horizon.date.apply(
-            partial(round_datetime, resolution="year")
-        )
-        inventory_in_time_horizon = (
-            inventory_in_time_horizon.groupby(
-                inventory_in_time_horizon.columns.tolist()
+        cache_key = ("disaggregated" if use_disaggregated_lci else "aggregate")
+        if cache_key not in self._dynamic_lcia_inventory_cache:
+            inventory_rounded = dynamic_inventory_df.copy()
+            inventory_rounded.date = round_datetime_series_to_year(
+                inventory_rounded.date
             )
-            .sum()
-            .reset_index()
-        )
+            self._dynamic_lcia_inventory_cache[cache_key] = (
+                inventory_rounded.groupby(inventory_rounded.columns.tolist())
+                .sum()
+                .reset_index()
+            )
+
+        # Set a default for inventory_in_time_horizon using the full dynamic_inventory_df
+        inventory_in_time_horizon = self._dynamic_lcia_inventory_cache[cache_key]
 
         # Calculate the latest considered impact date
         t0_date = pd.Timestamp(self.timeline_builder.edge_extractor.t0.date[0])
@@ -796,6 +829,7 @@ class TimexLCA:
             self.timeline,
             self.interdatabase_activity_mapping,
             expand_technosphere=expand_technosphere,
+            background_unit_lci_cache=self._background_unit_lci_cache,
         )
         self.dynamic_biosphere_matrix, self.temporal_market_lcis = (
             self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(
@@ -815,6 +849,7 @@ class TimexLCA:
         self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(
             expand_technosphere
         )
+        self._dynamic_lcia_inventory_cache.clear()
 
     def create_dynamic_inventory_dataframe(
         self,
@@ -853,40 +888,34 @@ class TimexLCA:
         pandas.DataFrame, dynamic inventory in DataFrame format
 
         """
-        if use_disaggregated_lci:
-            dynamic_inventory = self.dynamic_inventory_disaggregated
+        dynamic_inventory = (
+            self.dynamic_inventory_disaggregated
+            if use_disaggregated_lci
+            else self.dynamic_inventory
+        )
+        dynamic_inventory = dynamic_inventory.tocoo()
+
+        if expand_technosphere:
+            activities = [
+                self.lca.activity_dict.reversed[col] for col in dynamic_inventory.col
+            ]
         else:
-            dynamic_inventory = self.dynamic_inventory
-        dataframe_rows = []
-        for i in range(dynamic_inventory.shape[0]):
-            row_start = dynamic_inventory.indptr[i]
-            row_end = dynamic_inventory.indptr[i + 1]
-            for j in range(row_start, row_end):
-                row = i
-                col = dynamic_inventory.indices[j]
-                value = dynamic_inventory.data[j]
+            timeline_tmap = self.timeline["time_mapped_producer"].to_numpy()
+            activities = timeline_tmap[dynamic_inventory.col].tolist()
 
-                if expand_technosphere:
-                    emitting_process_id = self.lca.activity_dict.reversed[col]
-                else:
-                    emitting_process_id = self.timeline.iloc[col][
-                        "time_mapped_producer"
-                    ]
-
-                # indices are already the same as in the matrix, as we create an entirely new
-                # biosphere instead of adding new entries (like we do with the technosphere matrix)
-                bioflow_id, date = self.biosphere_time_mapping.reversed[row]
-                dataframe_rows.append(
-                    (
-                        date,
-                        value,
-                        bioflow_id,
-                        emitting_process_id,
-                    )
-                )
+        rows_resolved = [
+            self.biosphere_time_mapping.reversed[row] for row in dynamic_inventory.row
+        ]
+        dates = [item[1] for item in rows_resolved]
+        flows = [item[0] for item in rows_resolved]
 
         df = pd.DataFrame(
-            dataframe_rows, columns=["date", "amount", "flow", "activity"]
+            {
+                "date": dates,
+                "amount": dynamic_inventory.data,
+                "flow": flows,
+                "activity": activities,
+            }
         )
 
         df.date = df.date.astype("datetime64[s]")
@@ -1187,19 +1216,25 @@ class TimexLCA:
         }
         self.node_collections["background"] = background
 
-        foreground = {
-            node.id for db in demand_database_names for node in bd.Database(db)
-        }
-        self.node_collections["foreground"] = foreground
-
         first_level_background_static = set()
-        foreground_db = bd.Database(list(demand_database_names)[0])
-        for node_id in foreground:
-            node = foreground_db.get(id=node_id)
-            for exc in chain(node.technosphere(), node.substitution()):
-                if exc.input["database"] in demand_dependent_background_database_names:
-                    first_level_background_static.add(exc.input.id)
+        foreground = set()
+        for db_name in demand_database_names:
+            for node in bd.Database(db_name):
+                foreground.add(node.id)
+                for exc in node.technosphere():
+                    if (
+                        exc.input["database"]
+                        in demand_dependent_background_database_names
+                    ):
+                        first_level_background_static.add(exc.input.id)
+                for exc in node.substitution():
+                    if (
+                        exc.input["database"]
+                        in demand_dependent_background_database_names
+                    ):
+                        first_level_background_static.add(exc.input.id)
 
+        self.node_collections["foreground"] = foreground
         self.node_collections["first_level_background_static"] = (
             first_level_background_static
         )
@@ -1312,18 +1347,26 @@ class TimexLCA:
         None
             adds the static activities to the `activity_time_mapping`
         """
+        static_db_time_mapping = {
+            db: extract_date_as_integer(time, self.temporal_grouping)
+            for db, time in self.database_dates.items()
+            if isinstance(time, datetime)
+        }
+        dynamic_db_time_mapping = {
+            db: time for db, time in self.database_dates.items() if isinstance(time, str)
+        }
+
         for idx in self.base_lca.dicts.activity.keys():  # activity ids
             key = self.base_lca.remapping_dicts["activity"][idx]  # ('database', 'code')
-            time = self.database_dates[
-                key[0]
-            ]  # datetime (or 'dynamic' for foreground processes)
-            if isinstance(time, str):  # if 'dynamic', just add the string
-                self.activity_time_mapping.add((key, time), unique_id=idx)
-            elif isinstance(time, datetime):
+            db_name = key[0]
+            if db_name in dynamic_db_time_mapping:
                 self.activity_time_mapping.add(
-                    (key, extract_date_as_integer(time, self.temporal_grouping)),
-                    unique_id=idx,
-                )  # if datetime, map to the date as integer
+                    (key, dynamic_db_time_mapping[db_name]), unique_id=idx
+                )
+            elif db_name in static_db_time_mapping:
+                self.activity_time_mapping.add(
+                    (key, static_db_time_mapping[db_name]), unique_id=idx
+                )
             else:
                 raise ValueError(f"Time of activity {key} is neither datetime nor str.")
 
@@ -1344,11 +1387,25 @@ class TimexLCA:
         dict
             Dictionary mapping producer ids to reference timing for the specified demands.
         """
-        demand_ids = [bd.get_activity(key).id for key in self.demand.keys()]
+        demand_ids = [bd.get_id(key) for key in self.demand.keys()]
         demand_rows = self.timeline[
             self.timeline["producer"].isin(demand_ids)
             & (self.timeline["consumer"] == -1)
         ]
+
+        missing_demand_ids = sorted(set(demand_ids) - set(demand_rows["producer"]))
+        if missing_demand_ids:
+            functional_unit_producers = sorted(
+                set(self.timeline.loc[self.timeline["consumer"] == -1, "producer"])
+            )
+            raise ValueError(
+                "Could not find functional-unit timing rows for demand id(s) "
+                f"{missing_demand_ids}. The existing timeline contains functional-unit "
+                f"producer id(s) {functional_unit_producers}. This usually means the "
+                "Brightway database or demand nodes changed after build_timeline(); "
+                "recreate the TimexLCA object and rebuild the timeline before calling lci()."
+            )
+
         self.demand_timing = {
             row.producer: row.hash_producer for row in demand_rows.itertuples()
         }
