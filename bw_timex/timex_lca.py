@@ -28,6 +28,7 @@ from loguru import logger
 from peewee import fn
 from scipy import sparse
 
+from ._lci_cache import BACKGROUND_UNIT_LCI_CACHE
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import InterDatabaseMapping, TimeMappingDict
 from .matrix_modifier import MatrixModifier
@@ -101,6 +102,7 @@ class TimexLCA:
         demand: dict,
         method: tuple,
         database_dates: dict = None,
+        use_global_lci_cache: bool = True,
     ) -> None:
         """
         Instantiating a `TimexLCA` object calculates a static LCA, initializes time mappings
@@ -117,6 +119,16 @@ class TimexLCA:
                 `("EF v3.1", "climate change", "global warming potential (GWP100)")`
         database_dates : dict, optional
                 Dictionary mapping database names to dates.
+        use_global_lci_cache : bool, optional
+                If True (default), background unit LCI matrices are cached at
+                module level and reused across `TimexLCA` objects within the
+                same Python session. The cache is keyed by background process
+                identity plus the database's `modified` token, so edits to a
+                background database invalidate stale entries automatically. Set
+                to False to isolate this object's caching (e.g. when mutating
+                background databases via raw SQL that bypasses bw2data). The
+                module-level cache can be cleared with
+                `bw_timex.clear_background_lci_cache()`.
         """
 
         logger.info("Initializing TimexLCA object...")
@@ -175,7 +187,9 @@ class TimexLCA:
         self._cached_timeline = None
         self._default_edge_filter_function = None
         self._dynamic_lcia_inventory_cache = {}
-        self._background_unit_lci_cache = {}
+        self._background_unit_lci_cache = (
+            BACKGROUND_UNIT_LCI_CACHE if use_global_lci_cache else {}
+        )
 
     ########################################
     # Main functions to be called by users #

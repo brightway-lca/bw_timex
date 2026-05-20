@@ -78,6 +78,14 @@ class DynamicBiosphereBuilder:
 
         self.lca_obj = lca_obj
 
+        # Cached background unit LCIs are matrices sized to this lca_obj's
+        # technosphere/biosphere index space. They may only be reused by
+        # another TimexLCA object whose lca_obj has the *identical* index
+        # space (same databases, timeline and expand mode). The structure
+        # token (see lci_structure_token) makes the module-level cache miss
+        # instead of returning a structurally-incompatible matrix.
+        self._expand_technosphere = bool(expand_technosphere)
+
         if expand_technosphere:
             self.technosphere_matrix = (
                 lca_obj.technosphere_matrix.tocsc()
@@ -101,9 +109,14 @@ class DynamicBiosphereBuilder:
         self.interdatabase_activity_mapping = interdatabase_activity_mapping
         self._matrix_entries = {}  # (row, col) -> amount
         self._activity_biosphere_exchange_cache = {}
+        # Shared/global cache: only stable ("db_code", ...) keys go here so it
+        # can safely persist across TimexLCA objects.
         self._background_unit_lci_cache = (
             background_unit_lci_cache if background_unit_lci_cache is not None else {}
         )
+        # Per-object cache for keys that are NOT stable across TimexLCA objects
+        # (time-mapped activity ids and the per-run "temporalized" database).
+        self._instance_unit_lci_cache = {}
         self.temporal_market_cols = []  # To keep track of temporal market columns
 
     def build_dynamic_biosphere_matrix(
@@ -406,10 +419,44 @@ class DynamicBiosphereBuilder:
         Reusing the unit LCI avoids repeated `redo_lci` solves for equivalent processes.
         """
         cache_key = self.get_background_lci_cache_key(act)
-        if cache_key not in self._background_unit_lci_cache:
+        # Only stable background-process identities may be reused across
+        # TimexLCA objects; everything else stays in the per-object cache.
+        cache = (
+            self._background_unit_lci_cache
+            if cache_key[0] == "db_code"
+            else self._instance_unit_lci_cache
+        )
+        if cache_key not in cache:
             self.lca_obj.redo_lci({act: 1})
-            self._background_unit_lci_cache[cache_key] = self.lca_obj.inventory
-        return self._background_unit_lci_cache[cache_key]
+            cache[cache_key] = self.lca_obj.inventory
+        return cache[cache_key]
+
+    @property
+    def lci_structure_token(self):
+        """Fingerprint of this lca_obj's index space for safe cross-object reuse.
+
+        A globally-cached background unit LCI is a matrix sized to the
+        producing lca_obj's biosphere/technosphere dimensions. It is only
+        reusable by another TimexLCA whose lca_obj shares that exact index
+        space. The token captures everything that determines it without
+        touching lca_obj matrices (which may not exist yet at lookup time):
+        the expand mode, the background databases with their `modified`
+        tokens, and the number of time-mapped activities. Identical scenarios
+        re-run in the same notebook match; expand/non-expand or
+        differently-sized timelines miss instead of returning an
+        incompatible matrix.
+        """
+        db_versions = tuple(
+            sorted(
+                (db, bd.databases[db].get("modified") if db in bd.databases else None)
+                for db in self.database_dates
+            )
+        )
+        return (
+            self._expand_technosphere,
+            db_versions,
+            len(self.activity_time_mapping),
+        )
 
     def get_background_lci_cache_key(self, act):
         """Build a stable cache key for background unit LCI reuse."""
@@ -422,6 +469,9 @@ class DynamicBiosphereBuilder:
             db, code = process_key
             if db == "temporalized":
                 return ("temporalized", code)
-            return ("db_code", db, code)
+            # Include the background database's `modified` token so edits to
+            # that database invalidate stale globally-cached unit LCIs.
+            modified = bd.databases[db].get("modified") if db in bd.databases else None
+            return ("db_code", db, code, modified, self.lci_structure_token)
 
         return ("activity_id", act)
