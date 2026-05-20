@@ -16,7 +16,13 @@ reach this module-level cache.
 
 BACKGROUND_UNIT_LCI_CACHE = {}
 
+# Cached biosphere exchanges per (db, code, modified). Keyed by the source
+# database's `modified` token so foreground/background edits invalidate
+# stale entries automatically.
+BIOSPHERE_EXCHANGES_CACHE = {}
+
 
 def clear_background_lci_cache() -> None:
-    """Clear the module-level background unit LCI cache."""
+    """Clear all module-level bw_timex caches (unit LCI + biosphere exchanges)."""
     BACKGROUND_UNIT_LCI_CACHE.clear()
+    BIOSPHERE_EXCHANGES_CACHE.clear()

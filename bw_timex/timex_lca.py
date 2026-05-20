@@ -29,6 +29,8 @@ from peewee import fn
 from scipy import sparse
 
 from ._lci_cache import BACKGROUND_UNIT_LCI_CACHE
+FACTORIZE_SOLVES_THRESHOLD = 8
+
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import InterDatabaseMapping, TimeMappingDict
 from .matrix_modifier import MatrixModifier
@@ -190,6 +192,8 @@ class TimexLCA:
         self._background_unit_lci_cache = (
             BACKGROUND_UNIT_LCI_CACHE if use_global_lci_cache else {}
         )
+        # Whether the last lci() call LU-factorized the expanded technosphere.
+        self._lci_did_factorize = False
 
     ########################################
     # Main functions to be called by users #
@@ -414,6 +418,17 @@ class TimexLCA:
         if hasattr(self, "dynamic_inventory"):
             del self.dynamic_inventory
 
+        # Reset per-call; decided downstream based on cache state and the
+        self._lci_did_factorize = False
+        # Whether `redo_lci(self.fu)` was called at the end to restore the
+        # fu inventory. Only needed when the build actually ran any
+        # `redo_lci` during background unit-LCI solves.
+        self._lci_did_reset = False
+        # Number of background unit-LCI solves the most recent
+        # build_dynamic_biosphere_matrix had to perform (cache misses).
+        # Set by calculate_dynamic_inventory.
+        self._lci_pending_solves = 0
+
         if not hasattr(self, "timeline"):
             raise AttributeError(
                 "Timeline not yet built. Call TimexLCA.build_timeline() first."
@@ -452,11 +467,32 @@ class TimexLCA:
             self.lca.lci()
         else:  # building dynamic biosphere
             if expand_technosphere:
-                self.lca.lci(factorize=True)
+                # Cold-path shortcut: if no cached unit LCIs match this
+                # scenario AND the timeline has at least
+                # FACTORIZE_SOLVES_THRESHOLD temporal markets (an upper bound
+                # is unhelpful here, but a count above the break-even is a
+                # reliable lower bound on pending solves), factorize upfront
+                # to avoid an extra unfactorized solve. Otherwise pay only
+                # for a cheap initial solve; the factorize decision is then
+                # made inside calculate_dynamic_inventory based on the actual
+                # count of cache misses.
+                n_temporal_markets = len(self.node_collections["temporal_markets"])
+                if (
+                    n_temporal_markets >= FACTORIZE_SOLVES_THRESHOLD
+                    and not self._has_matching_cached_unit_lcis(expand_technosphere=True)
+                ):
+                    self.lca.lci(factorize=True)
+                    self._lci_did_factorize = True
+                else:
+                    self.lca.lci()
                 self.calculate_dynamic_inventory(expand_technosphere=True)
-                # to get back the original LCI - necessary because we do some redo_lci's in the
-                # dynamic inventory calculation
-                self.lca.redo_lci(self.fu)
+                # Restore the fu inventory only if the build actually mutated
+                # `self.lca.inventory` via at least one `redo_lci` call
+                # (i.e. there was a cache miss). With everything cached, the
+                # inventory is still the fu solve from `self.lca.lci()` above.
+                if self._lci_pending_solves > 0:
+                    self.lca.redo_lci(self.fu)
+                    self._lci_did_reset = True
             else:
                 self.calculate_dynamic_inventory(expand_technosphere=False)
 
@@ -795,6 +831,33 @@ class TimexLCA:
         )
         return self.matrix_modifier.create_datapackage()
 
+    def _has_matching_cached_unit_lcis(self, expand_technosphere: bool) -> bool:
+        """Whether the cache contains entries for any of this scenario's databases.
+
+        Cache keys are ``("db_code", db, code, modified)`` (structure-
+        independent triplet form); a hit on any background database in
+        ``self.database_dates`` with a matching ``modified`` token means
+        the build will likely reuse cached unit LCIs.
+        """
+        project = bd.projects.current
+        db_versions = {
+            db: bd.databases[db].get("modified") if db in bd.databases else None
+            for db in self.database_dates
+        }
+        for key in self._background_unit_lci_cache:
+            if not (
+                isinstance(key, tuple) and len(key) >= 5 and key[0] == "db_code"
+            ):
+                continue
+            key_project, db, _code, modified = key[1], key[2], key[3], key[4]
+            if (
+                key_project == project
+                and db in db_versions
+                and db_versions[db] == modified
+            ):
+                return True
+        return False
+
     def calculate_dynamic_inventory(
         self,
         expand_technosphere=True,
@@ -845,6 +908,25 @@ class TimexLCA:
             expand_technosphere=expand_technosphere,
             background_unit_lci_cache=self._background_unit_lci_cache,
         )
+
+        # Count the background unit-LCI solves that the build will actually
+        # have to perform (cache misses). Used both to decide whether to
+        # LU-factorize the technosphere and to skip the trailing
+        # redo_lci(self.fu) reset when nothing was solved.
+        if expand_technosphere:
+            pending = self.dynamic_biosphere_builder.count_pending_background_solves()
+            self._lci_pending_solves = pending
+            # Factorize only pays off once `pending + 1` (the +1 covers the
+            # trailing fu reset, when it happens) clears the empirical
+            # break-even. If `lci()` already factorized upfront (cold path
+            # with no matching cache entries), do not re-factorize.
+            if (
+                not self._lci_did_factorize
+                and pending + 1 >= FACTORIZE_SOLVES_THRESHOLD
+            ):
+                self.lca.lci(factorize=True)
+                self._lci_did_factorize = True
+
         self.dynamic_biosphere_matrix, self.temporal_market_lcis = (
             self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(
                 expand_technosphere=expand_technosphere,

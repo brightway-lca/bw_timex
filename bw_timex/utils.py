@@ -1,3 +1,4 @@
+import functools
 import json
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
@@ -94,6 +95,7 @@ def extract_date_as_string(timestamp: datetime, temporal_grouping: str) -> str:
     return timestamp.strftime(time_res_mapping_strftime[temporal_grouping])
 
 
+@functools.lru_cache(maxsize=4096)
 def convert_date_string_to_datetime(temporal_grouping, date_string) -> datetime:
     """
     Converts the string of a date to datetime object.
