@@ -16,13 +16,19 @@ reach this module-level cache.
 
 BACKGROUND_UNIT_LCI_CACHE = {}
 
-# Cached biosphere exchanges per (db, code, modified). Keyed by the source
-# database's `modified` token so foreground/background edits invalidate
-# stale entries automatically.
+# Cached biosphere exchanges per (project, db, code, modified). Keyed by the
+# source database's `modified` token so foreground/background edits
+# invalidate stale entries automatically.
 BIOSPHERE_EXCHANGES_CACHE = {}
+
+# Cached LCA solve results: maps a scenario fingerprint to
+# ``(supply_array, inventory)`` so identical scenarios re-run in the same
+# session can skip the ~1.4 s `spsolve` for the functional unit.
+LCI_SOLVE_CACHE = {}
 
 
 def clear_background_lci_cache() -> None:
-    """Clear all module-level bw_timex caches (unit LCI + biosphere exchanges)."""
+    """Clear all module-level bw_timex caches (unit LCI, biosphere exchanges, solve)."""
     BACKGROUND_UNIT_LCI_CACHE.clear()
     BIOSPHERE_EXCHANGES_CACHE.clear()
+    LCI_SOLVE_CACHE.clear()

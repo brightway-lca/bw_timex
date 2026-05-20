@@ -28,7 +28,7 @@ from loguru import logger
 from peewee import fn
 from scipy import sparse
 
-from ._lci_cache import BACKGROUND_UNIT_LCI_CACHE
+from ._lci_cache import BACKGROUND_UNIT_LCI_CACHE, LCI_SOLVE_CACHE
 FACTORIZE_SOLVES_THRESHOLD = 8
 
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
@@ -192,6 +192,9 @@ class TimexLCA:
         self._background_unit_lci_cache = (
             BACKGROUND_UNIT_LCI_CACHE if use_global_lci_cache else {}
         )
+        # Whether the last lci() call restored its supply_array / inventory
+        # from `LCI_SOLVE_CACHE` instead of running a fresh `spsolve`.
+        self._lci_used_cached_solve = False
         # Whether the last lci() call LU-factorized the expanded technosphere.
         self._lci_did_factorize = False
 
@@ -419,7 +422,11 @@ class TimexLCA:
             del self.dynamic_inventory
 
         # Reset per-call; decided downstream based on cache state and the
+        # pending-solve count.
         self._lci_did_factorize = False
+        # Whether the initial fu solve was restored from `LCI_SOLVE_CACHE`
+        # instead of running `lci_calculation`.
+        self._lci_used_cached_solve = False
         # Whether `redo_lci(self.fu)` was called at the end to restore the
         # fu inventory. Only needed when the build actually ran any
         # `redo_lci` during background unit-LCI solves.
@@ -467,29 +474,63 @@ class TimexLCA:
             self.lca.lci()
         else:  # building dynamic biosphere
             if expand_technosphere:
-                # Cold-path shortcut: if no cached unit LCIs match this
-                # scenario AND the timeline has at least
-                # FACTORIZE_SOLVES_THRESHOLD temporal markets (an upper bound
-                # is unhelpful here, but a count above the break-even is a
-                # reliable lower bound on pending solves), factorize upfront
-                # to avoid an extra unfactorized solve. Otherwise pay only
-                # for a cheap initial solve; the factorize decision is then
-                # made inside calculate_dynamic_inventory based on the actual
-                # count of cache misses.
-                n_temporal_markets = len(self.node_collections["temporal_markets"])
-                if (
-                    n_temporal_markets >= FACTORIZE_SOLVES_THRESHOLD
-                    and not self._has_matching_cached_unit_lcis(expand_technosphere=True)
-                ):
+                # Build matrices and dicts without solving; the fu solve
+                # is decided next based on actual pending background solves
+                # and the module-level solve cache.
+                self.lca.load_lci_data()
+                self.lca.build_demand_array()
+                # Placeholder so the shadow builder's __init__ can read
+                # supply_array; replaced with the real (cached or freshly
+                # solved) array below before any consumer uses it.
+                self.lca.supply_array = np.zeros(
+                    self.lca.technosphere_matrix.shape[0]
+                )
+                shadow = DynamicBiosphereBuilder(
+                    self.lca,
+                    self.activity_time_mapping,
+                    TimeMappingDict(start_id=0),
+                    self.demand_timing,
+                    self.node_collections,
+                    self.temporal_grouping,
+                    self.database_dates,
+                    self.database_dates_static,
+                    self.timeline,
+                    self.interdatabase_activity_mapping,
+                    expand_technosphere=True,
+                    background_unit_lci_cache=self._background_unit_lci_cache,
+                )
+                pending = shadow.count_pending_background_solves()
+                self._lci_pending_solves = pending
+
+                solve_key = self._solve_cache_key(expand_technosphere=True)
+                if pending == 0 and solve_key in LCI_SOLVE_CACHE:
+                    # Fully warm: skip the ~1.4 s fu solve and the trailing
+                    # reset; the cached supply_array & inventory cover both.
+                    supply, inventory = LCI_SOLVE_CACHE[solve_key]
+                    self.lca.supply_array = supply
+                    self.lca.inventory = inventory
+                    self._lci_used_cached_solve = True
+                elif pending + 1 >= FACTORIZE_SOLVES_THRESHOLD:
+                    # Many redo_lci's coming; pay the factorize once.
                     self.lca.lci(factorize=True)
+                    LCI_SOLVE_CACHE[solve_key] = (
+                        self.lca.supply_array.copy(),
+                        self.lca.inventory.copy(),
+                    )
                     self._lci_did_factorize = True
                 else:
-                    self.lca.lci()
+                    # Few or no redo_lci's; single solve, no factorize.
+                    self.lca.lci_calculation()
+                    LCI_SOLVE_CACHE[solve_key] = (
+                        self.lca.supply_array.copy(),
+                        self.lca.inventory.copy(),
+                    )
+
                 self.calculate_dynamic_inventory(expand_technosphere=True)
                 # Restore the fu inventory only if the build actually mutated
                 # `self.lca.inventory` via at least one `redo_lci` call
                 # (i.e. there was a cache miss). With everything cached, the
-                # inventory is still the fu solve from `self.lca.lci()` above.
+                # inventory is still the fu solve from above.
                 if self._lci_pending_solves > 0:
                     self.lca.redo_lci(self.fu)
                     self._lci_did_reset = True
@@ -831,6 +872,38 @@ class TimexLCA:
         )
         return self.matrix_modifier.create_datapackage()
 
+    def _solve_cache_key(self, expand_technosphere: bool) -> tuple:
+        """Fingerprint identifying a unique fu solve on this scenario.
+
+        Reuse from ``LCI_SOLVE_CACHE`` is only safe when the consuming
+        scenario produces *identical* technosphere/biosphere matrices and
+        demand RHS. We hash the matrix data directly so any change in the
+        timeline (different relinking, different temporal_grouping, etc.)
+        produces a different key — `len(activity_time_mapping)` alone
+        collides for differently-relinked scenarios of equal size.
+        """
+        import hashlib
+
+        T = self.lca.technosphere_matrix
+        B = self.lca.biosphere_matrix
+        d = self.lca.demand_array
+        tech_hash = hashlib.md5(
+            T.data.tobytes() + T.indices.tobytes() + T.indptr.tobytes()
+        ).digest()
+        bio_hash = hashlib.md5(
+            B.data.tobytes() + B.indices.tobytes() + B.indptr.tobytes()
+        ).digest()
+        demand_hash = hashlib.md5(np.asarray(d).tobytes()).digest()
+        return (
+            bd.projects.current,
+            bool(expand_technosphere),
+            T.shape,
+            B.shape,
+            tech_hash,
+            bio_hash,
+            demand_hash,
+        )
+
     def _has_matching_cached_unit_lcis(self, expand_technosphere: bool) -> bool:
         """Whether the cache contains entries for any of this scenario's databases.
 
@@ -909,23 +982,11 @@ class TimexLCA:
             background_unit_lci_cache=self._background_unit_lci_cache,
         )
 
-        # Count the background unit-LCI solves that the build will actually
-        # have to perform (cache misses). Used both to decide whether to
-        # LU-factorize the technosphere and to skip the trailing
-        # redo_lci(self.fu) reset when nothing was solved.
-        if expand_technosphere:
-            pending = self.dynamic_biosphere_builder.count_pending_background_solves()
-            self._lci_pending_solves = pending
-            # Factorize only pays off once `pending + 1` (the +1 covers the
-            # trailing fu reset, when it happens) clears the empirical
-            # break-even. If `lci()` already factorized upfront (cold path
-            # with no matching cache entries), do not re-factorize.
-            if (
-                not self._lci_did_factorize
-                and pending + 1 >= FACTORIZE_SOLVES_THRESHOLD
-            ):
-                self.lca.lci(factorize=True)
-                self._lci_did_factorize = True
+        # The pending-solve count + factorize decision is now made upfront
+        # by `lci()`. We trust `self._lci_pending_solves` / `_lci_did_factorize`
+        # set there. Calling `calculate_dynamic_inventory` directly without
+        # going through `lci()` will skip those optimizations but still
+        # produce correct results.
 
         self.dynamic_biosphere_matrix, self.temporal_market_lcis = (
             self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(

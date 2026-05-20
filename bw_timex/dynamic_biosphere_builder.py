@@ -449,25 +449,46 @@ class DynamicBiosphereBuilder:
         )
         if cache_key not in cache:
             self.lca_obj.redo_lci({act: 1})
-            cache[cache_key] = self._inventory_to_triplets(self.lca_obj.inventory)
-        matrix = self._rebuild_unit_lci(cache[cache_key])
+            matrix = self.lca_obj.inventory
+            # Snapshot triplets for cross-structure reuse, but keep the
+            # freshly-solved matrix directly — it's already sized to *this*
+            # lca_obj so no rebuild is needed on the miss path.
+            cache[cache_key] = self._inventory_to_triplets(matrix)
+        else:
+            matrix = self._rebuild_unit_lci(cache[cache_key])
         self._rebuilt_unit_lci_cache[cache_key] = matrix
         return matrix
 
     def _inventory_to_triplets(self, inv):
         """Convert a CSR inventory matrix to structure-independent triplets.
 
-        Translates row/col indices into stable (bioflow_id, activity_id)
-        pairs via the producing lca_obj's dicts, so the cache entry can be
-        reused by lca_objs with different index spaces.
+        Translates row/col indices into stable bioflow / activity ids via
+        the producing lca_obj's dicts, so the cache entry can be reused by
+        lca_objs with different index spaces. Returns a tuple of three
+        numpy arrays ``(bioflow_ids, activity_ids, values)`` — vectorized
+        for speed (Python-tuple lists cost ~1.3 s on premise/ecoinvent).
         """
         coo = inv.tocoo()
-        bio_rev = self.lca_obj.dicts.biosphere.reversed
-        act_rev = self.lca_obj.dicts.activity.reversed
-        return [
-            (bio_rev[r], act_rev[c], v)
-            for r, c, v in zip(coo.row, coo.col, coo.data)
-        ]
+        bio_arr, act_arr = self._lca_obj_id_arrays()
+        return (
+            bio_arr[coo.row].copy(),
+            act_arr[coo.col].copy(),
+            coo.data.copy(),
+        )
+
+    def _lca_obj_id_arrays(self):
+        """row/col index → bioflow_id / activity_id, cached per builder."""
+        if not hasattr(self, "_cached_lca_id_arrays"):
+            n_bio = self.lca_obj.biosphere_matrix.shape[0]
+            n_act = self.lca_obj.technosphere_matrix.shape[0]
+            bio_arr = np.full(n_bio, -1, dtype=np.int64)
+            for k, v in self.lca_obj.dicts.biosphere.reversed.items():
+                bio_arr[k] = v
+            act_arr = np.full(n_act, -1, dtype=np.int64)
+            for k, v in self.lca_obj.dicts.activity.reversed.items():
+                act_arr[k] = v
+            self._cached_lca_id_arrays = (bio_arr, act_arr)
+        return self._cached_lca_id_arrays
 
     def _rebuild_unit_lci(self, triplets):
         """Rebuild a unit-LCI CSR sized to *this* lca_obj from cached triplets.
@@ -482,17 +503,22 @@ class DynamicBiosphereBuilder:
         # yet. Materialize them now.
         if not hasattr(self.lca_obj, "technosphere_matrix"):
             self.lca_obj.load_lci_data()
+        bio_ids, act_ids, data = triplets
         bio_dict = self.lca_obj.dicts.biosphere
         act_dict = self.lca_obj.dicts.activity
-        rows, cols, vals = [], [], []
-        for bid, aid, v in triplets:
-            row = bio_dict.get(bid)
-            col = act_dict.get(aid)
-            if row is None or col is None:
-                continue
-            rows.append(row)
-            cols.append(col)
-            vals.append(v)
+        # Per-cache-entry list lookups are unavoidable (bw2calc dicts aren't
+        # numpy-friendly), but the tight loop is still cheap relative to a
+        # redo_lci solve. -1 sentinel marks missing keys; mask filters them.
+        bio_rows = np.fromiter(
+            (bio_dict.get(int(b), -1) for b in bio_ids), count=len(bio_ids), dtype=np.int64
+        )
+        act_cols = np.fromiter(
+            (act_dict.get(int(a), -1) for a in act_ids), count=len(act_ids), dtype=np.int64
+        )
+        mask = (bio_rows >= 0) & (act_cols >= 0)
+        rows = bio_rows[mask]
+        cols = act_cols[mask]
+        vals = data[mask]
         n_bio = self.lca_obj.biosphere_matrix.shape[0]
         n_act = self.lca_obj.technosphere_matrix.shape[0]
         return sp.csr_matrix((vals, (rows, cols)), shape=(n_bio, n_act))

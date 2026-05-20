@@ -8,6 +8,7 @@ from bw_timex import TimexLCA
 from bw_timex._lci_cache import (
     BACKGROUND_UNIT_LCI_CACHE,
     BIOSPHERE_EXCHANGES_CACHE,
+    LCI_SOLVE_CACHE,
 )
 
 
@@ -190,6 +191,35 @@ class TestModuleLevelLCICache:
         assert len(BIOSPHERE_EXCHANGES_CACHE) > 0
         bw_timex.clear_background_lci_cache()
         assert len(BIOSPHERE_EXCHANGES_CACHE) == 0
+
+    def test_warm_skips_initial_lca_solve(self):
+        # First run populates both unit-LCI cache and solve cache.
+        _build_tlca()
+        assert len(LCI_SOLVE_CACHE) > 0
+
+        # Second run with identical scenario should reuse the solve and
+        # never call lci_calculation again.
+        tlca2 = _build_tlca()
+        assert tlca2._lci_used_cached_solve is True
+
+    def test_cold_does_full_lca_solve(self):
+        tlca = _build_tlca()
+        assert tlca._lci_used_cached_solve is False
+
+    def test_clear_background_lci_cache_clears_solve_cache_too(self):
+        _build_tlca()
+        assert len(LCI_SOLVE_CACHE) > 0
+        bw_timex.clear_background_lci_cache()
+        assert len(LCI_SOLVE_CACHE) == 0
+
+    def test_warm_cached_solve_matches_score(self):
+        # Reusing the cached solve must not change the LCIA result.
+        tlca_cold = _build_tlca()
+        tlca_cold.static_lcia()
+        cold_score = tlca_cold.static_score
+        tlca_warm = _build_tlca()
+        tlca_warm.static_lcia()
+        assert tlca_warm.static_score == pytest.approx(cold_score)
 
     def test_opt_out_produces_same_score_as_global(self):
         tlca_global = _build_tlca()
