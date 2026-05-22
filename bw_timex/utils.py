@@ -1,3 +1,4 @@
+import functools
 import json
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
@@ -94,6 +95,7 @@ def extract_date_as_string(timestamp: datetime, temporal_grouping: str) -> str:
     return timestamp.strftime(time_res_mapping_strftime[temporal_grouping])
 
 
+@functools.lru_cache(maxsize=4096)
 def convert_date_string_to_datetime(temporal_grouping, date_string) -> datetime:
     """
     Converts the string of a date to datetime object.
@@ -168,6 +170,26 @@ def round_datetime(date: datetime, resolution: str) -> datetime:
         return start_of_hour + timedelta(hours=1) if date >= mid_hour else start_of_hour
 
     raise ValueError("Resolution must be one of 'year', 'month', 'day', or 'hour'.")
+
+
+def round_datetime_series_to_year(dates: pd.Series) -> pd.Series:
+    """
+    Vectorized equivalent of ``round_datetime(..., resolution="year")`` for a Series.
+
+    Dates on/after July 1st round up to January 1st of the next year, otherwise
+    down to January 1st of the same year. Matches ``round_datetime`` exactly but
+    avoids the per-row Python ``apply``.
+    """
+    dt = pd.to_datetime(dates)
+    years = dt.dt.year.to_numpy()
+    mid_year = pd.to_datetime(
+        {"year": years, "month": 7, "day": 1}
+    ).to_numpy()
+    round_up = dt.to_numpy() >= mid_year
+    rounded_years = years + round_up.astype(int)
+    return pd.to_datetime(
+        {"year": rounded_years, "month": 1, "day": 1}
+    ).set_axis(dates.index)
 
 
 def add_flows_to_characterization_functions(

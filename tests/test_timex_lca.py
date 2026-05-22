@@ -58,6 +58,20 @@ class TestTimexLCAProperties:
         with pytest.raises(ValueError, match="not possible to skip"):
             self.tlca.lci(expand_technosphere=False, build_dynamic_biosphere=False)
 
+    def test_lci_with_stale_timeline_raises_helpful_error(self):
+        self.tlca.build_timeline(
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+        )
+        self.tlca.timeline = self.tlca.timeline[
+            self.tlca.timeline["consumer"] != -1
+        ].copy()
+
+        with pytest.raises(
+            ValueError,
+            match="Brightway database or demand nodes changed after build_timeline",
+        ):
+            self.tlca.lci()
+
 
 # ─── Tests for labelling / dataframe methods ───
 
@@ -272,6 +286,38 @@ class TestTimexLCAEdgeCases:
         assert tlca.static_score != 0
         # dynamic_inventory should NOT exist
         assert not hasattr(tlca, "dynamic_inventory")
+
+    def test_lci_reuses_background_redo_lci_cache_across_calls(self):
+        fu = bd.get_node(database="foreground", code="A")
+        database_dates = {
+            "db_2022": datetime.strptime("2022", "%Y"),
+            "db_2024": datetime.strptime("2024", "%Y"),
+            "foreground": "dynamic",
+        }
+        tlca = TimexLCA(
+            demand={fu.key: 1},
+            method=("GWP", "example"),
+            database_dates=database_dates,
+        )
+        tlca.build_timeline(
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+        )
+
+        tlca.lci(expand_technosphere=True, build_dynamic_biosphere=True)
+        cache_len_after_first_lci = len(tlca._background_unit_lci_cache)
+        assert cache_len_after_first_lci > 0
+        assert (
+            tlca.dynamic_biosphere_builder._background_unit_lci_cache
+            is tlca._background_unit_lci_cache
+        )
+
+        tlca.lci(expand_technosphere=True, build_dynamic_biosphere=True)
+        cache_len_after_second_lci = len(tlca._background_unit_lci_cache)
+        assert cache_len_after_second_lci == cache_len_after_first_lci
+        assert (
+            tlca.dynamic_biosphere_builder._background_unit_lci_cache
+            is tlca._background_unit_lci_cache
+        )
 
     def test_dynamic_lcia(self):
         """Test the full dynamic_lcia path (lines 582-652)."""

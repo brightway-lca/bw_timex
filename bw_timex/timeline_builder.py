@@ -1,3 +1,4 @@
+from bisect import bisect_left
 from datetime import datetime, timedelta
 from typing import Callable, KeysView, Union
 
@@ -88,6 +89,8 @@ class TimelineBuilder:
         self.interpolation_type = interpolation_type
         self.cutoff = cutoff
         self.max_calc = max_calc
+        self._logged_reference_date_below_range = False
+        self._logged_reference_date_above_range = False
 
         # Finding indices of activities from the connected background databases that are known to be static, i.e. have no temporal distributions connecting to them.
         # These will be be skipped in the graph traversal.
@@ -231,22 +234,29 @@ class TimelineBuilder:
         )
         grouped_edges.drop(columns=["_te_key"], inplace=True)
 
-        # convert grouping times, which was only used as intermediate variable, back to datetime
-        grouped_edges["date_producer"] = grouped_edges["producer_grouping_time"].apply(
-            lambda x: convert_date_string_to_datetime(self.temporal_grouping, x)
+        # Convert grouping times to datetime with a unique-value cache to avoid repeated parsing
+        unique_grouping_strings = set(grouped_edges["producer_grouping_time"]).union(
+            set(grouped_edges["consumer_grouping_time"])
         )
-        grouped_edges["date_consumer"] = grouped_edges["consumer_grouping_time"].apply(
-            lambda x: convert_date_string_to_datetime(self.temporal_grouping, x)
+        datetime_cache = {
+            value: convert_date_string_to_datetime(self.temporal_grouping, value)
+            for value in unique_grouping_strings
+        }
+
+        grouped_edges["date_producer"] = grouped_edges["producer_grouping_time"].map(
+            datetime_cache
+        )
+        grouped_edges["date_consumer"] = grouped_edges["consumer_grouping_time"].map(
+            datetime_cache
         )
 
         # add dates as integers as hashes to the DataFrame
-        grouped_edges["hash_producer"] = grouped_edges["date_producer"].apply(
-            lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
-        )
-
-        grouped_edges["hash_consumer"] = grouped_edges["date_consumer"].apply(
-            lambda x: extract_date_as_integer(x, time_res=self.temporal_grouping)
-        )
+        hash_cache = {
+            dt: extract_date_as_integer(dt, time_res=self.temporal_grouping)
+            for dt in datetime_cache.values()
+        }
+        grouped_edges["hash_producer"] = grouped_edges["date_producer"].map(hash_cache)
+        grouped_edges["hash_consumer"] = grouped_edges["date_consumer"].map(hash_cache)
 
         # add new processes to activity_time_mapping
         for row in grouped_edges.itertuples():
@@ -258,19 +268,21 @@ class TimelineBuilder:
             )
 
         # store the ids from the time_mapping in DataFrame
-        grouped_edges["time_mapped_producer"] = grouped_edges.apply(
-            lambda row: self.get_time_mapping_key(row.producer, row.hash_producer),
-            axis=1,
-        )
+        grouped_edges["time_mapped_producer"] = [
+            self.get_time_mapping_key(producer, hash_producer)
+            for producer, hash_producer in zip(
+                grouped_edges["producer"], grouped_edges["hash_producer"]
+            )
+        ]
 
-        grouped_edges["time_mapped_consumer"] = grouped_edges.apply(
-            lambda row: (
-                self.get_time_mapping_key(row.consumer, row.hash_consumer)
-                if row.consumer != -1
-                else -1
-            ),
-            axis=1,
-        )
+        grouped_edges["time_mapped_consumer"] = [
+            self.get_time_mapping_key(consumer, hash_consumer)
+            if consumer != -1
+            else -1
+            for consumer, hash_consumer in zip(
+                grouped_edges["consumer"], grouped_edges["hash_consumer"]
+            )
+        ]
 
         # Add temporal_market_shares to background databases to the DataFrame
         grouped_edges = self.add_column_temporal_market_shares_to_timeline(
@@ -279,12 +291,12 @@ class TimelineBuilder:
         )
 
         # Retrieve producer and consumer names
-        grouped_edges["producer_name"] = grouped_edges.producer.apply(
-            lambda x: self.nodes[x]["name"]
-        )
-        grouped_edges["consumer_name"] = grouped_edges.consumer.apply(
-            self.get_consumer_name
-        )
+        grouped_edges["producer_name"] = [
+            self.nodes[producer]["name"] for producer in grouped_edges["producer"]
+        ]
+        grouped_edges["consumer_name"] = [
+            self.get_consumer_name(consumer) for consumer in grouped_edges["consumer"]
+        ]
 
         # Reorder columns
         grouped_edges = grouped_edges[
@@ -441,6 +453,8 @@ class TimelineBuilder:
         if "date_producer" not in list(tl_df.columns):
             raise ValueError("The timeline does not contain dates.")
 
+        sorted_dates = tuple(sorted(dates_list))
+
         # create reversed dict {date: database} with only static "background" db's
         self.reversed_database_dates = {
             v: k
@@ -448,30 +462,48 @@ class TimelineBuilder:
             if isinstance(v, datetime)
         }
 
-        if self.interpolation_type == "nearest":
-            tl_df["temporal_market_shares"] = tl_df["date_producer"].apply(
-                lambda x: self.find_closest_date(x, dates_list)
-            )
+        unique_producer_dates = tl_df["date_producer"].unique()
 
-        elif self.interpolation_type == "linear":
-            tl_df["temporal_market_shares"] = tl_df["date_producer"].apply(
-                lambda x: self.get_weights_for_interpolation_between_nearest_years(
-                    x, dates_list, interpolation_type
+        if interpolation_type == "nearest":
+            interpolation_weights = {
+                date: self.find_closest_date(date, sorted_dates)
+                for date in unique_producer_dates
+            }
+
+        elif interpolation_type == "linear":
+            interpolation_weights = {
+                date: self.get_weights_for_interpolation_between_nearest_years(
+                    date, sorted_dates, interpolation_type
                 )
-            )
+                for date in unique_producer_dates
+            }
 
         else:
             raise ValueError(
                 f"Sorry, but {interpolation_type} interpolation is not available yet."
             )
 
-        tl_df["temporal_market_shares"] = tl_df.apply(
-            self.add_interpolation_weights_at_intersection_to_background, axis=1
-        )  # add the weights to the timeline for processes at intersection
+        first_level_background_static = self.node_collections[
+            "first_level_background_static"
+        ]
+        remapped_interpolation_weights = {
+            producer_date: {
+                self.reversed_database_dates[date]: share
+                for date, share in weights.items()
+            }
+            for producer_date, weights in interpolation_weights.items()
+        }
+
+        tl_df["temporal_market_shares"] = [
+            remapped_interpolation_weights[producer_date]
+            if producer in first_level_background_static
+            else None
+            for producer, producer_date in zip(tl_df["producer"], tl_df["date_producer"])
+        ]
 
         return tl_df
 
-    def find_closest_date(self, target: datetime, dates: KeysView[datetime]) -> dict:
+    def find_closest_date(self, target: datetime, dates: tuple[datetime, ...]) -> dict:
         """
         Find the closest date to the target in the dates list.
 
@@ -492,19 +524,26 @@ class TimelineBuilder:
         if not dates:
             return None
 
-        # Sort the dates
-        dates = sorted(dates)
-
-        # Use min function with a key based on the absolute difference between the target and each date
-        closest = min(dates, key=lambda date: abs(target - date))
+        position = bisect_left(dates, target)
+        if position == 0:
+            closest = dates[0]
+        elif position == len(dates):
+            closest = dates[-1]
+        else:
+            lower_date = dates[position - 1]
+            higher_date = dates[position]
+            if abs(target - lower_date) <= abs(higher_date - target):
+                closest = lower_date
+            else:
+                closest = higher_date
 
         return {closest: 1}
 
     def get_weights_for_interpolation_between_nearest_years(
         self,
         reference_date: datetime,
-        dates_list: KeysView[datetime],
-        interpolation_type: str = "linear",
+        dates_list: tuple[datetime, ...],
+        interpolation_type: str | None = None,
     ) -> dict:
         """
         Find the nearest dates (lower and higher) for a given date from a list of dates
@@ -524,45 +563,34 @@ class TimelineBuilder:
         dict
             Dictionary with datetimes of the available closest databases as keys and the weights for interpolation as values.
         """
-        dates_list = sorted(dates_list)
+        interpolation_type = interpolation_type or self.interpolation_type
+        position = bisect_left(dates_list, reference_date)
 
-        diff_dates_list = [reference_date - x for x in dates_list]
+        if position < len(dates_list) and dates_list[position] == reference_date:
+            return {dates_list[position]: 1}
 
-        if timedelta(0) in diff_dates_list:  # date of process == date of database
-            exact_match = dates_list[diff_dates_list.index(timedelta(0))]
-            return {exact_match: 1}
+        if position == 0:
+            if not getattr(self, "_logged_reference_date_below_range", False):
+                logger.info(
+                    "Reference date {} is lower than all provided dates. Data will be taken from the closest higher year.",
+                    reference_date,
+                )
+                self._logged_reference_date_below_range = True
+            return {dates_list[0]: 1}
 
-        closest_lower = None
-        closest_higher = None
+        if position == len(dates_list):
+            if not getattr(self, "_logged_reference_date_above_range", False):
+                logger.info(
+                    "Reference date {} is higher than all provided dates. Data will be taken from the closest lower year.",
+                    reference_date,
+                )
+                self._logged_reference_date_above_range = True
+            return {dates_list[-1]: 1}
 
-        # select the closest lower and higher dates of the database in regards to the date of process
-        for date in dates_list:
-            if date < reference_date:
-                if (
-                    closest_lower is None
-                    or reference_date - date < reference_date - closest_lower
-                ):
-                    closest_lower = date
-            elif date > reference_date:
-                if (
-                    closest_higher is None
-                    or date - reference_date < closest_higher - reference_date
-                ):
-                    closest_higher = date
+        closest_lower = dates_list[position - 1]
+        closest_higher = dates_list[position]
 
-        if closest_lower is None:
-            logger.info(
-                f"Reference date {reference_date} is lower than all provided dates. Data will be taken from the closest higher year.",
-            )
-            return {closest_higher: 1}
-
-        if closest_higher is None:
-            logger.info(
-                f"Reference date {reference_date} is higher than all provided dates. Data will be taken from the closest lower year.",
-            )
-            return {closest_lower: 1}
-
-        if self.interpolation_type == "linear":
+        if interpolation_type == "linear":
             weight = int((reference_date - closest_lower).total_seconds()) / int(
                 (closest_higher - closest_lower).total_seconds()
             )
