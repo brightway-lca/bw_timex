@@ -1,3 +1,4 @@
+from ._lci_cache import clear_background_lci_cache
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .edge_extractor import EdgeExtractor
 from .helper_classes import SetList
@@ -10,4 +11,4 @@ from .utils import (
     get_temporal_evolution_factor,
 )
 
-__version__ = "1.0.0"
+__version__ = "1.0.2"
