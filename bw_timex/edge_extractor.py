@@ -38,6 +38,38 @@ class Edge:
     temporal_evolution: dict = None
 
 
+def extract_temporal_evolution(exc_data: dict) -> dict | None:
+    """Read ``temporal_evolution`` data from an exchange's data dict.
+
+    Returns a ``{datetime: factor}`` dict, or ``None`` if the exchange carries
+    no temporal evolution. ``temporal_evolution_amounts`` are normalized to
+    factors using the exchange's base ``amount``. ``temporal_evolution_factors``
+    and ``temporal_evolution_amounts`` are mutually exclusive.
+    """
+    has_amounts = exc_data.get("temporal_evolution_amounts") is not None
+    has_factors = exc_data.get("temporal_evolution_factors") is not None
+
+    if has_amounts and has_factors:
+        raise ValueError(
+            f"Exchange from {exc_data.get('input')} to "
+            f"{exc_data.get('output')} has both "
+            f"'temporal_evolution_amounts' and 'temporal_evolution_factors'. "
+            f"These are mutually exclusive — use one or the other."
+        )
+
+    if has_amounts:
+        base_amount = exc_data["amount"]
+        if base_amount != 0:
+            return {
+                k: v / abs(base_amount)
+                for k, v in exc_data["temporal_evolution_amounts"].items()
+            }
+        return None
+    if has_factors:
+        return exc_data["temporal_evolution_factors"]
+    return None
+
+
 class EdgeExtractor(TemporalisLCA):
     """
     Child class of TemporalisLCA that traverses the supply chain just as the parent class but can create a timeline of edges, in addition timeline of flows or nodes.
@@ -141,28 +173,7 @@ class EdgeExtractor(TemporalisLCA):
                 ]  # can be technosphere, substitution, production or other string
 
                 # Extract temporal evolution data from exchange
-                temporal_evolution = None
-                exc_data = exchange.data
-                has_amounts = exc_data.get("temporal_evolution_amounts") is not None
-                has_factors = exc_data.get("temporal_evolution_factors") is not None
-
-                if has_amounts and has_factors:
-                    raise ValueError(
-                        f"Exchange from {exc_data.get('input')} to "
-                        f"{exc_data.get('output', node.key)} has both "
-                        f"'temporal_evolution_amounts' and 'temporal_evolution_factors'. "
-                        f"These are mutually exclusive — use one or the other."
-                    )
-
-                if has_amounts:
-                    base_amount = exc_data["amount"]
-                    if base_amount != 0:
-                        temporal_evolution = {
-                            k: v / abs(base_amount)
-                            for k, v in exc_data["temporal_evolution_amounts"].items()
-                        }
-                elif has_factors:
-                    temporal_evolution = exc_data["temporal_evolution_factors"]
+                temporal_evolution = extract_temporal_evolution(exchange.data)
 
                 td_producer = (  # td_producer is the TemporalDistribution of the edge
                     self._exchange_value(
@@ -324,10 +335,11 @@ class EdgeExtractorBFS:
 
     def _get_exchange_td_and_type(self, input_id: int, output_id: int):
         """
-        Get temporal distribution and edge type for an exchange.
+        Get temporal distribution, edge type and temporal evolution for an exchange.
 
-        Returns (td_or_amount, edge_type) where td_or_amount is either a
-        TemporalDistribution or a float (the signed matrix value).
+        Returns (td_or_amount, edge_type, temporal_evolution) where td_or_amount
+        is either a TemporalDistribution or a float (the signed matrix value),
+        and temporal_evolution is a {datetime: factor} dict or None.
         """
         exchange = self._get_exchange(input_id, output_id)
 
@@ -337,11 +349,13 @@ class EdgeExtractorBFS:
 
         if exchange is None:
             sign = 1 if input_id == output_id else -1
-            return sign * matrix_value, "technosphere"
+            return sign * matrix_value, "technosphere", None
 
         edge_type = exchange.data["type"]
         sign = -1 if edge_type in ("generic consumption", "technosphere") else 1
         amount = sign * matrix_value
+
+        temporal_evolution = extract_temporal_evolution(exchange.data)
 
         td = exchange.data.get("temporal_distribution")
         if td is not None:
@@ -349,9 +363,9 @@ class EdgeExtractorBFS:
                 data = json.loads(td)
                 td = loader_registry[data["__loader__"]](data)
             if isinstance(td, TemporalDistribution):
-                return td * amount, edge_type
+                return td * amount, edge_type, temporal_evolution
 
-        return amount, edge_type
+        return amount, edge_type, temporal_evolution
 
     def _get_production_amount(self, activity_id: int) -> float:
         """Get the reference product production amount (diagonal of tech matrix)."""
@@ -422,8 +436,8 @@ class EdgeExtractorBFS:
             for input_id in input_ids:
                 leaf = self.edge_ff(input_id)
 
-                td_producer_raw, edge_type = self._get_exchange_td_and_type(
-                    input_id, node_id
+                td_producer_raw, edge_type, temporal_evolution = (
+                    self._get_exchange_td_and_type(input_id, node_id)
                 )
 
                 td_producer = td_producer_raw / abs(production_amount)
@@ -451,6 +465,7 @@ class EdgeExtractorBFS:
                         td_consumer=td_parent,
                         abs_td_producer=abs_td_producer,
                         abs_td_consumer=abs_td,
+                        temporal_evolution=temporal_evolution,
                     )
                 )
 
