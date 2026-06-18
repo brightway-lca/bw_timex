@@ -1,0 +1,61 @@
+{% set data = load_file_regex(load_file="../bw_timex/__init__.py", regex_pattern='__version__ = "(.+)"', from_recipe_dir=True) %}
+{% set version = data.group(1) %}
+
+package:
+  name: bw_timex
+  version: {{ version }}
+
+source:
+  # Builds the code in this working tree. Bump bw_timex/__init__.py before building.
+  path: ..
+
+build:
+  noarch: python
+  number: 0
+  script: {{ PYTHON }} -m pip install . --no-deps --no-build-isolation -vv
+
+requirements:
+  host:
+    - python >=3.11
+    - pip
+    - setuptools >=68
+  run:
+    - python >=3.11
+    - bw2calc >=2.4
+    - bw2data >=4.6
+    - bw_graph_tools >=0.4
+    - bw_temporalis >=1.1
+    - dynamic_characterization >=1.4
+    - numpy
+    - pandas
+    - tqdm
+    - matplotlib-base
+    - seaborn
+    - loguru
+    - ipython
+    - ipywidgets
+    - pydantic >=2.0
+
+test:
+  imports:
+    - bw_timex
+  requires:
+    - pip
+  commands:
+    - pip check
+
+about:
+  home: https://github.com/brightway-lca/bw_timex
+  summary: Time-explicit Life Cycle Assessment
+  description: |
+    bw_timex is a Brightway-based package for time-explicit Life Cycle
+    Assessment. It dynamically links processes across the temporal axis,
+    matching demand to the database representing the corresponding time.
+  license: BSD-3-Clause
+  license_file: ../LICENSE
+  doc_url: https://docs.brightway.dev/projects/bw-timex
+  dev_url: https://github.com/brightway-lca/bw_timex
+
+extra:
+  recipe-maintainers:
+    - TimoDiepers

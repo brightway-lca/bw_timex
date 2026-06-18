@@ -414,3 +414,107 @@ def test_temporal_evolution_reference_consumer_vs_producer():
     score_producer_ref = run_model("producer")
 
     assert score_producer_ref == pytest.approx(2 * score_consumer_ref, rel=1e-6)
+
+
+@bw2test
+def test_temporal_evolution_applied_with_bfs_traversal():
+    """temporal_evolution_factors must be applied with graph_traversal='bfs' too,
+    not only with the default priority traversal.
+
+    Regression test: the BFS edge extractor previously dropped
+    temporal_evolution, so the learning-curve-style scaling silently had no
+    effect. Same system as test_temporal_evolution_score_matches_hardcoded:
+    base amount 10, factor 0.75 at 2025 -> effective amount 7.5 -> score 7.5.
+    """
+    bd.Database("bio").write(
+        {
+            ("bio", "CO2"): {
+                "type": "emission",
+                "name": "carbon dioxide",
+            },
+        },
+    )
+
+    # Two identical background dbs so interpolation doesn't change anything
+    for db_name in ("db_2020", "db_2030"):
+        bd.Database(db_name).write(
+            {
+                (db_name, "electricity"): {
+                    "name": "electricity production",
+                    "location": "somewhere",
+                    "reference product": "electricity",
+                    "exchanges": [
+                        {
+                            "amount": 1,
+                            "type": "production",
+                            "input": (db_name, "electricity"),
+                        },
+                        {
+                            "amount": 1.0,
+                            "type": "biosphere",
+                            "input": ("bio", "CO2"),
+                        },
+                    ],
+                },
+            }
+        )
+
+    bd.Database("foreground").write(
+        {
+            ("foreground", "consumer"): {
+                "name": "consuming process",
+                "location": "somewhere",
+                "reference product": "consuming process",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("foreground", "consumer"),
+                    },
+                    {
+                        "amount": 10,
+                        "type": "technosphere",
+                        "input": ("db_2020", "electricity"),
+                        "temporal_distribution": TemporalDistribution(
+                            date=np.array([0], dtype="timedelta64[Y]"),
+                            amount=np.array([1.0]),
+                        ),
+                        "temporal_evolution_factors": {
+                            datetime(2020, 1, 1): 1.0,
+                            datetime(2030, 1, 1): 0.5,
+                        },
+                    },
+                ],
+            },
+        }
+    )
+
+    bd.Method(("GWP", "example")).write([(("bio", "CO2"), 1)])
+
+    for db in bd.databases:
+        bd.Database(db).register()
+        bd.Database(db).process()
+
+    database_dates = {
+        "db_2020": datetime(2020, 1, 1),
+        "db_2030": datetime(2030, 1, 1),
+        "foreground": "dynamic",
+    }
+
+    def score(graph_traversal):
+        tlca = TimexLCA(
+            demand={("foreground", "consumer"): 1},
+            method=("GWP", "example"),
+            database_dates=database_dates,
+        )
+        tlca.build_timeline(
+            starting_datetime="2025-01-01", graph_traversal=graph_traversal
+        )
+        tlca.lci()
+        tlca.static_lcia()
+        return tlca.static_score
+
+    # at 2025 the factor is 0.75 -> effective amount 10 * 0.75 = 7.5
+    assert score("bfs") == pytest.approx(7.5, rel=1e-4)
+    # and bfs must agree with the priority traversal
+    assert score("bfs") == pytest.approx(score("priority"), rel=1e-4)
