@@ -39,7 +39,7 @@ jobs:
         py-version: ["3.11", "3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
