@@ -498,3 +498,107 @@ def test_multi_vintage_demand_splits_across_cohorts():
     ]
 
     assert tlca.static_score == pytest.approx(0.5 * 0.40 + 0.5 * 0.10)
+
+
+def test_explicit_output_coefficient_alpha_scales_inputs():
+    """Production output coefficient alpha != 1 must scale the supply chain by 1/alpha.
+
+    A process produces *2* units of its product per invocation and consumes 4
+    units of background input. Demanding 1 unit of the product therefore runs
+    the process at scale 1/2, so the input is consumed at 0.5 * 4 = 2.0 and the
+    score is 2.0 (background = 1 kg CO2 per input unit, GWP = 1).
+
+    Every existing explicit fixture uses production amount = 1, so the 1/alpha
+    division is otherwise never exercised: a bug there would be invisible.
+    """
+    bd.projects.set_current("__test_explicit_alpha_scaling__")
+    bd.databases.clear()
+    bd.methods.clear()
+
+    bd.Database("bio").write(
+        {("bio", "co2"): {"name": "carbon dioxide", "unit": "kg", "type": "emission"}}
+    )
+    bd.Database("background").write(
+        {
+            ("background", "input"): {
+                "name": "input production",
+                "reference product": "input",
+                "unit": "kg",
+                "location": "GLO",
+                "exchanges": [
+                    {"input": ("background", "input"), "amount": 1, "type": "production"},
+                    {"input": ("bio", "co2"), "amount": 1, "type": "biosphere"},
+                ],
+            }
+        }
+    )
+    bd.Method(("GWP", "example")).write([(("bio", "co2"), 1.0)])
+
+    td_output = TemporalDistribution(
+        date=np.array([0, 1], dtype="timedelta64[Y]"),
+        amount=np.array([0.6, 0.4]),
+    )
+
+    bd.Database("foreground").write(
+        {
+            ("foreground", "product"): {
+                "name": "product",
+                "type": "product",
+                "unit": "unit",
+                "location": "GLO",
+                "exchanges": [],
+            },
+            ("foreground", "process"): {
+                "name": "process",
+                "type": "process",
+                "unit": "unit",
+                "location": "GLO",
+                "exchanges": [
+                    {
+                        "input": ("foreground", "product"),
+                        "amount": 2,  # alpha != 1
+                        "type": "production",
+                        "temporal_distribution": td_output,
+                    },
+                    {
+                        "input": ("background", "input"),
+                        "amount": 4,
+                        "type": "technosphere",
+                    },
+                ],
+            },
+        }
+    )
+    for db in bd.databases:
+        bd.Database(db).process()
+
+    product = bd.get_node(database="foreground", code="product")
+    method = ("GWP", "example")
+    demand = {product.key: 1}
+    database_dates = {"background": datetime(2030, 1, 1), "foreground": "dynamic"}
+
+    slca = bc.LCA(demand, method=method)
+    slca.lci()
+    slca.lcia()
+    # Sanity: bw2calc itself applies 1/alpha -> 0.5 * 4 * 1 = 2.0
+    assert slca.score == pytest.approx(2.0)
+
+    tlca = TimexLCA(demand=demand, method=method, database_dates=database_dates)
+    tlca.build_timeline(starting_datetime=datetime(2030, 1, 1))
+    tlca.lci()
+    tlca.static_lcia()
+
+    assert tlca.base_lca.score == pytest.approx(2.0)
+    assert tlca.static_score == pytest.approx(2.0)
+
+    # The per-cohort-instance input intensity carries the 1/alpha scaling:
+    # edge amount 4 / alpha 2 = 2.0 per cohort row (the cohort TD weights 0.6/0.4
+    # are applied to the process column in the matrix, summing to 1, so the total
+    # input is 0.6*2 + 0.4*2 = 2.0 and the score is 2.0). If 1/alpha were dropped
+    # the row amount would be 4.0; if mis-applied, 8.0.
+    input_rows = tlca.timeline[tlca.timeline["producer_name"] == "input production"]
+    observed = sorted(
+        (row.date_consumer.year, row.date_producer.year, float(row.amount))
+        for row in input_rows.itertuples()
+    )
+    assert observed == pytest.approx([(2030, 2030, 2.0), (2031, 2031, 2.0)])
