@@ -385,11 +385,16 @@ class EdgeExtractorBFS:
         edge_filter_function: Callable = None,
         cutoff: float = 1e-9,
         static_activity_indices: set[int] | None = None,
+        nodes: dict | None = None,
     ) -> None:
         self.lca_object = lca_object
         self.edge_ff = edge_filter_function if edge_filter_function else lambda x: False
         self.cutoff = cutoff
         self.static_activity_indices = static_activity_indices or set()
+        # {node_id: bw2data Activity proxy} reused from TimexLCA, so production /
+        # technosphere exchanges are read without re-fetching nodes.
+        self.nodes = nodes or {}
+        self._production_exchange_cache = {}
 
         if isinstance(starting_datetime, str):
             if starting_datetime == "now":
@@ -471,21 +476,97 @@ class EdgeExtractorBFS:
         ]
         return get_reference_product_production_amount(activity)
 
-    def _get_technosphere_inputs(self, activity_id: int) -> list[int]:
-        """Get all technosphere input activity IDs for a given activity."""
-        col_idx = self.lca_object.dicts.activity[activity_id]
-        col = self.tech_matrix_csc[:, col_idx]
-        product_idx = self.lca_object.dicts.product.get(activity_id)
+    def _get_production_exchange(self, process_id: int):
+        """Return the single ``production`` output exchange of ``process_id``,
+        or ``None`` if it has none. Read from the reused node proxy (no extra
+        node fetch) and memoized per process.
 
+        Identifying the output via the exchange type (rather than the matrix
+        sign) matters because a negative-amount technosphere input also produces
+        a positive matrix entry, so sign alone cannot tell them apart.
+        """
+        if process_id in self._production_exchange_cache:
+            return self._production_exchange_cache[process_id]
+
+        productions = list(self.nodes[process_id].production())
+        if len(productions) > 1:
+            raise ValueError(
+                f"Process {process_id} has multiple production outputs "
+                f"(co-production); not supported with graph_traversal='bfs'."
+            )
+        exchange = productions[0] if productions else None
+        self._production_exchange_cache[process_id] = exchange
+        return exchange
+
+    def _get_technosphere_inputs(self, activity_id: int) -> list[int]:
+        """Get the input product IDs consumed by a process.
+
+        Read straight from the node's technosphere exchanges, so the production
+        output is naturally excluded and avoided-burden inputs (which the matrix
+        stores with a flipped sign) are kept.
+        """
         inputs = []
-        for row_idx in col.nonzero()[0]:
-            if row_idx == product_idx:
-                continue
-            input_id = self.lca_object.dicts.product.reversed[row_idx]
+        for exchange in self.nodes[activity_id].technosphere():
+            input_id = exchange.input.id
             if input_id in self.static_activity_indices:
                 continue
             inputs.append(input_id)
         return inputs
+
+    def _get_producer_process(self, product_id: int) -> int | None:
+        """Return the process that produces ``product_id``.
+
+        For a chimaera node this is the node itself; for an explicit ``product``
+        it is the separate ``process`` whose ``production`` edge feeds the
+        product's row. Returns ``None`` if the product has no producer (a leaf).
+        """
+        try:  # chimaera: the product is also its own producing activity
+            self.lca_object.dicts.activity[product_id]
+            return product_id
+        except KeyError:
+            pass
+
+        product_idx = self.lca_object.dicts.product.get(product_id)
+        if product_idx is None:
+            return None
+        # Candidate producer columns come from the product's matrix row (cheap);
+        # the production one is confirmed against the node's production exchange.
+        row = self.tech_matrix_csc.getrow(product_idx).tocoo()
+        producers = []
+        for col_idx in row.col:
+            process_id = self.lca_object.dicts.activity.reversed[col_idx]
+            production = self._get_production_exchange(process_id)
+            if production is not None and production.input.id == product_id:
+                producers.append(process_id)
+        if not producers:
+            return None
+        if len(producers) > 1:
+            raise ValueError(
+                f"Product {product_id} has multiple producing processes "
+                f"({producers}); ambiguous-producer resolution is not supported "
+                f"with graph_traversal='bfs'."
+            )
+        return producers[0]
+
+    def _get_normalized_production_edge_td(self, process_id: int):
+        """Return the cohort ``TemporalDistribution`` on a process's production
+        output edge, normalized to unit weights, or ``None`` if there is none.
+
+        Chimaera self-production edges normally carry no TD, so this returns
+        ``None`` and chimaera traversal is unaffected.
+        """
+        production = self._get_production_exchange(process_id)
+        if production is None:
+            return None
+        td = production.get("temporal_distribution")
+        if isinstance(td, str) and "__loader__" in td:
+            data = json.loads(td)
+            td = loader_registry[data["__loader__"]](data)
+        if not isinstance(td, TemporalDistribution):
+            return None
+        # The TD weights normalize to 1; divide by the production amount (alpha)
+        # so the alpha scaling is applied only once, on the input side.
+        return td / abs(production["amount"])
 
     def build_edge_timeline(self) -> list:
         """
@@ -510,20 +591,47 @@ class EdgeExtractorBFS:
             fu_amount = demand_array[self.lca_object.dicts.activity[fu_id]]
             td = self.t0 * fu_amount
 
-            timeline.append(
-                Edge(
-                    edge_type="production",
-                    distribution=td,
-                    leaf=False,
-                    consumer=-1,
-                    producer=fu_id,
-                    td_producer=fu_amount,
-                    td_consumer=self.t0,
-                    abs_td_producer=self.t0,
+            # Spread the functional unit over the producing process's cohort TD
+            # (the explicit process -> product output edge). Chimaera nodes have
+            # no such TD, so the original behaviour is preserved exactly.
+            production_td = self._get_normalized_production_edge_td(fu_id)
+            if production_td is None:
+                timeline.append(
+                    Edge(
+                        edge_type="production",
+                        distribution=td,
+                        leaf=False,
+                        consumer=-1,
+                        producer=fu_id,
+                        td_producer=fu_amount,
+                        td_consumer=self.t0,
+                        abs_td_producer=self.t0,
+                    )
                 )
-            )
-
-            queue.append((fu_id, td, self.t0, self.t0, abs(fu_amount)))
+                queue.append((fu_id, td, self.t0, self.t0, abs(fu_amount)))
+            else:
+                # Cohort-spread the FU so the producing process is registered at
+                # every cohort time (each cohort gets its own time-mapped column).
+                seed_td = (td * production_td).simplify()
+                seed_abs_td = _join_datetime_and_timedelta_distributions(
+                    production_td, self.t0
+                )
+                timeline.append(
+                    Edge(
+                        edge_type="production",
+                        distribution=seed_td,
+                        leaf=False,
+                        consumer=-1,
+                        producer=fu_id,
+                        td_producer=seed_td,
+                        td_consumer=self.t0,
+                        abs_td_producer=seed_abs_td,
+                        abs_td_consumer=self.t0,
+                    )
+                )
+                queue.append(
+                    (fu_id, seed_td, self.t0, seed_abs_td, abs(fu_amount))
+                )
 
         while queue:
             node_id, td, td_parent, abs_td, supply = queue.popleft()
@@ -573,16 +681,35 @@ class EdgeExtractorBFS:
                     edge_supply = abs(td_producer_raw)
                 new_supply = supply * edge_supply / abs(production_amount)
 
-                if not leaf and new_supply >= self.cutoff * total_demand:
-                    queue.append(
-                        (
-                            input_id,
-                            distribution,
-                            td_producer,
-                            abs_td_producer,
-                            new_supply,
-                        )
+                if leaf or new_supply < self.cutoff * total_demand:
+                    continue
+
+                # Bipartite step: descend into the process that produces this
+                # input product. For chimaera nodes the producer is the product
+                # itself; for explicit nodes it is the separate process.
+                producer_process = self._get_producer_process(input_id)
+                if producer_process is None:
+                    continue
+
+                child_td, child_abs_td = distribution, abs_td_producer
+                producer_production_td = self._get_normalized_production_edge_td(
+                    producer_process
+                )
+                if producer_production_td is not None:
+                    child_td = (distribution * producer_production_td).simplify()
+                    child_abs_td = _join_datetime_and_timedelta_distributions(
+                        producer_production_td, abs_td_producer
                     )
+
+                queue.append(
+                    (
+                        producer_process,
+                        child_td,
+                        td_producer,
+                        child_abs_td,
+                        new_supply,
+                    )
+                )
 
         return timeline
 
