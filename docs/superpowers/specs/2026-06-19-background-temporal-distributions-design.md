@@ -98,17 +98,25 @@ accumulated during descent, not by a per-leaf interpolation.
 
 ### Priority-mode caveat (accepted)
 
+> **Implementation note (as-built, 2026-06-19):** The approach described in the
+> original design — approximating heap scores from `base_lca` for hopped-variant nodes
+> — was **abandoned** during implementation. The shipped code does **not** place
+> non-referenced variant subtrees on the priority heap at all. Instead, when the heap
+> loop first reaches an edge whose producer is a static background process with further
+> technosphere inputs, `_emit_variant_split` is called immediately, and each variant's
+> full subtree is walked via `_descend_variant_subtree` (proxy reads, not heap). The
+> referenced-system heap exploration order is therefore unchanged, and the explored
+> amounts are **exact** (identical to `graph_traversal='bfs'` for those subtrees). A
+> one-time warning is still emitted when `traverse_background=True` with
+> `graph_traversal="priority"` to inform users of this behaviour.
+
 `EdgeExtractor` inherits from `TemporalisLCA`, whose heap ordering uses per-subgraph
 **LCA scores computed from `base_lca`**. The other variants' subgraphs are not in
-`base_lca` (the foreground links only one variant), so when descent hops into another
-variant there is no exact subgraph score available. For hopped-variant nodes the heap
-score is **approximated from the nominal node's `base_lca` score**.
-
-This can slightly misorder the priority heap, which only affects *which* edges are
-explored first under `max_calc`/`cutoff` — not the correctness of explored amounts.
-This is an accepted limitation. It is documented and a **one-time warning** is emitted
-when `traverse_background=True` with `graph_traversal="priority"`. BFS has no score
-dependency and is unaffected.
+`base_lca` (the foreground links only one referenced variant), so non-referenced
+variant subtrees are walked in full via proxy reads when their parent edge is first
+reached on the heap — they are never enqueued on the priority heap. This is an
+accepted trade-off: the heap exploration order of the *referenced* system is unchanged,
+and variant subtree amounts are exact.
 
 ## Downstream changes
 
