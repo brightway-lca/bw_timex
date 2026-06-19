@@ -570,6 +570,22 @@ git commit -m "BFS: descend into background under traverse_background (no-TD equ
 
 ---
 
+> **COURSE CORRECTION (2026-06-19, after Task 4).** During Task 5 we verified that
+> Tasks 3+4 ALREADY route a background TD whose endpoint is a *leaf* (e.g. the
+> emission-only `bg_B` in the shallow `background_td_db` fixture) to the correct
+> variants — referenced-variant TD propagation spreads the flow in time and the
+> existing leaf `temporal_market_shares` interpolation routes each cohort to the
+> right variant by date. The genuinely new work (respective-variant lookup) only
+> matters for **deeper** chains: when descent continues *into* a background process
+> reached at a shifted date routing to a NON-referenced variant. Tasks 5–7 below are
+> therefore executed against a NEW deeper fixture `background_td_deep_db`
+> (`bg_A→bg_B→bg_C`, with `bg_B→bg_C` differing per variant) and the corrected,
+> self-contained briefs in `.git/sdd/task-5-brief.md`, `task-6-brief.md`,
+> `task-7-brief.md`. The numeric expectations and exact code in those briefs
+> supersede the original Task 5–7 text below where they differ. The shallow
+> `background_td_db` fixture and its leaf-routing behavior remain valid and are kept
+> as regression coverage.
+
 ### Task 5: BFS variant-aware split at background entry + TD edges
 
 Make the BFS descent split a producer into its date-interpolated variants at background entry and at TD-carrying edges, reading each branch's exchanges/amounts/TDs from the respective variant db. This is the core feature: a background TD spreads its downstream flow across variants.
