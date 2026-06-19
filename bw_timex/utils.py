@@ -1,5 +1,6 @@
 import functools
 import json
+from bisect import bisect_left
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Union
 
@@ -35,6 +36,65 @@ time_res_mapping_strftime = {
     "day": "%Y%m%d",
     "hour": "%Y%m%d%H",
 }
+
+
+def linear_interpolation_weights(
+    date: datetime, sorted_dates: tuple
+) -> dict:
+    """Return ``{date: weight}`` linear-interpolation weights for ``date``.
+
+    ``sorted_dates`` is an ascending tuple of the available (background-database)
+    dates. The weights are split between the two nearest bracketing dates,
+    proportional to temporal proximity. If ``date`` falls on or outside the
+    range of ``sorted_dates``, the single nearest in-range date gets weight 1.
+
+    Mirrors ``TimelineBuilder.get_weights_for_interpolation_between_nearest_years``
+    and is shared by both the timeline builder and the graph-traversal extractors.
+    """
+    if not sorted_dates:
+        return {}
+
+    position = bisect_left(sorted_dates, date)
+
+    if position < len(sorted_dates) and sorted_dates[position] == date:
+        return {sorted_dates[position]: 1}
+    if position == 0:
+        return {sorted_dates[0]: 1}
+    if position == len(sorted_dates):
+        return {sorted_dates[-1]: 1}
+
+    closest_lower = sorted_dates[position - 1]
+    closest_higher = sorted_dates[position]
+    weight = int((date - closest_lower).total_seconds()) / int(
+        (closest_higher - closest_lower).total_seconds()
+    )
+    return {closest_lower: round(1 - weight, 3), closest_higher: round(weight, 3)}
+
+
+def nearest_date_weight(date: datetime, sorted_dates: tuple) -> dict:
+    """Return ``{date: 1}`` for the single date in ``sorted_dates`` closest to
+    ``date``.
+
+    ``sorted_dates`` is an ascending tuple of available dates. Mirrors
+    ``TimelineBuilder.find_closest_date`` and is shared by the timeline builder
+    and the graph-traversal extractors.
+    """
+    if not sorted_dates:
+        return None
+
+    position = bisect_left(sorted_dates, date)
+    if position == 0:
+        closest = sorted_dates[0]
+    elif position == len(sorted_dates):
+        closest = sorted_dates[-1]
+    else:
+        lower_date = sorted_dates[position - 1]
+        higher_date = sorted_dates[position]
+        if abs(date - lower_date) <= abs(higher_date - date):
+            closest = lower_date
+        else:
+            closest = higher_date
+    return {closest: 1}
 
 
 def get_reference_product_production_amount(

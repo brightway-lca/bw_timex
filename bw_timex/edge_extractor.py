@@ -11,7 +11,11 @@ from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import ExchangeDataset as ED
 from bw_temporalis import TemporalDistribution, TemporalisLCA, loader_registry
 
-from .utils import get_reference_product_production_amount
+from .utils import (
+    get_reference_product_production_amount,
+    linear_interpolation_weights,
+    nearest_date_weight,
+)
 
 if not hasattr(np, "in1d"):
     np.in1d = np.isin
@@ -403,6 +407,11 @@ class EdgeExtractorBFS:
         self.max_calc = max_calc
         self._calc_count = 0
         self._production_exchange_cache = {}
+        # Producer node ids that were variant-resolved during a variant-aware
+        # background descent. These are already routed to their respective
+        # (real) variant database, so the timeline builder must temporalize them
+        # rather than treat them as temporal-market leaves.
+        self.variant_resolved_producers: set[int] = set()
 
         if self.traverse_background:
             # Background is no longer a hard stop; rely on cutoff / max_calc.
@@ -582,6 +591,147 @@ class EdgeExtractorBFS:
         # so the alpha scaling is applied only once, on the input side.
         return td / abs(production["amount"])
 
+    # ------------------------------------------------------------------
+    # Variant-aware (respective-variant) reads
+    #
+    # The base traversal runs on ``base_lca``, which only contains the
+    # referenced background variant. When descent continues INTO a background
+    # process reached at a date routing to a NON-referenced variant, the
+    # respective variant's exchanges/amounts/TDs must be read from the bw2data
+    # activity proxy in ``self.nodes`` rather than from the (referenced-only)
+    # technosphere matrix.
+    # ------------------------------------------------------------------
+
+    def _variant_shares_for_date(self, producer_date) -> dict:
+        """Return ``{db_name: weight}`` interpolation shares for a cohort date.
+
+        Maps the producer's absolute cohort date onto the available static
+        background databases, using the same interpolation as the timeline
+        builder so leaf and descended routing agree.
+        """
+        from datetime import datetime as _dt
+
+        dates_static = getattr(self, "database_dates_static", None) or {}
+        dates_to_db = {v: k for k, v in dates_static.items() if isinstance(v, _dt)}
+        sorted_dates = tuple(sorted(dates_to_db))
+        if not sorted_dates:
+            return {}
+
+        if isinstance(producer_date, np.datetime64):
+            producer_date = producer_date.astype("datetime64[s]").astype(_dt)
+
+        if getattr(self, "interpolation_type", "linear") == "nearest":
+            weights = nearest_date_weight(producer_date, sorted_dates)
+        else:
+            weights = linear_interpolation_weights(producer_date, sorted_dates)
+        return {dates_to_db[d]: w for d, w in (weights or {}).items()}
+
+    def _resolve_in_variant(self, node_id: int, db_name: str) -> int:
+        """Return the id of ``node_id``'s sibling in database ``db_name``.
+
+        If ``node_id`` already lives in ``db_name`` it is returned unchanged;
+        otherwise the sibling is looked up via the interdatabase mapping.
+        """
+        node = self.nodes.get(node_id)
+        if node is not None and node["database"] == db_name:
+            return node_id
+        return self.interdatabase_activity_mapping.find_match(node_id, db_name)
+
+    def _proxy_production_amount(self, activity_id: int) -> float:
+        """Production amount of a (possibly non-referenced) variant node, read
+        from its bw2data proxy."""
+        return get_reference_product_production_amount(self.nodes[activity_id])
+
+    def _proxy_technosphere_inputs(self, activity_id: int) -> list[int]:
+        """Technosphere input product ids of a variant node, read from its proxy.
+
+        ``static_activity_indices`` is empty when ``traverse_background`` is set,
+        so no filtering is needed, but it is honoured for symmetry with the
+        matrix path.
+        """
+        inputs = []
+        for exchange in self.nodes[activity_id].technosphere():
+            input_id = exchange.input.id
+            if input_id in self.static_activity_indices:
+                continue
+            inputs.append(input_id)
+        return inputs
+
+    def _get_exchange_td_and_type_from_proxy(self, input_id: int, output_id: int):
+        """Proxy-based counterpart of ``_get_exchange_td_and_type``.
+
+        Reads the exchange between ``input_id`` and ``output_id`` directly from
+        the consuming node's bw2data proxy (``self.nodes[output_id]``) rather
+        than from the technosphere matrix, because non-referenced variant nodes
+        are absent from ``base_lca``'s matrix. Returns the same
+        ``(td_or_amount, edge_type, temporal_evolution)`` tuple.
+        """
+        consumer = self.nodes[output_id]
+        exc = None
+        for candidate in consumer.technosphere():
+            if candidate.input.id == input_id:
+                exc = candidate
+                break
+        if exc is None:
+            for candidate in consumer.exchanges():
+                if (
+                    candidate.input.id == input_id
+                    and candidate.get("type") != "production"
+                ):
+                    exc = candidate
+                    break
+        if exc is None:
+            raise ValueError(
+                f"No exchange from {input_id} to {output_id} found on proxy."
+            )
+
+        edge_type = exc.get("type", "technosphere")
+        amount = exc["amount"]
+        temporal_evolution = extract_temporal_evolution(exc.as_dict())
+
+        td = exc.get("temporal_distribution")
+        if isinstance(td, str) and "__loader__" in td:
+            data = json.loads(td)
+            td = loader_registry[data["__loader__"]](data)
+        if isinstance(td, TemporalDistribution):
+            return td * amount, edge_type, temporal_evolution
+        return amount, edge_type, temporal_evolution
+
+    def _normalized_production_edge_td_from_proxy(self, process_id: int):
+        """Proxy-based counterpart of ``_get_normalized_production_edge_td``."""
+        productions = list(self.nodes[process_id].production())
+        if not productions:
+            return None
+        production = productions[0]
+        td = production.get("temporal_distribution")
+        if isinstance(td, str) and "__loader__" in td:
+            data = json.loads(td)
+            td = loader_registry[data["__loader__"]](data)
+        if not isinstance(td, TemporalDistribution):
+            return None
+        return td / abs(production["amount"])
+
+    def _producer_process_in_variant(self, product_id: int, db_name: str):
+        """Resolve the process producing ``product_id`` within variant
+        ``db_name`` from the proxy.
+
+        ``product_id`` was read from a variant proxy, so it already lives in
+        ``db_name``. For chimaera nodes the product produces itself; returns
+        ``None`` if the product has no producer (a pure leaf).
+        """
+        node = self.nodes.get(product_id)
+        if node is None:
+            return None
+        for _ in node.production():
+            return product_id
+        return product_id
+
+    def _is_static_background(self, node_id: int) -> bool:
+        """True if ``node_id`` lives in one of the static background databases."""
+        dates_static = getattr(self, "database_dates_static", None) or {}
+        node = self.nodes.get(node_id)
+        return node is not None and node["database"] in dates_static
+
     def build_edge_timeline(self) -> list:
         """
         Breadth-First-Search (BFS) traversal of the supply chain, extracting
@@ -622,7 +772,7 @@ class EdgeExtractorBFS:
                         abs_td_producer=self.t0,
                     )
                 )
-                queue.append((fu_id, td, self.t0, self.t0, abs(fu_amount)))
+                queue.append((fu_id, td, self.t0, self.t0, abs(fu_amount), None))
             else:
                 # Cohort-spread the FU so the producing process is registered at
                 # every cohort time (each cohort gets its own time-mapped column).
@@ -644,25 +794,39 @@ class EdgeExtractorBFS:
                     )
                 )
                 queue.append(
-                    (fu_id, seed_td, self.t0, seed_abs_td, abs(fu_amount))
+                    (fu_id, seed_td, self.t0, seed_abs_td, abs(fu_amount), None)
                 )
 
         while queue:
-            node_id, td, td_parent, abs_td, supply = queue.popleft()
+            node_id, td, td_parent, abs_td, supply, variant_db = queue.popleft()
 
             self._calc_count += 1
             if self._calc_count > self.max_calc:
                 break
 
-            production_amount = self._get_production_amount(node_id)
-            input_ids = self._get_technosphere_inputs(node_id)
+            # ``variant_db`` is set when this descent is into a respective
+            # (possibly non-referenced) background variant. Those nodes are not
+            # in ``base_lca``'s matrix, so read their exchanges from the proxy.
+            use_proxy = variant_db is not None
+
+            if use_proxy:
+                production_amount = self._proxy_production_amount(node_id)
+                input_ids = self._proxy_technosphere_inputs(node_id)
+            else:
+                production_amount = self._get_production_amount(node_id)
+                input_ids = self._get_technosphere_inputs(node_id)
 
             for input_id in input_ids:
                 leaf = self.edge_ff(input_id)
 
-                td_producer_raw, edge_type, temporal_evolution = (
-                    self._get_exchange_td_and_type(input_id, node_id)
-                )
+                if use_proxy:
+                    td_producer_raw, edge_type, temporal_evolution = (
+                        self._get_exchange_td_and_type_from_proxy(input_id, node_id)
+                    )
+                else:
+                    td_producer_raw, edge_type, temporal_evolution = (
+                        self._get_exchange_td_and_type(input_id, node_id)
+                    )
 
                 td_producer = td_producer_raw / abs(production_amount)
 
@@ -678,56 +842,201 @@ class EdgeExtractorBFS:
                     td_producer, abs_td
                 )
 
-                timeline.append(
-                    Edge(
-                        edge_type=edge_type,
-                        distribution=distribution,
-                        leaf=leaf,
-                        consumer=node_id,
-                        producer=input_id,
-                        td_producer=td_producer,
-                        td_consumer=td_parent,
-                        abs_td_producer=abs_td_producer,
-                        abs_td_consumer=abs_td,
-                        temporal_evolution=temporal_evolution,
-                    )
-                )
-
                 if isinstance(td_producer_raw, TemporalDistribution):
                     edge_supply = abs(td_producer_raw.amount.sum())
                 else:
                     edge_supply = abs(td_producer_raw)
                 new_supply = supply * edge_supply / abs(production_amount)
 
-                if leaf or new_supply < self.cutoff * total_demand:
-                    continue
+                # Resolve the producing process for this input product.
+                # For chimaera nodes the producer is the product itself.
+                if use_proxy:
+                    producer_process = self._producer_process_in_variant(
+                        input_id, variant_db
+                    )
+                else:
+                    producer_process = self._get_producer_process(input_id)
 
-                # Bipartite step: descend into the process that produces this
-                # input product. For chimaera nodes the producer is the product
-                # itself; for explicit nodes it is the separate process.
-                producer_process = self._get_producer_process(input_id)
-                if producer_process is None:
-                    continue
-
-                child_td, child_abs_td = distribution, abs_td_producer
-                producer_production_td = self._get_normalized_production_edge_td(
-                    producer_process
+                will_descend = (
+                    not leaf
+                    and new_supply >= self.cutoff * total_demand
+                    and producer_process is not None
                 )
-                if producer_production_td is not None:
-                    child_td = (distribution * producer_production_td).simplify()
-                    child_abs_td = _join_datetime_and_timedelta_distributions(
-                        producer_production_td, abs_td_producer
+
+                # Variant-aware split: when this input's producer is a static
+                # background process that we will descend into, emit one edge per
+                # temporally-appropriate variant (reading the RESPECTIVE variant's
+                # exchanges on descent) so that each variant node is both a
+                # producer and a consumer in the timeline and is rebuilt from its
+                # own (real) database. Leaves and foreground producers fall
+                # through to the original single-edge path unchanged.
+                # The variant split routes a background producer's cohorts to the
+                # temporally-appropriate variant(s). It happens only on the FIRST
+                # crossing from the referenced traversal (matrix reads) into the
+                # background. Once inside a variant descent (``use_proxy``), the
+                # variant is locked and every descendant stays in that same
+                # variant database, read via the proxy.
+                # Variant-split only matters when we will actually descend
+                # THROUGH a background process into its own (technosphere) inputs
+                # — that is where the respective variant's exchanges/amounts
+                # differ. A background producer with no technosphere inputs is a
+                # true market leaf (handled by the existing leaf machinery), so it
+                # is left untouched to preserve the Task 4 behaviour exactly.
+                variant_split = (
+                    will_descend
+                    and not use_proxy
+                    and self.traverse_background
+                    and getattr(self, "interdatabase_activity_mapping", None)
+                    is not None
+                    and self._is_static_background(node_id)
+                    and self._is_static_background(producer_process)
+                    and bool(self._proxy_technosphere_inputs(producer_process))
+                )
+
+                if not variant_split:
+                    # Inside a variant descent every produced node is already
+                    # routed to its real variant database, so mark it for
+                    # temporalization (not a temporal-market leaf).
+                    if use_proxy and self._is_static_background(input_id):
+                        self.variant_resolved_producers.add(input_id)
+                    timeline.append(
+                        Edge(
+                            edge_type=edge_type,
+                            distribution=distribution,
+                            leaf=leaf,
+                            consumer=node_id,
+                            producer=input_id,
+                            td_producer=td_producer,
+                            td_consumer=td_parent,
+                            abs_td_producer=abs_td_producer,
+                            abs_td_consumer=abs_td,
+                            temporal_evolution=temporal_evolution,
+                        )
                     )
 
-                queue.append(
-                    (
-                        producer_process,
-                        child_td,
-                        td_producer,
-                        child_abs_td,
-                        new_supply,
+                    if not will_descend:
+                        continue
+
+                    child_td, child_abs_td = distribution, abs_td_producer
+                    if use_proxy:
+                        producer_production_td = (
+                            self._normalized_production_edge_td_from_proxy(
+                                producer_process
+                            )
+                        )
+                    else:
+                        producer_production_td = (
+                            self._get_normalized_production_edge_td(producer_process)
+                        )
+                    if producer_production_td is not None:
+                        child_td = (distribution * producer_production_td).simplify()
+                        child_abs_td = _join_datetime_and_timedelta_distributions(
+                            producer_production_td, abs_td_producer
+                        )
+
+                    queue.append(
+                        (
+                            producer_process,
+                            child_td,
+                            td_producer,
+                            child_abs_td,
+                            new_supply,
+                            variant_db if use_proxy else None,
+                        )
                     )
-                )
+                    continue
+
+                # --- variant split path ---
+                # Route each producer cohort date to its variant(s). The producer
+                # cohort dates live on ``abs_td_producer``; the corresponding edge
+                # amounts live on ``distribution`` (same date axis).
+                variant_keep: dict[str, dict] = {}
+                for date in abs_td_producer.date:
+                    for db_name, weight in self._variant_shares_for_date(date).items():
+                        variant_keep.setdefault(db_name, {})[date] = weight
+
+                # The variant split routes by absolute producer date. The
+                # relative ``td_producer`` and absolute ``abs_td_producer`` share
+                # an index axis when the consumer has a single absolute date
+                # (the case for every background split: the consuming background
+                # process sits at one cohort date per descent). Mask all three
+                # arrays by the same kept indices so ``extract_edge_data`` can
+                # explode consumer/producer dates and amounts consistently.
+                if len(abs_td) != 1:
+                    raise NotImplementedError(
+                        "Variant-aware background split with a multi-date "
+                        "consumer is not supported."
+                    )
+
+                for db_name, keep in variant_keep.items():
+                    keep_idx = [
+                        i
+                        for i, d in enumerate(abs_td_producer.date)
+                        if keep.get(d)
+                    ]
+                    if not keep_idx:
+                        continue
+                    weights = np.array(
+                        [keep[abs_td_producer.date[i]] for i in keep_idx]
+                    )
+                    masked_abs_td_producer = TemporalDistribution(
+                        date=abs_td_producer.date[keep_idx],
+                        amount=abs_td_producer.amount[keep_idx] * weights,
+                    )
+                    masked_distribution = TemporalDistribution(
+                        date=distribution.date[keep_idx],
+                        amount=distribution.amount[keep_idx] * weights,
+                    )
+                    masked_td_producer = TemporalDistribution(
+                        date=td_producer.date[keep_idx],
+                        amount=td_producer.amount[keep_idx] * weights,
+                    )
+                    variant_id = self._resolve_in_variant(producer_process, db_name)
+                    self.variant_resolved_producers.add(variant_id)
+
+                    timeline.append(
+                        Edge(
+                            edge_type=edge_type,
+                            distribution=masked_distribution,
+                            leaf=leaf,
+                            consumer=node_id,
+                            producer=variant_id,
+                            td_producer=masked_td_producer,
+                            td_consumer=td_parent,
+                            abs_td_producer=masked_abs_td_producer,
+                            abs_td_consumer=abs_td,
+                            temporal_evolution=temporal_evolution,
+                        )
+                    )
+
+                    child_td, child_abs_td = (
+                        masked_distribution,
+                        masked_abs_td_producer,
+                    )
+                    producer_production_td = (
+                        self._normalized_production_edge_td_from_proxy(variant_id)
+                    )
+                    if producer_production_td is not None:
+                        child_td = (
+                            masked_distribution * producer_production_td
+                        ).simplify()
+                        child_abs_td = _join_datetime_and_timedelta_distributions(
+                            producer_production_td, masked_abs_td_producer
+                        )
+
+                    variant_supply = (
+                        new_supply * sum(keep.values()) / max(len(keep), 1)
+                    )
+                    queue.append(
+                        (
+                            variant_id,
+                            child_td,
+                            td_producer,
+                            child_abs_td,
+                            variant_supply,
+                            db_name,
+                        )
+                    )
 
         return timeline
 

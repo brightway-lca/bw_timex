@@ -155,31 +155,40 @@ class MatrixModifier:
 
         for producer in unique_producers:
             original_producer_node = self.nodes[producer[0]]
-            if (
-                original_producer_node["database"]
-                not in self.database_dates_static.keys()  # skip temporal markets
-            ):
-                new_producer_id = producer[1]
-                indices = (
-                    []
-                )  # list of (biosphere, technosphere) indices for the biosphere flow exchanges
-                amounts = []  # list of amounts corresponding to the bioflows
-                for exc in original_producer_node.biosphere():
-                    indices.append(
-                        (exc.input.id, new_producer_id)
-                    )  # directly build a list of tuples to pass into the datapackage, the new_producer_id is the new column index
-                    amounts.append(exc.amount)
+            new_producer_id = producer[1]
+            # Foreground producers and temporalized background producers (the
+            # latter descended into / variant-resolved with traverse_background)
+            # carry their own biosphere flows. Temporal markets do not — they
+            # only split a technosphere amount between databases, sourcing
+            # biosphere from the real background nodes they link to.
+            if new_producer_id in self.temporal_market_ids:
+                # Temporal markets source biosphere from the real background
+                # nodes they link to, so they get no biosphere of their own.
+                continue
 
-                datapackage_biosphere.add_persistent_vector(
-                    matrix="biosphere_matrix",
-                    name=uuid.uuid4().hex,
-                    data_array=np.array(amounts, dtype=float),
-                    indices_array=np.array(
-                        indices,
-                        dtype=bwp.INDICES_DTYPE,
-                    ),
-                    flip_array=np.array([False], dtype=bool),
-                )
+            indices = (
+                []
+            )  # list of (biosphere, technosphere) indices for the biosphere flow exchanges
+            amounts = []  # list of amounts corresponding to the bioflows
+            for exc in original_producer_node.biosphere():
+                indices.append(
+                    (exc.input.id, new_producer_id)
+                )  # directly build a list of tuples to pass into the datapackage, the new_producer_id is the new column index
+                amounts.append(exc.amount)
+
+            if not indices:
+                continue
+
+            datapackage_biosphere.add_persistent_vector(
+                matrix="biosphere_matrix",
+                name=uuid.uuid4().hex,
+                data_array=np.array(amounts, dtype=float),
+                indices_array=np.array(
+                    indices,
+                    dtype=bwp.INDICES_DTYPE,
+                ),
+                flip_array=np.array([False], dtype=bool),
+            )
         return datapackage_biosphere
 
     def add_row_to_technosphere_datapackage(

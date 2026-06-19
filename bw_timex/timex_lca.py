@@ -333,6 +333,13 @@ class TimexLCA:
         # Doing this here because we need the temporal grouping for consistent time resolution.
         self.add_static_activities_to_activity_time_mapping()
 
+        # When descending into the background, the BFS extractor must be able to
+        # resolve any background activity to its sibling in every other static
+        # variant database, so it can read the respective (non-referenced)
+        # variant's exchanges. Build the full mapping up front.
+        if traverse_background:
+            self.add_full_interdatabase_activity_mapping()
+
         # Create timeline builder that does the graph traversal (similar to bw_temporalis) and
         # extracts all edges with their temporal information. Can later be used to build a timeline
         # with the TimelineBuilder.build_timeline() method.
@@ -351,6 +358,7 @@ class TimexLCA:
             self.max_calc,
             graph_traversal=graph_traversal,
             traverse_background=traverse_background,
+            interdatabase_activity_mapping=self.interdatabase_activity_mapping,
             *args,
             **kwargs,
         )
@@ -1385,6 +1393,37 @@ class TimexLCA:
         self.node_collections["first_level_background_static"] = (
             first_level_background_static
         )
+
+    def add_full_interdatabase_activity_mapping(self) -> None:
+        """
+        Populate ``interdatabase_activity_mapping`` for every background activity
+        across all static variant databases.
+
+        Unlike ``add_interdatabase_activity_mapping_from_timeline`` (which only
+        maps producers that appear in the finished timeline), this pre-pass maps
+        every static-database node to its sibling in every other static database,
+        so the BFS extractor can resolve and read the respective (non-referenced)
+        variant's exchanges while it is still traversing.
+        """
+        static_dbs = set(self.database_dates_static.keys())
+        tuples_dict = {}
+        for node in self.nodes.values():
+            if node["database"] not in static_dbs:
+                continue
+            key = (node["name"], node.get("reference product"), node["location"])
+            tuples_dict.setdefault(key, node.id)
+        # Build the anchor -> {db: id} mapping in a plain dict first; indexing
+        # the InterDatabaseMapping itself would prematurely trigger
+        # make_reciprocal() before every entry has been added.
+        built = {}
+        for node in self.nodes.values():
+            if node["database"] not in static_dbs:
+                continue
+            key = (node["name"], node.get("reference product"), node["location"])
+            anchor = tuples_dict[key]
+            built.setdefault(anchor, {})[node["database"]] = node.id
+        self.interdatabase_activity_mapping.update(built)
+        self.interdatabase_activity_mapping.make_reciprocal()
 
     def add_interdatabase_activity_mapping_from_timeline(self) -> None:
         """
