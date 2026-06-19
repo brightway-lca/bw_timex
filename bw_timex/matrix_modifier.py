@@ -268,8 +268,12 @@ class MatrixModifier:
             flip_array=np.array([True], dtype=bool),
         )
 
-        # Check if previous producer comes from background database -> temporal market
-        if previous_producer_node["database"] in self.database_dates_static.keys():
+        # A row is a temporal market iff it carries temporal_market_shares.
+        # Leaf producers (background frontier) carry shares; producers traversed
+        # into (e.g. background processes descended into with traverse_background)
+        # do not, so they are rebuilt as temporalized processes (no double-count).
+        is_temporal_market = bool(getattr(row, "temporal_market_shares", None))
+        if is_temporal_market:
             # Create new edges based on temporal_market_shares from the row
             if not row.temporal_market_shares:
                 raise ValueError(

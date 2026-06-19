@@ -1459,11 +1459,17 @@ class TimexLCA:
             .index.values
         )
 
+        market_time_mapped = set(
+            self.timeline.loc[
+                self.timeline.temporal_market_shares.notnull(),
+                "time_mapped_producer",
+            ]
+        )
+
         temporal_market_ids = set()
         temporalized_process_ids = set()
-
         for producer, time_mapped_producer in unique_producers:
-            if self.nodes[producer]["database"] in self.database_dates_static.keys():
+            if time_mapped_producer in market_time_mapped:
                 temporal_market_ids.add(time_mapped_producer)
             else:
                 temporalized_process_ids.add(time_mapped_producer)
