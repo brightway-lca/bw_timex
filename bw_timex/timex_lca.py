@@ -279,11 +279,12 @@ class TimexLCA:
 
         if traverse_background and graph_traversal == "priority":
             logger.warning(
-                "traverse_background=True with graph_traversal='priority': heap "
-                "ordering uses base_lca scores as an approximation for nodes in "
-                "non-referenced background variants. Edge exploration order under "
-                "max_calc/cutoff may differ slightly; explored amounts are correct. "
-                "Use graph_traversal='bfs' to avoid the approximation."
+                "traverse_background=True with graph_traversal='priority': "
+                "non-referenced background variants are not placed on the priority "
+                "heap; each variant subtree is walked in full via proxy reads when its "
+                "parent edge is reached. The referenced-system heap exploration order is "
+                "unchanged and explored amounts are exact (identical to graph_traversal='bfs' "
+                "for these subtrees)."
             )
 
         timeline_cache_key = (

@@ -47,13 +47,7 @@ def _strip_background_tds():
 def _strip_background_tds_deep():
     """Remove temporal_distribution on every background technosphere exchange
     (bg_A->bg_B and bg_B->bg_C) in both variants of the deep fixture."""
-    for dbname in ("background_2020", "background_2030"):
-        for act in bd.Database(dbname):
-            for exc in act.technosphere():
-                if "temporal_distribution" in exc:
-                    del exc["temporal_distribution"]
-                    exc.save()
-        bd.Database(dbname).process()
+    _strip_background_tds()
 
 
 def _score(traverse_background):
