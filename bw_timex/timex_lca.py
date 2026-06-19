@@ -245,6 +245,28 @@ class TimexLCA:
             The graph traversal algorithm to use. Default is 'priority' (priority-first,
             using bw_temporalis TemporalisLCA). Alternative is 'bfs' (Breadth-First-Search,
             independent of TemporalisLCA, avoids per-subgraph LCA overhead).
+        traverse_background : bool, optional
+            If True, the graph traversal descends into background databases instead of
+            stopping at the first-level background frontier. Temporal distributions defined
+            on exchanges inside background databases are then honored: time-spread flows are
+            sourced from the temporally-appropriate background-db variant(s). Bounded by
+            ``cutoff`` and ``max_calc``. Default is False (background treated as static,
+            as before).
+
+            With ``graph_traversal='priority'``, non-referenced background variants are NOT
+            placed on the priority heap. Instead, each variant's subtree is walked in full
+            via proxy reads when the parent edge is reached. The referenced-system heap
+            exploration order is unchanged and explored amounts are exact (identical to
+            ``graph_traversal='bfs'`` for those subtrees). A one-time warning is emitted
+            when this combination is used.
+
+            .. note::
+                **Known limitation:** if a background process with further background
+                technosphere inputs is reached at *more than one cohort date* (e.g. via a
+                foreground ``temporal_distribution`` feeding into a non-leaf background
+                activity), the variant split raises ``NotImplementedError``. This
+                multi-date-consumer case fails loudly and only occurs under
+                ``traverse_background=True``.
         *args : iterable
             Positional arguments for the graph traversal, for `bw_temporalis.TemporalisLCA` passed
             to the `EdgeExtractor` class, which inherits from `TemporalisLCA`. See `bw_temporalis`
