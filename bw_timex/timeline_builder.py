@@ -112,6 +112,7 @@ class TimelineBuilder:
                 starting_datetime=self.starting_datetime,
                 edge_filter_function=edge_filter_function,
                 cutoff=self.cutoff,
+                max_calc=self.max_calc,
                 static_activity_indices=set(static_background_activity_ids),
                 nodes=self.nodes,
                 traverse_background=self.traverse_background,
