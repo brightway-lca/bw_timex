@@ -44,6 +44,18 @@ def _strip_background_tds():
         bd.Database(dbname).process()
 
 
+def _strip_background_tds_deep():
+    """Remove temporal_distribution on every background technosphere exchange
+    (bg_A->bg_B and bg_B->bg_C) in both variants of the deep fixture."""
+    for dbname in ("background_2020", "background_2030"):
+        for act in bd.Database(dbname):
+            for exc in act.technosphere():
+                if "temporal_distribution" in exc:
+                    del exc["temporal_distribution"]
+                    exc.save()
+        bd.Database(dbname).process()
+
+
 def _score(traverse_background):
     tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
     tlca.build_timeline(
@@ -100,6 +112,40 @@ def test_bfs_respective_variant_deep_chain(background_td_deep_db):
     # bg_C must appear at both 2024 and 2034.
     bg_c = tlca.timeline[tlca.timeline["producer_name"] == "bg_C"]
     assert sorted({d.year for d in bg_c["date_producer"]}) == [2024, 2034]
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_respective_variant_deep_chain_both_engines(
+    background_td_deep_db, graph_traversal
+):
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    tlca.build_timeline(
+        starting_datetime="2024-01-01",
+        graph_traversal=graph_traversal,
+        traverse_background=True,
+    )
+    tlca.lci()
+    tlca.static_lcia()
+    assert tlca.static_score == pytest.approx(48.4, rel=1e-9)
+    bg_c = tlca.timeline[tlca.timeline["producer_name"] == "bg_C"]
+    assert sorted({d.year for d in bg_c["date_producer"]}) == [2024, 2034]
+
+
+def test_priority_equivalence_without_background_tds(background_td_deep_db):
+    _strip_background_tds_deep()
+
+    def score(tb):
+        t = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+        t.build_timeline(
+            starting_datetime="2024-01-01",
+            graph_traversal="priority",
+            traverse_background=tb,
+        )
+        t.lci()
+        t.static_lcia()
+        return t.static_score
+
+    assert score(True) == pytest.approx(score(False), rel=1e-9)
 
 
 def test_bfs_per_variant_td_reads_respective_variant(background_td_deep_tdvar_db):

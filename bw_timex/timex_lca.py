@@ -277,6 +277,15 @@ class TimexLCA:
         interpolation_type = validated.interpolation_type
         graph_traversal = validated.graph_traversal
 
+        if traverse_background and graph_traversal == "priority":
+            logger.warning(
+                "traverse_background=True with graph_traversal='priority': heap "
+                "ordering uses base_lca scores as an approximation for nodes in "
+                "non-referenced background variants. Edge exploration order under "
+                "max_calc/cutoff may differ slightly; explored amounts are correct. "
+                "Use graph_traversal='bfs' to avoid the approximation."
+            )
+
         timeline_cache_key = (
             str(validated.starting_datetime),
             temporal_grouping,

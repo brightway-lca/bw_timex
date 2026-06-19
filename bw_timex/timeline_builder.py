@@ -138,6 +138,15 @@ class TimelineBuilder:
                 traverse_background=self.traverse_background,
                 **kwargs,
             )
+            # Same variant-aware descent inputs as the BFS extractor. The priority
+            # engine's own ``self.nodes`` are graph-traversal Node objects, so the
+            # shared mixin reads bw2data Activity proxies through ``bw_node_proxies``.
+            self.edge_extractor.bw_node_proxies = self.nodes
+            self.edge_extractor.database_dates_static = self.database_dates_static
+            self.edge_extractor.interdatabase_activity_mapping = (
+                self.interdatabase_activity_mapping
+            )
+            self.edge_extractor.interpolation_type = self.interpolation_type
         else:
             raise ValueError(
                 f"Unknown graph_traversal '{graph_traversal}'. Use 'priority' or 'bfs'."
