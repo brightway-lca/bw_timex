@@ -42,6 +42,7 @@ class TimelineBuilder:
         cutoff: float = 1e-9,
         max_calc: int = 2000,
         graph_traversal: str = "priority",
+        traverse_background: bool = False,
         *args,
         **kwargs,
     ) -> None:
@@ -89,6 +90,7 @@ class TimelineBuilder:
         self.interpolation_type = interpolation_type
         self.cutoff = cutoff
         self.max_calc = max_calc
+        self.traverse_background = traverse_background
         self._logged_reference_date_below_range = False
         self._logged_reference_date_above_range = False
 
@@ -109,6 +111,7 @@ class TimelineBuilder:
                 cutoff=self.cutoff,
                 static_activity_indices=set(static_background_activity_ids),
                 nodes=self.nodes,
+                traverse_background=self.traverse_background,
             )
         elif graph_traversal == "priority":
             self.edge_extractor = EdgeExtractor(
@@ -119,6 +122,7 @@ class TimelineBuilder:
                 cutoff=self.cutoff,
                 max_calc=self.max_calc,
                 static_activity_indices=set(static_background_activity_ids),
+                traverse_background=self.traverse_background,
                 **kwargs,
             )
         else:

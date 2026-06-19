@@ -211,6 +211,7 @@ class TimexLCA:
         cutoff: float = 1e-9,
         max_calc: int = 2000,
         graph_traversal: str = "priority",
+        traverse_background: bool = False,
         *args,
         **kwargs,
     ) -> pd.DataFrame:
@@ -271,6 +272,7 @@ class TimexLCA:
             cutoff=cutoff,
             max_calc=max_calc,
             graph_traversal=graph_traversal,
+            traverse_background=traverse_background,
         )
         interpolation_type = validated.interpolation_type
         graph_traversal = validated.graph_traversal
@@ -282,6 +284,7 @@ class TimexLCA:
             cutoff,
             max_calc,
             graph_traversal,
+            traverse_background,
             "default" if edge_filter_function is None else id(edge_filter_function),
         )
         if timeline_cache_key == self._last_timeline_build_key:
@@ -344,6 +347,7 @@ class TimexLCA:
             self.cutoff,
             self.max_calc,
             graph_traversal=graph_traversal,
+            traverse_background=traverse_background,
             *args,
             **kwargs,
         )

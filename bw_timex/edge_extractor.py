@@ -85,7 +85,8 @@ class EdgeExtractor(TemporalisLCA):
     using Brightway Datapackages.
     """
 
-    def __init__(self, *args, edge_filter_function: Callable = None, **kwargs) -> None:
+    def __init__(self, *args, edge_filter_function: Callable = None,
+        traverse_background: bool = False, **kwargs) -> None:
         """
         Initialize the EdgeExtractor class and traverses the supply chain using
         functions of the parent class TemporalisLCA.
@@ -96,6 +97,8 @@ class EdgeExtractor(TemporalisLCA):
         edge_filter_function : Callable, optional
             A callable that filters edges. If not provided, a function that always
             returns False is used.
+        traverse_background : bool, optional
+            Flag indicating whether to traverse background databases. Default is False.
         **kwargs : Arbitrary keyword arguments
 
         Returns
@@ -105,7 +108,7 @@ class EdgeExtractor(TemporalisLCA):
 
         """
         super().__init__(*args, **kwargs)  # use __init__ of TemporalisLCA
-
+        self.traverse_background = traverse_background
         if edge_filter_function:
             self.edge_ff = edge_filter_function
         else:
@@ -386,6 +389,7 @@ class EdgeExtractorBFS:
         cutoff: float = 1e-9,
         static_activity_indices: set[int] | None = None,
         nodes: dict | None = None,
+        traverse_background: bool = False,
     ) -> None:
         self.lca_object = lca_object
         self.edge_ff = edge_filter_function if edge_filter_function else lambda x: False
@@ -394,6 +398,7 @@ class EdgeExtractorBFS:
         # {node_id: bw2data Activity proxy} reused from TimexLCA, so production /
         # technosphere exchanges are read without re-fetching nodes.
         self.nodes = nodes or {}
+        self.traverse_background = traverse_background
         self._production_exchange_cache = {}
 
         if isinstance(starting_datetime, str):
