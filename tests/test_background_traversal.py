@@ -100,3 +100,38 @@ def test_bfs_respective_variant_deep_chain(background_td_deep_db):
     # bg_C must appear at both 2024 and 2034.
     bg_c = tlca.timeline[tlca.timeline["producer_name"] == "bg_C"]
     assert sorted({d.year for d in bg_c["date_producer"]}) == [2024, 2034]
+
+
+def test_bfs_per_variant_td_reads_respective_variant(background_td_deep_tdvar_db):
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    tlca.build_timeline(
+        starting_datetime="2024-01-01",
+        graph_traversal="bfs",
+        traverse_background=True,
+    )
+    tlca.lci()
+    tlca.static_lcia()
+    bg_c = tlca.timeline[tlca.timeline["producer_name"] == "bg_C"]
+    years = sorted({d.year for d in bg_c["date_producer"]})
+    # +20y spread (2044, 2054) appears ONLY if the 2030-variant TD was read.
+    assert 2044 in years, f"expected 2044 cohort from background_2030 TD, got {years}"
+    assert 2054 in years, f"expected 2054 cohort from background_2030 TD, got {years}"
+    # amounts equal across variants -> total CO2 unchanged at 10 kg
+    assert tlca.static_score == pytest.approx(10.0, rel=1e-9)
+
+
+def test_bfs_traversed_background_not_double_counted(background_td_deep_db):
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    tlca.build_timeline(
+        starting_datetime="2024-01-01",
+        graph_traversal="bfs",
+        traverse_background=True,
+    )
+    tlca.lci()
+    tlca.static_lcia()
+    tl = tlca.timeline
+    # bg_B is descended into -> temporalized, NOT a temporal market (no shares).
+    bg_b = tl[tl["producer_name"] == "bg_B"]
+    assert bg_b["temporal_market_shares"].isnull().all()
+    # Score is the hand-computed 48.4 (no inventory doubling).
+    assert tlca.static_score == pytest.approx(48.4, rel=1e-9)
