@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import bw2data as bd
+import pytest
 
 from bw_timex import TimexLCA
 
@@ -30,3 +31,38 @@ def test_classification_keys_on_shares_not_db(background_td_db):
     tlca.static_lcia()
     # bg_A is the only first-level background producer -> exactly one temporal market.
     assert len(tlca.node_collections["temporal_markets"]) == 1
+
+
+def _strip_background_tds():
+    """Remove the temporal_distribution on every background bg_A->bg_B exchange."""
+    for dbname in ("background_2020", "background_2030"):
+        for act in bd.Database(dbname):
+            for exc in act.technosphere():
+                if "temporal_distribution" in exc:
+                    del exc["temporal_distribution"]
+                    exc.save()
+        bd.Database(dbname).process()
+
+
+def _score(traverse_background):
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    tlca.build_timeline(
+        starting_datetime="2024-01-01",
+        graph_traversal="bfs",
+        traverse_background=traverse_background,
+    )
+    tlca.lci()
+    tlca.static_lcia()
+    return tlca.static_score, tlca.timeline
+
+
+def test_bfs_equivalence_without_background_tds(background_td_db):
+    _strip_background_tds()
+    score_static, tl_static = _score(False)
+    score_traverse, tl_traverse = _score(True)
+    # With traverse_background=True the BFS descends into bg_B, so the
+    # traverse timeline must contain bg_B edges (more rows than the static one).
+    assert len(tl_traverse) > len(tl_static), (
+        "traverse_background=True must produce a deeper timeline than False"
+    )
+    assert score_traverse == pytest.approx(score_static, rel=1e-9)

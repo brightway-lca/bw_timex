@@ -96,11 +96,14 @@ class TimelineBuilder:
 
         # Finding indices of activities from the connected background databases that are known to be static, i.e. have no temporal distributions connecting to them.
         # These will be be skipped in the graph traversal.
-        static_background_activity_ids = {
-            node_id
-            for node_id in self.node_collections["background"]
-            if node_id not in self.node_collections["first_level_background_static"]
-        }
+        if self.traverse_background:
+            static_background_activity_ids = set()
+        else:
+            static_background_activity_ids = {
+                node_id
+                for node_id in self.node_collections["background"]
+                if node_id not in self.node_collections["first_level_background_static"]
+            }
 
         logger.info("Traversing supply chain graph...")
         if graph_traversal == "bfs":
@@ -265,10 +268,18 @@ class TimelineBuilder:
         grouped_edges["hash_consumer"] = grouped_edges["date_consumer"].map(hash_cache)
 
         # add new processes to activity_time_mapping
+        static_dbs = set(self.database_dates_static.keys()) if self.traverse_background else set()
         for row in grouped_edges.itertuples():
+            producer_node = self.nodes[row.producer]
+            if self.traverse_background and producer_node["database"] in static_dbs:
+                # Traversed background node: store with actual db so the downstream
+                # biosphere exchange lookup can identify it unambiguously.
+                db_key = producer_node["database"]
+            else:
+                db_key = "temporalized"
             self.activity_time_mapping.add(
                 (
-                    ("temporalized", self.nodes[row.producer]["code"]),
+                    (db_key, producer_node["code"]),
                     row.hash_producer,
                 )
             )
@@ -423,6 +434,20 @@ class TimelineBuilder:
         except KeyError:
             return self.activity_time_mapping[((self.nodes[node_id].key), node_hash)]
 
+    def _leaf_background_producers(self, edges_df: pd.DataFrame) -> set:
+        """Producers that are leaves (never traversed into) and live in a static
+        background db. These are the temporal-market frontier."""
+        consumers = set(edges_df["consumer"].unique())
+        static_dbs = set(self.database_dates_static.keys())
+        leaves = set()
+        for producer in edges_df["producer"].unique():
+            if producer in consumers:
+                continue  # traversed into -> temporalized, not a market
+            node = self.nodes.get(producer)
+            if node is not None and node["database"] in static_dbs:
+                leaves.add(producer)
+        return leaves
+
     def add_column_temporal_market_shares_to_timeline(
         self,
         tl_df: pd.DataFrame,
@@ -491,9 +516,11 @@ class TimelineBuilder:
                 f"Sorry, but {interpolation_type} interpolation is not available yet."
             )
 
-        first_level_background_static = self.node_collections[
-            "first_level_background_static"
-        ]
+        if self.traverse_background:
+            market_producers = self._leaf_background_producers(tl_df)
+        else:
+            market_producers = self.node_collections["first_level_background_static"]
+
         remapped_interpolation_weights = {
             producer_date: {
                 self.reversed_database_dates[date]: share
@@ -504,7 +531,7 @@ class TimelineBuilder:
 
         tl_df["temporal_market_shares"] = [
             remapped_interpolation_weights[producer_date]
-            if producer in first_level_background_static
+            if producer in market_producers
             else None
             for producer, producer_date in zip(tl_df["producer"], tl_df["date_producer"])
         ]

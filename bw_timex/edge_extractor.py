@@ -390,6 +390,7 @@ class EdgeExtractorBFS:
         static_activity_indices: set[int] | None = None,
         nodes: dict | None = None,
         traverse_background: bool = False,
+        max_calc: int = 1_000_000,
     ) -> None:
         self.lca_object = lca_object
         self.edge_ff = edge_filter_function if edge_filter_function else lambda x: False
@@ -399,7 +400,15 @@ class EdgeExtractorBFS:
         # technosphere exchanges are read without re-fetching nodes.
         self.nodes = nodes or {}
         self.traverse_background = traverse_background
+        self.max_calc = max_calc
+        self._calc_count = 0
         self._production_exchange_cache = {}
+
+        if self.traverse_background:
+            # Background is no longer a hard stop; rely on cutoff / max_calc.
+            # A user-supplied edge_filter_function is still respected.
+            if edge_filter_function is None:
+                self.edge_ff = lambda x: False
 
         if isinstance(starting_datetime, str):
             if starting_datetime == "now":
@@ -640,6 +649,10 @@ class EdgeExtractorBFS:
 
         while queue:
             node_id, td, td_parent, abs_td, supply = queue.popleft()
+
+            self._calc_count += 1
+            if self._calc_count > self.max_calc:
+                break
 
             production_amount = self._get_production_amount(node_id)
             input_ids = self._get_technosphere_inputs(node_id)

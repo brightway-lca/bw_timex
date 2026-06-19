@@ -300,7 +300,7 @@ class TimexLCA:
                 ]
             ]
 
-        if edge_filter_function is None:
+        if edge_filter_function is None and not traverse_background:
             logger.info(
                 "No edge filter function provided. Skipping all edges in background databases."
             )
@@ -310,8 +310,11 @@ class TimexLCA:
                     skippable.update(node.id for node in bd.Database(db))
                 self._default_edge_filter_function = skippable.__contains__
             self.edge_filter_function = self._default_edge_filter_function
-        else:
+        elif edge_filter_function is not None:
             self.edge_filter_function = edge_filter_function
+        else:
+            # traverse_background=True with no user filter: BFS descends freely
+            self.edge_filter_function = lambda x: False
 
         self.starting_datetime = starting_datetime
         self.temporal_grouping = temporal_grouping
