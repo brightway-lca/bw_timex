@@ -149,13 +149,19 @@ class VariantBackgroundMixin:
     def _proxy_technosphere_inputs(self, activity_id: int) -> list[int]:
         """Technosphere input product ids of a variant node, read from its proxy.
 
-        ``static_activity_indices`` is empty when ``traverse_background`` is set,
-        so no filtering is needed, but it is honoured for symmetry with the
-        matrix path.
+        ``static_activity_indices`` contains MATRIX INDICES (as used by the
+        priority TemporalisLCA engine), not activity ids. When
+        ``traverse_background=True``, ``TimelineBuilder`` forces
+        ``static_activity_indices = set()`` so this filter is always a no-op on
+        the variant-descent path — filtering here by activity id would be
+        incorrect whenever the set is non-empty.
         """
         inputs = []
         for exchange in self.bw_node_proxies[activity_id].technosphere():
             input_id = exchange.input.id
+            # NOTE: static_activity_indices holds matrix indices, not activity ids;
+            # the filter below is only correct when the set is empty (the invariant
+            # enforced by EdgeExtractor.__init__ when traverse_background=True).
             if input_id in self.static_activity_indices:
                 continue
             inputs.append(input_id)
@@ -225,9 +231,15 @@ class VariantBackgroundMixin:
         node = self.bw_node_proxies.get(product_id)
         if node is None:
             return None
+        # Chimaera nodes have at least one production exchange; for a pure leaf
+        # (no production edge at all) we should return None — but in practice
+        # every node reachable here IS a chimaera and has a self-production edge,
+        # so the loop always returns on the first iteration. The trailing
+        # ``return product_id`` is therefore unreachable; it is kept as a
+        # defensive fallback matching the docstring.
         for _ in node.production():
             return product_id
-        return product_id
+        return None
 
     def _is_static_background(self, node_id: int) -> bool:
         """True if ``node_id`` lives in one of the static background databases."""
@@ -330,6 +342,8 @@ class VariantBackgroundMixin:
                     producer_production_td, masked_abs_td_producer
                 )
 
+            # Cutoff-tracking estimate only — never feeds emitted amounts.
+            # Emitted amounts come from the masked distributions above.
             variant_supply = new_supply * sum(keep.values()) / max(len(keep), 1)
             edges.extend(
                 self._descend_variant_subtree(
@@ -483,6 +497,15 @@ class EdgeExtractor(VariantBackgroundMixin, TemporalisLCA):
         # local copies before delegating.
         self.cutoff = kwargs.get("cutoff", 5e-4)
         self.static_activity_indices = kwargs.get("static_activity_indices") or set()
+        # INVARIANT: static_activity_indices holds TemporalisLCA MATRIX INDICES,
+        # not activity ids. _proxy_technosphere_inputs filters by activity id, so
+        # the two id-spaces must not be mixed. TimelineBuilder enforces the empty-
+        # set precondition when traverse_background=True; assert it here so any
+        # future caller that bypasses TimelineBuilder fails loudly.
+        assert not (self.static_activity_indices and traverse_background), (
+            "static_activity_indices must be empty when traverse_background=True "
+            "(index-space differs across engines)"
+        )
         super().__init__(*args, **kwargs)  # use __init__ of TemporalisLCA
         self.traverse_background = traverse_background
         if edge_filter_function:
@@ -712,6 +735,10 @@ class EdgeExtractor(VariantBackgroundMixin, TemporalisLCA):
                         new_supply = abs(td_producer.amount.sum())
                     else:
                         new_supply = abs(td_producer)
+                    # No per-edge cutoff term here: the priority heap loop has no
+                    # per-edge cutoff at this layer. Cutoff is enforced inside
+                    # ``_descend_variant_subtree`` where the supply is compared
+                    # against ``cutoff * total_demand`` per child edge.
                     timeline.extend(
                         self._emit_variant_split(
                             node_id=consumer_id,

@@ -396,7 +396,14 @@ class TimexLCA:
         )
 
         self.timeline = self.timeline_builder.build_timeline()
-        self.add_interdatabase_activity_mapping_from_timeline()
+        if not traverse_background:
+            # When traverse_background=True the full interdatabase mapping was
+            # already built by add_full_interdatabase_activity_mapping() above,
+            # covering every background activity. Running this again would reset
+            # entries via update({producer: {} ...}) before repopulating them,
+            # producing the same final result but wasting work and creating a
+            # fragile transient inconsistency. Skip it.
+            self.add_interdatabase_activity_mapping_from_timeline()
         self._last_timeline_build_key = timeline_cache_key
         self._cached_timeline = self.timeline
         self._dynamic_lcia_inventory_cache.clear()

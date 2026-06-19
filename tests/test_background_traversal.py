@@ -160,6 +160,22 @@ def test_bfs_per_variant_td_reads_respective_variant(background_td_deep_tdvar_db
     assert tlca.static_score == pytest.approx(10.0, rel=1e-9)
 
 
+@pytest.mark.parametrize("graph_traversal", ["bfs", "priority"])
+def test_multi_date_consumer_raises(
+    background_td_multidate_consumer_db, graph_traversal
+):
+    """A foreground TD feeding into a non-leaf background activity causes bg_A
+    to be reached at >1 cohort date. The variant split cannot handle a multi-date
+    consumer and must raise NotImplementedError loudly."""
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    with pytest.raises(NotImplementedError):
+        tlca.build_timeline(
+            starting_datetime="2024-01-01",
+            graph_traversal=graph_traversal,
+            traverse_background=True,
+        )
+
+
 def test_bfs_traversed_background_not_double_counted(background_td_deep_db):
     tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
     tlca.build_timeline(
