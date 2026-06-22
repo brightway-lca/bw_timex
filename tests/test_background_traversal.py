@@ -255,3 +255,89 @@ def test_foreground_td_into_traversed_background_convolves(
     assert amount_by("A") == [1.0]
     assert amount_by("B") == [0.9, 2.1]
     assert amount_by("C") == [0.8, 0.8, 1.2, 1.2]
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_background_td_with_explicit_product_paradigm(
+    explicit_background_td_db, graph_traversal
+):
+    """Background temporal distributions work when the foreground uses the
+    explicit process/product paradigm: a bare ``service_product`` plus a
+    ``service_process`` that owns the production edge to it, and the demand is
+    the *product*.
+
+    Hand-computation (demand service_product = 1, starting 2024):
+    - service_process -> 3 kWh electricity (descended -> temporalized).
+    - electricity -> fuel (amount 2), TD 60% +0y / 40% +10y -> fuel cohorts:
+        3.6 kg @2024,  2.4 kg @2034.
+    - fuel -> CO2 routed linearly between the 2020 and 2040 grids:
+        @2024 -> 0.8*11 + 0.2*7 = 10.2 -> 36.72
+        @2034 -> 0.3*11 + 0.7*7 = 8.2  -> 19.68
+    - total = 56.4 kg CO2 (the all-2020-grid static base would be 66.0).
+    """
+    import bw2calc as bc
+
+    database_dates = explicit_background_td_db
+    product = bd.get_node(database="foreground", code="service_product")
+    demand = {product.key: 1}
+
+    slca = bc.LCA(demand, method=METHOD)
+    slca.lci()
+    slca.lcia()
+    assert slca.score == pytest.approx(66.0, rel=1e-9)
+
+    tlca = TimexLCA(demand=demand, method=METHOD, database_dates=database_dates)
+    tlca.build_timeline(
+        starting_datetime="2024-01-01",
+        graph_traversal=graph_traversal,
+        traverse_background=True,
+    )
+    tlca.lci()
+    tlca.static_lcia()
+
+    assert tlca.base_lca.score == pytest.approx(slca.score)
+    assert tlca.static_score == pytest.approx(56.4, rel=1e-9)
+
+    tl = tlca.timeline
+    # The demanded explicit product's process is descended -> temporalized (no shares).
+    elec = tl[tl["producer_name"] == "electricity"]
+    assert elec["temporal_market_shares"].isnull().all()
+    # The background TD spreads fuel across two cohorts, each routed across variants.
+    fuel = tl[tl["producer_name"] == "fuel"]
+    assert sorted({d.year for d in fuel["date_producer"]}) == [2024, 2034]
+    assert fuel["temporal_market_shares"].notnull().all()
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_single_background_db_with_td_matches_static(
+    background_td_single_db, graph_traversal
+):
+    """With a single background database, an internal background TD only
+    redistributes emissions in time. Since every flow is sourced from that one
+    database regardless of when it occurs, the time-aggregated (static) score is
+    unchanged: traverse_background must match the plain static LCA score."""
+    import bw2calc as bc
+
+    from datetime import datetime
+
+    demand = {("foreground", "fu"): 1}
+    database_dates = {"background": datetime(2020, 1, 1), "foreground": "dynamic"}
+
+    slca = bc.LCA(demand, method=METHOD)
+    slca.lci()
+    slca.lcia()
+
+    tlca = TimexLCA(demand=demand, method=METHOD, database_dates=database_dates)
+    tlca.build_timeline(
+        starting_datetime="2024-01-01",
+        graph_traversal=graph_traversal,
+        traverse_background=True,
+    )
+    tlca.lci()
+    tlca.static_lcia()
+
+    # The background TD still spreads fuel over time...
+    fuel = tlca.timeline[tlca.timeline["producer_name"] == "fuel"]
+    assert sorted({d.year for d in fuel["date_producer"]}) == [2024, 2034]
+    # ...but with one background db the score equals the static LCA exactly.
+    assert tlca.static_score == pytest.approx(slca.score, rel=1e-9)
