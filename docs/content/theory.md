@@ -140,14 +140,9 @@ exchanges, amounts, and temporal distributions.
   exact (identical to ``graph_traversal='bfs'`` for those subtrees). A one-time
   warning is emitted when this combination is used.
 
-```{note}
-**Known limitation:** if a background process that has further background
-technosphere inputs is reached at *more than one cohort date* — for example
-via a foreground ``temporal_distribution`` feeding into a non-leaf background
-activity — the variant split raises ``NotImplementedError``. This
-multi-date-consumer case fails loudly and only occurs under
-``traverse_background=True``.
-```
+A background process reached at several cohort dates (for example via a foreground
+``temporal_distribution`` feeding into a non-leaf background activity) is split per
+consumer cohort, so multi-date consumers are routed correctly.
 
 ## Temporal evolution in the foreground system
 `bw_timex` (>0.3.4) allows you to also implement time-dependent modifications to the foreground exchanges. This optional feature is useful if you want to simulate changes in the foreground system over time, such as technological learning, efficiency improvements or changing market structures. Such changes are not covered by the linking to time-specific background processes. 

@@ -272,27 +272,92 @@ class VariantBackgroundMixin:
         subtree).
 
         Shared verbatim by both the BFS and priority engines.
+
+        A multi-date consumer (e.g. a foreground ``temporal_distribution``
+        feeding a non-leaf background activity, so the consuming background
+        process is reached at several cohort dates) is handled by splitting it
+        into one single-consumer-date routing per consumer cohort. The join that
+        builds ``abs_td_producer`` is consumer-major, so consumer cohort ``i`` is
+        the contiguous block ``i*M : (i+1)*M``; each block then reduces to the
+        single-consumer-date case, where the relative ``td_producer`` and the
+        absolute ``abs_td_producer`` share one index axis.
         """
-        # Route each producer cohort date to its variant(s). The producer cohort
-        # dates live on ``abs_td_producer``; the corresponding edge amounts live
-        # on ``distribution`` (same date axis).
+        n_consumer = len(abs_td)
+        m_producer = len(abs_td_producer) // n_consumer
+        # ``distribution`` is the (possibly simplify-merged) convolution; it stays
+        # consumer-major and aligned to the N*M ``abs_td_producer`` axis unless two
+        # convolved dates coincided and merged.
+        aligned = len(distribution) == n_consumer * m_producer
+
+        edges = []
+        for i in range(n_consumer):
+            block = slice(i * m_producer, (i + 1) * m_producer)
+            abs_td_producer_i = TemporalDistribution(
+                date=abs_td_producer.date[block],
+                amount=abs_td_producer.amount[block],
+            )
+            if aligned:
+                distribution_i = TemporalDistribution(
+                    date=distribution.date[block],
+                    amount=distribution.amount[block],
+                )
+            else:
+                # Rebuild this cohort's absolute distribution from the join dates.
+                # These amounts feed only cutoff / heap ordering, never emitted
+                # amounts (those come from ``abs_td_producer``), so the rebuild is
+                # safe for the inventory result.
+                distribution_i = TemporalDistribution(
+                    date=abs_td_producer_i.date,
+                    amount=abs_td.amount[i] * td_producer.amount,
+                )
+            abs_td_i = TemporalDistribution(
+                date=abs_td.date[i : i + 1],
+                amount=abs_td.amount[i : i + 1],
+            )
+            edges.extend(
+                self._emit_variant_split_for_consumer_date(
+                    node_id=node_id,
+                    producer_process=producer_process,
+                    edge_type=edge_type,
+                    temporal_evolution=temporal_evolution,
+                    td_producer=td_producer,
+                    distribution=distribution_i,
+                    abs_td_producer=abs_td_producer_i,
+                    abs_td=abs_td_i,
+                    td_parent=td_parent,
+                    new_supply=new_supply,
+                    total_demand=total_demand,
+                )
+            )
+        return edges
+
+    def _emit_variant_split_for_consumer_date(
+        self,
+        *,
+        node_id: int,
+        producer_process: int,
+        edge_type: str,
+        temporal_evolution,
+        td_producer: TemporalDistribution,
+        distribution: TemporalDistribution,
+        abs_td_producer: TemporalDistribution,
+        abs_td: TemporalDistribution,
+        td_parent,
+        new_supply: float,
+        total_demand: float,
+    ) -> list:
+        """Variant split for a single consumer cohort date (``len(abs_td) == 1``).
+
+        With one consumer date the relative ``td_producer`` and the absolute
+        ``abs_td_producer`` share one index axis, so all three arrays mask by the
+        same kept indices and ``extract_edge_data`` can explode the
+        consumer/producer dates and amounts consistently.
+        """
+        # Route each producer cohort date to its variant(s).
         variant_keep: dict[str, dict] = {}
         for date in abs_td_producer.date:
             for db_name, weight in self._variant_shares_for_date(date).items():
                 variant_keep.setdefault(db_name, {})[date] = weight
-
-        # The variant split routes by absolute producer date. The relative
-        # ``td_producer`` and absolute ``abs_td_producer`` share an index axis
-        # when the consumer has a single absolute date (the case for every
-        # background split: the consuming background process sits at one cohort
-        # date per descent). Mask all three arrays by the same kept indices so
-        # ``extract_edge_data`` can explode consumer/producer dates and amounts
-        # consistently.
-        if len(abs_td) != 1:
-            raise NotImplementedError(
-                "Variant-aware background split with a multi-date "
-                "consumer is not supported."
-            )
 
         edges = []
         for db_name, keep in variant_keep.items():

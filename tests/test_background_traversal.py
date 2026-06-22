@@ -161,19 +161,30 @@ def test_bfs_per_variant_td_reads_respective_variant(background_td_deep_tdvar_db
 
 
 @pytest.mark.parametrize("graph_traversal", ["bfs", "priority"])
-def test_multi_date_consumer_raises(
+def test_multi_date_consumer_split(
     background_td_multidate_consumer_db, graph_traversal
 ):
-    """A foreground TD feeding into a non-leaf background activity causes bg_A
-    to be reached at >1 cohort date. The variant split cannot handle a multi-date
-    consumer and must raise NotImplementedError loudly."""
+    """A foreground TD feeding a non-leaf background activity makes bg_A reached
+    at >1 cohort date, so the bg_A->bg_B variant split has a multi-date consumer.
+    The split routes each consumer cohort independently.
+
+    Hand-computation (starting 2024, fu->bg_A TD 60% @2024 / 40% @2034; all
+    intermediate amounts 1; bg_C->CO2 = 11 in 2020, 7 in 2030):
+    - bg_A: 0.6 @2024, 0.4 @2034  -> bg_B / bg_C carry the same dates.
+    - bg_B@2024 (0.6) routes {2020:0.6, 2030:0.4} -> 0.36 via 2020, 0.24 via 2030.
+    - bg_B@2034 (0.4) routes {2030:1.0}           -> 0.40 via 2030.
+    - locked-variant bg_C emissions: 0.36*11 + 0.24*7 + 0.40*7
+      = 3.96 + 1.68 + 2.80 = 8.44 kg CO2.
+    """
     tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
-    with pytest.raises(NotImplementedError):
-        tlca.build_timeline(
-            starting_datetime="2024-01-01",
-            graph_traversal=graph_traversal,
-            traverse_background=True,
-        )
+    tlca.build_timeline(
+        starting_datetime="2024-01-01",
+        graph_traversal=graph_traversal,
+        traverse_background=True,
+    )
+    tlca.lci()
+    tlca.static_lcia()
+    assert tlca.static_score == pytest.approx(8.44, rel=1e-9)
 
 
 def test_bfs_traversed_background_not_double_counted(background_td_deep_db):
