@@ -98,6 +98,7 @@ class BuildTimelineInputs(BaseModel):
     cutoff: float = Field(default=1e-9, gt=0)
     max_calc: int = Field(default=2000, gt=0)
     graph_traversal: Literal["priority", "bfs"] = "priority"
+    traverse_background: bool = False
 
     @field_validator("starting_datetime")
     @classmethod

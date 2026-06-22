@@ -116,6 +116,34 @@ of the exchange.
 
 
 
+### Traversing into background databases (`traverse_background`)
+
+By default the graph traversal stops at the boundary between the foreground and
+background systems: background databases are treated as static, and temporal
+distributions on their internal exchanges are ignored. Setting
+``traverse_background=True`` in ``build_timeline`` lifts this restriction.
+
+When enabled, the traversal descends into background databases (bounded by
+``cutoff`` and ``max_calc``). Exchanges inside background databases that carry a
+``temporal_distribution`` are honored: time-spread flows are sourced from the
+temporally-appropriate background-db variant — reading that variant's own
+exchanges, amounts, and temporal distributions.
+
+**Graph-traversal engine behavior under ``traverse_background=True``:**
+
+- With ``graph_traversal='bfs'`` (breadth-first search): all variant subtrees
+  are explored in standard BFS order.
+- With ``graph_traversal='priority'`` (the default): non-referenced background
+  variants are **not** placed on the priority heap. Each variant's subtree is
+  instead walked in full via proxy reads when the parent edge is reached. The
+  referenced-system heap exploration order is unchanged and explored amounts are
+  exact (identical to ``graph_traversal='bfs'`` for those subtrees). A one-time
+  warning is emitted when this combination is used.
+
+A background process reached at several cohort dates (for example via a foreground
+``temporal_distribution`` feeding into a non-leaf background activity) is split per
+consumer cohort, so multi-date consumers are routed correctly.
+
 ## Temporal evolution in the foreground system
 `bw_timex` (>0.3.4) allows you to also implement time-dependent modifications to the foreground exchanges. This optional feature is useful if you want to simulate changes in the foreground system over time, such as technological learning, efficiency improvements or changing market structures. Such changes are not covered by the linking to time-specific background processes. 
 

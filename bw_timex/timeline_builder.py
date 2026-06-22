@@ -14,6 +14,8 @@ from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
     extract_date_as_string,
+    linear_interpolation_weights,
+    nearest_date_weight,
     round_datetime,
 )
 
@@ -42,6 +44,8 @@ class TimelineBuilder:
         cutoff: float = 1e-9,
         max_calc: int = 2000,
         graph_traversal: str = "priority",
+        traverse_background: bool = False,
+        interdatabase_activity_mapping=None,
         *args,
         **kwargs,
     ) -> None:
@@ -89,16 +93,21 @@ class TimelineBuilder:
         self.interpolation_type = interpolation_type
         self.cutoff = cutoff
         self.max_calc = max_calc
+        self.traverse_background = traverse_background
+        self.interdatabase_activity_mapping = interdatabase_activity_mapping
         self._logged_reference_date_below_range = False
         self._logged_reference_date_above_range = False
 
         # Finding indices of activities from the connected background databases that are known to be static, i.e. have no temporal distributions connecting to them.
         # These will be be skipped in the graph traversal.
-        static_background_activity_ids = {
-            node_id
-            for node_id in self.node_collections["background"]
-            if node_id not in self.node_collections["first_level_background_static"]
-        }
+        if self.traverse_background:
+            static_background_activity_ids = set()
+        else:
+            static_background_activity_ids = {
+                node_id
+                for node_id in self.node_collections["background"]
+                if node_id not in self.node_collections["first_level_background_static"]
+            }
 
         logger.info("Traversing supply chain graph...")
         if graph_traversal == "bfs":
@@ -107,9 +116,16 @@ class TimelineBuilder:
                 starting_datetime=self.starting_datetime,
                 edge_filter_function=edge_filter_function,
                 cutoff=self.cutoff,
+                max_calc=self.max_calc,
                 static_activity_indices=set(static_background_activity_ids),
                 nodes=self.nodes,
+                traverse_background=self.traverse_background,
             )
+            self.edge_extractor.database_dates_static = self.database_dates_static
+            self.edge_extractor.interdatabase_activity_mapping = (
+                self.interdatabase_activity_mapping
+            )
+            self.edge_extractor.interpolation_type = self.interpolation_type
         elif graph_traversal == "priority":
             self.edge_extractor = EdgeExtractor(
                 base_lca,
@@ -119,8 +135,18 @@ class TimelineBuilder:
                 cutoff=self.cutoff,
                 max_calc=self.max_calc,
                 static_activity_indices=set(static_background_activity_ids),
+                traverse_background=self.traverse_background,
                 **kwargs,
             )
+            # Same variant-aware descent inputs as the BFS extractor. The priority
+            # engine's own ``self.nodes`` are graph-traversal Node objects, so the
+            # shared mixin reads bw2data Activity proxies through ``bw_node_proxies``.
+            self.edge_extractor.bw_node_proxies = self.nodes
+            self.edge_extractor.database_dates_static = self.database_dates_static
+            self.edge_extractor.interdatabase_activity_mapping = (
+                self.interdatabase_activity_mapping
+            )
+            self.edge_extractor.interpolation_type = self.interpolation_type
         else:
             raise ValueError(
                 f"Unknown graph_traversal '{graph_traversal}'. Use 'priority' or 'bfs'."
@@ -261,10 +287,18 @@ class TimelineBuilder:
         grouped_edges["hash_consumer"] = grouped_edges["date_consumer"].map(hash_cache)
 
         # add new processes to activity_time_mapping
+        static_dbs = set(self.database_dates_static.keys()) if self.traverse_background else set()
         for row in grouped_edges.itertuples():
+            producer_node = self.nodes[row.producer]
+            if self.traverse_background and producer_node["database"] in static_dbs:
+                # Traversed background node: store with actual db so the downstream
+                # biosphere exchange lookup can identify it unambiguously.
+                db_key = producer_node["database"]
+            else:
+                db_key = "temporalized"
             self.activity_time_mapping.add(
                 (
-                    ("temporalized", self.nodes[row.producer]["code"]),
+                    (db_key, producer_node["code"]),
                     row.hash_producer,
                 )
             )
@@ -419,6 +453,29 @@ class TimelineBuilder:
         except KeyError:
             return self.activity_time_mapping[((self.nodes[node_id].key), node_hash)]
 
+    def _leaf_background_producers(self, edges_df: pd.DataFrame) -> set:
+        """Producers that are leaves (never traversed into) and live in a static
+        background db. These are the temporal-market frontier."""
+        consumers = set(edges_df["consumer"].unique())
+        static_dbs = set(self.database_dates_static.keys())
+        # Producers that the BFS already resolved to their respective variant
+        # database during a variant-aware descent are temporalized (rebuilt from
+        # their own real db), not temporal markets — otherwise their already
+        # variant-routed amounts would be re-interpolated.
+        variant_resolved = getattr(
+            self.edge_extractor, "variant_resolved_producers", set()
+        )
+        leaves = set()
+        for producer in edges_df["producer"].unique():
+            if producer in consumers:
+                continue  # traversed into -> temporalized, not a market
+            if producer in variant_resolved:
+                continue  # already variant-resolved -> temporalized
+            node = self.nodes.get(producer)
+            if node is not None and node["database"] in static_dbs:
+                leaves.add(producer)
+        return leaves
+
     def add_column_temporal_market_shares_to_timeline(
         self,
         tl_df: pd.DataFrame,
@@ -487,9 +544,11 @@ class TimelineBuilder:
                 f"Sorry, but {interpolation_type} interpolation is not available yet."
             )
 
-        first_level_background_static = self.node_collections[
-            "first_level_background_static"
-        ]
+        if self.traverse_background:
+            market_producers = self._leaf_background_producers(tl_df)
+        else:
+            market_producers = self.node_collections["first_level_background_static"]
+
         remapped_interpolation_weights = {
             producer_date: {
                 self.reversed_database_dates[date]: share
@@ -500,7 +559,7 @@ class TimelineBuilder:
 
         tl_df["temporal_market_shares"] = [
             remapped_interpolation_weights[producer_date]
-            if producer in first_level_background_static
+            if producer in market_producers
             else None
             for producer, producer_date in zip(tl_df["producer"], tl_df["date_producer"])
         ]
@@ -524,24 +583,7 @@ class TimelineBuilder:
             Dictionary with the key as the closest datetime.datetime object from the list and a value of 1.
         """
 
-        # If the list is empty, return None
-        if not dates:
-            return None
-
-        position = bisect_left(dates, target)
-        if position == 0:
-            closest = dates[0]
-        elif position == len(dates):
-            closest = dates[-1]
-        else:
-            lower_date = dates[position - 1]
-            higher_date = dates[position]
-            if abs(target - lower_date) <= abs(higher_date - target):
-                closest = lower_date
-            else:
-                closest = higher_date
-
-        return {closest: 1}
+        return nearest_date_weight(target, dates)
 
     def get_weights_for_interpolation_between_nearest_years(
         self,
@@ -568,41 +610,30 @@ class TimelineBuilder:
             Dictionary with datetimes of the available closest databases as keys and the weights for interpolation as values.
         """
         interpolation_type = interpolation_type or self.interpolation_type
+        if interpolation_type != "linear":
+            raise ValueError(
+                f"Sorry, but {interpolation_type} interpolation is not available yet."
+            )
+
         position = bisect_left(dates_list, reference_date)
-
-        if position < len(dates_list) and dates_list[position] == reference_date:
-            return {dates_list[position]: 1}
-
-        if position == 0:
+        if position == 0 and not (
+            position < len(dates_list) and dates_list[position] == reference_date
+        ):
             if not getattr(self, "_logged_reference_date_below_range", False):
                 logger.info(
                     "Reference date {} is lower than all provided dates. Data will be taken from the closest higher year.",
                     reference_date,
                 )
                 self._logged_reference_date_below_range = True
-            return {dates_list[0]: 1}
-
-        if position == len(dates_list):
+        elif position == len(dates_list):
             if not getattr(self, "_logged_reference_date_above_range", False):
                 logger.info(
                     "Reference date {} is higher than all provided dates. Data will be taken from the closest lower year.",
                     reference_date,
                 )
                 self._logged_reference_date_above_range = True
-            return {dates_list[-1]: 1}
 
-        closest_lower = dates_list[position - 1]
-        closest_higher = dates_list[position]
-
-        if interpolation_type == "linear":
-            weight = int((reference_date - closest_lower).total_seconds()) / int(
-                (closest_higher - closest_lower).total_seconds()
-            )
-        else:
-            raise ValueError(
-                f"Sorry, but {interpolation_type} interpolation is not available yet."
-            )
-        return {closest_lower: round(1 - weight, 3), closest_higher: round(weight, 3)}
+        return linear_interpolation_weights(reference_date, dates_list)
 
     def add_interpolation_weights_at_intersection_to_background(
         self, row

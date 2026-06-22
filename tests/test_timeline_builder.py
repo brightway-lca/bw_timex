@@ -110,3 +110,20 @@ class TestAdjustSignOfAmount:
     def test_unrecognized_type(self):
         with pytest.raises(TypeError, match="Unrecognized type"):
             self.adjust("unknown_type")
+
+
+# --- traverse_background flag ---
+
+
+def test_traverse_background_flag_accepted_and_stored(process_at_base_database_time_db):
+    from bw_timex import TimexLCA
+
+    method = ("GWP", "example")
+    database_dates = {
+        "background_2020": datetime.strptime("2020", "%Y"),
+        "background_2030": datetime.strptime("2030", "%Y"),
+        "foreground": "dynamic",
+    }
+    tlca = TimexLCA({("foreground", "fu"): 1}, method, database_dates)
+    tlca.build_timeline(starting_datetime="2024-01-01", traverse_background=False)
+    assert tlca.timeline_builder.traverse_background is False

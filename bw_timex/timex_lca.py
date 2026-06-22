@@ -211,6 +211,7 @@ class TimexLCA:
         cutoff: float = 1e-9,
         max_calc: int = 2000,
         graph_traversal: str = "priority",
+        traverse_background: bool = False,
         *args,
         **kwargs,
     ) -> pd.DataFrame:
@@ -244,6 +245,20 @@ class TimexLCA:
             The graph traversal algorithm to use. Default is 'priority' (priority-first,
             using bw_temporalis TemporalisLCA). Alternative is 'bfs' (Breadth-First-Search,
             independent of TemporalisLCA, avoids per-subgraph LCA overhead).
+        traverse_background : bool, optional
+            If True, the graph traversal descends into background databases instead of
+            stopping at the first-level background frontier. Temporal distributions defined
+            on exchanges inside background databases are then honored: time-spread flows are
+            sourced from the temporally-appropriate background-db variant(s). Bounded by
+            ``cutoff`` and ``max_calc``. Default is False (background treated as static,
+            as before).
+
+            With ``graph_traversal='priority'``, non-referenced background variants are NOT
+            placed on the priority heap. Instead, each variant's subtree is walked in full
+            via proxy reads when the parent edge is reached. The referenced-system heap
+            exploration order is unchanged and explored amounts are exact (identical to
+            ``graph_traversal='bfs'`` for those subtrees). A one-time warning is emitted
+            when this combination is used.
         *args : iterable
             Positional arguments for the graph traversal, for `bw_temporalis.TemporalisLCA` passed
             to the `EdgeExtractor` class, which inherits from `TemporalisLCA`. See `bw_temporalis`
@@ -271,9 +286,20 @@ class TimexLCA:
             cutoff=cutoff,
             max_calc=max_calc,
             graph_traversal=graph_traversal,
+            traverse_background=traverse_background,
         )
         interpolation_type = validated.interpolation_type
         graph_traversal = validated.graph_traversal
+
+        if traverse_background and graph_traversal == "priority":
+            logger.warning(
+                "traverse_background=True with graph_traversal='priority': "
+                "non-referenced background variants are not placed on the priority "
+                "heap; each variant subtree is walked in full via proxy reads when its "
+                "parent edge is reached. The referenced-system heap exploration order is "
+                "unchanged and explored amounts are exact (identical to graph_traversal='bfs' "
+                "for these subtrees)."
+            )
 
         timeline_cache_key = (
             str(validated.starting_datetime),
@@ -282,6 +308,7 @@ class TimexLCA:
             cutoff,
             max_calc,
             graph_traversal,
+            traverse_background,
             "default" if edge_filter_function is None else id(edge_filter_function),
         )
         if timeline_cache_key == self._last_timeline_build_key:
@@ -297,7 +324,7 @@ class TimexLCA:
                 ]
             ]
 
-        if edge_filter_function is None:
+        if edge_filter_function is None and not traverse_background:
             logger.info(
                 "No edge filter function provided. Skipping all edges in background databases."
             )
@@ -307,8 +334,11 @@ class TimexLCA:
                     skippable.update(node.id for node in bd.Database(db))
                 self._default_edge_filter_function = skippable.__contains__
             self.edge_filter_function = self._default_edge_filter_function
-        else:
+        elif edge_filter_function is not None:
             self.edge_filter_function = edge_filter_function
+        else:
+            # traverse_background=True with no user filter: BFS descends freely
+            self.edge_filter_function = lambda x: False
 
         self.starting_datetime = starting_datetime
         self.temporal_grouping = temporal_grouping
@@ -327,6 +357,13 @@ class TimexLCA:
         # Doing this here because we need the temporal grouping for consistent time resolution.
         self.add_static_activities_to_activity_time_mapping()
 
+        # When descending into the background, the BFS extractor must be able to
+        # resolve any background activity to its sibling in every other static
+        # variant database, so it can read the respective (non-referenced)
+        # variant's exchanges. Build the full mapping up front.
+        if traverse_background:
+            self.add_full_interdatabase_activity_mapping()
+
         # Create timeline builder that does the graph traversal (similar to bw_temporalis) and
         # extracts all edges with their temporal information. Can later be used to build a timeline
         # with the TimelineBuilder.build_timeline() method.
@@ -344,12 +381,21 @@ class TimexLCA:
             self.cutoff,
             self.max_calc,
             graph_traversal=graph_traversal,
+            traverse_background=traverse_background,
+            interdatabase_activity_mapping=self.interdatabase_activity_mapping,
             *args,
             **kwargs,
         )
 
         self.timeline = self.timeline_builder.build_timeline()
-        self.add_interdatabase_activity_mapping_from_timeline()
+        if not traverse_background:
+            # When traverse_background=True the full interdatabase mapping was
+            # already built by add_full_interdatabase_activity_mapping() above,
+            # covering every background activity. Running this again would reset
+            # entries via update({producer: {} ...}) before repopulating them,
+            # producing the same final result but wasting work and creating a
+            # fragile transient inconsistency. Skip it.
+            self.add_interdatabase_activity_mapping_from_timeline()
         self._last_timeline_build_key = timeline_cache_key
         self._cached_timeline = self.timeline
         self._dynamic_lcia_inventory_cache.clear()
@@ -1379,6 +1425,37 @@ class TimexLCA:
             first_level_background_static
         )
 
+    def add_full_interdatabase_activity_mapping(self) -> None:
+        """
+        Populate ``interdatabase_activity_mapping`` for every background activity
+        across all static variant databases.
+
+        Unlike ``add_interdatabase_activity_mapping_from_timeline`` (which only
+        maps producers that appear in the finished timeline), this pre-pass maps
+        every static-database node to its sibling in every other static database,
+        so the BFS extractor can resolve and read the respective (non-referenced)
+        variant's exchanges while it is still traversing.
+        """
+        static_dbs = set(self.database_dates_static.keys())
+        tuples_dict = {}
+        for node in self.nodes.values():
+            if node["database"] not in static_dbs:
+                continue
+            key = (node["name"], node.get("reference product"), node["location"])
+            tuples_dict.setdefault(key, node.id)
+        # Build the anchor -> {db: id} mapping in a plain dict first; indexing
+        # the InterDatabaseMapping itself would prematurely trigger
+        # make_reciprocal() before every entry has been added.
+        built = {}
+        for node in self.nodes.values():
+            if node["database"] not in static_dbs:
+                continue
+            key = (node["name"], node.get("reference product"), node["location"])
+            anchor = tuples_dict[key]
+            built.setdefault(anchor, {})[node["database"]] = node.id
+        self.interdatabase_activity_mapping.update(built)
+        self.interdatabase_activity_mapping.make_reciprocal()
+
     def add_interdatabase_activity_mapping_from_timeline(self) -> None:
         """
         Fills the interdatabase_activity_mapping, which is a SetList of the matching processes
@@ -1455,11 +1532,17 @@ class TimexLCA:
             .index.values
         )
 
+        market_time_mapped = set(
+            self.timeline.loc[
+                self.timeline.temporal_market_shares.notnull(),
+                "time_mapped_producer",
+            ]
+        )
+
         temporal_market_ids = set()
         temporalized_process_ids = set()
-
         for producer, time_mapped_producer in unique_producers:
-            if self.nodes[producer]["database"] in self.database_dates_static.keys():
+            if time_mapped_producer in market_time_mapped:
                 temporal_market_ids.add(time_mapped_producer)
             else:
                 temporalized_process_ids.add(time_mapped_producer)
