@@ -191,3 +191,56 @@ def test_bfs_traversed_background_not_double_counted(background_td_deep_db):
     assert bg_b["temporal_market_shares"].isnull().all()
     # Score is the hand-computed 48.4 (no inventory doubling).
     assert tlca.static_score == pytest.approx(48.4, rel=1e-9)
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_foreground_td_into_traversed_background_convolves(
+    background_td_fg_and_bg_db, graph_traversal
+):
+    """A foreground TD on the background->foreground edge (B->A) must convolve
+    correctly with a background TD (C->B) when the traversal descends into the
+    background. This stresses the convolution + graph-traversal path.
+
+    Non-uniform weights are used on purpose so a symmetric bug cannot hide.
+
+    Hand-computation (starting 2024):
+    - A->B (amount 3), TD 70% @2024 / 30% @2030  -> B: 2.1 @2024, 0.9 @2030.
+    - B->C (amount 2), TD 60% @+0y / 40% @+10y    -> electricity C cohorts (kWh):
+        from B@2024: 2.1*2*0.6 = 2.52 @2024,  2.1*2*0.4 = 1.68 @2034
+        from B@2030: 0.9*2*0.6 = 1.08 @2030,  0.9*2*0.4 = 0.72 @2040
+    - C->CO2 by date-routed grid variant: @2024 -> 0.6*11+0.4*7 = 9.4;
+      @2030/@2034/@2040 -> 7 (clean 2030 grid).
+    - CO2 = 2.52*9.4 + 1.08*7 + 1.68*7 + 0.72*7
+          = 23.688 + 7.56 + 11.76 + 5.04 = 48.048 kg.
+    """
+    tlca = TimexLCA({("foreground", "A"): 1}, METHOD, DATABASE_DATES)
+    tlca.build_timeline(
+        starting_datetime="2024-01-01",
+        graph_traversal=graph_traversal,
+        traverse_background=True,
+    )
+    tlca.lci()
+    tlca.static_lcia()
+    assert tlca.static_score == pytest.approx(48.048, rel=1e-9)
+
+    tl = tlca.timeline
+    # The foreground TD spreads B (the descended background process) over 2024 & 2030.
+    b_years = sorted({d.year for d in tl[tl["producer_name"] == "B"]["date_producer"]})
+    assert b_years == [2024, 2030]
+    # Convolving both TDs yields four electricity cohorts.
+    c_years = sorted({d.year for d in tl[tl["producer_name"] == "C"]["date_producer"]})
+    assert c_years == [2024, 2030, 2034, 2040]
+    # B is descended into -> temporalized (no shares); C is the routed leaf.
+    assert tl[tl["producer_name"] == "B"]["temporal_market_shares"].isnull().all()
+    assert tl[tl["producer_name"] == "C"]["temporal_market_shares"].notnull().all()
+
+    # Per-row amounts are per-unit-of-parent-cohort (codebase convention):
+    #   B->A: 3 * [0.7, 0.3] = [2.1, 0.9]
+    #   C->B: 2 * [0.6, 0.4] = [1.2, 0.8] for each B cohort -> C rows [1.2, 1.2, 0.8, 0.8]
+    #   FU A: 1.0
+    amount_by = lambda name: sorted(
+        round(a, 6) for a in tl[tl["producer_name"] == name]["amount"]
+    )
+    assert amount_by("A") == [1.0]
+    assert amount_by("B") == [0.9, 2.1]
+    assert amount_by("C") == [0.8, 0.8, 1.2, 1.2]
