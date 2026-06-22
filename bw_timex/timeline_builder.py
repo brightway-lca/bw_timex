@@ -108,6 +108,7 @@ class TimelineBuilder:
                 edge_filter_function=edge_filter_function,
                 cutoff=self.cutoff,
                 static_activity_indices=set(static_background_activity_ids),
+                nodes=self.nodes,
             )
         elif graph_traversal == "priority":
             self.edge_extractor = EdgeExtractor(

@@ -602,3 +602,115 @@ def test_explicit_output_coefficient_alpha_scales_inputs():
         for row in input_rows.itertuples()
     )
     assert observed == pytest.approx([(2030, 2030, 2.0), (2031, 2031, 2.0)])
+
+
+def _write_explicit_two_background_cohort_db():
+    """Explicit process/product with a cohort production TD whose two cohorts
+    resolve to two different background databases. If the production-edge TD is
+    dropped, both cohorts collapse onto one background and the score changes -
+    so this fixture is sensitive to correct production-edge handling.
+    """
+    bd.Database("bio").write(
+        {("bio", "co2"): {"name": "carbon dioxide", "unit": "kg", "type": "emission"}}
+    )
+    for db_name, co2_per_kwh in [
+        ("electricity_market_2025", 0.40),
+        ("electricity_market_2035", 0.10),
+    ]:
+        bd.Database(db_name).write(
+            {
+                (db_name, "elec"): {
+                    "name": "electricity market",
+                    "reference product": "electricity",
+                    "location": "DE",
+                    "unit": "kWh",
+                    "exchanges": [
+                        {"amount": 1, "type": "production", "input": (db_name, "elec")},
+                        {"amount": co2_per_kwh, "type": "biosphere", "input": ("bio", "co2")},
+                    ],
+                },
+            }
+        )
+    bd.Method(("GWP", "example")).write([(("bio", "co2"), 1.0)])
+
+    td_install = TemporalDistribution(
+        date=np.array([0, 10], dtype="timedelta64[Y]"),
+        amount=np.array([0.5, 0.5]),
+    )
+    td_use_at_install = TemporalDistribution(
+        date=np.array([0], dtype="timedelta64[Y]"),
+        amount=np.array([1.0]),
+    )
+
+    bd.Database("foreground").write(
+        {
+            ("foreground", "unit_product"): {
+                "name": "unit product",
+                "type": "product",
+                "unit": "unit",
+                "location": "DE",
+                "exchanges": [],
+            },
+            ("foreground", "unit_lifecycle"): {
+                "name": "unit lifecycle",
+                "type": "process",
+                "unit": "unit",
+                "location": "DE",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("foreground", "unit_product"),
+                        "temporal_distribution": td_install,
+                    },
+                    {
+                        "amount": 1.0,
+                        "type": "technosphere",
+                        "input": ("electricity_market_2025", "elec"),
+                        "temporal_distribution": td_use_at_install,
+                    },
+                ],
+            },
+        }
+    )
+    for db in bd.databases:
+        bd.Database(db).process()
+
+
+def test_explicit_bfs_traversal_matches_priority():
+    """Explicit graphs must traverse correctly under graph_traversal='bfs' too.
+
+    Both EdgeExtractor variants (priority + BFS) need explicit-node support, and
+    BFS has regressed on temporal data before (see fix-bfs-with-evo-factors).
+    Two background databases make the score sensitive to the cohort split: if
+    the production-edge TD is dropped, both cohorts collapse onto the 2025
+    background (score 0.40) instead of the 0.5/0.5 mix (score 0.25).
+    """
+    bd.projects.set_current("__test_explicit_bfs_traversal__")
+    bd.databases.clear()
+    bd.methods.clear()
+    _write_explicit_two_background_cohort_db()
+
+    product = bd.get_node(database="foreground", code="unit_product")
+    method = ("GWP", "example")
+    demand = {product.key: 1}
+    database_dates = {
+        "electricity_market_2025": datetime(2025, 1, 1),
+        "electricity_market_2035": datetime(2035, 1, 1),
+        "foreground": "dynamic",
+    }
+
+    def score(graph_traversal):
+        tlca = TimexLCA(demand=demand, method=method, database_dates=database_dates)
+        tlca.build_timeline(
+            starting_datetime=datetime(2025, 1, 1),
+            temporal_grouping="year",
+            graph_traversal=graph_traversal,
+        )
+        tlca.lci()
+        tlca.static_lcia()
+        return tlca.static_score
+
+    priority_score = score("priority")
+    assert priority_score == pytest.approx(0.5 * 0.40 + 0.5 * 0.10)
+    assert score("bfs") == pytest.approx(priority_score)
