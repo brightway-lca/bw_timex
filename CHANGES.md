@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+## [1.1.0] - 2026-06-22
+* Added support for explicit `product` and `process` nodes instead of only `processwithreferenceproduct` ([#192](https://github.com/brightway-lca/bw_timex/pull/192))([#193](https://github.com/brightway-lca/bw_timex/pull/193))
+* Added `traverse_background` option to include temporal distributions in the background system ([#195](https://github.com/brightway-lca/bw_timex/pull/195))
+
 ## [1.0.3] - 2026-06-11
 * Fixed foreground evolution for breadth first graph traversal ([#191](https://github.com/brightway-lca/bw_timex/pull/191))
 
