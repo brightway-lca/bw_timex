@@ -194,8 +194,12 @@ class DynamicBiosphereBuilder:
                 # Get temporal evolution factor for this timestamp
                 temporal_evolution_factor = 1.0
                 if hasattr(row, "temporal_evolution") and row.temporal_evolution is not None:
+                    reference = getattr(row, "temporal_evolution_reference", "producer")
+                    reference_time = (
+                        row.date_consumer if reference == "consumer" else time_in_datetime
+                    )
                     temporal_evolution_factor = get_temporal_evolution_factor(
-                        row.temporal_evolution, time_in_datetime
+                        row.temporal_evolution, reference_time
                     )
 
                 for input_id, exc_amount, temporal_distribution in (

@@ -7,7 +7,10 @@ import numpy as np
 import pandas as pd
 
 from .helper_classes import InterDatabaseMapping
-from .utils import get_temporal_evolution_factor
+from .utils import (
+    get_reference_product_production_amount,
+    get_temporal_evolution_factor,
+)
 
 
 class MatrixModifier:
@@ -220,7 +223,9 @@ class MatrixModifier:
 
         if row.consumer == -1:  # functional unit
             new_producer_id = row.time_mapped_producer
-            fu_production_amount = self.nodes[row.producer].rp_exchange().amount
+            fu_production_amount = get_reference_product_production_amount(
+                self.nodes[row.producer]
+            )
             new_nodes.add((new_producer_id, fu_production_amount))
             self.temporalized_process_ids.add(
                 new_producer_id
@@ -233,15 +238,21 @@ class MatrixModifier:
         previous_producer_id = row.producer
         previous_producer_node = self.nodes[previous_producer_id]
 
-        production_exchange_amount = self.nodes[row.consumer].rp_exchange().amount
+        production_exchange_amount = get_reference_product_production_amount(
+            self.nodes[row.consumer], reference_product=row.consumer
+        )
         scaled_amount = row.amount * abs(
             production_exchange_amount
         )  # abs value used for scaling to preserve the sign of the exchange
 
         # Apply temporal evolution scaling if present
         if hasattr(row, "temporal_evolution") and row.temporal_evolution is not None:
+            reference = getattr(row, "temporal_evolution_reference", "producer")
+            reference_date = (
+                row.date_consumer if reference == "consumer" else row.date_producer
+            )
             factor = get_temporal_evolution_factor(
-                row.temporal_evolution, row.date_producer
+                row.temporal_evolution, reference_date
             )
             scaled_amount *= factor
 
@@ -316,8 +327,8 @@ class MatrixModifier:
                         "The producer activity is of type IOTableActivity, but has more than one production exchange. This is currently not supported."
                     )
             elif isinstance(previous_producer_node, bd.backends.proxies.Activity):
-                producer_production_amount = (
-                    self.nodes[row.producer].rp_exchange().amount
+                producer_production_amount = get_reference_product_production_amount(
+                    self.nodes[row.producer], reference_product=row.producer
                 )
             else:
                 raise ValueError(
