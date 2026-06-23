@@ -28,7 +28,7 @@ from loguru import logger
 from peewee import fn
 from scipy import sparse
 
-from ._lci_cache import BACKGROUND_UNIT_LCI_CACHE, LCI_SOLVE_CACHE
+from ._lci_cache import BACKGROUND_UNIT_LCI_CACHE, LCI_SOLVE_CACHE, NODES_CACHE
 FACTORIZE_SOLVES_THRESHOLD = 8
 
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
@@ -174,17 +174,31 @@ class TimexLCA:
 
         self.interdatabase_activity_mapping = InterDatabaseMapping()
 
-        # Getting all nodes from the databases for faster lookup later
-        all_nodes = bd.backends.ActivityDataset.select().where(
-            bd.backends.ActivityDataset.database << list(self.database_dates.keys())
-        )
-        self.nodes = {node.id: bd.backends.Activity(node) for node in all_nodes}
+        # Getting all nodes from the databases for faster lookup later. Node
+        # proxies are cached per database at module level (keyed by the
+        # database's `modified` token) so repeated TimexLCA objects in the same
+        # session reuse them instead of re-querying. Opt out via
+        # `use_global_lci_cache=False`.
+        self._nodes_cache = NODES_CACHE if use_global_lci_cache else {}
+        project = bd.projects.current
+        self.nodes = {}
+        # Build a cache mapping activity code to name for efficient lookups.
+        # This avoids repeated database queries in plotting and labeling functions.
+        self._activity_code_to_name_cache = {}
+        for db in self.database_dates.keys():
+            modified = bd.databases[db].get("modified") if db in bd.databases else None
+            key = ("nodes", project, db, modified)
+            db_nodes = self._nodes_cache.get(key)
+            if db_nodes is None:
+                rows = bd.backends.ActivityDataset.select().where(
+                    bd.backends.ActivityDataset.database == db
+                )
+                db_nodes = {row.id: bd.backends.Activity(row) for row in rows}
+                self._nodes_cache[key] = db_nodes
+            self.nodes.update(db_nodes)
+            for node in db_nodes.values():
+                self._activity_code_to_name_cache[node["code"]] = node["name"]
 
-        # Build a cache mapping activity code to name for efficient lookups
-        # This avoids repeated database queries in plotting and labeling functions
-        self._activity_code_to_name_cache = {
-            node["code"]: node["name"] for node in self.nodes.values()
-        }
         self._last_timeline_build_key = None
         self._cached_timeline = None
         self._default_edge_filter_function = None

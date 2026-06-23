@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [1.1.1] - 2026-06-23
+* Added module-level caching of database node proxies so repeated `TimexLCA` objects in a session reuse them instead of re-querying
+* Fixed `traverse_background` crashing on zero-amount background exchanges
+* Fixed `max_calc` not bounding the background traversal
+
 ## [1.1.0] - 2026-06-22
 * Added support for explicit `product` and `process` nodes instead of only `processwithreferenceproduct` ([#192](https://github.com/brightway-lca/bw_timex/pull/192))([#193](https://github.com/brightway-lca/bw_timex/pull/193))
 * Added `traverse_background` option to include temporal distributions in the background system ([#195](https://github.com/brightway-lca/bw_timex/pull/195))

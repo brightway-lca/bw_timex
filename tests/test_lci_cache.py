@@ -9,6 +9,7 @@ from bw_timex._lci_cache import (
     BACKGROUND_UNIT_LCI_CACHE,
     BIOSPHERE_EXCHANGES_CACHE,
     LCI_SOLVE_CACHE,
+    NODES_CACHE,
 )
 
 
@@ -220,6 +221,53 @@ class TestModuleLevelLCICache:
         tlca_warm = _build_tlca()
         tlca_warm.static_lcia()
         assert tlca_warm.static_score == pytest.approx(cold_score)
+
+    @staticmethod
+    def _nodes_keys(db="db_2020"):
+        modified = bd.databases[db].get("modified")
+        project = bd.projects.current
+        return [
+            k
+            for k in NODES_CACHE
+            if k[0] == "nodes"
+            and k[1] == project
+            and k[2] == db
+            and k[3] == modified
+        ]
+
+    def test_nodes_cache_populated_per_database(self):
+        tlca = _build_tlca()
+        # One entry per database in database_dates (db_2020 + foreground).
+        assert self._nodes_keys("db_2020")
+        assert self._nodes_keys("foreground")
+        # Cached node proxies are exactly what the object exposes.
+        cached = {}
+        for k in NODES_CACHE:
+            cached.update(NODES_CACHE[k])
+        assert set(cached) == set(tlca.nodes)
+
+    def test_nodes_cache_reused_across_objects(self):
+        tlca1 = _build_tlca()
+        key = self._nodes_keys("db_2020")[0]
+        cached_db = NODES_CACHE[key]
+
+        tlca2 = _build_tlca()
+        # Same per-db dict object reused, not re-queried.
+        assert self._nodes_keys("db_2020") == [key]
+        assert NODES_CACHE[key] is cached_db
+        # Proxies are shared across objects.
+        node_id = next(iter(cached_db))
+        assert tlca1.nodes[node_id] is tlca2.nodes[node_id]
+
+    def test_nodes_cache_opt_out_does_not_use_global(self):
+        _build_tlca(use_global_lci_cache=False)
+        assert len(NODES_CACHE) == 0
+
+    def test_clear_background_lci_cache_clears_nodes_too(self):
+        _build_tlca()
+        assert len(NODES_CACHE) > 0
+        bw_timex.clear_background_lci_cache()
+        assert len(NODES_CACHE) == 0
 
     def test_opt_out_produces_same_score_as_global(self):
         tlca_global = _build_tlca()
