@@ -32,7 +32,7 @@ requires-python = ">=3.11"
 dependencies = [
     "bw2calc>=2.4",
     "bw2data>=4.6",
-    "bw_graph_tools>=0.4",
+    "bw_graph_tools>=0.9",
     "numpy",
     "pandas",
     "tqdm",

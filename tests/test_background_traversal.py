@@ -341,3 +341,57 @@ def test_single_background_db_with_td_matches_static(
     assert sorted({d.year for d in fuel["date_producer"]}) == [2024, 2034]
     # ...but with one background db the score equals the static LCA exactly.
     assert tlca.static_score == pytest.approx(slca.score, rel=1e-9)
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_zero_amount_exchange_in_descended_background(
+    background_td_zero_exchange_db, graph_traversal
+):
+    """Descending into a background process that has a zero-amount technosphere
+    exchange (ubiquitous in real ecoinvent) must not crash.
+
+    Convolving the incoming TD with a zero edge yields an all-zero array, which
+    ``temporal_convolution`` drops, previously raising
+    ``ValueError("Empty array")``. The descent must skip zero-amount exchanges;
+    they contribute nothing, so the static score is unaffected (here: 2 fu *
+    5 bg_B * 1 kg CO2 = 10 kg)."""
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    tlca.build_timeline(
+        starting_datetime="2024-01-01",
+        graph_traversal=graph_traversal,
+        traverse_background=True,
+    )
+    tlca.lci()
+    tlca.static_lcia()
+    assert tlca.static_score == pytest.approx(10.0, rel=1e-9)
+    # The zero edge means bg_C never enters the inventory.
+    assert "bg_C" not in set(tlca.timeline["producer_name"])
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_max_calc_bounds_background_descent(
+    background_td_deep_chain_db, graph_traversal
+):
+    """max_calc must bound the background proxy descent, not only the
+    referenced-variant traversal (as the build_timeline docstring promises).
+
+    With a generous max_calc the full chain bg_0..bg_5 is descended; with a tiny
+    max_calc the descent stops early, so the deepest node never reaches the
+    timeline (and the build does not run away)."""
+
+    def producers(max_calc):
+        t = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+        t.build_timeline(
+            starting_datetime="2024-01-01",
+            graph_traversal=graph_traversal,
+            traverse_background=True,
+            max_calc=max_calc,
+        )
+        return set(t.timeline["producer_name"])
+
+    full = producers(10_000)
+    assert {"bg_0", "bg_5"} <= full  # whole chain descended
+
+    bounded = producers(3)
+    assert "bg_5" not in bounded  # deepest node cut off by the budget
+    assert len(bounded) < len(full)

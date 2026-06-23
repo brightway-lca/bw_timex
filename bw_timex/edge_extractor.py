@@ -444,12 +444,19 @@ class VariantBackgroundMixin:
 
         Engine-agnostic: it does not touch the priority heap or the BFS matrix,
         so both extractors call it identically after their first-crossing split.
+
+        Bounded by ``cutoff`` (per-edge supply threshold) and ``max_calc`` (total
+        descended-node budget, shared via ``self._calc_count``); the latter
+        caps how deep the background descent runs.
         """
         edges = []
         queue = deque()
         queue.append((node_id, td, td_parent, abs_td, supply))
 
         while queue:
+            self._calc_count += 1
+            if self._calc_count > self.max_calc:
+                break
             cur_id, cur_td, cur_parent, cur_abs_td, cur_supply = queue.popleft()
 
             production_amount = self._proxy_production_amount(cur_id)
@@ -467,6 +474,14 @@ class VariantBackgroundMixin:
                         date=np.array([0], dtype="timedelta64[Y]"),
                         amount=np.array([td_producer]),
                     )
+
+                # Zero-amount technosphere exchanges (ubiquitous in real
+                # ecoinvent) carry no inventory. Convolving them away would yield
+                # an empty TemporalDistribution (temporal_convolution drops zero
+                # entries), so skip them entirely, mirroring the matrix path
+                # where structural zeros are not edges.
+                if not np.any(td_producer.amount):
+                    continue
 
                 distribution = (cur_td * td_producer).simplify()
                 abs_td_producer = _join_datetime_and_timedelta_distributions(
@@ -561,6 +576,11 @@ class EdgeExtractor(VariantBackgroundMixin, TemporalisLCA):
         # not stored on it; the shared variant-descent mixin needs both, so keep
         # local copies before delegating.
         self.cutoff = kwargs.get("cutoff", 5e-4)
+        # max_calc bounds the background proxy descent too (the shared mixin's
+        # _descend_variant_subtree). TemporalisLCA consumes max_calc for its own
+        # heap traversal but does not store it, so keep a local copy + counter.
+        self.max_calc = kwargs.get("max_calc", 2000)
+        self._calc_count = 0
         self.static_activity_indices = kwargs.get("static_activity_indices") or set()
         # INVARIANT: static_activity_indices holds TemporalisLCA MATRIX INDICES,
         # not activity ids. _proxy_technosphere_inputs filters by activity id, so

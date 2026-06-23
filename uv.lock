@@ -129,7 +129,7 @@ wheels = [
 
 [[package]]
 name = "bw-graph-tools"
-version = "0.6"
+version = "0.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bw-processing" },
@@ -140,9 +140,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "scipy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8d/4d/2ec231e2e1df7ff6603f2801a18df71499fc8cf8512da029308a292adc25/bw_graph_tools-0.6.tar.gz", hash = "sha256:15ca2c056ba00499a8f4319b740499fae91b519dea5e776067d95a313817acf1", size = 27498, upload-time = "2025-06-26T03:17:04.745Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2a/58/1e53c178a2779295c0094006db9b6ec23fb78266eb900d4845d69cebbfb0/bw_graph_tools-0.9.tar.gz", hash = "sha256:881fa4504b45880e4be782ba1a64678cfe9dbcd0841c3f71f41d285de53dc984", size = 36684, upload-time = "2026-06-18T08:45:51.36Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a5/b0/3fcac887970463c0662538c0157afcc03833cd729c63d1b5391a5b70f226/bw_graph_tools-0.6-py3-none-any.whl", hash = "sha256:1487603150b327a812a4a5936ae437f44c20a336fa84f77e59de1ed3dd0b6de2", size = 29368, upload-time = "2025-06-26T03:17:03.382Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/9e/d3656424524ebd300ce38c32af70a42238f65e055f1aa9e62933ed60bf48/bw_graph_tools-0.9-py3-none-any.whl", hash = "sha256:e60d21c53671cb2d0700a7fb7134e42acc9eb4763a8ce847e2ebab78c5d46428", size = 32716, upload-time = "2026-06-18T08:45:50.068Z" },
 ]
 
 [[package]]
@@ -228,7 +228,7 @@ testing = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bw-graph-tools", specifier = ">=0.4" },
+    { name = "bw-graph-tools", specifier = ">=0.9" },
     { name = "bw-temporalis", specifier = ">=1.1" },
     { name = "bw2calc", specifier = ">=2.4" },
     { name = "bw2data", specifier = ">=4.6" },

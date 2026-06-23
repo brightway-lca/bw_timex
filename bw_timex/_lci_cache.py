@@ -26,9 +26,16 @@ BIOSPHERE_EXCHANGES_CACHE = {}
 # session can skip the ~1.4 s `spsolve` for the functional unit.
 LCI_SOLVE_CACHE = {}
 
+# Cached node proxies per database. Keyed by ``("nodes", project, db,
+# modified)`` so each ``TimexLCA`` reuses the ``Activity`` proxies built from
+# the database rows instead of re-querying. Editing a database bumps its
+# ``modified`` token, invalidating stale entries automatically.
+NODES_CACHE = {}
+
 
 def clear_background_lci_cache() -> None:
-    """Clear all module-level bw_timex caches (unit LCI, biosphere exchanges, solve)."""
+    """Clear all module-level bw_timex caches (unit LCI, biosphere exchanges, solve, nodes)."""
     BACKGROUND_UNIT_LCI_CACHE.clear()
     BIOSPHERE_EXCHANGES_CACHE.clear()
     LCI_SOLVE_CACHE.clear()
+    NODES_CACHE.clear()

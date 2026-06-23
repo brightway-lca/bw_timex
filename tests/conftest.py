@@ -1,8 +1,12 @@
 from .fixtures.background_td_db_fixture import background_td_db
 from .fixtures.background_td_deep_db_fixture import background_td_deep_db
+from .fixtures.background_td_deep_chain_db_fixture import background_td_deep_chain_db
 from .fixtures.background_td_deep_tdvar_db_fixture import background_td_deep_tdvar_db
 from .fixtures.background_td_fg_and_bg_db_fixture import background_td_fg_and_bg_db
 from .fixtures.background_td_single_db_fixture import background_td_single_db
+from .fixtures.background_td_zero_exchange_db_fixture import (
+    background_td_zero_exchange_db,
+)
 from .fixtures.explicit_background_td_db_fixture import explicit_background_td_db
 from .fixtures.background_td_multdate_consumer_fixture import (
     background_td_multidate_consumer_db,
