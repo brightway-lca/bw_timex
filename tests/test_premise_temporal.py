@@ -44,8 +44,61 @@ def test_triangular_code_5():
     td = premise_params_to_td(
         {"temporal_distribution": 5, "temporal_loc": 5.0, "temporal_min": 0.0, "temporal_max": 10.0}
     )
-    assert td.date.astype("timedelta64[Y]").astype(int).max() == 10
+    yrs = td.date.astype("timedelta64[Y]").astype(int)
+    assert yrs.min() == 0
+    assert yrs.max() == 10
     np.testing.assert_allclose(td.amount.sum(), 1.0)
+
+
+def test_normal_peak_near_loc():
+    """Issue 1 guard: normalized scale must concentrate mass near loc, not be flat."""
+    from bw_timex.premise_temporal import premise_params_to_td
+
+    # Narrow scale=2 over wide range [-50, 50], loc=0 → mass should concentrate near 0
+    td_narrow = premise_params_to_td(
+        {"temporal_distribution": 3, "temporal_loc": 0.0, "temporal_scale": 2.0,
+         "temporal_min": -50.0, "temporal_max": 50.0}
+    )
+    yrs_narrow = td_narrow.date.astype("timedelta64[Y]").astype(int)
+
+    # Peak must be within 2 years of loc=0
+    peak_year = yrs_narrow[np.argmax(td_narrow.amount)]
+    assert abs(peak_year - 0) <= 2, f"Peak at {peak_year}, expected near 0"
+
+    # Narrow scale should capture most mass within ±5 years
+    mass_within_5_narrow = td_narrow.amount[np.abs(yrs_narrow) <= 5].sum()
+    assert mass_within_5_narrow > 0.90, (
+        f"Narrow scale=2 mass within ±5 yrs: {mass_within_5_narrow:.4f} (expected >0.90)"
+    )
+
+    # Wide scale=40 over same range should spread mass much more
+    td_wide = premise_params_to_td(
+        {"temporal_distribution": 3, "temporal_loc": 0.0, "temporal_scale": 40.0,
+         "temporal_min": -50.0, "temporal_max": 50.0}
+    )
+    yrs_wide = td_wide.date.astype("timedelta64[Y]").astype(int)
+    mass_within_5_wide = td_wide.amount[np.abs(yrs_wide) <= 5].sum()
+
+    # Narrow should capture significantly more mass near centre than wide
+    assert mass_within_5_narrow > mass_within_5_wide * 3, (
+        f"Narrow ({mass_within_5_narrow:.4f}) should be >3x wide ({mass_within_5_wide:.4f})"
+    )
+
+
+def test_degenerate_min_equals_max_codes_345():
+    """Issue 2 guard: start==end must return single pulse, not raise ValueError."""
+    from bw_timex.premise_temporal import premise_params_to_td
+
+    for code in (3, 4, 5):
+        td = premise_params_to_td(
+            {"temporal_distribution": code, "temporal_loc": 7.0,
+             "temporal_min": 7.0, "temporal_max": 7.0,
+             "temporal_scale": 1.0}  # scale provided for code 3 normal
+        )
+        yrs = td.date.astype("timedelta64[Y]").astype(int)
+        assert len(yrs) == 1, f"code {code}: expected 1 date, got {len(yrs)}"
+        assert yrs[0] == 7, f"code {code}: expected year 7, got {yrs[0]}"
+        np.testing.assert_allclose(td.amount.sum(), 1.0, err_msg=f"code {code}: amount must sum to 1")
 
 
 def test_unsupported_code_raises():

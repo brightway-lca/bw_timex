@@ -101,8 +101,19 @@ def premise_params_to_td(params: dict, *, max_steps: int = 200) -> TemporalDistr
     start, end = _bounds(params, loc, scale)
     steps = max(2, min(max_steps, end - start + 1))
 
+    # Issue 2 fix: degenerate bounds (start == end) → single pulse, avoiding
+    # easy_timedelta_distribution's "Start value is later than end" error.
+    if start == end:
+        return _single_pulse(start)
+
     if code == 3:  # normal
-        return easy_timedelta_distribution(start, end, _RESOLUTION, steps=steps, kind="normal", param=scale)
+        # Issue 1 fix: easy_timedelta_distribution evaluates norm.pdf on a
+        # normalized [-0.5, 0.5] axis (width 1.0), so the std `param` must be
+        # in that normalized coordinate space, not in years.  Convert:
+        #   param_normalized = scale_years / (end - start)
+        # If scale is None, a default (or error) is deferred to the library.
+        normalized_scale = (scale / (end - start)) if scale is not None else scale
+        return easy_timedelta_distribution(start, end, _RESOLUTION, steps=steps, kind="normal", param=normalized_scale)
     if code == 4:  # uniform
         return easy_timedelta_distribution(start, end, _RESOLUTION, steps=steps, kind="uniform")
     if code == 5:  # triangular, mode = loc
