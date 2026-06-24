@@ -81,7 +81,7 @@ solvers = [
 ]
 
 premise = [
-    "premise>=2.5.0",
+    "premise",
 ]
 
 [tool.setuptools]
