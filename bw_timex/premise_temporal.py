@@ -120,3 +120,100 @@ def premise_params_to_td(params: dict, *, max_steps: int = 200) -> TemporalDistr
         return easy_timedelta_distribution(start, end, _RESOLUTION, steps=steps, kind="triangular", param=loc)
 
     raise ValueError(f"Unsupported premise temporal_distribution code: {code!r}")
+
+
+def _clean(value) -> str:
+    return (value or "").strip()
+
+
+def _supplier_key(exchange) -> tuple[str, str]:
+    supplier = exchange.input
+    return _clean(supplier.get("name")), _clean(
+        supplier.get("reference product") or supplier.get("product")
+    )
+
+
+def annotate_database(db_name, specs: TemporalSpecs, *, overwrite: bool = False) -> AnnotationReport:
+    """Write temporal distributions onto an existing premise bw2 database.
+
+    Mirrors premise's ``add_temporal_distributions`` placement rules using the
+    buckets in ``specs``. Returns an :class:`AnnotationReport`; never raises out
+    of a single bad exchange (records a fault and continues).
+    """
+    import bw2data as bd
+
+    if db_name not in bd.databases:
+        raise ValueError(f"Database {db_name!r} not found in the current project.")
+
+    report = AnnotationReport()
+
+    def _fault(ds, exc, reason):
+        report.faults.append({
+            "database": db_name,
+            "dataset": f"{_clean(ds.get('name'))} | {_clean(ds.get('reference product'))}",
+            "exchange": _clean(exc.get("name")),
+            "reason": reason,
+        })
+
+    def _apply(exc, td):
+        exc["temporal_distribution"] = td
+        exc.save()
+        report.annotated += 1
+
+    for ds in bd.Database(db_name):
+        ds_key = (_clean(ds.get("name")), _clean(ds.get("reference product")))
+        bg = specs.biomass_growth_params.get(ds_key)
+        ds_lifetime = specs.dataset_lifetimes.get(ds_key)
+
+        for exc in ds.exchanges():
+            if not overwrite and exc.get("temporal_distribution") is not None:
+                report.skipped_existing += 1
+                continue
+
+            etype = exc.get("type")
+
+            if etype == "biosphere":
+                if (
+                    bg is not None
+                    and _clean(exc.input.get("name")) == "Carbon dioxide, in air"
+                    and bg.get("temporal_distribution") is not None
+                ):
+                    _apply(exc, premise_params_to_td(bg))
+                continue
+
+            if etype != "technosphere":
+                continue
+
+            sup_name, sup_ref = _supplier_key(exc)
+            if not sup_ref:
+                _fault(ds, exc, "Missing supplier product on technosphere exchange.")
+                continue
+            key = (sup_name, sup_ref)
+
+            params = specs.stock_asset_params.get(key)
+            is_maintenance = key in specs.maintenance_suppliers
+            is_end_of_life = key in specs.end_of_life_suppliers
+            matched = int(params is not None) + int(is_maintenance) + int(is_end_of_life)
+
+            if matched == 0:
+                continue
+            if matched > 1:
+                _fault(ds, exc, f"Ambiguous temporal tags for supplier {key}.")
+                continue
+
+            if params is not None:
+                _apply(exc, premise_params_to_td(params))
+                continue
+
+            if ds_lifetime is None:
+                _fault(ds, exc, "Missing dataset lifetime for maintenance/end_of_life.")
+                continue
+
+            if is_maintenance:
+                _apply(exc, premise_params_to_td(
+                    {"temporal_distribution": 4, "temporal_min": 0.0, "temporal_max": ds_lifetime}))
+            else:  # end_of_life
+                _apply(exc, premise_params_to_td(
+                    {"temporal_distribution": 6, "temporal_offsets": [ds_lifetime], "temporal_weights": [1.0]}))
+
+    return report

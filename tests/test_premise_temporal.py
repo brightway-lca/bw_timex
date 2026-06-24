@@ -113,3 +113,122 @@ def test_annotation_report_merge():
     b = AnnotationReport(annotated=3, skipped_existing=0, faults=[{"y": 2}])
     a.merge(b)
     assert a.annotated == 4 and a.skipped_existing == 2 and len(a.faults) == 2
+
+
+# ---------------------------------------------------------------------------
+# Task 2: annotate_database tests
+# ---------------------------------------------------------------------------
+from bw2data.tests import bw2test
+
+
+def _write_synthetic_dbs():
+    import bw2data as bd
+    bd.Database("bio").write({
+        ("bio", "co2"): {"name": "Carbon dioxide, in air", "type": "emission", "categories": ("air",)},
+    })
+    bd.Database("ei").write({
+        # biomass-growth dataset: has the CO2-in-air biosphere exchange
+        ("ei", "forest"): {
+            "name": "forestry", "reference product": "wood", "location": "GLO", "unit": "kg",
+            "exchanges": [
+                {"input": ("ei", "forest"), "amount": 1.0, "type": "production"},
+                {"input": ("bio", "co2"), "amount": -2.0, "type": "biosphere"},
+            ],
+        },
+        # supplier used as stock_asset, maintenance, and end_of_life by consumers below
+        ("ei", "machine"): {
+            "name": "machine", "reference product": "machine", "location": "GLO", "unit": "unit",
+            "exchanges": [{"input": ("ei", "machine"), "amount": 1.0, "type": "production"}],
+        },
+        # consumer with a 50-year lifetime that buys the machine (tagged maintenance/eol per specs)
+        ("ei", "plant"): {
+            "name": "plant", "reference product": "power", "location": "GLO", "unit": "kWh",
+            "exchanges": [
+                {"input": ("ei", "plant"), "amount": 1.0, "type": "production"},
+                {"input": ("ei", "machine"), "amount": 0.1, "type": "technosphere"},
+            ],
+        },
+    })
+
+
+@bw2test
+def test_biomass_growth_lands_on_co2_exchange():
+    import bw2data as bd
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={("forestry", "wood"): {
+            "temporal_distribution": 3, "temporal_loc": -20.0, "temporal_scale": 3.0,
+            "temporal_min": -40.0, "temporal_max": -1.0}},
+        stock_asset_params={}, maintenance_suppliers=set(),
+        end_of_life_suppliers=set(), dataset_lifetimes={},
+    )
+    report = annotate_database("ei", specs)
+    forest = bd.get_node(database="ei", code="forest")
+    bio_exc = [e for e in forest.exchanges() if e["type"] == "biosphere"][0]
+    assert bio_exc.get("temporal_distribution") is not None
+    assert report.annotated == 1
+
+
+@bw2test
+def test_maintenance_uniform_over_lifetime():
+    import bw2data as bd
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={}, stock_asset_params={},
+        maintenance_suppliers={("machine", "machine")}, end_of_life_suppliers=set(),
+        dataset_lifetimes={("plant", "power"): 50.0},
+    )
+    report = annotate_database("ei", specs)
+    plant = bd.get_node(database="ei", code="plant")
+    tech_exc = [e for e in plant.exchanges() if e["type"] == "technosphere"][0]
+    td = tech_exc.get("temporal_distribution")
+    assert td is not None
+    yrs = td.date.astype("timedelta64[Y]").astype(int)
+    assert yrs.min() == 0 and yrs.max() == 50
+    assert report.annotated == 1
+
+
+@bw2test
+def test_ambiguous_supplier_is_faulted_not_applied():
+    import bw2data as bd
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={}, stock_asset_params={},
+        maintenance_suppliers={("machine", "machine")},
+        end_of_life_suppliers={("machine", "machine")},
+        dataset_lifetimes={("plant", "power"): 50.0},
+    )
+    report = annotate_database("ei", specs)
+    plant = bd.get_node(database="ei", code="plant")
+    tech_exc = [e for e in plant.exchanges() if e["type"] == "technosphere"][0]
+    assert tech_exc.get("temporal_distribution") is None
+    assert report.annotated == 0 and len(report.faults) == 1
+
+
+@bw2test
+def test_idempotent_skip_then_overwrite():
+    import bw2data as bd
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={("forestry", "wood"): {
+            "temporal_distribution": 1, "temporal_loc": -5.0}},
+        stock_asset_params={}, maintenance_suppliers=set(),
+        end_of_life_suppliers=set(), dataset_lifetimes={},
+    )
+    annotate_database("ei", specs)
+    again = annotate_database("ei", specs)
+    assert again.annotated == 0 and again.skipped_existing >= 1
+    forced = annotate_database("ei", specs, overwrite=True)
+    assert forced.annotated == 1
+
+
+@bw2test
+def test_unknown_database_raises():
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    specs = TemporalSpecs({}, {}, set(), set(), {})
+    with pytest.raises(ValueError):
+        annotate_database("does-not-exist", specs)
