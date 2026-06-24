@@ -232,3 +232,39 @@ def test_unknown_database_raises():
     specs = TemporalSpecs({}, {}, set(), set(), {})
     with pytest.raises(ValueError):
         annotate_database("does-not-exist", specs)
+
+
+# ---------------------------------------------------------------------------
+# Task 3: load_temporal_specs tests
+# ---------------------------------------------------------------------------
+
+def test_import_error_when_premise_missing(monkeypatch):
+    import builtins
+    from bw_timex import premise_temporal
+    real_import = builtins.__import__
+
+    def fake_import(name, *a, **k):
+        if name == "premise" or name.startswith("premise."):
+            raise ImportError("no premise")
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    with pytest.raises(ImportError, match="bw-timex\\[premise\\]"):
+        premise_temporal.load_temporal_specs()
+
+
+def test_load_temporal_specs_reads_premise_csv():
+    pytest.importorskip("premise")
+    from bw_timex.premise_temporal import load_temporal_specs, TemporalSpecs
+    try:
+        specs = load_temporal_specs()
+    except RuntimeError:
+        pytest.skip("installed premise lacks TrailsDataPackage temporal support")
+    assert isinstance(specs, TemporalSpecs)
+    # premise's bundled CSV is non-empty across at least one bucket
+    assert (
+        specs.biomass_growth_params
+        or specs.stock_asset_params
+        or specs.maintenance_suppliers
+        or specs.end_of_life_suppliers
+    )

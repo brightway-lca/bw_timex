@@ -217,3 +217,52 @@ def annotate_database(db_name, specs: TemporalSpecs, *, overwrite: bool = False)
                     {"temporal_distribution": 6, "temporal_offsets": [ds_lifetime], "temporal_weights": [1.0]}))
 
     return report
+
+
+# ---------------------------------------------------------------------------
+# Task 3: load_temporal_specs — reuse premise's CSV loader (optional dep)
+# ---------------------------------------------------------------------------
+
+def _import_premise_trails():
+    """Import premise's trails module, or raise a clear, actionable error."""
+    try:
+        from premise import trails as premise_trails
+    except ImportError as exc:
+        raise ImportError(
+            "premise temporal annotation requires premise (>=2.5.0). "
+            "Install it with: pip install bw-timex[premise]"
+        ) from exc
+    if not hasattr(premise_trails, "TrailsDataPackage") or not hasattr(
+        premise_trails, "FILEPATH_TEMPORAL_PARAMETERS"
+    ):
+        raise RuntimeError(
+            "The installed premise lacks temporal-distribution support "
+            "(TrailsDataPackage / temporal_distributions.csv). Upgrade to premise>=2.5.0."
+        )
+    return premise_trails
+
+
+class _DummySelf:
+    """Stand-in for the unused ``self`` of premise's CSV loader method."""
+
+
+def load_temporal_specs(path=None) -> TemporalSpecs:
+    """Load premise's curated temporal specs into a :class:`TemporalSpecs`.
+
+    Reuses premise's own ``_load_temporal_specs_from_csv`` (which ignores
+    ``self``) so parsing/categorization stays in premise. ``path`` defaults to
+    premise's bundled ``temporal_distributions.csv``.
+    """
+    premise_trails = _import_premise_trails()
+    csv_path = path if path is not None else premise_trails.FILEPATH_TEMPORAL_PARAMETERS
+    loader = premise_trails.TrailsDataPackage._load_temporal_specs_from_csv
+    stock_assets, end_of_life, biomass_growth, maintenance, dataset_lifetimes = loader(
+        _DummySelf(), csv_path
+    )
+    return TemporalSpecs(
+        biomass_growth_params=biomass_growth,
+        stock_asset_params=stock_assets,
+        maintenance_suppliers=maintenance,
+        end_of_life_suppliers=end_of_life,
+        dataset_lifetimes=dataset_lifetimes,
+    )
