@@ -295,3 +295,21 @@ def test_add_premise_temporal_distributions_uses_injected_specs(monkeypatch):
     assert report.annotated == 1
     forest = bd.get_node(database="ei", code="forest")
     assert [e for e in forest.exchanges() if e["type"] == "biosphere"][0].get("temporal_distribution") is not None
+
+
+def test_core_import_does_not_require_premise(monkeypatch):
+    # Importing bw_timex and using the converter must not require premise.
+    import builtins
+    real_import = builtins.__import__
+
+    def fake_import(name, *a, **k):
+        if name == "premise" or name.startswith("premise."):
+            raise ImportError("premise blocked")
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    import importlib
+    import bw_timex.premise_temporal as pt
+    importlib.reload(pt)
+    td = pt.premise_params_to_td({"temporal_distribution": 1, "temporal_loc": 0.0})
+    assert td is not None
