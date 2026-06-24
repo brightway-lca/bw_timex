@@ -80,10 +80,6 @@ solvers = [
     "pypardiso; sys_platform != 'darwin' or platform_machine != 'arm64'",
 ]
 
-premise = [
-    "premise",
-]
-
 [tool.setuptools]
 license-files = ["LICENSE"]
 package-data = {bw_timex = ["*.md", "*.txt", "data/*.json"]}

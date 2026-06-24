@@ -235,7 +235,10 @@ def _import_premise_trails():
     except ImportError as exc:
         raise ImportError(
             "premise temporal annotation requires premise (>=2.5.0). "
-            "Install it with: pip install bw-timex[premise]"
+            "Install premise separately (e.g. `pip install premise>=2.5.0`). "
+            "Note: premise pins scipy<1.14, which is not available for Python "
+            "3.13, so it cannot be a co-resolved bw_timex extra; install it in "
+            "an environment that satisfies that constraint."
         ) from exc
     if not hasattr(premise_trails, "TrailsDataPackage") or not hasattr(
         premise_trails, "FILEPATH_TEMPORAL_PARAMETERS"

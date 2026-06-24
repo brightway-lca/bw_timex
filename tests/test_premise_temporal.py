@@ -292,7 +292,7 @@ def test_import_error_when_premise_missing(monkeypatch):
         return real_import(name, *a, **k)
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
-    with pytest.raises(ImportError, match="bw-timex\\[premise\\]"):
+    with pytest.raises(ImportError, match="requires premise"):
         premise_temporal.load_temporal_specs()
 
 
