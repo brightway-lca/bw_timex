@@ -234,6 +234,49 @@ def test_unknown_database_raises():
         annotate_database("does-not-exist", specs)
 
 
+@bw2test
+def test_malformed_stock_asset_params_is_faulted_not_raised():
+    """Guard: a bad temporal_distribution code in stock_asset_params must be faulted, not raised."""
+    import bw2data as bd
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={},
+        stock_asset_params={("machine", "machine"): {"temporal_distribution": 99}},
+        maintenance_suppliers=set(),
+        end_of_life_suppliers=set(),
+        dataset_lifetimes={},
+    )
+    report = annotate_database("ei", specs)
+    assert report.annotated == 0
+    assert len(report.faults) >= 1
+
+
+@bw2test
+def test_end_of_life_pulse_at_lifetime():
+    """end_of_life happy path: single pulse at dataset lifetime."""
+    import bw2data as bd
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={},
+        stock_asset_params={},
+        maintenance_suppliers=set(),
+        end_of_life_suppliers={("machine", "machine")},
+        dataset_lifetimes={("plant", "power"): 50.0},
+    )
+    report = annotate_database("ei", specs)
+    plant = bd.get_node(database="ei", code="plant")
+    tech_exc = [e for e in plant.exchanges() if e["type"] == "technosphere"][0]
+    td = tech_exc.get("temporal_distribution")
+    assert td is not None
+    yrs = td.date.astype("timedelta64[Y]").astype(int)
+    assert len(yrs) == 1, f"Expected single pulse, got {len(yrs)} dates"
+    assert yrs[0] == 50, f"Expected pulse at year 50, got year {yrs[0]}"
+    np.testing.assert_allclose(td.amount.sum(), 1.0)
+    assert report.annotated == 1
+
+
 # ---------------------------------------------------------------------------
 # Task 3: load_temporal_specs tests
 # ---------------------------------------------------------------------------

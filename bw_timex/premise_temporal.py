@@ -155,7 +155,12 @@ def annotate_database(db_name, specs: TemporalSpecs, *, overwrite: bool = False)
             "reason": reason,
         })
 
-    def _apply(exc, td):
+    def _convert_and_apply(ds, exc, params):
+        try:
+            td = premise_params_to_td(params)
+        except Exception as err:  # malformed CSV row -> fault, never abort the pass
+            _fault(ds, exc, f"Temporal distribution conversion failed: {err}")
+            return
         exc["temporal_distribution"] = td
         exc.save()
         report.annotated += 1
@@ -178,7 +183,7 @@ def annotate_database(db_name, specs: TemporalSpecs, *, overwrite: bool = False)
                     and _clean(exc.input.get("name")) == "Carbon dioxide, in air"
                     and bg.get("temporal_distribution") is not None
                 ):
-                    _apply(exc, premise_params_to_td(bg))
+                    _convert_and_apply(ds, exc, bg)
                 continue
 
             if etype != "technosphere":
@@ -202,7 +207,7 @@ def annotate_database(db_name, specs: TemporalSpecs, *, overwrite: bool = False)
                 continue
 
             if params is not None:
-                _apply(exc, premise_params_to_td(params))
+                _convert_and_apply(ds, exc, params)
                 continue
 
             if ds_lifetime is None:
@@ -210,11 +215,11 @@ def annotate_database(db_name, specs: TemporalSpecs, *, overwrite: bool = False)
                 continue
 
             if is_maintenance:
-                _apply(exc, premise_params_to_td(
-                    {"temporal_distribution": 4, "temporal_min": 0.0, "temporal_max": ds_lifetime}))
+                _convert_and_apply(ds, exc,
+                    {"temporal_distribution": 4, "temporal_min": 0.0, "temporal_max": ds_lifetime})
             else:  # end_of_life
-                _apply(exc, premise_params_to_td(
-                    {"temporal_distribution": 6, "temporal_offsets": [ds_lifetime], "temporal_weights": [1.0]}))
+                _convert_and_apply(ds, exc,
+                    {"temporal_distribution": 6, "temporal_offsets": [ds_lifetime], "temporal_weights": [1.0]})
 
     return report
 
