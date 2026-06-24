@@ -11,4 +11,6 @@ from .utils import (
     get_temporal_evolution_factor,
 )
 
+from .premise_temporal import add_premise_temporal_distributions
+
 __version__ = "1.1.1"

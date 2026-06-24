@@ -268,3 +268,30 @@ def test_load_temporal_specs_reads_premise_csv():
         or specs.maintenance_suppliers
         or specs.end_of_life_suppliers
     )
+
+
+# ---------------------------------------------------------------------------
+# Task 4: add_premise_temporal_distributions public API tests
+# ---------------------------------------------------------------------------
+
+def test_public_export():
+    import bw_timex
+    assert hasattr(bw_timex, "add_premise_temporal_distributions")
+
+
+@bw2test
+def test_add_premise_temporal_distributions_uses_injected_specs(monkeypatch):
+    import bw2data as bd
+    from bw_timex import premise_temporal
+    from bw_timex.premise_temporal import TemporalSpecs, add_premise_temporal_distributions
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={("forestry", "wood"): {"temporal_distribution": 1, "temporal_loc": -5.0}},
+        stock_asset_params={}, maintenance_suppliers=set(),
+        end_of_life_suppliers=set(), dataset_lifetimes={},
+    )
+    monkeypatch.setattr(premise_temporal, "load_temporal_specs", lambda *a, **k: specs)
+    report = add_premise_temporal_distributions(["ei"])
+    assert report.annotated == 1
+    forest = bd.get_node(database="ei", code="forest")
+    assert [e for e in forest.exchanges() if e["type"] == "biosphere"][0].get("temporal_distribution") is not None

@@ -266,3 +266,22 @@ def load_temporal_specs(path=None) -> TemporalSpecs:
         end_of_life_suppliers=end_of_life,
         dataset_lifetimes=dataset_lifetimes,
     )
+
+
+# ---------------------------------------------------------------------------
+# Task 4: public entry point
+# ---------------------------------------------------------------------------
+
+def add_premise_temporal_distributions(databases, *, overwrite: bool = False) -> AnnotationReport:
+    """Annotate existing premise databases with temporal distributions.
+
+    ``databases`` is an iterable of database names (or a mapping whose keys are
+    database names; values are ignored). Loads premise's temporal specs once and
+    annotates each database. Returns an aggregated :class:`AnnotationReport`.
+    """
+    names = list(databases.keys()) if isinstance(databases, dict) else list(databases)
+    specs = load_temporal_specs()
+    report = AnnotationReport()
+    for name in names:
+        report.merge(annotate_database(name, specs, overwrite=overwrite))
+    return report
