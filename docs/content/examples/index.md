@@ -49,6 +49,22 @@ on time-explicit LCA.
 by @TimoDiepers
 :::
 
+:::{grid-item-card} 📁💻 Import foreground system from Excel
+:link: ./example_Importing_model_from_excel.html
+:link-type: url
+:class-body: sphinx-design-class-body-examples
+:text-align: left
+:style: margin-bottom: 20px;
+This notebook shows how to import your modelled product system from an Excel file.
+on time-explicit LCA.
+ <a title="Microsoft, Public domain, via Wikimedia Commons" href="https://commons.wikimedia.org/wiki/File:Microsoft_Office_Excel_(2025%E2%80%93present).svg"><img width="500" alt="Microsoft Office Excel (2025–present)" src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Microsoft_Office_Excel_%282025%E2%80%93present%29.svg/500px-Microsoft_Office_Excel_%282025%E2%80%93present%29.svg.png"></a>
+
++++
+by @jakobsarthur & @muelleram
+:::
+
+
+
 :::{grid-item-card} Or do you have anything to add? 🧐
 :link: ./index.html
 :link-type: url
