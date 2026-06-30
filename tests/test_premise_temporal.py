@@ -101,6 +101,65 @@ def test_degenerate_min_equals_max_codes_345():
         np.testing.assert_allclose(td.amount.sum(), 1.0, err_msg=f"code {code}: amount must sum to 1")
 
 
+def test_lognormal_code_2_fleet_age():
+    """premise code 2 = lognormal of fleet age (median = -loc, sigma=0.55 fixed,
+    negative-loc convention, truncated to [min, max]). The CSV ``scale`` is NOT
+    the lognormal sigma and must be ignored."""
+    from bw_timex.premise_temporal import premise_params_to_td
+
+    td = premise_params_to_td(
+        {
+            "temporal_distribution": 2,
+            "temporal_loc": -12.0,  # median age 12 years
+            "temporal_scale": 1.5,  # vestigial for code 2 -> must be ignored
+            "temporal_min": -16.0,
+            "temporal_max": -1.0,
+        }
+    )
+    yrs = td.date.astype("timedelta64[Y]").astype(int)
+    # truncated to [min, max] and all in the past (negative-loc convention)
+    assert yrs.min() >= -16 and yrs.max() <= -1
+    assert (yrs <= 0).all()
+    np.testing.assert_allclose(td.amount.sum(), 1.0)
+    # mode of the lognormal = -median * exp(-sigma**2) = -12 * exp(-0.55**2) ~ -8.9
+    peak = yrs[np.argmax(td.amount)]
+    assert -11 <= peak <= -7, f"peak at {peak}, expected near -9"
+    # right-skewed: more mass on the older (more negative) tail than the recent tail
+    older = td.amount[yrs <= -12].sum()
+    recent = td.amount[yrs >= -4].sum()
+    assert older > recent
+
+
+def test_lognormal_code_2_ignores_scale_value():
+    """Two code-2 rows with the same loc/min/max but different ``scale`` must
+    produce identical distributions (scale is not used for lognormal)."""
+    from bw_timex.premise_temporal import premise_params_to_td
+
+    base = {"temporal_distribution": 2, "temporal_loc": -10.0,
+            "temporal_min": -13.0, "temporal_max": -1.0}
+    td_a = premise_params_to_td({**base, "temporal_scale": 1.5})
+    td_b = premise_params_to_td({**base, "temporal_scale": 99.0})
+    np.testing.assert_allclose(td_a.amount, td_b.amount)
+    assert (td_a.date == td_b.date).all()
+
+
+def test_triangular_code_5_narrow_span_falls_back():
+    """A triangular whose integer span is too narrow for the >=3 steps that
+    easy_timedelta_distribution requires must not raise; it degrades to a uniform
+    over the available offsets (premise has real code-5 rows with min=-2/max=-1)."""
+    from bw_timex.premise_temporal import premise_params_to_td
+
+    for mn, mx in [(-2.0, -1.0), (-1.5, -1.0)]:
+        td = premise_params_to_td(
+            {"temporal_distribution": 5, "temporal_loc": -1.2,
+             "temporal_min": mn, "temporal_max": mx, "temporal_scale": 1.0}
+        )
+        yrs = td.date.astype("timedelta64[Y]").astype(int)
+        assert len(yrs) >= 1
+        assert yrs.min() >= -2 and yrs.max() <= -1
+        np.testing.assert_allclose(td.amount.sum(), 1.0)
+
+
 def test_unsupported_code_raises():
     from bw_timex.premise_temporal import premise_params_to_td
     with pytest.raises(ValueError):
@@ -305,6 +364,39 @@ def test_load_temporal_specs_reads_premise_csv():
         pytest.skip("installed premise lacks TrailsDataPackage temporal support")
     assert isinstance(specs, TemporalSpecs)
     # premise's bundled CSV is non-empty across at least one bucket
+    assert (
+        specs.biomass_growth_params
+        or specs.stock_asset_params
+        or specs.maintenance_suppliers
+        or specs.end_of_life_suppliers
+    )
+
+
+def test_load_temporal_specs_handles_bom_csv(tmp_path):
+    """Regression: premise's CSV loader opens files without ``utf-8-sig``, so a
+    UTF-8 BOM corrupts the first column name (``name`` -> ``\\ufeffname``) and
+    raises ``missing columns: ['name']``. ``load_temporal_specs`` must tolerate a
+    BOM-prefixed file (premise's own bundled CSV currently ships one)."""
+    premise = pytest.importorskip("premise")
+    from premise import trails
+
+    if not hasattr(trails, "FILEPATH_TEMPORAL_PARAMETERS"):
+        pytest.skip("installed premise lacks temporal-distribution support")
+
+    from bw_timex.premise_temporal import load_temporal_specs, TemporalSpecs
+
+    # Round-trip premise's curated CSV through an explicit BOM so the test owns
+    # its input regardless of how the bundled file happens to be encoded.
+    src = trails.FILEPATH_TEMPORAL_PARAMETERS
+    with open(src, encoding="utf-8-sig") as fi:
+        content = fi.read()
+    bom_csv = tmp_path / "with_bom.csv"
+    with open(bom_csv, "w", encoding="utf-8-sig") as fo:  # utf-8-sig writes a BOM
+        fo.write(content)
+
+    specs = load_temporal_specs(path=str(bom_csv))
+    assert isinstance(specs, TemporalSpecs)
+    # parsed past the (BOM-prefixed) 'name' column into at least one bucket
     assert (
         specs.biomass_growth_params
         or specs.stock_asset_params

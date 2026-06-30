@@ -1,6 +1,7 @@
 """Annotate existing premise databases with bw_timex temporal distributions.
 
-premise (the trails work, released in premise >= 2.5.0) curates background
+premise's *trails* work (currently unreleased; on the
+``trails_temporal_distributions_update`` branch of polca/premise) curates background
 temporal data in ``temporal_distributions.csv`` and places it on exchanges via
 fixed rules. This module reuses premise's CSV loader and mirrors those
 placement rules to write ``bw_temporalis.TemporalDistribution`` objects onto the
@@ -16,6 +17,13 @@ import numpy as np
 from bw_temporalis import TemporalDistribution, easy_timedelta_distribution
 
 _RESOLUTION = "Y"  # premise temporal values are in years
+
+# premise code 2 is a lognormal of *fleet age*. premise's curated CSV does not
+# expose the log-space sigma in machine-readable form: it is stated only in the
+# free-text ``param_notes`` ("sigma=0.55; negative loc convention") and the
+# ``scale`` column (1.5) is vestigial for this code. We mirror premise's stated
+# constant here. Override only if premise later parameterizes it per row.
+_LOGNORMAL_FLEET_AGE_SIGMA = 0.55
 
 
 @dataclass
@@ -67,6 +75,45 @@ def _bounds(params: dict, loc, scale) -> tuple[int, int]:
     return start, end
 
 
+def _lognormal_fleet_age_td(loc, mn, mx, sigma: float = _LOGNORMAL_FLEET_AGE_SIGMA) -> TemporalDistribution:
+    """Build premise's code-2 lognormal fleet-age distribution.
+
+    The asset age is lognormal with median ``-loc`` (loc is negative: the asset
+    was built in the past) and fixed log-space ``sigma``. The pdf is sampled on
+    integer ages truncated to ``[-mx, -mn]``, renormalized, and mapped back to
+    negative year offsets (the "negative loc convention").
+    """
+    from scipy.stats import lognorm
+
+    if loc is None or loc >= 0:
+        raise ValueError(
+            "lognormal (code 2) requires a negative temporal_loc (median age = -loc)"
+        )
+    if mn is None or mx is None:
+        raise ValueError("lognormal (code 2) requires temporal_min and temporal_max")
+
+    median = -loc
+    age_lo = max(1, int(round(-mx)))  # -max (clamped: lognormal undefined at 0)
+    age_hi = int(round(-mn))  # -min
+    if age_hi < age_lo:
+        age_lo, age_hi = age_hi, age_lo
+    if age_hi == age_lo:
+        return _single_pulse(-age_lo)
+
+    ages = np.arange(age_lo, age_hi + 1)
+    pdf = lognorm.pdf(ages, s=sigma, scale=median)
+    total = pdf.sum()
+    if not np.isfinite(total) or total == 0:
+        raise ValueError("lognormal (code 2) produced no probability mass over [min, max]")
+
+    dates = -ages  # back to negative time offsets
+    order = np.argsort(dates)
+    return TemporalDistribution(
+        date=np.array(dates[order], dtype="timedelta64[Y]"),
+        amount=(pdf / total)[order],
+    )
+
+
 def premise_params_to_td(params: dict, *, max_steps: int = 200) -> TemporalDistribution:
     """Convert one premise temporal-parameter dict into a ``TemporalDistribution``.
 
@@ -98,6 +145,11 @@ def premise_params_to_td(params: dict, *, max_steps: int = 200) -> TemporalDistr
             amount=amount,
         )
 
+    if code == 2:  # lognormal of fleet age ("negative loc convention")
+        return _lognormal_fleet_age_td(
+            loc, params.get("temporal_min"), params.get("temporal_max")
+        )
+
     start, end = _bounds(params, loc, scale)
     steps = max(2, min(max_steps, end - start + 1))
 
@@ -117,6 +169,11 @@ def premise_params_to_td(params: dict, *, max_steps: int = 200) -> TemporalDistr
     if code == 4:  # uniform
         return easy_timedelta_distribution(start, end, _RESOLUTION, steps=steps, kind="uniform")
     if code == 5:  # triangular, mode = loc
+        # easy_timedelta_distribution requires >=3 steps for a triangular; when
+        # the integer span is too narrow (premise has real min=-2/max=-1 rows)
+        # the shape is indistinguishable from uniform, so degrade to uniform.
+        if steps < 3:
+            return easy_timedelta_distribution(start, end, _RESOLUTION, steps=steps, kind="uniform")
         return easy_timedelta_distribution(start, end, _RESOLUTION, steps=steps, kind="triangular", param=loc)
 
     raise ValueError(f"Unsupported premise temporal_distribution code: {code!r}")
@@ -234,24 +291,51 @@ def _import_premise_trails():
         from premise import trails as premise_trails
     except ImportError as exc:
         raise ImportError(
-            "premise temporal annotation requires premise (>=2.5.0). "
-            "Install premise separately (e.g. `pip install premise>=2.5.0`). "
-            "Note: premise pins scipy<1.14, which is not available for Python "
-            "3.13, so it cannot be a co-resolved bw_timex extra; install it in "
-            "an environment that satisfies that constraint."
+            "premise temporal annotation requires premise's (currently unreleased) "
+            "trails work. Install it separately from the branch, e.g.:\n"
+            '    pip install "premise @ '
+            'git+https://github.com/polca/premise.git@trails_temporal_distributions_update"\n'
+            "Note: premise pins scipy<1.14, which has no Python 3.13 wheels, so it "
+            "cannot be a co-resolved bw_timex extra; install it on Python <=3.12."
         ) from exc
     if not hasattr(premise_trails, "TrailsDataPackage") or not hasattr(
         premise_trails, "FILEPATH_TEMPORAL_PARAMETERS"
     ):
         raise RuntimeError(
             "The installed premise lacks temporal-distribution support "
-            "(TrailsDataPackage / temporal_distributions.csv). Upgrade to premise>=2.5.0."
+            "(TrailsDataPackage / temporal_distributions.csv). Install premise from the "
+            "trails_temporal_distributions_update branch of polca/premise."
         )
     return premise_trails
 
 
 class _DummySelf:
     """Stand-in for the unused ``self`` of premise's CSV loader method."""
+
+
+def _bom_free_path(path):
+    """Return ``path``, or a BOM-stripped temp copy if it starts with a UTF-8 BOM.
+
+    premise's ``_load_temporal_specs_from_csv`` opens the file without
+    ``encoding="utf-8-sig"``, so a BOM corrupts the first column name
+    (``name`` -> ``﻿name``) and the loader raises
+    ``missing columns: ['name']``. premise's own bundled
+    ``temporal_distributions.csv`` ships with a BOM, so we sanitize before
+    handing the path back to premise's loader.
+    """
+    import os
+    import tempfile
+
+    with open(path, "rb") as fh:
+        if fh.read(3) != b"\xef\xbb\xbf":
+            return path  # no BOM, leave untouched
+
+    with open(path, encoding="utf-8-sig") as fi:
+        data = fi.read()
+    fd, clean = tempfile.mkstemp(prefix="premise_temporal_", suffix=".csv")
+    with os.fdopen(fd, "w", encoding="utf-8", newline="") as fo:
+        fo.write(data)
+    return clean
 
 
 def load_temporal_specs(path=None) -> TemporalSpecs:
@@ -263,6 +347,7 @@ def load_temporal_specs(path=None) -> TemporalSpecs:
     """
     premise_trails = _import_premise_trails()
     csv_path = path if path is not None else premise_trails.FILEPATH_TEMPORAL_PARAMETERS
+    csv_path = _bom_free_path(csv_path)
     loader = premise_trails.TrailsDataPackage._load_temporal_specs_from_csv
     stock_assets, end_of_life, biomass_growth, maintenance, dataset_lifetimes = loader(
         _DummySelf(), csv_path
