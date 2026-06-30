@@ -187,7 +187,9 @@ class MatrixModifier:
                     indices,
                     dtype=bwp.INDICES_DTYPE,
                 ),
-                flip_array=np.array([False], dtype=bool),
+                # one flip flag per biosphere flow (never flipped); must match
+                # the indices length or bw_processing raises ShapeMismatch.
+                flip_array=np.zeros(len(indices), dtype=bool),
             )
         return datapackage_biosphere
 
