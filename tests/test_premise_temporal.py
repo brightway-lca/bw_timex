@@ -1,0 +1,450 @@
+import numpy as np
+import pytest
+from bw_temporalis import TemporalDistribution
+
+
+def test_discrete_code_1_single_pulse_at_loc():
+    from bw_timex.premise_temporal import premise_params_to_td
+    td = premise_params_to_td({"temporal_distribution": 1, "temporal_loc": -5.0})
+    assert isinstance(td, TemporalDistribution)
+    assert td.date.astype("timedelta64[Y]").astype(int).tolist() == [-5]
+    assert np.allclose(td.amount.sum(), 1.0)
+
+
+def test_empirical_code_6_offsets_weights_normalised():
+    from bw_timex.premise_temporal import premise_params_to_td
+    td = premise_params_to_td(
+        {"temporal_distribution": 6, "temporal_offsets": [0, 10], "temporal_weights": [1.0, 3.0]}
+    )
+    assert td.date.astype("timedelta64[Y]").astype(int).tolist() == [0, 10]
+    np.testing.assert_allclose(td.amount, [0.25, 0.75])
+
+
+def test_uniform_code_4_from_min_max():
+    from bw_timex.premise_temporal import premise_params_to_td
+    td = premise_params_to_td({"temporal_distribution": 4, "temporal_min": 0.0, "temporal_max": 5.0})
+    yrs = td.date.astype("timedelta64[Y]").astype(int)
+    assert yrs.min() == 0 and yrs.max() == 5
+    np.testing.assert_allclose(td.amount.sum(), 1.0)
+
+
+def test_normal_code_3_bounds_from_min_max():
+    from bw_timex.premise_temporal import premise_params_to_td
+    td = premise_params_to_td(
+        {"temporal_distribution": 3, "temporal_loc": -20.0, "temporal_scale": 3.0,
+         "temporal_min": -40.0, "temporal_max": -1.0}
+    )
+    yrs = td.date.astype("timedelta64[Y]").astype(int)
+    assert yrs.min() == -40 and yrs.max() == -1
+    np.testing.assert_allclose(td.amount.sum(), 1.0)
+
+
+def test_triangular_code_5():
+    from bw_timex.premise_temporal import premise_params_to_td
+    td = premise_params_to_td(
+        {"temporal_distribution": 5, "temporal_loc": 5.0, "temporal_min": 0.0, "temporal_max": 10.0}
+    )
+    yrs = td.date.astype("timedelta64[Y]").astype(int)
+    assert yrs.min() == 0
+    assert yrs.max() == 10
+    np.testing.assert_allclose(td.amount.sum(), 1.0)
+
+
+def test_normal_peak_near_loc():
+    """Issue 1 guard: normalized scale must concentrate mass near loc, not be flat."""
+    from bw_timex.premise_temporal import premise_params_to_td
+
+    # Narrow scale=2 over wide range [-50, 50], loc=0 → mass should concentrate near 0
+    td_narrow = premise_params_to_td(
+        {"temporal_distribution": 3, "temporal_loc": 0.0, "temporal_scale": 2.0,
+         "temporal_min": -50.0, "temporal_max": 50.0}
+    )
+    yrs_narrow = td_narrow.date.astype("timedelta64[Y]").astype(int)
+
+    # Peak must be within 2 years of loc=0
+    peak_year = yrs_narrow[np.argmax(td_narrow.amount)]
+    assert abs(peak_year - 0) <= 2, f"Peak at {peak_year}, expected near 0"
+
+    # Narrow scale should capture most mass within ±5 years
+    mass_within_5_narrow = td_narrow.amount[np.abs(yrs_narrow) <= 5].sum()
+    assert mass_within_5_narrow > 0.90, (
+        f"Narrow scale=2 mass within ±5 yrs: {mass_within_5_narrow:.4f} (expected >0.90)"
+    )
+
+    # Wide scale=40 over same range should spread mass much more
+    td_wide = premise_params_to_td(
+        {"temporal_distribution": 3, "temporal_loc": 0.0, "temporal_scale": 40.0,
+         "temporal_min": -50.0, "temporal_max": 50.0}
+    )
+    yrs_wide = td_wide.date.astype("timedelta64[Y]").astype(int)
+    mass_within_5_wide = td_wide.amount[np.abs(yrs_wide) <= 5].sum()
+
+    # Narrow should capture significantly more mass near centre than wide
+    assert mass_within_5_narrow > mass_within_5_wide * 3, (
+        f"Narrow ({mass_within_5_narrow:.4f}) should be >3x wide ({mass_within_5_wide:.4f})"
+    )
+
+
+def test_degenerate_min_equals_max_codes_345():
+    """Issue 2 guard: start==end must return single pulse, not raise ValueError."""
+    from bw_timex.premise_temporal import premise_params_to_td
+
+    for code in (3, 4, 5):
+        td = premise_params_to_td(
+            {"temporal_distribution": code, "temporal_loc": 7.0,
+             "temporal_min": 7.0, "temporal_max": 7.0,
+             "temporal_scale": 1.0}  # scale provided for code 3 normal
+        )
+        yrs = td.date.astype("timedelta64[Y]").astype(int)
+        assert len(yrs) == 1, f"code {code}: expected 1 date, got {len(yrs)}"
+        assert yrs[0] == 7, f"code {code}: expected year 7, got {yrs[0]}"
+        np.testing.assert_allclose(td.amount.sum(), 1.0, err_msg=f"code {code}: amount must sum to 1")
+
+
+def test_lognormal_code_2_fleet_age():
+    """premise code 2 = lognormal of fleet age (median = -loc, sigma=0.55 fixed,
+    negative-loc convention, truncated to [min, max]). The CSV ``scale`` is NOT
+    the lognormal sigma and must be ignored."""
+    from bw_timex.premise_temporal import premise_params_to_td
+
+    td = premise_params_to_td(
+        {
+            "temporal_distribution": 2,
+            "temporal_loc": -12.0,  # median age 12 years
+            "temporal_scale": 1.5,  # vestigial for code 2 -> must be ignored
+            "temporal_min": -16.0,
+            "temporal_max": -1.0,
+        }
+    )
+    yrs = td.date.astype("timedelta64[Y]").astype(int)
+    # truncated to [min, max] and all in the past (negative-loc convention)
+    assert yrs.min() >= -16 and yrs.max() <= -1
+    assert (yrs <= 0).all()
+    np.testing.assert_allclose(td.amount.sum(), 1.0)
+    # mode of the lognormal = -median * exp(-sigma**2) = -12 * exp(-0.55**2) ~ -8.9
+    peak = yrs[np.argmax(td.amount)]
+    assert -11 <= peak <= -7, f"peak at {peak}, expected near -9"
+    # right-skewed: more mass on the older (more negative) tail than the recent tail
+    older = td.amount[yrs <= -12].sum()
+    recent = td.amount[yrs >= -4].sum()
+    assert older > recent
+
+
+def test_lognormal_code_2_ignores_scale_value():
+    """Two code-2 rows with the same loc/min/max but different ``scale`` must
+    produce identical distributions (scale is not used for lognormal)."""
+    from bw_timex.premise_temporal import premise_params_to_td
+
+    base = {"temporal_distribution": 2, "temporal_loc": -10.0,
+            "temporal_min": -13.0, "temporal_max": -1.0}
+    td_a = premise_params_to_td({**base, "temporal_scale": 1.5})
+    td_b = premise_params_to_td({**base, "temporal_scale": 99.0})
+    np.testing.assert_allclose(td_a.amount, td_b.amount)
+    assert (td_a.date == td_b.date).all()
+
+
+def test_triangular_code_5_narrow_span_falls_back():
+    """A triangular whose integer span is too narrow for the >=3 steps that
+    easy_timedelta_distribution requires must not raise; it degrades to a uniform
+    over the available offsets (premise has real code-5 rows with min=-2/max=-1)."""
+    from bw_timex.premise_temporal import premise_params_to_td
+
+    for mn, mx in [(-2.0, -1.0), (-1.5, -1.0)]:
+        td = premise_params_to_td(
+            {"temporal_distribution": 5, "temporal_loc": -1.2,
+             "temporal_min": mn, "temporal_max": mx, "temporal_scale": 1.0}
+        )
+        yrs = td.date.astype("timedelta64[Y]").astype(int)
+        assert len(yrs) >= 1
+        assert yrs.min() >= -2 and yrs.max() <= -1
+        np.testing.assert_allclose(td.amount.sum(), 1.0)
+
+
+def test_unsupported_code_raises():
+    from bw_timex.premise_temporal import premise_params_to_td
+    with pytest.raises(ValueError):
+        premise_params_to_td({"temporal_distribution": 99, "temporal_loc": 1.0})
+
+
+def test_annotation_report_merge():
+    from bw_timex.premise_temporal import AnnotationReport
+    a = AnnotationReport(annotated=1, skipped_existing=2, faults=[{"x": 1}])
+    b = AnnotationReport(annotated=3, skipped_existing=0, faults=[{"y": 2}])
+    a.merge(b)
+    assert a.annotated == 4 and a.skipped_existing == 2 and len(a.faults) == 2
+
+
+# ---------------------------------------------------------------------------
+# Task 2: annotate_database tests
+# ---------------------------------------------------------------------------
+from bw2data.tests import bw2test
+
+
+def _write_synthetic_dbs():
+    import bw2data as bd
+    bd.Database("bio").write({
+        ("bio", "co2"): {"name": "Carbon dioxide, in air", "type": "emission", "categories": ("air",)},
+    })
+    bd.Database("ei").write({
+        # biomass-growth dataset: has the CO2-in-air biosphere exchange
+        ("ei", "forest"): {
+            "name": "forestry", "reference product": "wood", "location": "GLO", "unit": "kg",
+            "exchanges": [
+                {"input": ("ei", "forest"), "amount": 1.0, "type": "production"},
+                {"input": ("bio", "co2"), "amount": -2.0, "type": "biosphere"},
+            ],
+        },
+        # supplier used as stock_asset, maintenance, and end_of_life by consumers below
+        ("ei", "machine"): {
+            "name": "machine", "reference product": "machine", "location": "GLO", "unit": "unit",
+            "exchanges": [{"input": ("ei", "machine"), "amount": 1.0, "type": "production"}],
+        },
+        # consumer with a 50-year lifetime that buys the machine (tagged maintenance/eol per specs)
+        ("ei", "plant"): {
+            "name": "plant", "reference product": "power", "location": "GLO", "unit": "kWh",
+            "exchanges": [
+                {"input": ("ei", "plant"), "amount": 1.0, "type": "production"},
+                {"input": ("ei", "machine"), "amount": 0.1, "type": "technosphere"},
+            ],
+        },
+    })
+
+
+@bw2test
+def test_biomass_growth_lands_on_co2_exchange():
+    import bw2data as bd
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={("forestry", "wood"): {
+            "temporal_distribution": 3, "temporal_loc": -20.0, "temporal_scale": 3.0,
+            "temporal_min": -40.0, "temporal_max": -1.0}},
+        stock_asset_params={}, maintenance_suppliers=set(),
+        end_of_life_suppliers=set(), dataset_lifetimes={},
+    )
+    report = annotate_database("ei", specs)
+    forest = bd.get_node(database="ei", code="forest")
+    bio_exc = [e for e in forest.exchanges() if e["type"] == "biosphere"][0]
+    assert bio_exc.get("temporal_distribution") is not None
+    assert report.annotated == 1
+
+
+@bw2test
+def test_maintenance_uniform_over_lifetime():
+    import bw2data as bd
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={}, stock_asset_params={},
+        maintenance_suppliers={("machine", "machine")}, end_of_life_suppliers=set(),
+        dataset_lifetimes={("plant", "power"): 50.0},
+    )
+    report = annotate_database("ei", specs)
+    plant = bd.get_node(database="ei", code="plant")
+    tech_exc = [e for e in plant.exchanges() if e["type"] == "technosphere"][0]
+    td = tech_exc.get("temporal_distribution")
+    assert td is not None
+    yrs = td.date.astype("timedelta64[Y]").astype(int)
+    assert yrs.min() == 0 and yrs.max() == 50
+    assert report.annotated == 1
+
+
+@bw2test
+def test_ambiguous_supplier_is_faulted_not_applied():
+    import bw2data as bd
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={}, stock_asset_params={},
+        maintenance_suppliers={("machine", "machine")},
+        end_of_life_suppliers={("machine", "machine")},
+        dataset_lifetimes={("plant", "power"): 50.0},
+    )
+    report = annotate_database("ei", specs)
+    plant = bd.get_node(database="ei", code="plant")
+    tech_exc = [e for e in plant.exchanges() if e["type"] == "technosphere"][0]
+    assert tech_exc.get("temporal_distribution") is None
+    assert report.annotated == 0 and len(report.faults) == 1
+
+
+@bw2test
+def test_idempotent_skip_then_overwrite():
+    import bw2data as bd
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={("forestry", "wood"): {
+            "temporal_distribution": 1, "temporal_loc": -5.0}},
+        stock_asset_params={}, maintenance_suppliers=set(),
+        end_of_life_suppliers=set(), dataset_lifetimes={},
+    )
+    annotate_database("ei", specs)
+    again = annotate_database("ei", specs)
+    assert again.annotated == 0 and again.skipped_existing >= 1
+    forced = annotate_database("ei", specs, overwrite=True)
+    assert forced.annotated == 1
+
+
+@bw2test
+def test_unknown_database_raises():
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    specs = TemporalSpecs({}, {}, set(), set(), {})
+    with pytest.raises(ValueError):
+        annotate_database("does-not-exist", specs)
+
+
+@bw2test
+def test_malformed_stock_asset_params_is_faulted_not_raised():
+    """Guard: a bad temporal_distribution code in stock_asset_params must be faulted, not raised."""
+    import bw2data as bd
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={},
+        stock_asset_params={("machine", "machine"): {"temporal_distribution": 99}},
+        maintenance_suppliers=set(),
+        end_of_life_suppliers=set(),
+        dataset_lifetimes={},
+    )
+    report = annotate_database("ei", specs)
+    assert report.annotated == 0
+    assert len(report.faults) >= 1
+
+
+@bw2test
+def test_end_of_life_pulse_at_lifetime():
+    """end_of_life happy path: single pulse at dataset lifetime."""
+    import bw2data as bd
+    from bw_timex.premise_temporal import annotate_database, TemporalSpecs
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={},
+        stock_asset_params={},
+        maintenance_suppliers=set(),
+        end_of_life_suppliers={("machine", "machine")},
+        dataset_lifetimes={("plant", "power"): 50.0},
+    )
+    report = annotate_database("ei", specs)
+    plant = bd.get_node(database="ei", code="plant")
+    tech_exc = [e for e in plant.exchanges() if e["type"] == "technosphere"][0]
+    td = tech_exc.get("temporal_distribution")
+    assert td is not None
+    yrs = td.date.astype("timedelta64[Y]").astype(int)
+    assert len(yrs) == 1, f"Expected single pulse, got {len(yrs)} dates"
+    assert yrs[0] == 50, f"Expected pulse at year 50, got year {yrs[0]}"
+    np.testing.assert_allclose(td.amount.sum(), 1.0)
+    assert report.annotated == 1
+
+
+# ---------------------------------------------------------------------------
+# Task 3: load_temporal_specs tests
+# ---------------------------------------------------------------------------
+
+def test_import_error_when_premise_missing(monkeypatch):
+    import builtins
+    from bw_timex import premise_temporal
+    real_import = builtins.__import__
+
+    def fake_import(name, *a, **k):
+        if name == "premise" or name.startswith("premise."):
+            raise ImportError("no premise")
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    with pytest.raises(ImportError, match="requires premise"):
+        premise_temporal.load_temporal_specs()
+
+
+def test_load_temporal_specs_reads_premise_csv():
+    pytest.importorskip("premise")
+    from bw_timex.premise_temporal import load_temporal_specs, TemporalSpecs
+    try:
+        specs = load_temporal_specs()
+    except RuntimeError:
+        pytest.skip("installed premise lacks TrailsDataPackage temporal support")
+    assert isinstance(specs, TemporalSpecs)
+    # premise's bundled CSV is non-empty across at least one bucket
+    assert (
+        specs.biomass_growth_params
+        or specs.stock_asset_params
+        or specs.maintenance_suppliers
+        or specs.end_of_life_suppliers
+    )
+
+
+def test_load_temporal_specs_handles_bom_csv(tmp_path):
+    """Regression: premise's CSV loader opens files without ``utf-8-sig``, so a
+    UTF-8 BOM corrupts the first column name (``name`` -> ``\\ufeffname``) and
+    raises ``missing columns: ['name']``. ``load_temporal_specs`` must tolerate a
+    BOM-prefixed file (premise's own bundled CSV currently ships one)."""
+    premise = pytest.importorskip("premise")
+    from premise import trails
+
+    if not hasattr(trails, "FILEPATH_TEMPORAL_PARAMETERS"):
+        pytest.skip("installed premise lacks temporal-distribution support")
+
+    from bw_timex.premise_temporal import load_temporal_specs, TemporalSpecs
+
+    # Round-trip premise's curated CSV through an explicit BOM so the test owns
+    # its input regardless of how the bundled file happens to be encoded.
+    src = trails.FILEPATH_TEMPORAL_PARAMETERS
+    with open(src, encoding="utf-8-sig") as fi:
+        content = fi.read()
+    bom_csv = tmp_path / "with_bom.csv"
+    with open(bom_csv, "w", encoding="utf-8-sig") as fo:  # utf-8-sig writes a BOM
+        fo.write(content)
+
+    specs = load_temporal_specs(path=str(bom_csv))
+    assert isinstance(specs, TemporalSpecs)
+    # parsed past the (BOM-prefixed) 'name' column into at least one bucket
+    assert (
+        specs.biomass_growth_params
+        or specs.stock_asset_params
+        or specs.maintenance_suppliers
+        or specs.end_of_life_suppliers
+    )
+
+
+# ---------------------------------------------------------------------------
+# Task 4: add_premise_temporal_distributions public API tests
+# ---------------------------------------------------------------------------
+
+def test_public_export():
+    import bw_timex
+    assert hasattr(bw_timex, "add_premise_temporal_distributions")
+
+
+@bw2test
+def test_add_premise_temporal_distributions_uses_injected_specs(monkeypatch):
+    import bw2data as bd
+    from bw_timex import premise_temporal
+    from bw_timex.premise_temporal import TemporalSpecs, add_premise_temporal_distributions
+    _write_synthetic_dbs()
+    specs = TemporalSpecs(
+        biomass_growth_params={("forestry", "wood"): {"temporal_distribution": 1, "temporal_loc": -5.0}},
+        stock_asset_params={}, maintenance_suppliers=set(),
+        end_of_life_suppliers=set(), dataset_lifetimes={},
+    )
+    monkeypatch.setattr(premise_temporal, "load_temporal_specs", lambda *a, **k: specs)
+    report = add_premise_temporal_distributions(["ei"])
+    assert report.annotated == 1
+    forest = bd.get_node(database="ei", code="forest")
+    assert [e for e in forest.exchanges() if e["type"] == "biosphere"][0].get("temporal_distribution") is not None
+
+
+def test_core_import_does_not_require_premise(monkeypatch):
+    # Importing bw_timex and using the converter must not require premise.
+    import builtins
+    real_import = builtins.__import__
+
+    def fake_import(name, *a, **k):
+        if name == "premise" or name.startswith("premise."):
+            raise ImportError("premise blocked")
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    import importlib
+    import bw_timex.premise_temporal as pt
+    importlib.reload(pt)
+    td = pt.premise_params_to_td({"temporal_distribution": 1, "temporal_loc": 0.0})
+    assert td is not None

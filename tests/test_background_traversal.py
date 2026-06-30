@@ -369,6 +369,34 @@ def test_zero_amount_exchange_in_descended_background(
 
 
 @pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_descended_background_with_multiple_biosphere_flows(
+    background_td_multibio_db, graph_traversal
+):
+    """A descended (temporalized) background producer carrying >1 biosphere flow
+    must not crash. ``MatrixModifier.create_biosphere_datapackage`` previously
+    hardcoded ``flip_array=np.array([False])`` (length 1) while the indices array
+    grows one row per biosphere exchange, raising
+    ``ShapeMismatch: flip_array shape ((1,)) doesn't match indices_array ((2,))``.
+
+    Hand-computation (demand fu=1, starting 2024):
+    - fu -> bg_A (amount 2); bg_A -> bg_B (amount 5) -> 10 units of bg_B.
+    - bg_B (temporalized) emits CO2=1 + CH4=3 -> 10 * 4 = 40.
+    - bg_B -> bg_C (amount 1) -> 10 units bg_C, CO2=1 -> 10.
+    - The TD only spreads time across two identical variants, so the
+      time-aggregated score is 40 + 10 = 50.
+    """
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    tlca.build_timeline(
+        starting_datetime="2024-01-01",
+        graph_traversal=graph_traversal,
+        traverse_background=True,
+    )
+    tlca.lci()
+    tlca.static_lcia()
+    assert tlca.static_score == pytest.approx(50.0, rel=1e-9)
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
 def test_max_calc_bounds_background_descent(
     background_td_deep_chain_db, graph_traversal
 ):
