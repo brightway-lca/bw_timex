@@ -423,3 +423,41 @@ def test_max_calc_bounds_background_descent(
     bounded = producers(3)
     assert "bg_5" not in bounded  # deepest node cut off by the budget
     assert len(bounded) < len(full)
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_max_calc_truncated_descent_conserves_impact(
+    background_td_deep_chain_db, graph_traversal
+):
+    """Truncating the background descent with ``max_calc`` must not change the
+    total impact.
+
+    When the descent stops early (budget exhausted rather than the cutoff), the
+    frontier node must be capped as a static-leaf temporal market -- the same
+    treatment a cutoff frontier gets -- so its remaining upstream is solved
+    statically instead of being dropped. The deep chain here is identical in both
+    variants, so the static cap captures exactly the burden that a full descent
+    would, and the score is invariant to ``max_calc``.
+
+    Without that cap the truncated frontier is demanded-but-unsupplied: the deep
+    ``bg_5 -> CO2`` burden is silently lost (score collapses to 0), and in graphs
+    with convergence it instead raises ``KeyError`` in ``get_time_mapping_key`` or
+    ``NonsquareTechnosphere`` in ``lci()`` (the diesel-car premise case, where a
+    ``max_calc``-truncated deep chain left "sewer grid construction" dangling).
+    """
+
+    def score(max_calc):
+        t = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+        t.build_timeline(
+            starting_datetime="2024-01-01",
+            graph_traversal=graph_traversal,
+            traverse_background=True,
+            max_calc=max_calc,
+        )
+        t.lci()  # must not raise NonsquareTechnosphere
+        t.static_lcia()
+        return t.static_score
+
+    full = score(10_000)  # whole chain descended
+    truncated = score(3)  # descent cut off before bg_5
+    assert truncated == pytest.approx(full, rel=1e-9)

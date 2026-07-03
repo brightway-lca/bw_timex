@@ -456,6 +456,16 @@ class VariantBackgroundMixin:
         while queue:
             self._calc_count += 1
             if self._calc_count > self.max_calc:
+                # max_calc truncated the descent: the nodes still queued were
+                # recorded as edges and marked variant-resolved, but were never
+                # expanded, so their own upstream was not captured. Unlike a
+                # cutoff (which prunes negligible branches on purpose), max_calc
+                # is a compute budget -- dropping the remainder would silently
+                # lose that burden. Un-mark these frontier nodes so the timeline
+                # builder caps them as static market leaves (their remaining
+                # upstream is then solved statically), keeping the system square.
+                for queued in queue:
+                    self.variant_resolved_producers.discard(queued[0])
                 break
             cur_id, cur_td, cur_parent, cur_abs_td, cur_supply = queue.popleft()
 
