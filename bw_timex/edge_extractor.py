@@ -220,6 +220,26 @@ class VariantBackgroundMixin:
             return None
         return td / abs(production["amount"])
 
+    @staticmethod
+    def _fold_production_td(base_td, prod_td):
+        """Convolve ``base_td`` with a producer's normalized production-edge TD.
+
+        Unlike ``_join_datetime_and_timedelta_distributions`` (which tiles the
+        producer amounts and drops the consumer-side amounts), this takes the
+        outer product of amounts and the outer sum of dates, so the cohort
+        weights carried in ``base_td`` are preserved. Ravel is ``base``-major so
+        the result stays index-aligned with a sibling ``base_td`` folded the same
+        way. Used to register a descended background producer at its
+        production-TD-weighted cohorts.
+        """
+        date = (
+            base_td.date.reshape(-1, 1) + prod_td.date.reshape(1, -1)
+        ).ravel()
+        amount = (
+            base_td.amount.reshape(-1, 1) * prod_td.amount.reshape(1, -1)
+        ).ravel()
+        return TemporalDistribution(date=date, amount=amount)
+
     def _producer_process_in_variant(self, product_id: int, db_name: str):
         """Resolve the process producing ``product_id`` within variant
         ``db_name`` from the proxy.
@@ -382,6 +402,26 @@ class VariantBackgroundMixin:
             variant_id = self._resolve_in_variant(producer_process, db_name)
             self.variant_resolved_producers.add(variant_id)
 
+            # If this background producer has a production-edge TD, spread it into
+            # production-TD-weighted cohorts on the PRODUCER side too, so it is
+            # registered at exactly the cohort-years it is later consumed at
+            # (bands match -> no KeyError) with weights = exchange x production
+            # (conserves). Fold identically into all three arrays to keep them
+            # index-aligned for extract_edge_data.
+            producer_production_td = self._normalized_production_edge_td_from_proxy(
+                variant_id
+            )
+            if producer_production_td is not None:
+                masked_td_producer = self._fold_production_td(
+                    masked_td_producer, producer_production_td
+                )
+                masked_abs_td_producer = self._fold_production_td(
+                    masked_abs_td_producer, producer_production_td
+                )
+                masked_distribution = self._fold_production_td(
+                    masked_distribution, producer_production_td
+                )
+
             edges.append(
                 Edge(
                     edge_type=edge_type,
@@ -398,14 +438,6 @@ class VariantBackgroundMixin:
             )
 
             child_td, child_abs_td = masked_distribution, masked_abs_td_producer
-            producer_production_td = self._normalized_production_edge_td_from_proxy(
-                variant_id
-            )
-            if producer_production_td is not None:
-                child_td = (masked_distribution * producer_production_td).simplify()
-                child_abs_td = _join_datetime_and_timedelta_distributions(
-                    producer_production_td, masked_abs_td_producer
-                )
 
             # Cutoff-tracking estimate only — never feeds emitted amounts.
             # Emitted amounts come from the masked distributions above.
@@ -507,6 +539,27 @@ class VariantBackgroundMixin:
                 if self._is_static_background(input_id):
                     self.variant_resolved_producers.add(input_id)
 
+                # Fold this producer's own production-edge TD into the producer
+                # side so it is registered at the same production-TD-weighted
+                # cohorts it is consumed at (bands match -> no KeyError; weights
+                # = exchange x production -> conserves). Fold identically into
+                # td_producer/abs_td_producer/distribution to keep them aligned.
+                producer_production_td = None
+                if producer_process is not None:
+                    producer_production_td = (
+                        self._normalized_production_edge_td_from_proxy(producer_process)
+                    )
+                if producer_production_td is not None:
+                    td_producer = self._fold_production_td(
+                        td_producer, producer_production_td
+                    )
+                    abs_td_producer = self._fold_production_td(
+                        abs_td_producer, producer_production_td
+                    )
+                    distribution = self._fold_production_td(
+                        distribution, producer_production_td
+                    )
+
                 edges.append(
                     Edge(
                         edge_type=edge_type,
@@ -525,18 +578,8 @@ class VariantBackgroundMixin:
                 if not will_descend:
                     continue
 
-                child_td, child_abs_td = distribution, abs_td_producer
-                producer_production_td = (
-                    self._normalized_production_edge_td_from_proxy(producer_process)
-                )
-                if producer_production_td is not None:
-                    child_td = (distribution * producer_production_td).simplify()
-                    child_abs_td = _join_datetime_and_timedelta_distributions(
-                        producer_production_td, abs_td_producer
-                    )
-
                 queue.append(
-                    (producer_process, child_td, td_producer, child_abs_td, new_supply)
+                    (producer_process, distribution, td_producer, abs_td_producer, new_supply)
                 )
         return edges
 
