@@ -475,7 +475,17 @@ class TimelineBuilder:
                 if k == db_key
             ]
             if candidates:
-                return min(candidates, key=lambda hv: abs(hv[0] - node_hash))[1]
+                nearest_hash, nearest_value = min(
+                    candidates, key=lambda hv: abs(hv[0] - node_hash)
+                )
+                logger.warning(
+                    "No exact time-mapped column for node {} at requested year-hash "
+                    "{}; snapping to nearest registered year-hash {} instead.",
+                    db_key,
+                    node_hash,
+                    nearest_hash,
+                )
+                return nearest_value
         raise KeyError((db_keys[-1], node_hash))
 
     def _leaf_background_producers(self, edges_df: pd.DataFrame) -> set:

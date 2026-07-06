@@ -143,11 +143,15 @@ def background_prod_td_deep_db():
 @pytest.fixture
 @bw2test
 def background_prod_td_convergent_db():
-    """fu -> bg_A -> {bg_S, bg_R -> bg_S}; bg_S -> CO2, two variants.
+    """fu -> bg_A -> {bg_S, bg_R -> bg_S}; bg_S -> bg_T -> CO2, two variants.
 
     bg_S (production-edge TD) is reached both directly from bg_A and via bg_R,
-    so it appears at multiple cohorts through two paths. Total impact = 2.0
-    (bg_A demands bg_S once directly and once through bg_R, coefficients 1).
+    so it appears at multiple cohorts through two paths. bg_S has a downstream
+    technosphere child (bg_T) so it is genuinely consumed at the production-TD-
+    shifted cohorts through both parents -- unlike a bare biosphere-emitting
+    leaf, which is never "consumed" and so can't expose the over-count bug.
+    Total impact = 2.0 (bg_A demands bg_S once directly and once through bg_R,
+    coefficients 1).
     """
     biosphere = bd.Database("biosphere")
     biosphere.write(
@@ -181,12 +185,14 @@ def background_prod_td_convergent_db():
         bg_a = db.new_node("bg_A", name="bg_A", unit="k"); bg_a["reference product"] = "bg_A"; bg_a.save()
         bg_r = db.new_node("bg_R", name="bg_R", unit="k"); bg_r["reference product"] = "bg_R"; bg_r.save()
         bg_s = db.new_node("bg_S", name="bg_S", unit="k"); bg_s["reference product"] = "bg_S"; bg_s.save()
+        bg_t = db.new_node("bg_T", name="bg_T", unit="k"); bg_t["reference product"] = "bg_T"; bg_t.save()
 
         bg_a.new_edge(input=bg_a, amount=1, type="production").save()
         bg_r.new_edge(input=bg_r, amount=1, type="production").save()
         ps = bg_s.new_edge(input=bg_s, amount=1, type="production")
         ps["temporal_distribution"] = prod_td_s
         ps.save()
+        bg_t.new_edge(input=bg_t, amount=1, type="production").save()
 
         e1 = bg_a.new_edge(input=bg_s, amount=1, type="technosphere")
         e1["temporal_distribution"] = td
@@ -195,8 +201,9 @@ def background_prod_td_convergent_db():
         e2["temporal_distribution"] = td
         e2.save()
         bg_r.new_edge(input=bg_s, amount=1, type="technosphere").save()
-        bg_s.new_edge(input=co2, amount=1, type="biosphere").save()
-        variants[db.name] = {"bg_A": bg_a, "bg_R": bg_r, "bg_S": bg_s}
+        bg_s.new_edge(input=bg_t, amount=1, type="technosphere").save()
+        bg_t.new_edge(input=co2, amount=1, type="biosphere").save()
+        variants[db.name] = {"bg_A": bg_a, "bg_R": bg_r, "bg_S": bg_s, "bg_T": bg_t}
 
     fu.new_edge(input=variants["background_2020"]["bg_A"], amount=1, type="technosphere").save()
 
