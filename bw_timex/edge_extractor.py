@@ -220,6 +220,26 @@ class VariantBackgroundMixin:
             return None
         return td / abs(production["amount"])
 
+    @staticmethod
+    def _fold_production_td(base_td, prod_td):
+        """Convolve ``base_td`` with a producer's normalized production-edge TD.
+
+        Unlike ``_join_datetime_and_timedelta_distributions`` (which tiles the
+        producer amounts and drops the consumer-side amounts), this takes the
+        outer product of amounts and the outer sum of dates, so the cohort
+        weights carried in ``base_td`` are preserved. Ravel is ``base``-major so
+        the result stays index-aligned with a sibling ``base_td`` folded the same
+        way. Used to register a descended background producer at its
+        production-TD-weighted cohorts.
+        """
+        date = (
+            base_td.date.reshape(-1, 1) + prod_td.date.reshape(1, -1)
+        ).ravel()
+        amount = (
+            base_td.amount.reshape(-1, 1) * prod_td.amount.reshape(1, -1)
+        ).ravel()
+        return TemporalDistribution(date=date, amount=amount)
+
     def _producer_process_in_variant(self, product_id: int, db_name: str):
         """Resolve the process producing ``product_id`` within variant
         ``db_name`` from the proxy.
