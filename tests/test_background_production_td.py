@@ -26,3 +26,19 @@ def test_first_level_production_td_conserves(background_prod_td_db, graph_traver
     t.lci()
     t.static_lcia()
     assert t.static_score == pytest.approx(t.base_lca.score, rel=1e-6)
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_deep_production_td_conserves(background_prod_td_deep_db, graph_traversal):
+    t = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    t.build_timeline(
+        starting_datetime="2020-01-01",
+        temporal_grouping="year",
+        graph_traversal=graph_traversal,
+        traverse_background=True,
+        cutoff=1e-9,
+        max_calc=2000,
+    )
+    t.lci()
+    t.static_lcia()
+    assert t.static_score == pytest.approx(t.base_lca.score, rel=1e-6)

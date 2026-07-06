@@ -1,4 +1,7 @@
-from .fixtures.background_prod_td_db_fixture import background_prod_td_db
+from .fixtures.background_prod_td_db_fixture import (
+    background_prod_td_db,
+    background_prod_td_deep_db,
+)
 from .fixtures.background_td_db_fixture import background_td_db
 from .fixtures.background_td_deep_db_fixture import background_td_deep_db
 from .fixtures.background_td_deep_chain_db_fixture import background_td_deep_chain_db

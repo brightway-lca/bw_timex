@@ -539,6 +539,27 @@ class VariantBackgroundMixin:
                 if self._is_static_background(input_id):
                     self.variant_resolved_producers.add(input_id)
 
+                # Fold this producer's own production-edge TD into the producer
+                # side so it is registered at the same production-TD-weighted
+                # cohorts it is consumed at (bands match -> no KeyError; weights
+                # = exchange x production -> conserves). Fold identically into
+                # td_producer/abs_td_producer/distribution to keep them aligned.
+                producer_production_td = None
+                if producer_process is not None:
+                    producer_production_td = (
+                        self._normalized_production_edge_td_from_proxy(producer_process)
+                    )
+                if producer_production_td is not None:
+                    td_producer = self._fold_production_td(
+                        td_producer, producer_production_td
+                    )
+                    abs_td_producer = self._fold_production_td(
+                        abs_td_producer, producer_production_td
+                    )
+                    distribution = self._fold_production_td(
+                        distribution, producer_production_td
+                    )
+
                 edges.append(
                     Edge(
                         edge_type=edge_type,
@@ -557,18 +578,8 @@ class VariantBackgroundMixin:
                 if not will_descend:
                     continue
 
-                child_td, child_abs_td = distribution, abs_td_producer
-                producer_production_td = (
-                    self._normalized_production_edge_td_from_proxy(producer_process)
-                )
-                if producer_production_td is not None:
-                    child_td = (distribution * producer_production_td).simplify()
-                    child_abs_td = _join_datetime_and_timedelta_distributions(
-                        producer_production_td, abs_td_producer
-                    )
-
                 queue.append(
-                    (producer_process, child_td, td_producer, child_abs_td, new_supply)
+                    (producer_process, distribution, td_producer, abs_td_producer, new_supply)
                 )
         return edges
 
