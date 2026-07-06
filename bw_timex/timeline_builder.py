@@ -446,12 +446,37 @@ class TimelineBuilder:
             time_mapping_id (key) of the corresponding time-mapped activity.
 
         """
-        try:
-            return self.activity_time_mapping[
-                (("temporalized", self.nodes[node_id]["code"]), node_hash)
+        code = self.nodes[node_id]["code"]
+        db_keys = (("temporalized", code), self.nodes[node_id].key)
+        for db_key in db_keys:
+            try:
+                return self.activity_time_mapping[(db_key, node_hash)]
+            except KeyError:
+                continue
+        return self._nearest_time_mapping_key(db_keys, node_hash)
+
+    def _nearest_time_mapping_key(self, db_keys: tuple, node_hash: int) -> int:
+        """Fallback for a node consumed at a year that has no time-mapped column.
+
+        A background producer that is descended into is registered in
+        ``activity_time_mapping`` at its producer-side (delivery) years, but its
+        own production-edge TD shifts the years at which it *operates* (and is
+        therefore consumed as an input). When that operating year falls outside
+        the producer-side band, the exact lookup misses. Rather than raise (which
+        would leave the edge dangling and the technosphere nonsquare), snap to
+        the nearest registered year for the same node so the edge attaches to an
+        existing column. Mirrors the nearest-database interpolation used
+        everywhere else for out-of-band dates.
+        """
+        for db_key in db_keys:
+            candidates = [
+                (h, v)
+                for (k, h), v in self.activity_time_mapping.items()
+                if k == db_key
             ]
-        except KeyError:
-            return self.activity_time_mapping[((self.nodes[node_id].key), node_hash)]
+            if candidates:
+                return min(candidates, key=lambda hv: abs(hv[0] - node_hash))[1]
+        raise KeyError((db_keys[-1], node_hash))
 
     def _leaf_background_producers(self, edges_df: pd.DataFrame) -> set:
         """Producers that are leaves (never traversed into) and live in a static
