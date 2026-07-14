@@ -516,8 +516,8 @@ class TimexLCA:
             self.expanded_technosphere = True  # set flag for later static lcia usage
         else:  # setup for timeline approach
             logger.warning(
-                "Building the dynamic inventory directly from the timeline. This feature is under development.\
-                Use at your own risk... and check your results! Disaggregated lci is not yet implemented."
+                "Disaggregated lci is not yet implemented with this option.\n" \
+                "Please use expand_technosphere=True if you want to perform a contribution analysis on the background processes."
             )
             self.collect_temporalized_processes_from_timeline()
             data_obs = self.data_objs
