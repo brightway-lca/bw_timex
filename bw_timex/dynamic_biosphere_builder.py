@@ -91,9 +91,17 @@ class DynamicBiosphereBuilder:
             self.dynamic_supply_array = lca_obj.supply_array
             self.activity_dict = lca_obj.dicts.activity
         else:
-            self.dynamic_supply_array = timeline.amount.values.astype(
+            # `timeline.amount` is the LOCAL, per-edge exchange amount (per unit
+            # of the immediate consumer); it does not carry the upstream
+            # supply-chain scaling that a real linear solve provides "for free"
+            # in the `expand_technosphere=True` branch above. `cumulative_amount`
+            # is its recursively-scaled counterpart (see `edge_extractor.py`'s
+            # `Edge.cumulative_amount_producer` / `_join_cumulative_amount`) and
+            # is the correct quantity to scale each timeline row's biosphere/
+            # market contribution by.
+            self.dynamic_supply_array = timeline.cumulative_amount.values.astype(
                 float
-            )  # get the supply vector directly from the timeline
+            )  # get the (cumulative) supply vector directly from the timeline
 
         self.activity_time_mapping = activity_time_mapping
         self.biosphere_time_mapping = biosphere_time_mapping
