@@ -6,6 +6,8 @@ import bw2data as bd
 import numpy as np
 import pandas as pd
 import pytest
+from bw2data.tests import bw2test
+from bw_temporalis import TemporalDistribution
 from dynamic_characterization.classes import CharacterizedRow
 
 from bw_timex import TimexLCA
@@ -287,6 +289,50 @@ class TestTimexLCAEdgeCases:
         # dynamic_inventory should NOT exist
         assert not hasattr(tlca, "dynamic_inventory")
 
+    @pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+    def test_lci_expand_false_matches_expand_true(self, graph_traversal):
+        """``expand_technosphere=False`` builds the dynamic inventory directly
+        from the timeline instead of via the expanded technosphere/biosphere
+        matrices. It must agree with the (matrix-based) ``expand_technosphere=True``
+        result: A demands B in three equal (1/3) shares at 2022/2023/2024; B
+        always demands 1 unit of the background market C, interpolated between
+        db_2022 (15 kg CO2/unit) and db_2024 (10 kg CO2/unit). The expected
+        total is (15 + 12.5 + 10) / 3 = 12.5.
+
+        Regression test for a bug where `expand_technosphere=False` scaled
+        every node by its raw local (per-edge) timeline amount instead of its
+        true cumulative (supply-chain-scaled) throughput, overcounting nodes
+        more than one hop below a scale-1 ancestor (here: 3x too high, 37.5
+        instead of 12.5).
+        """
+        fu = bd.get_node(database="foreground", code="A")
+        database_dates = {
+            "db_2022": datetime.strptime("2022", "%Y"),
+            "db_2024": datetime.strptime("2024", "%Y"),
+            "foreground": "dynamic",
+        }
+
+        def run(expand_technosphere):
+            tlca = TimexLCA(
+                demand={fu.key: 1},
+                method=("GWP", "example"),
+                database_dates=database_dates,
+            )
+            tlca.build_timeline(
+                starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+                graph_traversal=graph_traversal,
+            )
+            tlca.lci(
+                expand_technosphere=expand_technosphere, build_dynamic_biosphere=True
+            )
+            return tlca.dynamic_inventory.sum()
+
+        total_true = run(True)
+        total_false = run(False)
+        assert total_true == pytest.approx(12.5)
+        assert total_false == pytest.approx(12.5)
+        assert total_false == pytest.approx(total_true)
+
     def test_lci_reuses_background_redo_lci_cache_across_calls(self):
         fu = bd.get_node(database="foreground", code="A")
         database_dates = {
@@ -525,3 +571,73 @@ class TestTimexLCAEdgeCases:
         assert isinstance(result, pd.DataFrame)
         assert len(result) > 0
         assert isinstance(tlca.dynamic_score, float)
+
+
+@bw2test
+def test_lci_expand_false_direct_biosphere_flow_beyond_hop_one():
+    """`expand_technosphere=False` must correctly scale a foreground process's
+    OWN direct biosphere flow (the "temporalized_processes" branch of
+    `DynamicBiosphereBuilder`), not just background-market contributions (the
+    "temporal_markets" branch, covered by `test_lci_expand_false_matches_expand_true`).
+
+    Chain: A -(1/3 each at 2022/2023/2024)-> B -> D, where D has its own direct
+    biosphere flow (100 kg CO2) and D is two hops from the functional unit (A),
+    same depth at which the original bug manifested. Expected total: 100
+    (100 kg CO2 scaled by 1/3 at each of the three time points sums to 100).
+    """
+    bd.Database("bio").write(
+        {("bio", "CO2"): {"type": "biosphere", "name": "carbon dioxide"}},
+    )
+    bd.Database("foreground").write(
+        {
+            ("foreground", "A"): {
+                "name": "A",
+                "location": "somewhere",
+                "reference product": "A",
+                "exchanges": [
+                    {"amount": 1, "type": "production", "input": ("foreground", "A")},
+                    {
+                        "amount": 1,
+                        "input": ("foreground", "B"),
+                        "temporal_distribution": TemporalDistribution(
+                            np.array([-24, -12, 0], dtype="timedelta64[M]"),
+                            np.array([1 / 3, 1 / 3, 1 / 3]),
+                        ),
+                        "type": "technosphere",
+                    },
+                ],
+            },
+            ("foreground", "B"): {
+                "name": "B",
+                "location": "somewhere",
+                "reference product": "B",
+                "exchanges": [
+                    {"amount": 1, "type": "production", "input": ("foreground", "B")},
+                    {"amount": 1, "input": ("foreground", "D"), "type": "technosphere"},
+                ],
+            },
+            ("foreground", "D"): {
+                "name": "D",
+                "location": "somewhere",
+                "reference product": "D",
+                "exchanges": [
+                    {"amount": 1, "type": "production", "input": ("foreground", "D")},
+                    {"amount": 100, "input": ("bio", "CO2"), "type": "biosphere"},
+                ],
+            },
+        }
+    )
+    bd.Method(("GWP", "example")).write([(("bio", "CO2"), 1)])
+    for db in bd.databases:
+        bd.Database(db).process()
+
+    fu = bd.get_node(database="foreground", code="A")
+    tlca = TimexLCA(
+        demand={fu.key: 1},
+        method=("GWP", "example"),
+        database_dates={"foreground": "dynamic"},
+    )
+    tlca.build_timeline(starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"))
+    tlca.lci(expand_technosphere=False, build_dynamic_biosphere=True)
+
+    assert tlca.dynamic_inventory.sum() == pytest.approx(100)

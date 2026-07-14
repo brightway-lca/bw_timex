@@ -202,12 +202,16 @@ class TimelineBuilder:
         edges_df = pd.DataFrame(edges_data)
 
         # adjust the sign for substitution exchanges:
-        edges_df["amount"] = edges_df["amount"] * edges_df["edge_type"].apply(
+        sign = edges_df["edge_type"].apply(
             lambda x: self.adjust_sign_of_amount_based_on_edge_type(x)
         )
+        edges_df["amount"] = edges_df["amount"] * sign
+        edges_df["cumulative_amount"] = edges_df["cumulative_amount"] * sign
 
         # Explode datetime and amount columns: each row with multiple dates and amounts is exploded into multiple rows with one date and one amount
-        edges_df = edges_df.explode(["consumer_date", "producer_date", "amount"])
+        edges_df = edges_df.explode(
+            ["consumer_date", "producer_date", "amount", "cumulative_amount"]
+        )
 
         # Create a hashable key from temporal_evolution dicts for dedup and groupby
         # (dicts are unhashable, so we need a hashable proxy column)
@@ -215,7 +219,24 @@ class TimelineBuilder:
             lambda d: tuple(sorted(d.items())) if isinstance(d, dict) else None
         )
 
-        dedup_cols = [c for c in edges_df.columns if c != "temporal_evolution"]
+        # `cumulative_amount` is deliberately excluded from the dedup key: rows
+        # that are otherwise identical (same producer/consumer/dates/local
+        # amount/edge type) can arise from the same time-collapsed node being
+        # reached via multiple distinct ancestor paths (e.g. absolute temporal
+        # distributions that look up the same producer dates regardless of
+        # which upstream cohort reached them). Those are genuine duplicates
+        # from the local-amount/dedup point of view (the existing behavior:
+        # keep one, don't sum), but their cumulative amounts must be summed
+        # across all such paths before the duplicates are dropped, since each
+        # path represents an additive upstream contribution.
+        dedup_cols = [
+            c
+            for c in edges_df.columns
+            if c not in ("temporal_evolution", "cumulative_amount")
+        ]
+        edges_df["cumulative_amount"] = edges_df.groupby(dedup_cols, dropna=False)[
+            "cumulative_amount"
+        ].transform("sum")
         edges_df.drop_duplicates(subset=dedup_cols, inplace=True)
         edges_df = edges_df[edges_df["amount"] != 0]
 
@@ -253,7 +274,7 @@ class TimelineBuilder:
                 ],
                 dropna=False,
             )
-            .agg({"amount": "sum"})
+            .agg({"amount": "sum", "cumulative_amount": "sum"})
             .reset_index()
         )
         # Reconstruct temporal_evolution dicts from the hashable _te_key
@@ -348,6 +369,7 @@ class TimelineBuilder:
                 "consumer",
                 "consumer_name",
                 "amount",
+                "cumulative_amount",
                 "temporal_market_shares",
                 "temporal_evolution",
                 "temporal_evolution_reference",
@@ -398,6 +420,13 @@ class TimelineBuilder:
             "consumer_date": consumer_date,
             "producer_date": edge.abs_td_producer.date,
             "amount": edge.abs_td_producer.amount,
+            # Same dates/shape as "amount", but holding the true cumulative
+            # (supply-chain-scaled) throughput rather than just the local,
+            # per-unit-of-immediate-consumer exchange amount. Used to build the
+            # dynamic inventory directly from the timeline
+            # (`TimexLCA.lci(expand_technosphere=False)`), where there is no
+            # matrix solve to derive this scale from otherwise.
+            "cumulative_amount": edge.cumulative_amount_producer.amount,
             "edge_type": edge.edge_type,
             "temporal_evolution": edge.temporal_evolution,
             "temporal_evolution_reference": edge.temporal_evolution_reference,

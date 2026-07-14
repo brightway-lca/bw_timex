@@ -344,6 +344,39 @@ def test_single_background_db_with_td_matches_static(
 
 
 @pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_expand_false_traverse_background_matches_static(
+    background_td_single_db, graph_traversal
+):
+    """Same scenario as `test_single_background_db_with_td_matches_static`, but
+    building the dynamic inventory directly from the timeline
+    (`expand_technosphere=False`) instead of via the expanded matrices.
+
+    Regression test for the variant-descent (`traverse_background=True`) path
+    of the `expand_technosphere=False` local-vs-cumulative-amount fix: `fuel`
+    is reached two hops into the background (fu -> electricity -> fuel), so a
+    naive local (non-cumulative) scaling would overcount it.
+    """
+    import bw2calc as bc
+
+    demand = {("foreground", "fu"): 1}
+    database_dates = {"background": datetime(2020, 1, 1), "foreground": "dynamic"}
+
+    slca = bc.LCA(demand, method=METHOD)
+    slca.lci()
+    slca.lcia()
+
+    tlca = TimexLCA(demand=demand, method=METHOD, database_dates=database_dates)
+    tlca.build_timeline(
+        starting_datetime="2024-01-01",
+        graph_traversal=graph_traversal,
+        traverse_background=True,
+    )
+    tlca.lci(expand_technosphere=False, build_dynamic_biosphere=True)
+
+    assert tlca.dynamic_inventory.sum() == pytest.approx(slca.score, rel=1e-9)
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
 def test_zero_amount_exchange_in_descended_background(
     background_td_zero_exchange_db, graph_traversal
 ):
