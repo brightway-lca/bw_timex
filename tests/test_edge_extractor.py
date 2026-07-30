@@ -4,7 +4,10 @@ import numpy as np
 import pytest
 from bw_temporalis import TemporalDistribution
 
-from bw_timex.edge_extractor import _join_datetime_and_timedelta_distributions
+from bw_timex.edge_extractor import (
+    _join_datetime_and_timedelta_distributions,
+    VariantBackgroundMixin,
+)
 
 
 class TestJoinDatetimeAndTimedeltaDistributions:
@@ -91,3 +94,21 @@ class TestJoinDatetimeAndTimedeltaDistributions:
         )
         with pytest.raises(ValueError, match="Can't join"):
             _join_datetime_and_timedelta_distributions("not_a_td", td_consumer)
+
+
+def test_fold_production_td_outer_product():
+    base = TemporalDistribution(
+        date=np.array([0, 10], dtype="timedelta64[Y]"),
+        amount=np.array([0.6, 0.4]),
+    )
+    prod = TemporalDistribution(
+        date=np.array([0, 3], dtype="timedelta64[Y]"),
+        amount=np.array([0.5, 0.5]),
+    )
+    out = VariantBackgroundMixin._fold_production_td(base, prod)
+    # dates: 0+0, 0+3, 10+0, 10+3  (i-major)
+    assert list(out.date.astype("timedelta64[Y]").astype(int)) == [0, 3, 10, 13]
+    # amounts: 0.6*0.5, 0.6*0.5, 0.4*0.5, 0.4*0.5
+    np.testing.assert_allclose(out.amount, [0.3, 0.3, 0.2, 0.2])
+    # total weight preserved (prod is normalized)
+    assert out.amount.sum() == pytest.approx(base.amount.sum())
