@@ -15,6 +15,6 @@ submodules:
    include: all
 
 build:
-   os: "ubuntu-lts-latest" # https://docs.readthedocs.io/en/stable/config-file/v2.html#build-os
+   os: "ubuntu-24.04" # https://docs.readthedocs.io/en/stable/config-file/v2.html#build-os
    tools:
-      python: "mambaforge-latest" # https://docs.readthedocs.io/en/stable/config-file/v2.html#build-tools-python, mamba instead of conda for better build performance
+      python: "miniforge3-latest" # https://docs.readthedocs.io/en/stable/config-file/v2.html#build-tools-python, miniforge3 replaces deprecated mambaforge and bundles mamba
