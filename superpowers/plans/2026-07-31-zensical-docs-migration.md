@@ -8,14 +8,14 @@
 
 **Tech Stack:** zensical (0.0.37 at time of writing), mkdocstrings[python], mkdocs-autorefs, pymdown-extensions >= 10.0, nbconvert >= 7.0, MathJax 3 via CDN.
 
-**Spec:** `docs/superpowers/specs/2026-07-31-zensical-docs-migration-design.md`
+**Spec:** `superpowers/specs/2026-07-31-zensical-docs-migration-design.md`
 
 ## Global Constraints
 
 - **Reference implementation:** `/Users/timodiepers/Documents/Coding/optimex` — copy its file layout, `zensical.toml` structure, `docs/convert_notebooks.py`, `docs/javascripts/source-overrides.js` and `docs/stylesheets/extra.css` rather than inventing new patterns. Deviations are listed per task.
 - **Prose is ported, not rewritten.** Only syntax changes. Do not reword paragraphs, retitle sections, or reorder content unless a step says so.
 - **No "grid cards" on the landing page or the API pages** (explicit user decision). The examples index keeps cards because it already uses them today.
-- **Tabbed navigation** grouped like optimex: Home / User Guide / Theory / Examples / API Reference, with `navigation.tabs` enabled. (This reverses an earlier flat-nav decision; the change landed in commit `10ab75a`.)
+- **Tabbed navigation** grouped like optimex: Home / User Guide / Theory / Examples / API Reference, with `navigation.tabs` + `navigation.indexes` enabled. Sections that own an index page (Getting Started, Examples, API Reference) use it as the section landing page, with their sub-pages nested beneath. (This reverses an earlier flat-nav decision; commits `10ab75a` and later.)
 - **Python tooling is `uv`.** Use `uv pip install`, never bare `pip` or `conda`, for local work. The `.venv` in the repo root is Python 3.12.12 and already has `bw_timex` installed editable.
 - **Commit messages carry no Claude attribution trailers.** No `Co-Authored-By: Claude`, no `Claude-Session:`.
 - **Branch:** `docs/zensical-migration`, already created off `origin/main` @ `5f158e3`. Do not merge or open a PR.
@@ -1055,10 +1055,10 @@ git rm -r docs/_templates
 
 ```bash
 grep -rn "conf.py\|environment.yaml\|_templates\|custom.css\|sphinx" --include='*.toml' --include='*.yaml' --include='*.yml' --include='*.md' --include='*.cff' . \
-  | grep -v '^./docs/superpowers/' | grep -v '^./site/' | grep -v '^./.venv/'
+  | grep -v '^./superpowers/' | grep -v '^./site/' | grep -v '^./.venv/'
 ```
 
-Expected: no hits pointing at the deleted docs files. Hits inside `docs/superpowers/` (this plan and the spec) are fine. If `.github/workflows/*` or `CONTRIBUTING.md` mention building the docs with Sphinx, update those references to `zensical build` in this step.
+Expected: no hits pointing at the deleted docs files. Hits inside `superpowers/` (this plan and the spec) are fine. If `.github/workflows/*` or `CONTRIBUTING.md` mention building the docs with Sphinx, update those references to `zensical build` in this step.
 
 - [ ] **Step 5: Full clean build**
 

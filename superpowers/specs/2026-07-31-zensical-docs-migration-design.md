@@ -67,6 +67,9 @@ into `site/`.
   pydata-sphinx-theme, myst-parser, sphinx-click, sphinx-design, sphinx-notfound-page,
   sphinx-favicon, sphinx-copybutton, sphinx-autobuild) with the Zensical set above.
 - **`.gitignore`**: add `site/`.
+- **`superpowers/`** (this spec, the plan, and task reports) lives at the repository root,
+  not under `docs/`. Zensical renders every `.md` under `docs/` and offers no page-exclusion
+  config, so internal planning documents kept there would be published to the public site.
 - **Deleted**: `docs/conf.py`, `docs/environment.yaml`, `docs/_templates/` (including
   `autoapi_templates/`). Git history retains them.
 
@@ -99,12 +102,15 @@ Five top-level tabs, grouped as in `optimex`. Within each tab, pages keep the or
 old toctrees gave them:
 
 ```
-Home            index.md, changelog, license, contributing, code of conduct, funding
-User Guide      installation, getting started (index + steps 1-4),
-                what LCA should I do?, modeling paradigms
+Home            Overview (index.md), Changelog, License, Contributing,
+                Code of Conduct, Funding
+User Guide      Installation
+                Getting Started ......... section index + Steps 1-4 nested beneath
+                What LCA should I do?
+                Modeling paradigms
 Theory          content/theory.md
-Examples        content/examples/index.md + 4 generated notebook pages
-API Reference   api/index.md + 7 module pages
+Examples        section index + 4 generated notebook pages nested beneath
+API Reference   section index + 7 module pages nested beneath
 ```
 
 ## Feature mapping
