@@ -14,23 +14,23 @@
 [![status](https://joss.theoj.org/papers/eb9021af0207b86e02439768a4841670/status.svg)](https://joss.theoj.org/papers/eb9021af0207b86e02439768a4841670)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb)
 
-This is a python package for [time-explicit Life Cycle Assessment](https://docs.brightway.dev/projects/bw-timex/en/latest/content/theory.html#terminology) that helps you assess the environmental impacts of products and processes over time. `bw_timex` builds on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
+**`bw_timex` makes your LCA use the right data for the right point in time.** It's a python package for [time-explicit Life Cycle Assessment](https://docs.brightway.dev/projects/bw-timex/en/latest/content/theory.html#terminology), built on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
 
-## ✨ Features
-This package enables you to account for:
-- **Timing of processes** throughout the supply chain (e.g., end-of-life treatment occurs 20 years after construction)
-- **Variable** and/or **evolving** supply chains & technologies (e.g., increasing shares of renewable electricity or higher process efficiencies in the future)
-- **Timing of emissions** (by applying dynamic characterization functions)
+## ⏳ The problem
+An LCA normally evaluates your **entire supply chain with data for a single point in time**. But an electric car built in 2025 has a battery made in 2024, is driven on an evolving electricity mix until 2040, and is recycled with 2040 technologies. Anything long-lived, or in a system that changes over time, ends up being assessed with **data that doesn't match when processes actually happen**.
 
-You can define temporal distributions for process and emission exchanges, which are then automatically propagated through the supply chain and mapped to corresponding time-specific background databases. In addition, you can also define the temporal evolution of processes and emission exchanges, which applies a time-dependent modification to the exchange amounts compared to the original amounts. The resulting time-explicit LCI reflects the current technology status within the production system at the actual time of each process. Also, `bw_timex` keeps track of the timing of emissions, which means that you can apply [dynamic characterization functions](https://github.com/brightway-lca/dynamic_characterization).
+You *can* work around this by hand: split each exchange into one copy per point in time, work out which year every process upstream lands in — a delay at one level shifts every other process connected to it — and wire each copy to a different time-specific background database. It's tedious, easy to get wrong, and you redo it every time the model changes.
 
-## 💡 Use Cases
-`bw_timex` is ideal for cases with:
-- **Variable** or strongly **evolving production systems**
-- **Long-lived** products
-- **Biogenic** carbon
+## ✨ What `bw_timex` does
+**You bring** your normal Brightway model, plus:
+- **temporal distributions**, specifying when each exchange happens relative to the process consuming it — either a single shift ("2 years earlier") or spread over time ("30% two years earlier, 50% now, 20% four years later")
+- **time-specific process data**, like background databases representing different points in time (e.g. from [`premise`](https://github.com/polca/premise)) and, for your own foreground processes, how they change over time (e.g. efficiency gains)
 
-Still unsure if you need time-explicit LCA? Overwhelmed by all the options? [Check out our decision tree](https://docs.brightway.dev/projects/bw-timex/en/latest/content/decisiontree.html) for some guidance.
+**`bw_timex` figures out** when every process in the supply chain actually happens, relinks each one to the background database matching that date (interpolating between databases in between), and applies your time-specific amounts.
+
+**You get** a time-explicit inventory: each process assessed with data from the time it actually occurs, and each emission tagged with when it happens — so you can characterize it with [dynamic characterization functions](https://github.com/brightway-lca/dynamic_characterization) instead of static factors.
+
+Most useful for long-lived products, strongly evolving production systems, and biogenic carbon. Still unsure whether you need time-explicit LCA? [Check out our decision tree](https://docs.brightway.dev/projects/bw-timex/en/latest/content/decisiontree.html) for some guidance.
 
 ## 👩‍💻 Getting Started
 - [Installation Guide](https://docs.brightway.dev/projects/bw-timex/en/latest/content/installation.html)
