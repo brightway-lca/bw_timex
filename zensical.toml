@@ -11,14 +11,23 @@ edit_uri = "edit/main/docs/"
 copyright = "Copyright &copy; 2026 bw_timex developers"
 
 nav = [
-  { Overview = "index.md" },
-  { Installation = "content/installation.md" },
-  { "Getting Started" = [
-    { Overview = "content/getting_started/index.md" },
+  { Home = [
+    { Overview = "index.md" },
+    { Changelog = "content/changelog.md" },
+    { License = "content/license.md" },
+    { Contributing = "content/contributing.md" },
+    { "Code of Conduct" = "content/codeofconduct.md" },
+    { Funding = "content/funding.md" },
+  ]},
+  { "User Guide" = [
+    { Installation = "content/installation.md" },
+    { "Getting Started" = "content/getting_started/index.md" },
     { "Step 1 - Adding temporal information" = "content/getting_started/adding_temporal_information.md" },
     { "Step 2 - Building the process timeline" = "content/getting_started/build_process_timeline.md" },
     { "Step 3 - Calculating the time-explicit LCI" = "content/getting_started/time_explicit_lci.md" },
     { "Step 4 - Impact assessment" = "content/getting_started/lcia.md" },
+    { "What LCA should I do?" = "content/decisiontree.md" },
+    { "Modeling paradigms" = "content/dev/explicit_process_product_paradigm.md" },
   ]},
   { Theory = "content/theory.md" },
   { Examples = [
@@ -38,13 +47,6 @@ nav = [
     { "Helper Classes" = "api/helper_classes.md" },
     { Utils = "api/utils.md" },
   ]},
-  { "What LCA should I do?" = "content/decisiontree.md" },
-  { "Modeling paradigms" = "content/dev/explicit_process_product_paradigm.md" },
-  { Contributing = "content/contributing.md" },
-  { "Code of Conduct" = "content/codeofconduct.md" },
-  { License = "content/license.md" },
-  { Changelog = "content/changelog.md" },
-  { Funding = "content/funding.md" },
 ]
 
 extra_javascript = [
@@ -71,6 +73,7 @@ features = [
   "navigation.footer",
   "navigation.instant",
   "navigation.instant.prefetch",
+  "navigation.tabs",
   "navigation.path",
   "navigation.top",
   "navigation.tracking",
