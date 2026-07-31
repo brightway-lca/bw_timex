@@ -29,7 +29,6 @@ nav = [
       { "Step 4 - Impact assessment" = "content/getting_started/lcia.md" },
     ]},
     { "What LCA should I do?" = "content/decisiontree.md" },
-    { "Modeling paradigms" = "content/dev/explicit_process_product_paradigm.md" },
   ]},
   { Theory = "content/theory.md" },
   { Examples = [
@@ -89,16 +88,16 @@ features = [
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
 scheme = "default"
-primary = "light-green"
-accent = "light-green"
+primary = "deep-purple"
+accent = "deep-purple"
 toggle.icon = "lucide/sun"
 toggle.name = "Switch to dark mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: dark)"
 scheme = "slate"
-primary = "light-green"
-accent = "light-green"
+primary = "deep-purple"
+accent = "deep-purple"
 toggle.icon = "lucide/moon-star"
 toggle.name = "Switch to light mode"
 
