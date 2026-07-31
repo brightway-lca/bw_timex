@@ -23,6 +23,10 @@ nav = [
   { Theory = "content/theory.md" },
   { Examples = [
     { Overview = "content/examples/index.md" },
+    { "Life Cycle of an Electric Car" = "content/examples/example_electric_vehicle_premise.md" },
+    { "Dynamic Characterization" = "content/examples/example_simple_dynamic_characterization.md" },
+    { "EV Case Study for our Paper" = "content/examples/paper_case_study.md" },
+    { "Import from Excel" = "content/examples/example_Importing_model_from_excel.md" },
   ]},
   { "What LCA should I do?" = "content/decisiontree.md" },
   { "Modeling paradigms" = "content/dev/explicit_process_product_paradigm.md" },
