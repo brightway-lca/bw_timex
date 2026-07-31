@@ -595,6 +595,33 @@ class TimexLCA:
                     self.lca.redo_lci(self.fu)
                     self._lci_did_reset = True
             else:
+                # Same planning as above, minus the functional-unit solve: the
+                # supply comes from the timeline, so only the background
+                # unit-LCI solves during the build matter here.
+                self.lca.load_lci_data()
+                shadow = DynamicBiosphereBuilder(
+                    self.lca,
+                    self.activity_time_mapping,
+                    TimeMappingDict(start_id=0),
+                    self.demand_timing,
+                    self.node_collections,
+                    self.temporal_grouping,
+                    self.database_dates,
+                    self.database_dates_static,
+                    self.timeline,
+                    self.interdatabase_activity_mapping,
+                    expand_technosphere=False,
+                    background_unit_lci_cache=self._background_unit_lci_cache,
+                )
+                pending = shadow.count_pending_background_solves()
+                self._lci_pending_solves = pending
+
+                if pending >= FACTORIZE_SOLVES_THRESHOLD:
+                    # Many `redo_lci`s coming; pay the LU factorization once.
+                    # No solve needed, just the factorized technosphere.
+                    self.lca.decompose_technosphere()
+                    self._lci_did_factorize = True
+
                 self.calculate_dynamic_inventory(expand_technosphere=False)
 
     def disaggregate_background_lci(self) -> None:

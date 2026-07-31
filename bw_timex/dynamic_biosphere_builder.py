@@ -6,7 +6,11 @@ from bw_temporalis import TemporalDistribution
 from scipy import sparse as sp
 
 from .helper_classes import SetList
-from .utils import convert_date_string_to_datetime, get_temporal_evolution_factor
+from .utils import (
+    convert_date_string_to_datetime,
+    get_reference_product_production_amount,
+    get_temporal_evolution_factor,
+)
 
 
 class DynamicBiosphereBuilder:
@@ -99,9 +103,9 @@ class DynamicBiosphereBuilder:
             # `Edge.cumulative_amount_producer` / `_join_cumulative_amount`) and
             # is the correct quantity to scale each timeline row's biosphere/
             # market contribution by.
-            self.dynamic_supply_array = timeline.cumulative_amount.values.astype(
-                float
-            )  # get the (cumulative) supply vector directly from the timeline
+            self.dynamic_supply_array = self._supply_array_from_timeline(
+                timeline, node_collections
+            )
 
         self.activity_time_mapping = activity_time_mapping
         self.biosphere_time_mapping = biosphere_time_mapping
@@ -134,6 +138,35 @@ class DynamicBiosphereBuilder:
         # within one build_dynamic_biosphere_matrix run.
         self._rebuilt_unit_lci_cache = {}
         self.temporal_market_cols = []  # To keep track of temporal market columns
+
+    @staticmethod
+    def _supply_array_from_timeline(
+        timeline: pd.DataFrame, node_collections: dict
+    ) -> np.ndarray:
+        """Per-timeline-row supply, used instead of a solved supply array when
+        the dynamic inventory is built directly from the timeline.
+
+        `timeline.cumulative_amount` is the supply-chain-scaled amount of the
+        producer's PRODUCT (the local, per-consumer `timeline.amount` scaled by
+        all upstream edges). That is what the temporal markets need, since their
+        background unit LCIs are also per unit of product. A temporalized
+        process, however, is scaled by its own production amount when its
+        biosphere exchanges are read (those are per production amount, not per
+        unit of product), which the expanded technosphere gets for free from the
+        solve. So convert those rows to process units here.
+        """
+        supply = timeline.cumulative_amount.values.astype(float)
+        temporalized = node_collections["temporalized_processes"]
+        production_amounts = {}
+        for position, row in enumerate(timeline.itertuples()):
+            if row.time_mapped_producer not in temporalized:
+                continue
+            if row.producer not in production_amounts:
+                production_amounts[row.producer] = (
+                    get_reference_product_production_amount(row.producer)
+                )
+            supply[position] /= production_amounts[row.producer]
+        return supply
 
     def build_dynamic_biosphere_matrix(
         self,
@@ -257,6 +290,11 @@ class DynamicBiosphereBuilder:
                         )
 
             elif idx in self.node_collections["temporal_markets"]:
+                if expand_technosphere and idx in temporal_market_lcis:
+                    # Several timeline rows (one per consumer) can share a
+                    # time-mapped market, but with expanded matrices they all
+                    # map to the same column, whose supply already sums them up.
+                    continue
                 self.temporal_market_cols.append(process_col_index)
                 (
                     (original_db, original_code),
@@ -269,20 +307,30 @@ class DynamicBiosphereBuilder:
                     demand = self.demand_from_timeline(row)
 
                 if demand:
+                    # lci of all background activities of the temporal market,
+                    # per unit of market output. Built per timeline row: the
+                    # same time-mapped market can occur in several rows (one per
+                    # consumer), and when building from the timeline each of
+                    # those rows is its own column with its own supply.
+                    unit_lci_total = None
                     for act, amount in demand.items():
-                        unit_lci = self.get_background_unit_lci(act)
-                        # add lci of both background activities of the temporal market and save total lci
-                        if idx not in temporal_market_lcis.keys():
-                            temporal_market_lcis[idx] = unit_lci * amount
-                        else:
-                            temporal_market_lcis[idx] += unit_lci * amount
+                        unit_lci = self.get_background_unit_lci(act) * amount
+                        unit_lci_total = (
+                            unit_lci
+                            if unit_lci_total is None
+                            else unit_lci_total + unit_lci
+                        )
 
-                    aggregated_inventory = temporal_market_lcis[idx].sum(axis=1)
+                    aggregated_inventory = unit_lci_total.sum(axis=1)
 
                     # multiply LCI with supply of temporal market
-                    temporal_market_lcis[idx] *= self.dynamic_supply_array[
-                        process_col_index
-                    ]
+                    scaled_lci = (
+                        unit_lci_total * self.dynamic_supply_array[process_col_index]
+                    )
+                    if idx not in temporal_market_lcis:
+                        temporal_market_lcis[idx] = scaled_lci
+                    else:
+                        temporal_market_lcis[idx] += scaled_lci
 
                     for row_idx, amount in enumerate(aggregated_inventory.A1):
                         bioflow = self.lca_obj.dicts.biosphere.reversed[row_idx]
@@ -544,20 +592,17 @@ class DynamicBiosphereBuilder:
         technosphere upfront is worth it; factorization only pays off once
         the number of pending solves exceeds the break-even point.
         """
-        if not self._expand_technosphere:
-            # Non-expand path: demands come from the timeline rows and we
-            # cannot cheaply enumerate without effectively running the build.
-            # Be conservative and report unknown-many so callers can fall
-            # back to the default factorize policy if they care.
-            return len(self.node_collections.get("temporal_markets", ()))
-
         pending_keys = set()
         for row in self.timeline.itertuples():
             idx = row.time_mapped_producer
             if idx not in self.node_collections["temporal_markets"]:
                 continue
-            process_col_index = self.activity_dict[idx]
-            demand = self.demand_from_technosphere(idx, process_col_index)
+            if self._expand_technosphere:
+                demand = self.demand_from_technosphere(idx, self.activity_dict[idx])
+            else:
+                # Timeline path: the demands come from the row's temporal
+                # market shares, which is a plain mapping lookup — no solve.
+                demand = self.demand_from_timeline(row)
             if not demand:
                 continue
             for act in demand:

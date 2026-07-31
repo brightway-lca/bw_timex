@@ -13,7 +13,7 @@ from bw_timex._lci_cache import (
 )
 
 
-def _build_tlca(**kwargs):
+def _build_tlca(expand_technosphere=True, **kwargs):
     node_a = bd.get_node(database="foreground", code="A")
     database_dates = {
         "db_2020": datetime.strptime("2020", "%Y"),
@@ -26,7 +26,9 @@ def _build_tlca(**kwargs):
         **kwargs,
     )
     tlca.build_timeline(starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"))
-    tlca.lci(expand_technosphere=True, build_dynamic_biosphere=True)
+    tlca.lci(
+        expand_technosphere=expand_technosphere, build_dynamic_biosphere=True
+    )
     return tlca
 
 
@@ -192,6 +194,46 @@ class TestModuleLevelLCICache:
         assert len(BIOSPHERE_EXCHANGES_CACHE) > 0
         bw_timex.clear_background_lci_cache()
         assert len(BIOSPHERE_EXCHANGES_CACHE) == 0
+
+    def test_from_timeline_counts_pending_background_solves(self):
+        # Building from the timeline needs the same background unit LCIs as the
+        # expanded path, so it has to plan its solves the same way.
+        tlca = _build_tlca(expand_technosphere=False)
+        assert tlca._lci_pending_solves > 0
+        tlca_warm = _build_tlca(expand_technosphere=False)
+        assert tlca_warm._lci_pending_solves == 0
+
+    def test_from_timeline_factorizes_when_above_threshold(self, monkeypatch):
+        import bw_timex.timex_lca as tlca_mod
+
+        monkeypatch.setattr(tlca_mod, "FACTORIZE_SOLVES_THRESHOLD", 1)
+        tlca = _build_tlca(expand_technosphere=False)
+        assert tlca._lci_did_factorize is True
+
+    def test_from_timeline_skips_factorization_when_below_threshold(self, monkeypatch):
+        import bw_timex.timex_lca as tlca_mod
+
+        monkeypatch.setattr(tlca_mod, "FACTORIZE_SOLVES_THRESHOLD", 1000)
+        tlca = _build_tlca(expand_technosphere=False)
+        assert tlca._lci_did_factorize is False
+
+    def test_from_timeline_warm_cache_skips_factorization(self, monkeypatch):
+        import bw_timex.timex_lca as tlca_mod
+
+        monkeypatch.setattr(tlca_mod, "FACTORIZE_SOLVES_THRESHOLD", 1)
+        _build_tlca(expand_technosphere=False)
+        # Everything the second run needs is cached, so there is nothing left
+        # to factorize for.
+        tlca_warm = _build_tlca(expand_technosphere=False)
+        assert tlca_warm._lci_did_factorize is False
+
+    def test_from_timeline_matches_expanded_score(self):
+        tlca_expanded = _build_tlca(expand_technosphere=True)
+        tlca_expanded.static_lcia()
+        tlca_timeline = _build_tlca(expand_technosphere=False)
+        assert tlca_timeline.dynamic_inventory.sum() == pytest.approx(
+            tlca_expanded.dynamic_inventory.sum()
+        )
 
     def test_warm_skips_initial_lca_solve(self):
         # First run populates both unit-LCI cache and solve cache.

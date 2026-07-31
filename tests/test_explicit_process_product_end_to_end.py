@@ -500,17 +500,8 @@ def test_multi_vintage_demand_splits_across_cohorts():
     assert tlca.static_score == pytest.approx(0.5 * 0.40 + 0.5 * 0.10)
 
 
-def test_explicit_output_coefficient_alpha_scales_inputs():
-    """Production output coefficient alpha != 1 must scale the supply chain by 1/alpha.
-
-    A process produces *2* units of its product per invocation and consumes 4
-    units of background input. Demanding 1 unit of the product therefore runs
-    the process at scale 1/2, so the input is consumed at 0.5 * 4 = 2.0 and the
-    score is 2.0 (background = 1 kg CO2 per input unit, GWP = 1).
-
-    Every existing explicit fixture uses production amount = 1, so the 1/alpha
-    division is otherwise never exercised: a bug there would be invisible.
-    """
+def _write_explicit_alpha_db():
+    """Explicit process/product setup with a production output coefficient of 2."""
     bd.projects.set_current("__test_explicit_alpha_scaling__")
     bd.databases.clear()
     bd.methods.clear()
@@ -572,6 +563,20 @@ def test_explicit_output_coefficient_alpha_scales_inputs():
     for db in bd.databases:
         bd.Database(db).process()
 
+
+def test_explicit_output_coefficient_alpha_scales_inputs():
+    """Production output coefficient alpha != 1 must scale the supply chain by 1/alpha.
+
+    A process produces *2* units of its product per invocation and consumes 4
+    units of background input. Demanding 1 unit of the product therefore runs
+    the process at scale 1/2, so the input is consumed at 0.5 * 4 = 2.0 and the
+    score is 2.0 (background = 1 kg CO2 per input unit, GWP = 1).
+
+    Every existing explicit fixture uses production amount = 1, so the 1/alpha
+    division is otherwise never exercised: a bug there would be invisible.
+    """
+    _write_explicit_alpha_db()
+
     product = bd.get_node(database="foreground", code="product")
     method = ("GWP", "example")
     demand = {product.key: 1}
@@ -602,6 +607,30 @@ def test_explicit_output_coefficient_alpha_scales_inputs():
         for row in input_rows.itertuples()
     )
     assert observed == pytest.approx([(2030, 2030, 2.0), (2031, 2031, 2.0)])
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_explicit_output_coefficient_alpha_from_timeline(graph_traversal):
+    """Same alpha != 1 setup, but with the dynamic inventory built directly from
+    the timeline. `cumulative_amount` is in units of the produced product, so
+    the 1/alpha scaling has to be applied exactly once, when the process's own
+    biosphere exchanges are read - not zero times and not twice.
+    """
+    _write_explicit_alpha_db()
+
+    product = bd.get_node(database="foreground", code="product")
+    demand = {product.key: 1}
+    method = ("GWP", "example")
+    database_dates = {"background": datetime(2030, 1, 1), "foreground": "dynamic"}
+
+    tlca = TimexLCA(demand=demand, method=method, database_dates=database_dates)
+    tlca.build_timeline(
+        starting_datetime=datetime(2030, 1, 1), graph_traversal=graph_traversal
+    )
+    tlca.lci(expand_technosphere=False)
+
+    # 1 unit of product = 0.5 process invocations = 2 units of input = 2 kg CO2
+    assert tlca.dynamic_inventory.sum() == pytest.approx(2.0)
 
 
 def _write_explicit_two_background_cohort_db():
