@@ -21,6 +21,7 @@
 - **Branch:** `docs/zensical-migration`, already created off `origin/main` @ `5f158e3`. Do not merge or open a PR.
 - **Admonition syntax:** classic Material (`!!! type "Title"`) with **4-space indented body**. Every nested code fence, image, and mermaid block inside an admonition must be indented 4 spaces too.
 - **Light/dark images:** Zensical supports this natively via the URL fragments `#only-light` and `#only-dark`. Verified in `zensical/templates/assets/stylesheets/*/palette.*.min.css`. **Do not write custom CSS for it.**
+- **Custom CSS is capped at optimex parity.** `docs/stylesheets/extra.css` is optimex's stylesheet verbatim, minus its project-specific `.example-flowchart` rule. **Do not add a single rule beyond it.** Where the Sphinx docs used a bespoke style, use the nearest built-in Zensical/Material feature instead — a built-in admonition type, a built-in palette color, a built-in theme feature. Brand color comes from the built-in `light-green` palette in `zensical.toml`, not from CSS variables. If a step appears to require a new CSS rule, that step is wrong: report it rather than writing the rule.
 - **Do not delete or modify anything under `docs/content/data/`, `docs/content/examples/data/`, or `docs/_static/`** except where a step says so. 12 SVGs in `content/data/` are already unreferenced today; leave them.
 - **Do not touch the top-level `notebooks/` directory.** The notebooks the docs render live in `docs/content/examples/` and are separate, output-bearing copies.
 
@@ -30,8 +31,8 @@
 
 **Created:**
 - `zensical.toml` — site config, nav, theme, markdown extensions, mkdocstrings config
+- `docs/stylesheets/extra.css` — optimex's stylesheet verbatim, minus its `.example-flowchart` rule
 - `docs/requirements.txt` — docs build dependencies for RTD
-- `docs/stylesheets/extra.css` — brand palette, header title styling, custom `launch` admonition
 - `docs/javascripts/source-overrides.js` — repoints edit/view buttons on notebook-derived pages
 - `docs/convert_notebooks.py` — nbconvert wrapper for the four example notebooks
 - `docs/api/index.md` + 7 module pages — mkdocstrings API reference
@@ -54,7 +55,7 @@ Stands up the build so every later task can verify itself with a real build. Nav
 - Modify: `.gitignore`
 
 **Interfaces:**
-- Produces: a working `zensical build` writing to `site/`; the `nav` array that Tasks 8 and 9 extend; `docs/stylesheets/extra.css`, which Task 4 extends with the `launch` admonition.
+- Produces: a working `zensical build` writing to `site/`; the `nav` array that Tasks 8 and 9 extend.
 
 - [ ] **Step 1: Install the docs toolchain**
 
@@ -148,16 +149,16 @@ features = [
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
 scheme = "default"
-primary = "custom"
-accent = "custom"
+primary = "light-green"
+accent = "light-green"
 toggle.icon = "lucide/sun"
 toggle.name = "Switch to dark mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: dark)"
 scheme = "slate"
-primary = "custom"
-accent = "custom"
+primary = "light-green"
+accent = "light-green"
 toggle.icon = "lucide/moon-star"
 toggle.name = "Switch to light mode"
 
@@ -211,7 +212,12 @@ custom_checkbox = true
 [project.markdown_extensions.pymdownx.tilde]
 
 [project.plugins.mkdocstrings]
-enabled = true
+# Temporarily disabled: mkdocstrings registers a block processor that fires on any
+# line starting with ":::", which collides fatally with the MyST colon-fence
+# directives still present in theory.md, installation.md, examples/index.md and
+# getting_started/adding_temporal_information.md. Task 9 flips this to true, by
+# which point Tasks 3/4/5/7 have removed every colon fence.
+enabled = false
 default_handler = "python"
 
 [project.plugins.mkdocstrings.handlers.python]
@@ -244,28 +250,12 @@ filters = ["!^_", "!^__"]
 
 Two deliberate differences from `optimex`: `navigation.tabs` is absent (flat nav), and `mkdocstrings.handlers.python.paths = ["."]` because `bw_timex` uses a flat layout, not `src/`.
 
-- [ ] **Step 3: Seed `docs/stylesheets/extra.css`**
+- [ ] **Step 3: Copy optimex's stylesheet**
 
-Start from optimex's file, minus its optimex-only rules, plus the brand palette. Copy `/Users/timodiepers/Documents/Coding/optimex/docs/stylesheets/extra.css` to `docs/stylesheets/extra.css`, delete the `.example-flowchart` rule (optimex-specific), and prepend the brand palette block:
-
-```css
-/* Brand palette — greens taken from the bw_timex logo */
-:root {
-  --md-primary-fg-color:        #316733;
-  --md-primary-fg-color--light: #74b944;
-  --md-primary-fg-color--dark:  #24502a;
-  --md-accent-fg-color:         #74b944;
-}
-
-[data-md-color-scheme="slate"] {
-  --md-primary-fg-color:        #74b944;
-  --md-primary-fg-color--light: #8fd15e;
-  --md-primary-fg-color--dark:  #316733;
-  --md-accent-fg-color:         #8fd15e;
-}
-```
-
-The optimex file already contains the `.md-header__topic:first-child` rule that renders the site title in lowercase monospace — keep it, it suits `bw_timex`.
+Copy `/Users/timodiepers/Documents/Coding/optimex/docs/stylesheets/extra.css` to
+`docs/stylesheets/extra.css` and delete only its `.example-flowchart` rule (optimex-specific).
+Add nothing else — no brand-palette block, no admonition rules. Brand color comes from the
+built-in `light-green` palette already set in the `zensical.toml` above.
 
 - [ ] **Step 4: Ignore the build output**
 
@@ -284,14 +274,6 @@ cd /Users/timodiepers/Documents/Coding/bw_timex
 ```
 
 Expected: build completes and `site/index.html` exists. Pages will render badly (raw MyST directives) — that is expected at this stage; only the build succeeding matters.
-
-If the build **errors on `primary = "custom"`**, that value is not accepted. Fall back to `primary = "light-green"` / `accent = "light-green"` in both palette entries, and scope the CSS overrides so they beat Material's built-ins:
-
-```css
-[data-md-color-primary="light-green"] { --md-primary-fg-color: #316733; /* … */ }
-```
-
-Note in the commit message which variant was used.
 
 - [ ] **Step 6: Confirm the nav rendered**
 
@@ -463,11 +445,9 @@ git commit -m "docs: convert installation tabs and admonitions to Zensical synta
 
 **Files:**
 - Modify: `docs/content/getting_started/index.md`, `docs/content/getting_started/adding_temporal_information.md`, `docs/content/getting_started/lcia.md`, `docs/content/getting_started/build_process_timeline.md`, `docs/content/getting_started/time_explicit_lci.md`
-- Modify: `docs/stylesheets/extra.css`
 
 **Interfaces:**
-- Consumes: `docs/stylesheets/extra.css` from Task 1.
-- Produces: the `launch` admonition type, used only on this section's index page.
+- Consumes: nothing beyond the build config from Task 1.
 
 - [ ] **Step 1: Convert the images on `getting_started/index.md`**
 
@@ -480,43 +460,17 @@ The light/dark `{image}` pair (lines 5-15) becomes two Markdown images using the
 
 - [ ] **Step 2: Convert the launch admonition on the same page**
 
+The pydata theme styled this one with a bespoke `admonition-launch` class and a FontAwesome rocket. There is no rocket among Zensical's built-in admonition types, and no CSS rule may be added beyond optimex's stylesheet, so use the built-in `tip` type — the closest match in intent for a "try this yourself" callout:
+
 ```markdown
-!!! launch "You want more interaction?"
+!!! tip "You want more interaction?"
 
     [Launch this tutorial on Binder!](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb) In this interactive environment, you can directly run the bw_timex code yourself whilst following along.
 ```
 
 Then delete the trailing `{toctree}` block from the page (the nav in `zensical.toml` covers it).
 
-- [ ] **Step 3: Define the `launch` admonition in `docs/stylesheets/extra.css`**
-
-Append. The icon is a rocket, replacing pydata's FontAwesome `\f135`:
-
-```css
-/* Custom "launch" admonition (was .admonition-launch in the pydata theme) */
-:root {
-  --md-admonition-icon--launch: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91 0M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>');
-}
-
-.md-typeset .admonition.launch,
-.md-typeset details.launch {
-  border-color: var(--md-primary-fg-color);
-}
-
-.md-typeset .launch > .admonition-title,
-.md-typeset .launch > summary {
-  background-color: color-mix(in srgb, var(--md-primary-fg-color) 12%, transparent);
-}
-
-.md-typeset .launch > .admonition-title::before,
-.md-typeset .launch > summary::before {
-  background-color: var(--md-primary-fg-color);
-  -webkit-mask-image: var(--md-admonition-icon--launch);
-          mask-image: var(--md-admonition-icon--launch);
-}
-```
-
-- [ ] **Step 4: Convert the three dropdowns in `adding_temporal_information.md`**
+- [ ] **Step 3: Convert the three dropdowns in `adding_temporal_information.md`**
 
 Each `:::{dropdown} <span …>TEXT</style>` with `:icon: codescan` becomes a collapsed details block. Note the source has mismatched `<span>…</style>` tags — drop the inline HTML entirely and use a plain title:
 
@@ -530,7 +484,7 @@ Each `:::{dropdown} <span …>TEXT</style>` with `:icon: codescan` becomes a col
 
 Titles for the other two: "Here's the code to add this information to our modeled production system in Brightway" and "Again, here's the code in case you're interested". The `:icon: codescan` option has no Material equivalent and is dropped; the default note icon is used.
 
-- [ ] **Step 5: Convert the two images in `lcia.md`**
+- [ ] **Step 4: Convert the two images in `lcia.md`**
 
 These have no light/dark variants, only `:align: center` and `:alt:`:
 
@@ -540,23 +494,23 @@ These have no light/dark variants, only `:align: center` and `:alt:`:
 
 and the same pattern for `dynamic_characterized_inventory_gwp.svg`. Keep the surrounding `<br />` tags as they are.
 
-- [ ] **Step 6: Check the remaining two pages**
+- [ ] **Step 5: Check the remaining two pages**
 
 `build_process_timeline.md` and `time_explicit_lci.md` contain only headings, prose, Python fences and a pipe table — all valid Material Markdown. Read them and confirm no MyST directive remains; make no edits if none is found.
 
-- [ ] **Step 7: Build and verify**
+- [ ] **Step 6: Build and verify**
 
 ```bash
 .venv/bin/zensical build 2>&1 | tail -20
 grep -c 'only-light' site/content/getting_started/index.html
-grep -c 'admonition launch' site/content/getting_started/index.html
+grep -c 'admonition tip' site/content/getting_started/index.html
 grep -c 'details' site/content/getting_started/adding_temporal_information/index.html
 grep -rc '{image}\|{dropdown}\|{toctree}\|{admonition}' site/content/getting_started/ | grep -v ':0' || echo "no raw directives"
 ```
 
-Expected: `only-light` ≥ 1, `admonition launch` returns `1`, the details grep is ≥ 3, and the last command prints `no raw directives`.
+Expected: `only-light` ≥ 1, `admonition tip` returns `1`, the details grep is ≥ 3, and the last command prints `no raw directives`.
 
-- [ ] **Step 8: Serve and eyeball the light/dark swap**
+- [ ] **Step 7: Serve and eyeball the light/dark swap**
 
 ```bash
 .venv/bin/zensical serve
@@ -564,10 +518,10 @@ Expected: `only-light` ≥ 1, `admonition launch` returns `1`, the details grep 
 
 Open `http://localhost:8000/content/getting_started/`, toggle the palette switch, and confirm exactly one of the two step-overview images is visible in each scheme. Stop the server.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add docs/content/getting_started docs/stylesheets/extra.css
+git add docs/content/getting_started
 git commit -m "docs: convert getting started section to Zensical syntax"
 ```
 
@@ -985,7 +939,19 @@ The other six follow the same shape with `::: bw_timex.timeline_builder`, `::: b
 
 `validation.py`, `_lci_cache.py` and `bw_timex/data/` get no page, matching the old `autoapi_ignore` list and the `filters = ["!^_", "!^__"]` handler option.
 
-- [ ] **Step 3: Add the API subtree to the nav**
+- [ ] **Step 3: Re-enable mkdocstrings**
+
+Task 1 shipped `zensical.toml` with `[project.plugins.mkdocstrings] enabled = false` and an explanatory comment, because mkdocstrings' block processor fires on any line starting with `:::` and that collided with the MyST colon-fences then still present in four content pages. Tasks 3, 4, 5 and 7 have since removed all of them. Set `enabled = true` and delete the now-stale comment.
+
+Before building, confirm no colon fences remain anywhere:
+
+```bash
+grep -rn '^\s*:::' docs --include='*.md' | grep -v '/superpowers/'
+```
+
+Expected: no output. If any hit appears, it belongs to whichever page task missed it — fix that page here rather than leaving mkdocstrings disabled.
+
+- [ ] **Step 4: Add the API subtree to the nav**
 
 Insert after the `Examples` entry in `zensical.toml`, preserving the toctree's original position (API came after Examples, before the decision tree):
 
@@ -1002,7 +968,7 @@ Insert after the `Examples` entry in `zensical.toml`, preserving the toctree's o
   ]},
 ```
 
-- [ ] **Step 4: Build and verify the docstrings rendered**
+- [ ] **Step 5: Build and verify the docstrings rendered**
 
 ```bash
 .venv/bin/zensical build 2>&1 | tail -30
@@ -1013,11 +979,11 @@ grep -c 'field-list\|doc-md-description' site/api/timeline_builder/index.html
 
 Expected: non-zero counts. A page containing only the heading and no `doc-` markup means mkdocstrings failed to import the module — check the build log for an import error (the package must be importable from the venv, which it is via the editable install).
 
-- [ ] **Step 5: Confirm numpy-style sections parsed**
+- [ ] **Step 6: Confirm numpy-style sections parsed**
 
 Open `site/api/timeline_builder/index.html` and confirm parameter tables are rendered as tables rather than as a preformatted blob. `bw_timex` docstrings use numpydoc `Parameters` / `----------` sections and the handler is configured with `docstring_style = "numpy"`; a preformatted blob means the style setting is not being applied.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add docs/api zensical.toml
@@ -1184,7 +1150,7 @@ Expected: `broken links: 0`. Cross-page links written as `content/theory.md#term
 Walk every nav entry and confirm:
 - Landing page renders with no leftover toctree.
 - Installation: both tab sets switch.
-- Getting Started: images swap with the palette toggle; the launch admonition shows a rocket icon; the three code dropdowns expand.
+- Getting Started: images swap with the palette toggle; the Binder callout renders as a tip admonition; the three code dropdowns expand.
 - Theory: four example admonitions, the four-step matrix tab set, both mermaid diagrams.
 - Decision tree: mermaid flowchart renders.
 - Examples: five cards; all four notebook pages open with their plots.
