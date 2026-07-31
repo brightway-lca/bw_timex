@@ -122,13 +122,13 @@ Funding                   content/funding.md
 | Sphinx / MyST feature | Zensical replacement |
 |---|---|
 | `{toctree}` (3 blocks) | `nav` in `zensical.toml`; the directives are deleted from the pages |
-| `{image}` + `:class: only-light/only-dark` (10 pairs) | `![](x.svg#only-light)` / `#only-dark` — Material's native fragment convention, backed by CSS in `extra.css` |
+| `{image}` + `:class: only-light/only-dark` (10 pairs) | `![](x.svg#only-light)` / `#only-dark` — supported natively by Zensical's bundled palette CSS (verified in `zensical/templates/assets/stylesheets/*/palette.*.min.css`), so no custom CSS is needed |
 | `{image}` `:height:` / `:align:` | `attr_list`: `{ width="450" style="display:block;margin:auto" }` |
 | `::::{grid}` / `:::{grid-item-card}` (examples index) | `<div class="grid cards" markdown>` — kept only here, because this page already uses cards |
 | `::::{tab-set}` / `:::{tab-item}` (installation) | `=== "Tab title"` (`pymdownx.tabbed`) |
 | `{note}`, `{admonition} X :class: important` | `!!! note`, `!!! important "X"` |
 | `{admonition} … :class: admonition-launch` (1×, getting_started) | custom `!!! launch` admonition type, defined in `extra.css` |
-| `{admonition} … :class: admonition-example` (4×, theory) | custom `!!! example-box` admonition type, defined in `extra.css` (`example` is already a built-in Material type, so the custom one needs a distinct name) |
+| `{admonition} … :class: admonition-example` (4×, theory) | Material's **built-in** `!!! example` type — its beaker icon matches the FontAwesome flask (`\f518`) the pydata rule used, so no custom CSS is needed |
 | `:::{dropdown}` (3×, adding_temporal_information) | `??? note "title"` (`pymdownx.details`) |
 | ` ```{mermaid} ` | superfences custom fence `mermaid`; Zensical themes diagrams natively, so conf.py's 40-line `mermaid_init_js` MutationObserver is dropped |
 | `{include} ../../FILE.md` | `--8<-- "FILE.md"` (`pymdownx.snippets`, base path = repo root) |
@@ -138,7 +138,7 @@ Funding                   content/funding.md
 | `use_edit_page_button` | theme features `content.action.edit` / `content.action.view` + `edit_uri` |
 | `icon_links` (Binder, GitHub) | `[[project.extra.social]]` entries |
 | `sphinx-favicon` | `theme.favicon` + `_static/favicons` assets |
-| light/dark logo pair | `theme.logo` set to the light asset, dark variant swapped by CSS in `extra.css` |
+| light/dark logo pair (`bw_timex_{light,dark}_rtd.svg`) | optimex pattern: `theme.logo` = the scheme-neutral `_static/favicon.svg` mark, with the site name rendered as text beside it (lowercase monospace, styled in `extra.css`). Avoids a light/dark logo swap entirely; the wordmark SVGs stay in `_static/` for the README |
 | `sphinx-autoapi` (+ `autoapisummary`, `class.rst` template) | mkdocstrings, one handwritten page per module (below) |
 | `sphinx.ext.inheritance_diagram` / graphviz | **dropped** — no mkdocstrings equivalent |
 | `sphinx-notfound-page` custom 404 body | **dropped** — Material's built-in 404 is used; the jokey copy would need a theme override |
@@ -182,13 +182,15 @@ prose rather than bare numbers.
 `docs/_static/custom.css` is replaced by `docs/stylesheets/extra.css`, seeded from the
 optimex file and extended with:
 
-1. `img[src$="#only-light"]` / `#only-dark` visibility rules keyed on
-   `[data-md-color-scheme]`, plus the same treatment for the header logo pair.
-2. Custom `launch` and `example-box` admonition types — colors from the Material palette
-   variables, icons as SVG mask data URIs replacing pydata's FontAwesome glyph hack
-   (`\f135` rocket / `\f518` flask).
-3. Brand palette overrides pinning primary/accent to the logo greens `#74b944` /
-   `#316733` on top of a Material named palette.
+1. A custom `launch` admonition type — colors from the Material palette variables, icon as
+   an SVG mask data URI replacing pydata's FontAwesome rocket (`\f135`). The former
+   `admonition-example` needs no CSS: it maps onto Material's built-in `example` type.
+2. Brand palette overrides pinning primary/accent to the logo greens `#74b944` /
+   `#316733`, declared against `primary = "custom"` with a documented fallback to a named
+   Material palette if Zensical rejects that value.
+
+Light/dark image swapping needs no CSS at all — it is built into the bundled palette
+stylesheet.
 
 The pydata-specific rules in `custom.css` (`#rtd-footer-container`, `.bd-header`,
 `.bd-page-width`, sidebar-toggle padding) are dropped — they target a theme that no
