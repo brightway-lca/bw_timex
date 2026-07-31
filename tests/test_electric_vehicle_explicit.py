@@ -128,3 +128,34 @@ class TestClass_EV_Explicit:
         )
 
         assert self.tlca.static_score == pytest.approx(expected_timex_score, abs=0.5)
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_from_timeline_matches_expanded(vehicle_explicit_db, graph_traversal):
+    """The dynamic inventory built directly from the timeline must match the one
+    built via expanded matrices, also in the explicit process/product paradigm
+    (where the timeline's producers are products, not chimaera nodes).
+    """
+    ev_product = bd.get_node(database="foreground", code="EV_product")
+    database_dates = {
+        "db_2020": datetime.strptime("2020", "%Y"),
+        "db_2030": datetime.strptime("2030", "%Y"),
+        "db_2040": datetime.strptime("2040", "%Y"),
+        "foreground": "dynamic",
+    }
+
+    inventories = {}
+    for expand_technosphere in (True, False):
+        tlca = TimexLCA(
+            demand={ev_product.key: 1},
+            method=("GWP", "example"),
+            database_dates=database_dates,
+        )
+        tlca.build_timeline(
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+            graph_traversal=graph_traversal,
+        )
+        tlca.lci(expand_technosphere=expand_technosphere)
+        inventories[expand_technosphere] = tlca.dynamic_inventory.sum()
+
+    assert inventories[False] == pytest.approx(inventories[True])

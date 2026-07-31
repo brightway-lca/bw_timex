@@ -428,3 +428,28 @@ def test_max_calc_bounds_background_descent(
     bounded = producers(3)
     assert "bg_5" not in bounded  # deepest node cut off by the budget
     assert len(bounded) < len(full)
+
+
+@pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
+def test_background_td_explicit_product_paradigm_from_timeline(
+    explicit_background_td_db, graph_traversal
+):
+    """Same hand-computed 56.4 kg CO2 as
+    `test_background_td_with_explicit_product_paradigm`, but with the dynamic
+    inventory built directly from the timeline instead of expanded matrices.
+    """
+    product = bd.get_node(database="foreground", code="service_product")
+
+    tlca = TimexLCA(
+        demand={product.key: 1},
+        method=METHOD,
+        database_dates=explicit_background_td_db,
+    )
+    tlca.build_timeline(
+        starting_datetime="2024-01-01",
+        graph_traversal=graph_traversal,
+        traverse_background=True,
+    )
+    tlca.lci(expand_technosphere=False)
+
+    assert tlca.dynamic_inventory.sum() == pytest.approx(56.4, rel=1e-9)

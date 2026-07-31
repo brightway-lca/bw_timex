@@ -523,7 +523,10 @@ class VariantBackgroundMixin:
                     td_producer, cur_abs_td
                 )
                 abs_cumulative_producer = _join_cumulative_amount(
-                    td_producer, cur_abs_td, cur_abs_cumulative.amount
+                    td_producer,
+                    cur_abs_td,
+                    cur_abs_cumulative.amount,
+                    scaling=_cumulative_hop_scaling(production_amount),
                 )
 
                 if isinstance(td_producer_raw, TemporalDistribution):
@@ -733,11 +736,25 @@ class EdgeExtractor(VariantBackgroundMixin, TemporalisLCA):
                 )
                 abs_td_consumer = self.t0
 
-            # At the FU seed there is no ancestor to scale by (the functional
-            # unit's own cumulative throughput is 1 by definition, self.t0.amount
-            # == [1]), so the cumulative amount is numerically identical to the
-            # local `abs_td_producer` computed above.
-            cumulative_amount_producer = abs_td_producer
+            # At the FU seed there is no ancestor to scale by, but the cumulative
+            # amount is the demanded amount of the product, which
+            # `abs_td_producer` only carries in the explicit process/product
+            # branch above (where it also picked up the sign of the production
+            # edge, which is divided out again here).
+            if row_id != col_id:
+                fu_production_amount = get_reference_product_production_amount(
+                    col_id, reference_product=row_id, lca=self.lca_object
+                )
+                cumulative_amount_producer = TemporalDistribution(
+                    date=abs_td_producer.date,
+                    amount=abs_td_producer.amount
+                    * _cumulative_hop_scaling(fu_production_amount),
+                )
+            else:
+                cumulative_amount_producer = TemporalDistribution(
+                    date=abs_td_producer.date,
+                    amount=abs_td_producer.amount * edge.amount,
+                )
 
             heappush(
                 heap,
@@ -794,6 +811,9 @@ class EdgeExtractor(VariantBackgroundMixin, TemporalisLCA):
                     "temporal_evolution_reference", "producer"
                 )
 
+                consumer_production_amount = get_reference_product_production_amount(
+                    node.activity_datapackage_id, lca=self.lca_object
+                )
                 td_producer = (  # td_producer is the TemporalDistribution of the edge
                     self._exchange_value(
                         exchange=exchange,
@@ -801,14 +821,13 @@ class EdgeExtractor(VariantBackgroundMixin, TemporalisLCA):
                         col_id=col_id,
                         matrix_label="technosphere_matrix",
                     )
-                    / abs(
-                        get_reference_product_production_amount(
-                            node.activity_datapackage_id, lca=self.lca_object
-                        )
-                    )
+                    / abs(consumer_production_amount)
                 )
                 producer = self.nodes[edge.producer_unique_id]
                 leaf = self.edge_ff(row_id)
+                # Only set in the explicit process/product branch below, where
+                # `td_producer` picks up the sign of the production edge.
+                producer_production_amount = None
 
                 # If an edge does not have a TD, give it a td with timedelta=0 and the amount= 'edge value'
                 if isinstance(td_producer, Number):
@@ -848,6 +867,13 @@ class EdgeExtractor(VariantBackgroundMixin, TemporalisLCA):
                                 amount=np.array([production_td]),
                             )
                         td_producer = (td_producer * production_td).simplify()
+                        producer_production_amount = (
+                            get_reference_product_production_amount(
+                                row_id,
+                                reference_product=product_id,
+                                lca=self.lca_object,
+                            )
+                        )
 
                 distribution = (
                     td * td_producer
@@ -857,7 +883,12 @@ class EdgeExtractor(VariantBackgroundMixin, TemporalisLCA):
                     td_producer, abs_td
                 )
                 cumulative_amount_producer = _join_cumulative_amount(
-                    td_producer, abs_td, cumulative_amount_parent.amount
+                    td_producer,
+                    abs_td,
+                    cumulative_amount_parent.amount,
+                    scaling=_cumulative_hop_scaling(
+                        consumer_production_amount, producer_production_amount
+                    ),
                 )
 
                 # Variant-aware split at the FIRST crossing from the referenced
@@ -1227,9 +1258,12 @@ class EdgeExtractorBFS(VariantBackgroundMixin):
             # no such TD, so the original behaviour is preserved exactly.
             production_td = self._get_normalized_production_edge_td(fu_id)
             if production_td is None:
-                # No ancestor to scale by at the FU seed (the functional unit's
-                # own cumulative throughput is 1 by definition), so the
-                # cumulative amount is numerically identical to `abs_td_producer`.
+                # No ancestor to scale by at the FU seed, so the cumulative
+                # amount is just the demanded amount (`abs_td_producer` is
+                # normalized to 1 and carries the timing only).
+                fu_cumulative = TemporalDistribution(
+                    date=self.t0.date, amount=self.t0.amount * fu_amount
+                )
                 timeline.append(
                     Edge(
                         edge_type="production",
@@ -1240,16 +1274,28 @@ class EdgeExtractorBFS(VariantBackgroundMixin):
                         td_producer=fu_amount,
                         td_consumer=self.t0,
                         abs_td_producer=self.t0,
-                        cumulative_amount_producer=self.t0,
+                        cumulative_amount_producer=fu_cumulative,
                     )
                 )
-                queue.append((fu_id, td, self.t0, self.t0, self.t0, abs(fu_amount)))
+                queue.append(
+                    (fu_id, td, self.t0, self.t0, fu_cumulative, abs(fu_amount))
+                )
             else:
                 # Cohort-spread the FU so the producing process is registered at
                 # every cohort time (each cohort gets its own time-mapped column).
                 seed_td = (td * production_td).simplify()
                 seed_abs_td = _join_datetime_and_timedelta_distributions(
                     production_td, self.t0
+                )
+                # Cumulative amounts are in units of the produced product, so
+                # the 1/alpha that `production_td` carries is taken back out
+                # (the builder re-applies it, signed, per process) and the
+                # demanded amount is applied instead.
+                fu_cumulative = TemporalDistribution(
+                    date=seed_abs_td.date,
+                    amount=seed_abs_td.amount
+                    * abs(self._get_production_amount(fu_id))
+                    * fu_amount,
                 )
                 timeline.append(
                     Edge(
@@ -1262,11 +1308,11 @@ class EdgeExtractorBFS(VariantBackgroundMixin):
                         td_consumer=self.t0,
                         abs_td_producer=seed_abs_td,
                         abs_td_consumer=self.t0,
-                        cumulative_amount_producer=seed_abs_td,
+                        cumulative_amount_producer=fu_cumulative,
                     )
                 )
                 queue.append(
-                    (fu_id, seed_td, self.t0, seed_abs_td, seed_abs_td, abs(fu_amount))
+                    (fu_id, seed_td, self.t0, seed_abs_td, fu_cumulative, abs(fu_amount))
                 )
 
         while queue:
@@ -1306,7 +1352,10 @@ class EdgeExtractorBFS(VariantBackgroundMixin):
                     td_producer, abs_td
                 )
                 abs_cumulative_producer = _join_cumulative_amount(
-                    td_producer, abs_td, cumulative_amount_parent.amount
+                    td_producer,
+                    abs_td,
+                    cumulative_amount_parent.amount,
+                    scaling=_cumulative_hop_scaling(production_amount),
                 )
 
                 if isinstance(td_producer_raw, TemporalDistribution):
@@ -1472,10 +1521,51 @@ def _join_datetime_and_timedelta_distributions(
         )
 
 
+def _cumulative_hop_scaling(
+    consumer_production_amount: float,
+    producer_production_amount: float | None = None,
+) -> float:
+    """Correction factor turning a local edge coefficient into a supply factor.
+
+    ``td_producer`` normalizes an edge by the *consumer's absolute* production
+    amount, which is what the matrix modifier expects (it multiplies that
+    normalization back out when it builds the expanded technosphere). A linear
+    solve instead divides by the *signed* production amount:
+    ``supply_consumer = cumulative_consumer / production_amount_consumer``.
+
+    Dropping that sign is harmless for the timeline's local ``amount`` column,
+    but not for ``cumulative_amount``, which is used as the supply array when
+    the dynamic inventory is built straight from the timeline
+    (``expand_technosphere=False``). A process with a negative production amount
+    (the usual waste-treatment convention) would otherwise flip the sign of its
+    whole upstream subtree.
+
+    Parameters
+    ----------
+    consumer_production_amount : float
+        Production amount of the consuming process, as used to normalize
+        ``td_producer``.
+    producer_production_amount : float, optional
+        Only for explicit process/product setups, where ``td_producer`` picked
+        up the sign of the producer's off-diagonal production edge. Cumulative
+        amounts are in units of the produced product, so that sign is divided
+        out again.
+
+    Returns
+    -------
+    float
+    """
+    scaling = abs(consumer_production_amount) / consumer_production_amount
+    if producer_production_amount is not None:
+        scaling *= abs(producer_production_amount) / producer_production_amount
+    return scaling
+
+
 def _join_cumulative_amount(
     td_producer: TemporalDistribution,
     td_consumer: TemporalDistribution,
     cumulative_amount_consumer: np.ndarray,
+    scaling: float = 1.0,
 ) -> TemporalDistribution:
     """
     Companion to ``_join_datetime_and_timedelta_distributions``, used to build
@@ -1509,6 +1599,8 @@ def _join_cumulative_amount(
         dates (i.e. the consumer edge's own ``cumulative_amount_producer.amount``,
         or an array of 1s at the root, where the functional unit's cumulative
         scale is 1 by definition).
+    scaling : float
+        Factor applied to all resulting amounts, see `_cumulative_hop_scaling`.
 
     Returns
     -------
@@ -1523,7 +1615,7 @@ def _join_cumulative_amount(
     ):
         return TemporalDistribution(
             date=td_consumer.date,
-            amount=cumulative_amount_consumer * float(td_producer),
+            amount=cumulative_amount_consumer * float(td_producer) * scaling,
         )
 
     if isinstance(td_producer, TemporalDistribution) and isinstance(
@@ -1550,7 +1642,7 @@ def _join_cumulative_amount(
         amount = (
             cumulative_amount_consumer.reshape((-1, 1))
             * td_producer.amount.reshape((1, -1))
-        ).ravel()
+        ).ravel() * scaling
         return TemporalDistribution(date, amount)
     else:
         raise ValueError(
