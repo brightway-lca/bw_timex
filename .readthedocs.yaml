@@ -5,16 +5,17 @@
 # Required
 version: 2
 
-conda:
-   environment: docs/environment.yaml
-
-sphinx:
-   configuration: docs/conf.py
-
 submodules:
    include: all
 
 build:
-   os: "ubuntu-24.04" # https://docs.readthedocs.io/en/stable/config-file/v2.html#build-os
+   os: "ubuntu-lts-latest"
    tools:
-      python: "miniforge3-latest" # https://docs.readthedocs.io/en/stable/config-file/v2.html#build-tools-python, miniforge3 replaces deprecated mambaforge and bundles mamba
+      python: "3.12"
+   commands:
+      - pip install -r docs/requirements.txt
+      - pip install -e .
+      - python docs/convert_notebooks.py
+      - zensical build
+      - mkdir -p $READTHEDOCS_OUTPUT/html
+      - cp -r site/* $READTHEDOCS_OUTPUT/html/
