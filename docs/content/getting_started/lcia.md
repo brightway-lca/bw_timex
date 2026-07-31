@@ -58,10 +58,7 @@ To visualize what's going on, we can conveniently plot it with:
 ```python
 tlca.plot_dynamic_characterized_inventory()
 ```
-```{image} ../data/dynamic_characterized_inventory_radiative_forcing.svg
-:align: center
-:alt: Plot showing the radiative forcing over time
-```
+![Plot showing the radiative forcing over time](../data/dynamic_characterized_inventory_radiative_forcing.svg){ style="display:block;margin:0 auto" }
 <br />
 
 Of course we can also assess the "standard" climate change metric Global Warming Potential (GWP):
@@ -85,10 +82,7 @@ tlca.dynamic_lcia(
 ```python
 tlca.plot_dynamic_characterized_inventory()
 ```
-```{image} ../data/dynamic_characterized_inventory_gwp.svg
-:align: center
-:alt: Plot showing the radiative forcing over time
-```
+![Plot showing the radiative forcing over time](../data/dynamic_characterized_inventory_gwp.svg){ style="display:block;margin:0 auto" }
 <br />
 
 For most of the functions we used here, there are numerous optional arguments and settings you can tweak. We explore some of them in our other [Examples](../examples/index.md), but when in doubt check out our [docstrings](../api/index), which provide information also for the more advanced settings - so please browse through them as needed ☀️

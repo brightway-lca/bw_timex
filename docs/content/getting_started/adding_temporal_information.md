@@ -1,8 +1,7 @@
 # Step 1 - Adding temporal information
 
 To get you started with time-explicit LCA, we'll investigate this very simple production system with two "technosphere" nodes A and B and a "biosphere" node representing some CO<sub>2</sub> emissions. For the sake of this example, we'll assume that we demand Process A to run exactly once.
-```{mermaid}
-:caption: Example production system
+```mermaid
 flowchart LR
 subgraph background[<i>background</i>]
     B(Process B):::bg
@@ -28,99 +27,96 @@ style foreground fill:none, stroke:none;
 style biosphere fill:none, stroke:none;
 ```
 
-:::{dropdown} <span style="font-weight: normal; font-style: italic;">Here's the code to set this up with brightway - but this is not essential here</style>
-:icon: codescan
+??? note "Here's the code to set this up with brightway - but this is not essential here"
 
-```python
-import bw2data as bd
+    ```python
+    import bw2data as bd
 
-bd.projects.set_current("getting_started_with_timex")
+    bd.projects.set_current("getting_started_with_timex")
 
-bd.Database("biosphere").write(
-    {
-        ("biosphere", "CO2"): {
-            "type": "emission",
-            "name": "CO2",
-        },
-    }
-)
+    bd.Database("biosphere").write(
+        {
+            ("biosphere", "CO2"): {
+                "type": "emission",
+                "name": "CO2",
+            },
+        }
+    )
 
-bd.Database("background").write(
-    {
-        ("background", "B"): {
-            "name": "B",
-            "location": "somewhere",
-            "reference product": "B",
-            "exchanges": [
-                {
-                    "amount": 1,
-                    "type": "production",
-                    "input": ("background", "B"),
-                },
-                {
-                    "amount": 11,
-                    "type": "biosphere",
-                    "input": ("biosphere", "CO2"),
-                },
-            ],
-        },
-    }
-)
+    bd.Database("background").write(
+        {
+            ("background", "B"): {
+                "name": "B",
+                "location": "somewhere",
+                "reference product": "B",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("background", "B"),
+                    },
+                    {
+                        "amount": 11,
+                        "type": "biosphere",
+                        "input": ("biosphere", "CO2"),
+                    },
+                ],
+            },
+        }
+    )
 
-bd.Database("foreground").write(
-    {
-        ("foreground", "A"): {
-            "name": "A",
-            "location": "somewhere",
-            "reference product": "A",
-            "exchanges": [
-                {
-                    "amount": 1,
-                    "type": "production",
-                    "input": ("foreground", "A"),
-                },
-                {
-                    "amount": 3,
-                    "type": "technosphere",
-                    "input": ("background", "B"),
-                },
-                {
-                    "amount": 5,
-                    "type": "biosphere",
-                    "input": ("biosphere", "CO2"),
-                }
-            ],
-        },
-    }
-)
+    bd.Database("foreground").write(
+        {
+            ("foreground", "A"): {
+                "name": "A",
+                "location": "somewhere",
+                "reference product": "A",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("foreground", "A"),
+                    },
+                    {
+                        "amount": 3,
+                        "type": "technosphere",
+                        "input": ("background", "B"),
+                    },
+                    {
+                        "amount": 5,
+                        "type": "biosphere",
+                        "input": ("biosphere", "CO2"),
+                    }
+                ],
+            },
+        }
+    )
 
-bd.Method(("our", "method")).write(
-    [
-        (("biosphere", "CO2"), 1),
-    ]
-)
-```
-:::
+    bd.Method(("our", "method")).write(
+        [
+            (("biosphere", "CO2"), 1),
+        ]
+    )
+    ```
 
 Now, if you want to consider time in your LCA, you need to somehow add temporal information. For time-explicit LCA, we consider two kinds of temporal information, that will be discussed in the following.
 
-:::{note}
-Brightway can represent inventory data either with separate process and product nodes or with
-chimaera process+product nodes. See the Brightway inventory overview on
-[processes, products, and something in between](https://docs.brightway.dev/en/latest/content/overview/inventory.html#processes-products-and-something-in-between).
+!!! note
 
-This getting-started page uses the common chimaera style, where Process A is also its reference
-product. The temporal concepts below also apply to explicit process/product models; the main
-difference is where output-side timing can be attached. If you want to represent several
-production-time groups of the same product, you can do this in either paradigm. In a chimaera
-model, this timing is often represented with an intermediary foreground edge. In an explicit
-model, it can live directly on the process→product production edge.
-:::
+    Brightway can represent inventory data either with separate process and product nodes or with
+    chimaera process+product nodes. See the Brightway inventory overview on
+    [processes, products, and something in between](https://docs.brightway.dev/en/latest/content/overview/inventory.html#processes-products-and-something-in-between).
+
+    This getting-started page uses the common chimaera style, where Process A is also its reference
+    product. The temporal concepts below also apply to explicit process/product models; the main
+    difference is where output-side timing can be attached. If you want to represent several
+    production-time groups of the same product, you can do this in either paradigm. In a chimaera
+    model, this timing is often represented with an intermediary foreground edge. In an explicit
+    model, it can live directly on the process→product production edge.
 
 ## Temporal distributions
 To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges. To carry the temporal information, we use the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class is a *container for a series of amount spread over time*, so it tells you what share of an exchange happens at what point in time. So, let's include this information in our production system - first visually:
-```{mermaid}
-:caption: Temporalized example production system
+```mermaid
 flowchart LR
 subgraph background[" "]
     B_2020(Process B):::bg
@@ -146,57 +142,57 @@ end
     style biosphere fill:none, stroke:none;
 
 ```
-:::{dropdown} <span style="font-weight: normal; font-style: italic;">Here's the code to add this information to our modeled production system in Brightway</style>
-:icon: codescan
 
-```python
-import numpy as np
-from bw_temporalis import TemporalDistribution
-from bw_timex.utils import add_temporal_distribution_to_exchange
+*Temporalized example production system*
 
-# Starting with the exchange between A and B
-# First, create a TemporalDistribution with the time information from above
-td_b_to_a = TemporalDistribution(
-    date=np.array([-2, 0, 4], dtype="timedelta64[Y]"),
-    amount=np.array([0.3, 0.5, 0.2]),
-)
+??? note "Here's the code to add this information to our modeled production system in Brightway"
 
-# Now add the temporal distribution to the corresponding exchange. In
-# principle, you just have to do the following:
-# exchange_object["temporal_distribution"] = TemporalDistribution
-# We currently don't have the exchange_object at hand here, but we can
-# use the utility function add_temporal_distribution_to_exchange to help.
-add_temporal_distribution_to_exchange(
-    temporal_distribution=td_b_to_a,
-    input_code="B",
-    input_database="background",
-    output_code="A",
-    output_database="foreground"
-)
+    ```python
+    import numpy as np
+    from bw_temporalis import TemporalDistribution
+    from bw_timex.utils import add_temporal_distribution_to_exchange
 
-# Now we do the same for our other temporalized exchange between A and CO2
-td_a_to_co2 = TemporalDistribution(
-    date=np.array([0, 1], dtype="timedelta64[Y]"),
-    amount=np.array([0.6, 0.4]),
-)
+    # Starting with the exchange between A and B
+    # First, create a TemporalDistribution with the time information from above
+    td_b_to_a = TemporalDistribution(
+        date=np.array([-2, 0, 4], dtype="timedelta64[Y]"),
+        amount=np.array([0.3, 0.5, 0.2]),
+    )
 
-# We actually only have to define enough fields to uniquely identify the
-# exchange here
-add_temporal_distribution_to_exchange(
-    temporal_distribution=td_a_to_co2,
-    input_code="CO2",
-    output_code="A"
-)
-```
-:::
+    # Now add the temporal distribution to the corresponding exchange. In
+    # principle, you just have to do the following:
+    # exchange_object["temporal_distribution"] = TemporalDistribution
+    # We currently don't have the exchange_object at hand here, but we can
+    # use the utility function add_temporal_distribution_to_exchange to help.
+    add_temporal_distribution_to_exchange(
+        temporal_distribution=td_b_to_a,
+        input_code="B",
+        input_database="background",
+        output_code="A",
+        output_database="foreground"
+    )
+
+    # Now we do the same for our other temporalized exchange between A and CO2
+    td_a_to_co2 = TemporalDistribution(
+        date=np.array([0, 1], dtype="timedelta64[Y]"),
+        amount=np.array([0.6, 0.4]),
+    )
+
+    # We actually only have to define enough fields to uniquely identify the
+    # exchange here
+    add_temporal_distribution_to_exchange(
+        temporal_distribution=td_a_to_co2,
+        input_code="CO2",
+        output_code="A"
+    )
+    ```
 
 ## Time-specific process data
 
 While the temporal information above tells us when the processes occur, we also need information on how our processes change over time. So, for our simple example, let's say our background process B somehow evolves, so that it emits less CO<sub>2</sub> in the future. To make it precise, we assume that the original process we modeled above represents the process state in the year 2020, emitting 11 kg CO<sub>2</sub>, which reduces to 7 kg CO<sub>2</sub> by 2030:
 
 
-```{mermaid}
-:caption: Temporalized example production system with two time-specific background processes B
+```mermaid
 flowchart LR
 subgraph background[" "]
     B_2020(Process B \n 2020):::bg
@@ -224,33 +220,33 @@ end
 
 ```
 
-:::{dropdown} <span style="font-weight: normal; font-style: italic;">Again, here's the code in case you're interested</span>
-:icon: codescan
+*Temporalized example production system with two time-specific background processes B*
 
-```python
-bd.Database("background_2030").write(
-    {
-        ("background_2030", "B"): {
-            "name": "B",
-            "location": "somewhere",
-            "reference product": "B",
-            "exchanges": [
-                {
-                    "amount": 1,
-                    "type": "production",
-                    "input": ("background_2030", "B"),
-                },
-                {
-                    "amount": 7,
-                    "type": "biosphere",
-                    "input": ("biosphere", "CO2"),
-                },
-            ],
-        },
-    }
-)
-```
-:::
+??? note "Again, here's the code in case you're interested"
+
+    ```python
+    bd.Database("background_2030").write(
+        {
+            ("background_2030", "B"): {
+                "name": "B",
+                "location": "somewhere",
+                "reference product": "B",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("background_2030", "B"),
+                    },
+                    {
+                        "amount": 7,
+                        "type": "biosphere",
+                        "input": ("biosphere", "CO2"),
+                    },
+                ],
+            },
+        }
+    )
+    ```
 
 So, as you can see, the processes at specific time steps reside within a separate normal Brightway database. To hand them to `bw_timex`, we just need to define a dictionary that maps the names of time-specific databases to the point in time that they represent:
 
@@ -266,9 +262,9 @@ database_dates = {
 }
 ```
 
-:::{note}
-You can use whatever data source you want for the time-specific process data. A nice package from the Brightway cosmos that can help you is [premise](https://premise.readthedocs.io/en/latest/introduction.html).
-:::
+!!! note
+
+    You can use whatever data source you want for the time-specific process data. A nice package from the Brightway cosmos that can help you is [premise](https://premise.readthedocs.io/en/latest/introduction.html).
 
 ## Temporal evolution of foreground exchanges (`bw_timex>0.3.4`)
 
@@ -372,6 +368,6 @@ add_temporal_evolution_to_exchange(
 )
 ```
 
-:::{note}
-Temporal evolution only applies to foreground exchanges. Background process evolution is handled by the database interpolation mechanism described above.
-:::
+!!! note
+
+    Temporal evolution only applies to foreground exchanges. Background process evolution is handled by the database interpolation mechanism described above.
