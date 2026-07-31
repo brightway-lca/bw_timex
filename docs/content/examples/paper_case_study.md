@@ -53,7 +53,7 @@ db_2040 = bd.Database("ei310_IMAGE_SSP2_RCP19_2040_electricity")
 In this study, we consider the following production system for the EV. Purple boxes are foreground, cyan boxes are background (i.e., ecoinvent/premise).
 
 
-```{mermaid}
+```mermaid
 flowchart LR
     glider_production(glider production):::ei-->ev_production
     powertrain_production(powertrain production):::ei-->ev_production
@@ -424,7 +424,7 @@ dlca_no_tds.dynamic_lcia(metric="radiative_forcing")
 
 Now that the production system is modelled, we can add temporal distributions at the intermediate flow level. The temporal information we want to embed in our product system looks like this:
 
-```{mermaid}
+```mermaid
 flowchart LR
     glider_production(glider production):::ei-->|0-2 years prior|ev_production
     powertrain_production(powertrain production):::ei-->|1 year prior|ev_production

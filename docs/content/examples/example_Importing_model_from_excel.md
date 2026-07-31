@@ -141,7 +141,7 @@ for db in bd.databases:
 
 In this study, we consider the following production system for our ev. Purple boxes are foreground, cyan boxes are background (i.e., ecoinvent/premise).
 
-```{mermaid}
+```mermaid
 flowchart LR
     glider_production(glider production):::ei-->ev_production
     powertrain_production(powertrain production):::ei-->ev_production
@@ -590,7 +590,7 @@ tlca.create_labelled_dynamic_inventory_dataframe()
 
 
 
-Now we can do all further analysis as detailed in the other example notebook [example_electric_vehicle_standalone](./example_electric_vehicle_standalone.ipynb). Below you just find the quick calculations. For the full dynamic characterization please see the linked notebook.
+Now we can do all further analysis as detailed in the other example notebook [example_electric_vehicle_standalone](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_electric_vehicle_standalone.ipynb). Below you just find the quick calculations. For the full dynamic characterization please see the linked notebook.
 
 
 ```python

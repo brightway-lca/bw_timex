@@ -42,7 +42,7 @@ db_2040 = bd.Database("ei310_IMAGE_SSP2_RCP19_2040_electricity")
 
 In this study, we consider the following production system for our ev. Purple boxes are foreground, cyan boxes are background (i.e., ecoinvent/premise).
 
-```{mermaid}
+```mermaid
 flowchart LR
     glider_production(glider production):::ei-->ev_production
     powertrain_production(powertrain production):::ei-->ev_production
@@ -222,7 +222,7 @@ electricity_to_driving = driving.new_edge(
 
 Now that the production system is modelled, we can add temporal distributions at the exchange level. The temporal information we want to embed in our product system looks somewhat like this:
 
-```{mermaid}
+```mermaid
 flowchart LR
     glider_production(glider production):::ei-->|"0-2 years prior \n &nbsp;"|ev_production
     powertrain_production(powertrain production):::ei-->|"1 year prior \n &nbsp;"|ev_production
