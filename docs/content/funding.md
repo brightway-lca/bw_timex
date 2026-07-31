@@ -1,3 +1,1 @@
-```{include} ../../FUNDING.md
-
-```
+--8<-- "FUNDING.md"
