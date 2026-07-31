@@ -38,6 +38,10 @@ extra_javascript = [
   "javascripts/source-overrides.js",
 ]
 
+extra_css = [
+  "stylesheets/extra.css",
+]
+
 [project.theme]
 language = "en"
 logo = "_static/favicon.svg"
