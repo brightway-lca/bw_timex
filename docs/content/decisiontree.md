@@ -2,7 +2,7 @@
 
 Not only are there many "types" of LCA already, `bw_timex` also adds lots of further options for time-explicit LCA alone. The following decision tree tries to give some guidance on what type of LCA is suitable in your case, and also navigate the options coming with `bw_timex`:
 
-```{mermaid}
+```mermaid
 flowchart TD
     %% Define node classes
     classDef decision fill:#3fb1c5,color:black,stroke:none;
