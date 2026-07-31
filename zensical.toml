@@ -28,6 +28,16 @@ nav = [
     { "EV Case Study for our Paper" = "content/examples/paper_case_study.md" },
     { "Import from Excel" = "content/examples/example_Importing_model_from_excel.md" },
   ]},
+  { "API Reference" = [
+    { Overview = "api/index.md" },
+    { TimexLCA = "api/timex_lca.md" },
+    { "Timeline Builder" = "api/timeline_builder.md" },
+    { "Matrix Modifier" = "api/matrix_modifier.md" },
+    { "Dynamic Biosphere Builder" = "api/dynamic_biosphere_builder.md" },
+    { "Edge Extractor" = "api/edge_extractor.md" },
+    { "Helper Classes" = "api/helper_classes.md" },
+    { Utils = "api/utils.md" },
+  ]},
   { "What LCA should I do?" = "content/decisiontree.md" },
   { "Modeling paradigms" = "content/dev/explicit_process_product_paradigm.md" },
   { Contributing = "content/contributing.md" },
@@ -136,12 +146,7 @@ custom_checkbox = true
 [project.markdown_extensions.pymdownx.tilde]
 
 [project.plugins.mkdocstrings]
-# Temporarily disabled: mkdocstrings registers a block processor that fires on any
-# line starting with ":::", which collides fatally with the MyST colon-fence
-# directives still present in theory.md, installation.md, examples/index.md and
-# getting_started/adding_temporal_information.md. Task 9 flips this to true, by
-# which point Tasks 3/4/5/7 have removed every colon fence.
-enabled = false
+enabled = true
 default_handler = "python"
 
 [project.plugins.mkdocstrings.handlers.python]
