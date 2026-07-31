@@ -15,7 +15,7 @@
 - **Reference implementation:** `/Users/timodiepers/Documents/Coding/optimex` — copy its file layout, `zensical.toml` structure, `docs/convert_notebooks.py`, `docs/javascripts/source-overrides.js` and `docs/stylesheets/extra.css` rather than inventing new patterns. Deviations are listed per task.
 - **Prose is ported, not rewritten.** Only syntax changes. Do not reword paragraphs, retitle sections, or reorder content unless a step says so.
 - **No "grid cards" on the landing page or the API pages** (explicit user decision). The examples index keeps cards because it already uses them today.
-- **Flat navigation** in the current toctree order. No `navigation.tabs`.
+- **Tabbed navigation** grouped like optimex: Home / User Guide / Theory / Examples / API Reference, with `navigation.tabs` enabled. (This reverses an earlier flat-nav decision; the change landed in commit `10ab75a`.)
 - **Python tooling is `uv`.** Use `uv pip install`, never bare `pip` or `conda`, for local work. The `.venv` in the repo root is Python 3.12.12 and already has `bw_timex` installed editable.
 - **Commit messages carry no Claude attribution trailers.** No `Co-Authored-By: Claude`, no `Claude-Session:`.
 - **Branch:** `docs/zensical-migration`, already created off `origin/main` @ `5f158e3`. Do not merge or open a PR.
@@ -248,7 +248,7 @@ filters = ["!^_", "!^__"]
 [project.plugins.tags]
 ```
 
-Two deliberate differences from `optimex`: `navigation.tabs` is absent (flat nav), and `mkdocstrings.handlers.python.paths = ["."]` because `bw_timex` uses a flat layout, not `src/`.
+One deliberate difference from `optimex`: `mkdocstrings.handlers.python.paths = ["."]`, because `bw_timex` uses a flat package layout, not `src/`.
 
 - [ ] **Step 3: Copy optimex's stylesheet**
 
@@ -281,7 +281,7 @@ Expected: build completes and `site/index.html` exists. Pages will render badly 
 grep -c 'md-nav__link' site/index.html
 ```
 
-Expected: a non-zero count, and `grep -o 'Modeling paradigms' site/index.html` finds the entry — proving the flat nav including the previously orphaned dev page was picked up.
+Expected: a non-zero count, and `grep -o 'Modeling paradigms' site/index.html` finds the entry — proving the nav including the previously orphaned dev page was picked up.
 
 - [ ] **Step 7: Commit**
 

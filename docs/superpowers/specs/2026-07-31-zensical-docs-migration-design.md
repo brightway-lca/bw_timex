@@ -16,7 +16,7 @@ adaptation. Prose content is ported, not rewritten.
 - Rewriting or restructuring the documentation text.
 - Adding Material "grid cards" to pages that do not already use cards (explicitly ruled
   out by the user for the landing page and the API section).
-- Regrouping the navigation into top-level tabs. The current flat sidebar order stays.
+- Reordering pages within their section. The nav is grouped into optimex-style top-level tabs (Home / User Guide / Theory / Examples / API Reference), but each section keeps the toctree's original ordering.
 - Touching `notebooks/` — the notebooks rendered in the docs live in
   `docs/content/examples/` and are separate, output-bearing copies.
 
@@ -46,7 +46,8 @@ into `site/`.
     `repo_url = "https://github.com/brightway-lca/bw_timex"`, `edit_uri = "edit/main/docs/"`.
   - `nav` replacing the three `{toctree}` blocks (see *Navigation*).
   - Theme: logo/favicon from `docs/_static/`, the same `features` list as `optimex`
-    minus `navigation.tabs` (flat nav), palette in brand green rather than indigo.
+    including `navigation.tabs`, and Material's built-in `light-green` palette rather
+    than optimex's indigo.
   - `markdown_extensions` identical to `optimex` — critically `pymdownx.tabbed`
     (`alternate_style = true`), `pymdownx.details`, `pymdownx.snippets`,
     `pymdownx.superfences` with the mermaid custom fence, `pymdownx.arithmatex`
@@ -94,27 +95,16 @@ into `site/`.
 
 ## Navigation
 
-Flat, in the current toctree order:
+Five top-level tabs, grouped as in `optimex`. Within each tab, pages keep the order the
+old toctrees gave them:
 
 ```
-Overview                  index.md
-Installation              content/installation.md
-Getting Started           content/getting_started/index.md
-  Step 1 …                content/getting_started/adding_temporal_information.md
-  Step 2 …                content/getting_started/build_process_timeline.md
-  Step 3 …                content/getting_started/time_explicit_lci.md
-  Step 4 …                content/getting_started/lcia.md
-Theory                    content/theory.md
-Examples                  content/examples/index.md
-  (4 generated notebook pages)
-API                       api/index.md + 7 module pages
-What LCA should I do?     content/decisiontree.md
-Modeling paradigms        content/dev/explicit_process_product_paradigm.md
-Contributing              content/contributing.md
-Code of Conduct           content/codeofconduct.md
-License                   content/license.md
-Changelog                 content/changelog.md
-Funding                   content/funding.md
+Home            index.md, changelog, license, contributing, code of conduct, funding
+User Guide      installation, getting started (index + steps 1-4),
+                what LCA should I do?, modeling paradigms
+Theory          content/theory.md
+Examples        content/examples/index.md + 4 generated notebook pages
+API Reference   api/index.md + 7 module pages
 ```
 
 ## Feature mapping
@@ -127,7 +117,7 @@ Funding                   content/funding.md
 | `::::{grid}` / `:::{grid-item-card}` (examples index) | `<div class="grid cards" markdown>` — kept only here, because this page already uses cards |
 | `::::{tab-set}` / `:::{tab-item}` (installation) | `=== "Tab title"` (`pymdownx.tabbed`) |
 | `{note}`, `{admonition} X :class: important` | `!!! note`, `!!! important "X"` |
-| `{admonition} … :class: admonition-launch` (1×, getting_started) | custom `!!! launch` admonition type, defined in `extra.css` |
+| `{admonition} … :class: admonition-launch` (1×, getting_started) | built-in `!!! tip` — Zensical has no rocket admonition type and the project adds no CSS beyond optimex's stylesheet |
 | `{admonition} … :class: admonition-example` (4×, theory) | Material's **built-in** `!!! example` type — its beaker icon matches the FontAwesome flask (`\f518`) the pydata rule used, so no custom CSS is needed |
 | `:::{dropdown}` (3×, adding_temporal_information) | `??? note "title"` (`pymdownx.details`) |
 | ` ```{mermaid} ` | superfences custom fence `mermaid`; Zensical themes diagrams natively, so conf.py's 40-line `mermaid_init_js` MutationObserver is dropped |
