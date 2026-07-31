@@ -205,6 +205,7 @@ to the temporal resolution of the available databases.
     ```
 
     The resulting timeline looks like this:
+
     | date_producer | producer_name | date_consumer | consumer_name | amount | temporal_market_shares                          |
     |---------------|---------------|---------------|---------------|--------|------------------------------------------------|
     | 2022-01-01    | B             | 2024-01-01    | A             | 0.9    | {'background': 0.8, 'background_2030': 0.2}    |
@@ -267,23 +268,23 @@ created:
 
     === "1. Original matrices"
 
-        ![Matrix modification step 1: original matrices](data/matrix1_light.svg#only-light){ style="display:block;margin:0 auto" }
-        ![Matrix modification step 1: original matrices](data/matrix1_dark.svg#only-dark){ style="display:block;margin:0 auto" }
+        ![Matrix modification step 1: original matrices](data/matrix1_light.svg#only-light)
+        ![Matrix modification step 1: original matrices](data/matrix1_dark.svg#only-dark)
 
     === "2. Time-explicit rows and columns"
 
-        ![Matrix modification step 2: time-explicit rows and columns](data/matrix2_light.svg#only-light){ style="display:block;margin:0 auto" }
-        ![Matrix modification step 2: time-explicit rows and columns](data/matrix2_dark.svg#only-dark){ style="display:block;margin:0 auto" }
+        ![Matrix modification step 2: time-explicit rows and columns](data/matrix2_light.svg#only-light)
+        ![Matrix modification step 2: time-explicit rows and columns](data/matrix2_dark.svg#only-dark)
 
     === "3. Temporal market shares from the timeline"
 
-        ![Matrix modification step 3: temporal market shares from the timeline](data/matrix3_light.svg#only-light){ style="display:block;margin:0 auto" }
-        ![Matrix modification step 3: temporal market shares from the timeline](data/matrix3_dark.svg#only-dark){ style="display:block;margin:0 auto" }
+        ![Matrix modification step 3: temporal market shares from the timeline](data/matrix3_light.svg#only-light)
+        ![Matrix modification step 3: temporal market shares from the timeline](data/matrix3_dark.svg#only-dark)
 
     === "4. Dynamic biosphere"
 
-        ![Matrix modification step 4: dynamic biosphere](data/matrix4_light.svg#only-light){ style="display:block;margin:0 auto" }
-        ![Matrix modification step 4: dynamic biosphere](data/matrix4_dark.svg#only-dark){ style="display:block;margin:0 auto" }
+        ![Matrix modification step 4: dynamic biosphere](data/matrix4_light.svg#only-light)
+        ![Matrix modification step 4: dynamic biosphere](data/matrix4_dark.svg#only-dark)
 
     The timings from the timeline and the inventory information from the time-specific databases is inserted into the new time-explicit matrices. For each specific point in time that product b is demanded, temporal markets are created, distributing the demand for b between the time-specific background databases. The dynamic biosphere matrix is created, containing the timing of emissions. You can see that the CO<sub>2</sub> emission at process A occurs both in 2024 and 2025, based on the temporal distribution on this biosphere exchange.
 

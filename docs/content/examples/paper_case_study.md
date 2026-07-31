@@ -310,21 +310,7 @@ dlca_no_tds.dynamic_lcia(metric="radiative_forcing")
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="md-typeset__table"><table>
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -583,21 +569,7 @@ dlca.dynamic_lcia(metric="radiative_forcing")
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="md-typeset__table"><table>
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -730,21 +702,7 @@ tlca.build_timeline(starting_datetime="2024-01-01", temporal_grouping="month")
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="md-typeset__table"><table>
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -1093,21 +1051,7 @@ tlca.dynamic_lcia(metric="GWP")
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="md-typeset__table"><table>
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -1632,21 +1576,7 @@ tlca.dynamic_lcia(metric="radiative_forcing")
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="md-typeset__table"><table>
   <thead>
     <tr style="text-align: right;">
       <th></th>

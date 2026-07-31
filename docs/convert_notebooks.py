@@ -47,6 +47,7 @@ NOTEBOOK_SOURCE_PATHS: dict[str, str] = {
 }
 
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*[mK]")
+PANDAS_TABLE_STYLE = re.compile(r"<div>\s*<style scoped>.*?</style>\s*", re.DOTALL)
 
 
 def strip_ansi(text: str) -> str:
@@ -78,6 +79,15 @@ def convert(
 
     # Strip ANSI codes
     body = strip_ansi(body)
+
+    # Pandas exports DataFrames with an inline <style scoped> block that overrides
+    # the docs theme's normal table styling. Drop that block so notebook tables
+    # inherit the same rules as regular Markdown tables in the built docs.
+    body = PANDAS_TABLE_STYLE.sub('<div class="md-typeset__table">', body)
+
+    # Keep dataframe tables readable on small screens without changing their
+    # internal table layout.
+    body = body.replace('<table border="1" class="dataframe">', '<table>')
 
     # Rewrite bare image refs  ![png](output_N_M.png)
     # → ![png](<stem>_files/output_N_M.png)

@@ -35,7 +35,7 @@ Here are some examples on how you can use `bw_timex`.
 
     This is the notebook used to calculate the time-explicit LCAs and create the Figures for our paper on time-explicit LCA.
 
-    ![](./data/paper_radiative_forcing.svg)
+    <img src="./data/paper_radiative_forcing.svg" alt="" style="display: block; background-color: white;" />
 
     [:material-arrow-right: View Example](./paper_case_study.md)
 
@@ -46,6 +46,9 @@ Here are some examples on how you can use `bw_timex`.
     ---
 
     This notebook shows how to import your modelled product system from an Excel file.
+
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Microsoft_Office_Excel_%282025%E2%80%93present%29.svg/250px-Microsoft_Office_Excel_%282025%E2%80%93present%29.svg.png" style="display: block; width: 50%; margin: 0 auto;" />
+
 
     [:material-arrow-right: View Example](./example_Importing_model_from_excel.md)
 

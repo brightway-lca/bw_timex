@@ -122,21 +122,7 @@ tlca.build_timeline()
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="md-typeset__table"><table>
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -267,21 +253,7 @@ tlca.dynamic_lcia(
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="md-typeset__table"><table>
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -870,21 +842,7 @@ df
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="md-typeset__table"><table>
   <thead>
     <tr style="text-align: right;">
       <th></th>

@@ -9,6 +9,7 @@ You *can* work around this by hand: split each exchange into one copy per point 
 
 ## ✨ What `bw_timex` does
 **You bring** your normal Brightway model, plus:
+
 - **temporal distributions**, specifying when each exchange happens relative to the process consuming it — either a single shift ("2 years earlier") or spread over time ("30% two years earlier, 50% now, 20% four years later")
 - **time-specific process data**, like background databases representing different points in time (e.g. from [`premise`](https://github.com/polca/premise)) and, for your own foreground processes, how they change over time (e.g. efficiency gains)
 
@@ -25,11 +26,13 @@ Most useful for long-lived products, strongly evolving production systems, and b
 
 ## 📚 Citation
 If `bw_timex` supports your scientific work, please consider citing our companion publications:
+
 - The conceptual framework and formalization of time-explicit LCA are described in our [methodology paper](https://doi.org/10.1007/s11367-025-02539-3)
 - The implementation of this methodology in `bw_timex` is covered by our [JOSS paper](https://doi.org/10.21105/joss.09621)
 
 ## 💬 Support
 If you have any questions or need help, do not hesitate to contact us:
+
 - Timo Diepers ([timo.diepers@ltt.rwth-aachen.de](mailto:timo.diepers@ltt.rwth-aachen.de))
 - Amelie Müller ([a.muller@cml.leidenuniv.nl](mailto:a.muller@cml.leidenuniv.nl))
 - Arthur Jakobs ([artos.jakobs@psi.ch](mailto:artos.jakobs@psi.ch))
