@@ -38,10 +38,6 @@ extra_javascript = [
   "javascripts/source-overrides.js",
 ]
 
-extra_css = [
-  "stylesheets/extra.css",
-]
-
 [project.theme]
 language = "en"
 logo = "_static/favicon.svg"
@@ -69,16 +65,16 @@ features = [
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
 scheme = "default"
-primary = "custom"
-accent = "custom"
+primary = "light-green"
+accent = "light-green"
 toggle.icon = "lucide/sun"
 toggle.name = "Switch to dark mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: dark)"
 scheme = "slate"
-primary = "custom"
-accent = "custom"
+primary = "light-green"
+accent = "light-green"
 toggle.icon = "lucide/moon-star"
 toggle.name = "Switch to light mode"
 
