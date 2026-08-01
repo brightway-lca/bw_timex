@@ -25,12 +25,13 @@ jobs:
         run: uv python install 3.12
       - name: Install docs deps
         run: |
-          uv pip install --system -r docs/requirements.txt
-          uv pip install --system -e .
+          uv venv
+          uv pip install -r docs/requirements.txt
+          uv pip install -e .
       - name: Convert notebooks
-        run: python docs/convert_notebooks.py
+        run: uv run python docs/convert_notebooks.py
       - name: Build site
-        run: zensical build
+        run: uv run zensical build
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
