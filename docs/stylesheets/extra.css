@@ -71,12 +71,20 @@
 }
 
 /* Round the outer corners of the table, matching the code block radius.
-   Leave the theme's own .md-typeset__scrollwrap/.md-typeset__table margin and
-   padding untouched - that's what gives tables the same edge-to-edge width as
-   code blocks on narrow viewports; overriding it here previously broke that
+   Leave the theme's own .md-typeset__scrollwrap horizontal bleed margin
+   untouched - that's what gives tables the same edge-to-edge width as code
+   blocks on narrow viewports; overriding it here previously broke that
    compensation and clipped the table's left edge on mobile. */
 .md-content .md-typeset .md-typeset__table table {
   border-radius: 0.4rem;
+}
+
+/* The theme adds an extra margin-bottom on top of .md-typeset__scrollwrap's
+   own 1em, so tables get ~1.5em below but only 1em above - drop that extra
+   bit so the margin around a table matches the symmetric 1em code blocks
+   get. */
+.md-content .md-typeset .md-typeset__table {
+  margin-bottom: 0;
 }
 
 /* Highlight code cells in the rendered example notebooks (and only those)
