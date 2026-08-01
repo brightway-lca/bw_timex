@@ -185,6 +185,8 @@ filters = ["!^_", "!^__"]
 [project.markdown_extensions.zensical.extensions.preview]
 configurations = [{ targets.include = ["**"] }]
 
+[project.markdown_extensions.zensical.extensions.glightbox]
+
 [project.extra.tags]
 example = "example"
 premise = "premise"
