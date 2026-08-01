@@ -97,4 +97,19 @@
   border-radius: 0.4rem;
 }
 
+/* Below the theme's own mobile breakpoint, the code cell (like the table
+   and the code block itself) bleeds all the way to the true screen edge
+   rather than just to the edge of an inset content column - a rounded
+   corner sitting flush against the actual screen edge looks like a
+   rendering glitch, and it also clips the inset box-shadow above into a
+   rounded bar instead of a flat one flush with the screen. Squaring both
+   off here, since above this breakpoint the cell still has visible page
+   margin around it and the rounding reads as intentional. */
+@media screen and (max-width: 44.984375em) {
+  .md-content__inner.notebook-page.md-typeset .language-python.highlight > pre > code.md-code__content,
+  .md-content__inner.notebook-page.md-typeset .language-python.highlight > pre > .md-code__content {
+    border-radius: 0;
+  }
+}
+
 
