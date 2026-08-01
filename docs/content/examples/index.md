@@ -1,3 +1,7 @@
+---
+icon: lucide/layout-grid
+---
+
 # Example Collection
 
 Here are some examples on how you can use `bw_timex`.

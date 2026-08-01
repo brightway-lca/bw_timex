@@ -1,3 +1,7 @@
+---
+icon: lucide/download
+---
+
 # Installation
 
 `bw_timex` is a Python software package. It's available via [`pip`](https://pypi.org/project/pip/) and [`conda`](https://docs.conda.io/en/latest/) / [`mamba`](https://mamba.readthedocs.io/en/latest/).

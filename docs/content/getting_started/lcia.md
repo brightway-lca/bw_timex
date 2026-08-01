@@ -1,3 +1,7 @@
+---
+icon: lucide/gauge
+---
+
 # Step 4 - Impact assessment
 To characterize the time-explicit inventory, we have two options: Static and dynamic life cycle impact assessment (LCIA).
 

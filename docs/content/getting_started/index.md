@@ -1,3 +1,7 @@
+---
+icon: lucide/footprints
+---
+
 # Getting Started
 
 This section will help you quickly getting started with your time-explicit LCA project. We're keeping it simple here - no deep dives into how things work in the background, no exploring of all the features and options `bw_timex` has. Just a quick walkthrough of the different steps of a `TimexLCA`. Here's a rundown:

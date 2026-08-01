@@ -1,3 +1,7 @@
+---
+icon: lucide/calculator
+---
+
 # Step 3 - Calculating the time-explicit LCI
 
 Calculating the time-explicit LCI from the timeline is very simple, at least from the user perspective:

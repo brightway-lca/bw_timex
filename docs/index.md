@@ -1,3 +1,7 @@
+---
+icon: lucide/house
+---
+
 # Time-explicit LCA with `bw_timex`
 
 **`bw_timex` makes your LCA use the right data for the right point in time.** It's a python package for [time-explicit Life Cycle Assessment](content/theory.md#terminology), built on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).

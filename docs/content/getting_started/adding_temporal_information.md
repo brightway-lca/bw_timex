@@ -1,3 +1,7 @@
+---
+icon: lucide/clock
+---
+
 # Step 1 - Adding temporal information
 
 To get you started with time-explicit LCA, we'll investigate this very simple production system with two "technosphere" nodes A and B and a "biosphere" node representing some CO<sub>2</sub> emissions. For the sake of this example, we'll assume that we demand Process A to run exactly once.
