@@ -70,12 +70,21 @@
   border-radius: 0.4rem;
 }
 
-/* Notebook-derived tables: allow horizontal scroll without changing the table style */
+/* Notebook-derived tables: allow horizontal scroll without changing the table style.
+   Drop the theme's fixed 0.8rem side padding so tables use the same width as
+   code blocks/paragraphs instead of sitting inset from them - most noticeable
+   on narrow (mobile) viewports where that inset made tables feel cramped. */
 .md-content .md-typeset .md-typeset__table {
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   margin: 1.25rem 0;
+  padding: 0;
+}
+
+/* Round the outer corners of the table, matching the code block radius */
+.md-content .md-typeset .md-typeset__table table {
+  border-radius: 0.4rem;
 }
 
 /* Highlight code cells in the rendered example notebooks (and only those)
