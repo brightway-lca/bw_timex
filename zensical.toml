@@ -180,3 +180,6 @@ inherited_members = false
 filters = ["!^_", "!^__"]
 
 [project.plugins.tags]
+
+[project.markdown_extensions.zensical.extensions.preview]
+configurations = [{ targets.include = ["**"] }]
