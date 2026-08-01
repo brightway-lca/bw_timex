@@ -512,7 +512,7 @@ tlca.build_timeline(temporal_grouping="month")
 
 
 
-<div class="md-typeset__table"><table>
+<table>
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -824,7 +824,6 @@ tlca.build_timeline(temporal_grouping="month")
     </tr>
   </tbody>
 </table>
-</div>
 
 
 
@@ -897,7 +896,21 @@ tlca.dynamic_inventory_df
 
 
 
-<div class="md-typeset__table"><table>
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table>
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -1048,7 +1061,21 @@ tlca.dynamic_lcia(metric="radiative_forcing", fixed_time_horizon=True)
 
 
 
-<div class="md-typeset__table"><table>
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table>
   <thead>
     <tr style="text-align: right;">
       <th></th>

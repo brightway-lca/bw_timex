@@ -351,7 +351,7 @@ tlca.create_labelled_dynamic_inventory_dataframe()
 
 
 
-<div class="md-typeset__table"><table>
+<table>
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -574,7 +574,6 @@ tlca.create_labelled_dynamic_inventory_dataframe()
     </tr>
   </tbody>
 </table>
-</div>
 
 
 

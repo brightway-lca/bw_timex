@@ -124,7 +124,7 @@ tlca.build_timeline()
 
 
 
-<div class="md-typeset__table"><table>
+<table>
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -148,7 +148,6 @@ tlca.build_timeline()
     </tr>
   </tbody>
 </table>
-</div>
 
 
 
@@ -255,7 +254,7 @@ tlca.dynamic_lcia(
 
 
 
-<div class="md-typeset__table"><table>
+<table>
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -844,7 +843,21 @@ df
 
 
 
-<div class="md-typeset__table"><table>
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table>
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -916,7 +929,6 @@ df
     </tr>
   </tbody>
 </table>
-</div>
 
 
 
