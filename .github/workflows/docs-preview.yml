@@ -1,0 +1,46 @@
+name: Docs preview (zensical)
+
+on:
+  push:
+    branches: [docs/zensical-migration]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+      - name: Install docs deps
+        run: |
+          uv pip install --system -r docs/requirements.txt
+          uv pip install --system -e .
+      - name: Convert notebooks
+        run: python docs/convert_notebooks.py
+      - name: Build site
+        run: zensical build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
