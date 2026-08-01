@@ -7,6 +7,8 @@ tags:
 
 
 <div hidden data-source-edit-path="docs/content/examples/example_simple_dynamic_characterization.ipynb" data-source-view-path="docs/content/examples/example_simple_dynamic_characterization.ipynb"></div>
+<div class="notebook-render" markdown>
+
 # Dynamic characterization
 This notebook is meant to explain the options for dynamic characterization in `bw_timex`.
 In this example, there is a very simple database containing only one node with a pulse emission of CH4, occuring at a 10 year delay.
@@ -920,3 +922,6 @@ df
 
 One can see that a longer time horizon leads to smaller differences between fixed (time horizon starts at FU for all flows) and flexible time horizons (time horizon starts at each emissions seperately). An increase in time horizon also leads to lower overall scores, because the system contains multiple short-lived GHGs, such as CH4 and N2O, whose CO2-equivalence value decreases when assessing longer time horizons.
 
+
+
+</div>

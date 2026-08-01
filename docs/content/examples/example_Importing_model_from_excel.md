@@ -7,6 +7,8 @@ tags:
 
 
 <div hidden data-source-edit-path="docs/content/examples/example_Importing_model_from_excel.ipynb" data-source-view-path="docs/content/examples/example_Importing_model_from_excel.ipynb"></div>
+<div class="notebook-render" markdown>
+
 # Loading your LCA model with temporal distributions from an excel file
 
 
@@ -606,3 +608,6 @@ tlca.base_lca.score
     28089.199999794364
 
 
+
+
+</div>

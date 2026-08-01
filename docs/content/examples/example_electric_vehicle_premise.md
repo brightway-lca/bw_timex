@@ -7,6 +7,8 @@ tags:
 
 
 <div hidden data-source-edit-path="docs/content/examples/example_electric_vehicle_premise.ipynb" data-source-view-path="docs/content/examples/example_electric_vehicle_premise.ipynb"></div>
+<div class="notebook-render" markdown>
+
 # Time-explicit LCA of an electric vehicle
 
 
@@ -1426,3 +1428,6 @@ plot_characterized_inventory_as_waterfall(
 
 
 One can see that the time-explicit results (in the middle) are somewhere in between the static and the prospective results. This makes sense as at each timestep, the underlying processes are sourced from progressively "cleaner" background databases, reaching a lower impact than if they are only sourced from the current database, but not so low as the prospective results, which are fully sourced from the most decarbonized database. Notably, the electricity consumption in the use-phase, modelled uniformly over the lifetime of the EV, contributes less and less to the score in the later years, since the electricity becomes cleaner in the future databases.
+
+
+</div>

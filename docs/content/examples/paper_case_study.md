@@ -7,6 +7,8 @@ tags:
 
 
 <div hidden data-source-edit-path="docs/content/examples/paper_case_study.ipynb" data-source-view-path="docs/content/examples/paper_case_study.ipynb"></div>
+<div class="notebook-render" markdown>
+
 # Time-explicit LCA of an electric vehicle
 
 
@@ -2016,3 +2018,6 @@ plt.show()
 ![png](paper_case_study_files/output_56_0.png)
     
 
+
+
+</div>

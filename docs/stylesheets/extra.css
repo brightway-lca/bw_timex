@@ -78,13 +78,14 @@
   margin: 1.25rem 0;
 }
 
-/* Highlight the rendered notebook code blocks with a subtle primary-color inset border */
-.md-content .md-typeset .language-python.highlight {
+/* Highlight code cells in the rendered example notebooks (and only those)
+   with a subtle primary-color inset border */
+.md-content .md-typeset .notebook-render .language-python.highlight {
   box-shadow: none;
 }
 
-.md-content .md-typeset .language-python.highlight > pre > code.md-code__content,
-.md-content .md-typeset .language-python.highlight > pre > .md-code__content {
+.md-content .md-typeset .notebook-render .language-python.highlight > pre > code.md-code__content,
+.md-content .md-typeset .notebook-render .language-python.highlight > pre > .md-code__content {
   box-shadow: inset 0.2rem 0 0 var(--md-primary-fg-color);
   border-radius: 0.4rem;
 }

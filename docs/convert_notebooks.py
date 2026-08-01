@@ -131,6 +131,11 @@ def convert(
     # Build YAML front-matter lines
     tags_yaml = "\n".join(f"  - {t}" for t in tags)
     frontmatter = f"---\nicon: {icon}\ntags:\n{tags_yaml}\n---\n\n"
+
+    # Wrap the notebook body in a marker div so the primary-color code-cell
+    # highlight (see docs/stylesheets/extra.css) applies only to notebook-
+    # derived pages, not to regular Markdown pages with Python code fences.
+    body = f'<div class="notebook-render" markdown>\n\n{body}\n\n</div>\n'
     body = frontmatter + source_override + body
 
     # Write markdown file
