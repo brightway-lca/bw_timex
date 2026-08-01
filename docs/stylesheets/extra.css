@@ -70,20 +70,26 @@
   border-radius: 0.4rem;
 }
 
-/* Round the outer corners of the table, matching the code block radius.
-   Leave the theme's own .md-typeset__scrollwrap horizontal bleed margin
-   untouched - that's what gives tables the same edge-to-edge width as code
-   blocks on narrow viewports; overriding it here previously broke that
-   compensation and clipped the table's left edge on mobile. */
+/* Round the outer corners of the table, matching the code block radius. */
 .md-content .md-typeset .md-typeset__table table {
   border-radius: 0.4rem;
 }
 
-/* The theme adds an extra margin-bottom on top of .md-typeset__scrollwrap's
-   own 1em, so tables get ~1.5em below but only 1em above - drop that extra
-   bit so the margin around a table matches the symmetric 1em code blocks
-   get. */
+/* The theme bleeds tables past the content column with a negative left/right
+   margin on .md-typeset__scrollwrap, cancelled out by matching padding on
+   the inner .md-typeset__table - in principle a no-op, in practice fragile
+   (broke once already, see prior commit). Pin both to zero instead, so the
+   table sits flush with the content column at the same left/right position
+   as code blocks and paragraphs, by construction rather than cancellation. */
+.md-content .md-typeset .md-typeset__scrollwrap {
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 1em;
+}
+
 .md-content .md-typeset .md-typeset__table {
+  padding-left: 0;
+  padding-right: 0;
   margin-bottom: 0;
 }
 
