@@ -184,7 +184,9 @@ filters = ["!^_", "!^__"]
 [project.plugins.tags]
 
 [project.markdown_extensions.zensical.extensions.preview]
-configurations = [{ targets.include = ["**"] }]
+configurations = [
+  { targets.include = ["**"], targets.exclude = ["**/*.svg", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.gif", "**/*.webp"] },
+]
 
 [project.markdown_extensions.zensical.extensions.glightbox]
 
