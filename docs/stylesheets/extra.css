@@ -75,58 +75,6 @@
   border-radius: 0.4rem;
 }
 
-/* Keep wide tables scrollable instead of overflowing past the viewport -
-   table layout won't shrink columns below their content's min-width
-   otherwise. Bleed the scroll container out to the same edge the theme
-   already bleeds code blocks to (.md-content__inner's own .8rem inset,
-   see main.css `.md-content__inner>pre{margin:1em -.8rem}`) rather than
-   stopping at the paragraph-text margin - a table that visibly extends
-   past where the text does reads as its own wide, scrollable element
-   instead of looking like it simply ends where the text column ends. */
-.md-content .md-typeset .md-typeset__table {
-  margin-left: -0.8rem;
-  margin-right: -0.8rem;
-  max-width: calc(100% + 1.6rem);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Notebook output tables (rendered raw, unclassed <table>s from
-   DataFrame.to_html()) get the theme's `table:not([class])` styling
-   instead - no separate wrapper div, and no inner padding layer to
-   preserve, so a smaller bleed keeps a bit of breathing room from the
-   table's own border rather than butting it against the viewport edge. */
-.md-content .md-typeset table:not([class]) {
-  margin-left: -0.2rem;
-  margin-right: -0.2rem;
-  max-width: calc(100% + 0.4rem);
-}
-
-/* Fade/shadow at the edges of horizontally-scrollable tables, so it's
-   visible that content continues off-screen - notebook output tables
-   (rendered raw, unclassed <table>s from DataFrame.to_html()) scroll
-   within their own border via the theme's `table:not([class])` rule, and
-   on mobile the scrollbar itself is invisible until actively dragged, so
-   without this a wide table just looks cut off rather than scrollable.
-   Classic "scroll shadow" technique: an opaque mask layer at each edge,
-   attached `local` so it scrolls with the content and only covers that
-   edge's shadow layer (attached `scroll`, pinned to the box) once you've
-   actually scrolled all the way to that edge - including at rest, when
-   the table doesn't overflow at all, so no false affordance appears. */
-.md-content .md-typeset .md-typeset__table,
-.md-content .md-typeset table:not([class]) {
-  background:
-    linear-gradient(to right, var(--md-default-bg-color) 50%, transparent) 0 0,
-    linear-gradient(to left, var(--md-default-bg-color) 50%, transparent) 100% 0,
-    linear-gradient(to right, var(--md-default-fg-color--lightest), transparent) 0 0,
-    linear-gradient(to left, var(--md-default-fg-color--lightest), transparent) 100% 0;
-  background-repeat: no-repeat;
-  background-color: var(--md-default-bg-color);
-  background-size: 1.5rem 100%, 1.5rem 100%, 0.6rem 100%, 0.6rem 100%;
-  background-position: 0 0, 100% 0, 0 0, 100% 0;
-  background-attachment: local, local, scroll, scroll;
-}
-
 /* The theme adds an extra margin-bottom on .md-typeset__table on top of its
    .md-typeset__scrollwrap parent's own 1em, so tables get ~1.5em below but
    only 1em above - drop that extra bit for a symmetric margin. */
