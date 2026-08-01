@@ -14,7 +14,7 @@ This notebook contains the code for the exemplary case study of out paper on tim
 
 
 
-```python { .notebook-cell }
+```python
 import bw2data as bd
 
 bd.projects.set_current("timex")
@@ -29,7 +29,7 @@ First, we set up the databases we need, starting with a new empty foreground dat
 
 
 
-```python { .notebook-cell }
+```python
 if "foreground" in bd.databases:
     del bd.databases["foreground"]  # to make sure we create the foreground from scratch
 foreground = bd.Database("foreground")
@@ -41,7 +41,7 @@ In the [premise documentation](https://premise.readthedocs.io/en/latest/) you ca
 
 
 
-```python { .notebook-cell }
+```python
 db_2020 = bd.Database("ei310_IMAGE_SSP2_RCP19_2020_electricity")
 db_2030 = bd.Database("ei310_IMAGE_SSP2_RCP19_2030_electricity")
 db_2040 = bd.Database("ei310_IMAGE_SSP2_RCP19_2040_electricity")
@@ -74,7 +74,7 @@ For our EV model, we make the following assumptions:
 
 
 
-```python { .notebook-cell }
+```python
 LIFETIME = 16  # years
 MILEAGE = 150_000  # km
 ELECTRICITY_CONSUMPTION = 0.2  # kWh/km
@@ -89,7 +89,7 @@ Now, we create the foreground processes:
 
 
 
-```python { .notebook-cell }
+```python
 ev_production = foreground.new_node(
     "ev_production", name="production of an electric vehicle", unit="unit"
 )
@@ -111,7 +111,7 @@ We take the actual process data from ecoinvent. However, the ecoinvent processes
 
 
 
-```python { .notebook-cell }
+```python
 for db in [db_2020, db_2030, db_2040]:
     for code in [
         "glider_production_without_eol",
@@ -171,7 +171,7 @@ Now, we add the intermediate flows, starting with the EV production:
 
 
 
-```python { .notebook-cell }
+```python
 glider_production = db_2020.get(code="glider_production_without_eol")
 powertrain_production = db_2020.get(code="powertrain_production_without_eol")
 battery_production = db_2020.get(code="battery_production_without_eol")
@@ -193,7 +193,7 @@ battery_to_ev = ev_production.new_edge(
 
 
 
-```python { .notebook-cell }
+```python
 glider_eol = db_2020.get(name="treatment of used glider, passenger car, shredding")
 powertrain_eol = db_2020.get(
     name="treatment of used powertrain for electric passenger car, manual dismantling"
@@ -225,7 +225,7 @@ used_ev_to_battery_eol = used_ev.new_edge(
 
 
 
-```python { .notebook-cell }
+```python
 electricity_production = db_2020.get(
     name="market group for electricity, low voltage", location="WEU"
 )
@@ -242,7 +242,7 @@ electricity_to_driving = driving.new_edge(
 ```
 
 
-```python { .notebook-cell }
+```python
 glider_to_ev.save()
 powertrain_to_ev.save()
 battery_to_ev.save()
@@ -258,7 +258,7 @@ To allow a comparison with a static LCA later, we calculate the radiative forcin
 
 
 
-```python { .notebook-cell }
+```python
 from datetime import datetime
 from bw_timex import TimexLCA
 
@@ -401,7 +401,7 @@ dlca_no_tds.dynamic_lcia(metric="radiative_forcing")
   </tbody>
 </table>
 <p>37209 rows × 4 columns</p>
-</div>
+
 
 
 
@@ -433,7 +433,7 @@ Now we create the relative `TemporalDistribution` objects:
 
 
 
-```python { .notebook-cell }
+```python
 from bw_temporalis import TemporalDistribution, easy_timedelta_distribution
 import numpy as np
 
@@ -470,7 +470,7 @@ We now add the rTDs to the intermediate flows of our EV system.
 
 
 
-```python { .notebook-cell }
+```python
 glider_to_ev["temporal_distribution"] = td_glider_production
 glider_to_ev.save()
 
@@ -503,7 +503,7 @@ Now that we have the temporal distributions, we can calculate the dynamic LCA fo
 
 
 
-```python { .notebook-cell }
+```python
 dlca = TimexLCA({driving: 1}, method, database_dates_dlca)
 dlca.build_timeline(starting_datetime="2024-01-01", temporal_grouping="month")
 dlca.lci()
@@ -569,20 +569,6 @@ dlca.dynamic_lcia(metric="radiative_forcing")
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table>
   <thead>
     <tr style="text-align: right;">
@@ -674,7 +660,7 @@ dlca.dynamic_lcia(metric="radiative_forcing")
   </tbody>
 </table>
 <p>154154 rows × 4 columns</p>
-</div>
+
 
 
 
@@ -685,7 +671,7 @@ Now that everything is set up, we can calculate a Time-explicit LCA, first setti
 
 
 
-```python { .notebook-cell }
+```python
 database_dates = {
     db_2020.name: datetime.strptime("2020", "%Y"),
     db_2030.name: datetime.strptime("2030", "%Y"),
@@ -716,20 +702,6 @@ tlca.build_timeline(starting_datetime="2024-01-01", temporal_grouping="month")
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table>
   <thead>
     <tr style="text-align: right;">
@@ -1045,11 +1017,12 @@ tlca.build_timeline(starting_datetime="2024-01-01", temporal_grouping="month")
 
 
 
+
 Now we can expand the matrices:
 
 
 
-```python { .notebook-cell }
+```python
 tlca.lci()
 ```
 
@@ -1067,7 +1040,7 @@ Now we can calculate the GWI over the EV life cycle. We characterize the time-ex
 
 
 
-```python { .notebook-cell }
+```python
 tlca.dynamic_lcia(metric="GWP")
 ```
 
@@ -1078,20 +1051,6 @@ tlca.dynamic_lcia(metric="GWP")
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table>
   <thead>
     <tr style="text-align: right;">
@@ -1183,7 +1142,7 @@ tlca.dynamic_lcia(metric="GWP")
   </tbody>
 </table>
 <p>2291 rows × 4 columns</p>
-</div>
+
 
 
 
@@ -1191,7 +1150,7 @@ To compare the time-explicit results to prospective LCA results, we do additiona
 
 
 
-```python { .notebook-cell }
+```python
 import bw2calc as bc
 from collections import defaultdict
 
@@ -1278,7 +1237,7 @@ Comparing the overall scores:
 
 
 
-```python { .notebook-cell }
+```python
 print("Score 2020", sum(prospective_scores[2020].values()))
 print("Score 2030: ", sum(prospective_scores[2030].values()))
 print("Score 2040: ", sum(prospective_scores[2040].values()))
@@ -1295,7 +1254,7 @@ Now we plot this as a waterfall chart, comparing the different approaches. The f
 
 
 
-```python { .notebook-cell }
+```python
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -1554,7 +1513,7 @@ def plot_characterized_inventory_as_waterfall(
 ```
 
 
-```python { .notebook-cell }
+```python
 order_stacked_activities = [
     glider_production_without_eol["name"],
     battery_production_without_eol["name"],
@@ -1606,7 +1565,7 @@ Next, we calculate the radiative forcing over the EV life cycle via dynamic char
 
 
 
-```python { .notebook-cell }
+```python
 tlca.dynamic_lcia(metric="radiative_forcing")
 ```
 
@@ -1617,20 +1576,6 @@ tlca.dynamic_lcia(metric="radiative_forcing")
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table>
   <thead>
     <tr style="text-align: right;">
@@ -1722,7 +1667,7 @@ tlca.dynamic_lcia(metric="radiative_forcing")
   </tbody>
 </table>
 <p>154151 rows × 4 columns</p>
-</div>
+
 
 
 
@@ -1730,7 +1675,7 @@ We want to compare the time-explicit results to the ones from dynamic LCA with a
 
 
 
-```python { .notebook-cell }
+```python
 from functools import partial
 from bw_timex.utils import round_datetime
 
@@ -1779,7 +1724,7 @@ def create_plot_df(lca):
 ```
 
 
-```python { .notebook-cell }
+```python
 df_tlca = create_plot_df(tlca)
 df_dlca = create_plot_df(dlca)
 df_dlca_no_tds = create_plot_df(dlca_no_tds)
@@ -1789,7 +1734,7 @@ Providing initial zero value for cumulative plots:
 
 
 
-```python { .notebook-cell }
+```python
 df_tlca = pd.concat(
     [
         pd.DataFrame({col: [0] for col in df_tlca.columns}, index=[min(df_tlca.index)]),
@@ -1817,7 +1762,7 @@ Plotting:
 
 
 
-```python { .notebook-cell }
+```python
 import matplotlib.dates as mdates
 from matplotlib.ticker import NullLocator
 

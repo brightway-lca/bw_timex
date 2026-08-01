@@ -92,16 +92,16 @@
 }
 
 /* Highlight code cells in the rendered example notebooks (and only those)
-   with a subtle primary-color inset border. Tagged directly on the fence
-   (see docs/convert_notebooks.py) rather than via a wrapping div, since the
-   theme bleeds code blocks edge-to-edge via a direct-child selector
-   (.md-content__inner>.highlight) that a wrapper div would break. */
-.md-content .md-typeset .language-python.highlight.notebook-cell {
+   with a subtle primary-color inset border. Scoped via a JS-added class
+   (see docs/javascripts/source-overrides.js) rather than the Markdown
+   source. .md-content__inner and .md-typeset are the same element here,
+   not ancestor/descendant. */
+.md-content__inner.notebook-page.md-typeset .language-python.highlight {
   box-shadow: none;
 }
 
-.md-content .md-typeset .language-python.highlight.notebook-cell > pre > code.md-code__content,
-.md-content .md-typeset .language-python.highlight.notebook-cell > pre > .md-code__content {
+.md-content__inner.notebook-page.md-typeset .language-python.highlight > pre > code.md-code__content,
+.md-content__inner.notebook-page.md-typeset .language-python.highlight > pre > .md-code__content {
   box-shadow: inset 0.2rem 0 0 var(--md-primary-fg-color);
   border-radius: 0.4rem;
 }

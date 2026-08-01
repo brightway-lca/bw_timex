@@ -15,7 +15,7 @@ Further down, there is an example with multiple greenhouse gases.
 
 
 
-```python { .notebook-cell }
+```python
 import bw2data as bd
 import numpy as np
 from bw_temporalis import TemporalDistribution
@@ -89,13 +89,13 @@ We select the demand and the method and calculate a LCA with `bw_timex`
 
 
 
-```python { .notebook-cell }
+```python
 demand = {("test", "A"): 1}
 gwp = ("GWP", "example")
 ```
 
 
-```python { .notebook-cell }
+```python
 from bw_timex import TimexLCA
 
 tlca = TimexLCA(demand, gwp)
@@ -106,7 +106,7 @@ tlca = TimexLCA(demand, gwp)
 
 
 
-```python { .notebook-cell }
+```python
 tlca.build_timeline()
 ```
 
@@ -150,12 +150,13 @@ tlca.build_timeline()
 
 
 
-```python { .notebook-cell }
+
+```python
 tlca.lci()
 ```
 
 
-```python { .notebook-cell }
+```python
 tlca.static_lcia()
 tlca.static_score
 ```
@@ -184,7 +185,7 @@ First, import the dynamic characterization function of CH4 and have a look at it
 
 
 
-```python { .notebook-cell }
+```python
 from bw_timex.dynamic_characterization import characterize_ch4
 
 characterize_ch4?
@@ -232,7 +233,7 @@ characterize_ch4?
 Then, we can create the characterization_functions where we map the function to the corresponding flow via its ID:
 
 
-```python { .notebook-cell }
+```python
 characterization_functions_ch4 = {
     bd.get_node(code="CH4").id: characterize_ch4,
 }
@@ -241,7 +242,7 @@ characterization_functions_ch4 = {
 Now, the dynamic LCIA can be calculated:
 
 
-```python { .notebook-cell }
+```python
 tlca.dynamic_lcia(
     metric="radiative_forcing",
     fixed_time_horizon=False,
@@ -379,12 +380,12 @@ tlca.dynamic_lcia(
   </tbody>
 </table>
 <p>99 rows × 7 columns</p>
-</div>
 
 
 
 
-```python { .notebook-cell }
+
+```python
 tlca.plot_dynamic_characterized_inventory()
 ```
 
@@ -398,7 +399,7 @@ CH4 has a half-life time of 8.6 years, so the decay curve is quite steep and it 
 
 
 
-```python { .notebook-cell }
+```python
 print(
     f"characterized dynamic score: {tlca.dynamic_score} [{tlca.metric} ({tlca.time_horizon} years)]"
 )
@@ -411,7 +412,7 @@ If we evaluate radiative forcing over a shorter time horizon, the score gets sma
 
 
 
-```python { .notebook-cell }
+```python
 tlca.dynamic_lcia(
     metric="radiative_forcing",
     fixed_time_horizon=False,
@@ -431,7 +432,7 @@ With `fixed_time_horizon = True`, we evaluate all emissions from time of the fun
 
 
 
-```python { .notebook-cell }
+```python
 tlca.dynamic_lcia(
     metric="radiative_forcing",
     fixed_time_horizon=True,
@@ -478,7 +479,7 @@ Let's evaluate GWP20:
 
 
 
-```python { .notebook-cell }
+```python
 tlca.dynamic_lcia(
     metric="GWP",
     time_horizon=20,
@@ -501,7 +502,7 @@ With `fixed_time_horizon = True` and `time_horizon = 20` years, the difference i
 
 
 
-```python { .notebook-cell }
+```python
 tlca.dynamic_lcia(
     metric="GWP",
     fixed_time_horizon=True,
@@ -527,7 +528,7 @@ Lastly, let's look at a system with multiple GHGs spread over time.
 
 
 
-```python { .notebook-cell }
+```python
 def write_database_multi_emission():
 
     project_name = "__test_database1__"
@@ -613,7 +614,7 @@ def write_database_multi_emission():
 ```
 
 
-```python { .notebook-cell }
+```python
 write_database_multi_emission()
 ```
 
@@ -636,7 +637,7 @@ Import additional default dynamic characterization function for N2O and calculat
 
 
 
-```python { .notebook-cell }
+```python
 from bw_timex.dynamic_characterization import characterize_n2o, characterize_co2
 
 demand = {("test", "A"): 1}
@@ -663,7 +664,7 @@ match dynamic charcterization functions to biosphere flows:
 
 
 
-```python { .notebook-cell }
+```python
 characterization_functions = {
     bd.get_node(code="CH4").id: characterize_ch4,
     bd.get_node(code="CO2").id: characterize_co2,
@@ -675,7 +676,7 @@ characterization_functions = {
 
 
 
-```python { .notebook-cell }
+```python
 tlca.dynamic_lcia(
     metric="radiative_forcing",
     time_horizon=100,
@@ -698,7 +699,7 @@ print(
 
 
 
-```python { .notebook-cell }
+```python
 tlca.plot_dynamic_characterized_inventory(cumsum=True)
 ```
 
@@ -712,7 +713,7 @@ tlca.plot_dynamic_characterized_inventory(cumsum=True)
 
 
 
-```python { .notebook-cell }
+```python
 tlca.dynamic_lcia(
     metric="GWP",
     time_horizon=100,
@@ -741,7 +742,7 @@ Ultimately, let's compare how changing the length of the time horizon affects th
 
 
 
-```python { .notebook-cell }
+```python
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -834,27 +835,13 @@ df = pd.DataFrame(
 
 
 
-```python { .notebook-cell }
+```python
 df
 ```
 
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table>
   <thead>
     <tr style="text-align: right;">
@@ -927,6 +914,7 @@ df
     </tr>
   </tbody>
 </table>
+
 
 
 

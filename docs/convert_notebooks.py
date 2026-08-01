@@ -47,10 +47,22 @@ NOTEBOOK_SOURCE_PATHS: dict[str, str] = {
 }
 
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*[mK]")
-PANDAS_TABLE_STYLE = re.compile(
-    r"<div>\s*<style scoped>.*?</style>\s*(<table.*?</table>)\s*</div>", re.DOTALL
+# Pandas wraps its <table> in <div><style scoped>...</style>...</div>, but the
+# closing </div> isn't always present in nbconvert's markdown output (depends
+# on the dataframe/output shape) - matching both tags in one regex silently
+# fails to match when the closing tag is missing, leaving an unclosed <div>
+# and an unscoped raw <style> block in the page, corrupting everything after
+# it. Strip the opening preamble and any (optional) closing </div> separately
+# instead, so each half is stripped independently of whether the other is
+# present.
+PANDAS_TABLE_STYLE_OPEN = re.compile(r"<div>\s*<style scoped>.*?</style>\s*", re.DOTALL)
+# Large/truncated dataframes get a "<p>N rows x M columns</p>" notice between
+# </table> and the wrapper's </div> - tolerate it so the </div> strip doesn't
+# silently miss it (found the hard way: a missed strip here left an orphaned
+# </div> that closed an unrelated ancestor early, corrupting page layout).
+PANDAS_TABLE_STYLE_CLOSE = re.compile(
+    r"(</table>\s*(?:<p>[\d,]+ rows [x×] [\d,]+ columns</p>\s*)?)</div>", re.DOTALL
 )
-NOTEBOOK_CODE_FENCE = re.compile(r"^```python$", re.MULTILINE)
 
 
 def strip_ansi(text: str) -> str:
@@ -88,7 +100,8 @@ def convert(
     # extension itself emits - the theme's own JS wraps every <table> in
     # .md-typeset__scrollwrap/.md-typeset__table at runtime, so pre-wrapping it
     # here would leave it double-wrapped and mis-aligned.
-    body = PANDAS_TABLE_STYLE.sub(r"\1", body)
+    body = PANDAS_TABLE_STYLE_OPEN.sub("", body)
+    body = PANDAS_TABLE_STYLE_CLOSE.sub(r"\1", body)
 
     # Keep dataframe tables readable on small screens without changing their
     # internal table layout.
@@ -137,13 +150,13 @@ def convert(
     tags_yaml = "\n".join(f"  - {t}" for t in tags)
     frontmatter = f"---\nicon: {icon}\ntags:\n{tags_yaml}\n---\n\n"
 
-    # Tag each Python code cell's fence with a class so the primary-color
-    # code-cell highlight (see docs/stylesheets/extra.css) applies only to
-    # notebook-derived pages, not regular Markdown pages with Python fences.
-    # A wrapping <div> was used previously, but the theme bleeds code blocks
-    # edge-to-edge via a direct-child selector (.md-content__inner>.highlight)
-    # that a wrapper div breaks - tagging the fence itself avoids that.
-    body = NOTEBOOK_CODE_FENCE.sub('```python { .notebook-cell }', body)
+    # Do NOT wrap the body or tag fences to scope the primary-color code-cell
+    # highlight (see docs/stylesheets/extra.css) - both were tried and both
+    # corrupt Zensical's rendering: a wrapping <div markdown> breaks
+    # md_in_html's block nesting around the raw <table>, and tagging fences
+    # with superfences' inline "{ .class }" attribute syntax corrupts
+    # Zensical's renderer entirely (confirmed broken on mobile, live).
+    # Scoping is done via JS instead - see docs/javascripts/source-overrides.js.
     body = frontmatter + source_override + body
 
     # Write markdown file
