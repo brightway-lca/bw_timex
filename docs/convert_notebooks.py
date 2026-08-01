@@ -50,6 +50,7 @@ ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*[mK]")
 PANDAS_TABLE_STYLE = re.compile(
     r"<div>\s*<style scoped>.*?</style>\s*(<table.*?</table>)\s*</div>", re.DOTALL
 )
+NOTEBOOK_CODE_FENCE = re.compile(r"^```python$", re.MULTILINE)
 
 
 def strip_ansi(text: str) -> str:
@@ -136,10 +137,13 @@ def convert(
     tags_yaml = "\n".join(f"  - {t}" for t in tags)
     frontmatter = f"---\nicon: {icon}\ntags:\n{tags_yaml}\n---\n\n"
 
-    # Wrap the notebook body in a marker div so the primary-color code-cell
-    # highlight (see docs/stylesheets/extra.css) applies only to notebook-
-    # derived pages, not to regular Markdown pages with Python code fences.
-    body = f'<div class="notebook-render" markdown>\n\n{body}\n\n</div>\n'
+    # Tag each Python code cell's fence with a class so the primary-color
+    # code-cell highlight (see docs/stylesheets/extra.css) applies only to
+    # notebook-derived pages, not regular Markdown pages with Python fences.
+    # A wrapping <div> was used previously, but the theme bleeds code blocks
+    # edge-to-edge via a direct-child selector (.md-content__inner>.highlight)
+    # that a wrapper div breaks - tagging the fence itself avoids that.
+    body = NOTEBOOK_CODE_FENCE.sub('```python { .notebook-cell }', body)
     body = frontmatter + source_override + body
 
     # Write markdown file

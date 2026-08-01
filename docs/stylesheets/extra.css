@@ -75,32 +75,33 @@
   border-radius: 0.4rem;
 }
 
-/* The theme bleeds tables past the content column with a negative left/right
-   margin on .md-typeset__scrollwrap, cancelled out by matching padding on
-   the inner .md-typeset__table - in principle a no-op, in practice fragile
-   (broke once already, see prior commit). Pin both to zero instead, so the
-   table sits flush with the content column at the same left/right position
-   as code blocks and paragraphs, by construction rather than cancellation. */
-.md-content .md-typeset .md-typeset__scrollwrap {
-  margin-left: 0;
-  margin-right: 0;
-  margin-bottom: 1em;
+/* Keep wide tables scrollable within the content column (same left/right
+   inset as paragraphs) instead of overflowing past the viewport - table
+   layout won't shrink columns below their content's min-width otherwise. */
+.md-content .md-typeset .md-typeset__table {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
+/* The theme adds an extra margin-bottom on .md-typeset__table on top of its
+   .md-typeset__scrollwrap parent's own 1em, so tables get ~1.5em below but
+   only 1em above - drop that extra bit for a symmetric margin. */
 .md-content .md-typeset .md-typeset__table {
-  padding-left: 0;
-  padding-right: 0;
   margin-bottom: 0;
 }
 
 /* Highlight code cells in the rendered example notebooks (and only those)
-   with a subtle primary-color inset border */
-.md-content .md-typeset .notebook-render .language-python.highlight {
+   with a subtle primary-color inset border. Tagged directly on the fence
+   (see docs/convert_notebooks.py) rather than via a wrapping div, since the
+   theme bleeds code blocks edge-to-edge via a direct-child selector
+   (.md-content__inner>.highlight) that a wrapper div would break. */
+.md-content .md-typeset .language-python.highlight.notebook-cell {
   box-shadow: none;
 }
 
-.md-content .md-typeset .notebook-render .language-python.highlight > pre > code.md-code__content,
-.md-content .md-typeset .notebook-render .language-python.highlight > pre > .md-code__content {
+.md-content .md-typeset .language-python.highlight.notebook-cell > pre > code.md-code__content,
+.md-content .md-typeset .language-python.highlight.notebook-cell > pre > .md-code__content {
   box-shadow: inset 0.2rem 0 0 var(--md-primary-fg-color);
   border-radius: 0.4rem;
 }

@@ -7,8 +7,6 @@ tags:
 
 
 <div hidden data-source-edit-path="docs/content/examples/example_Importing_model_from_excel.ipynb" data-source-view-path="docs/content/examples/example_Importing_model_from_excel.ipynb"></div>
-<div class="notebook-render" markdown>
-
 # Loading your LCA model with temporal distributions from an excel file
 
 
@@ -48,7 +46,7 @@ Analoguesly absolute temporal distritbutions are supported.
 
 
 
-```python
+```python { .notebook-cell }
 # Set up a bw project
 
 import bw2data as bd
@@ -57,14 +55,14 @@ bd.projects.set_current("electric_vehicle_standalone_excel")
 ```
 
 
-```python
+```python { .notebook-cell }
 # Fresh start
 for db in list(bd.databases):
     del bd.databases[db]
 ```
 
 
-```python
+```python { .notebook-cell }
 # Add some background databases
 
 biosphere = bd.Database("biosphere")
@@ -109,7 +107,7 @@ background_databases = [
 We now create some very simple processes within these databases. These process get only one aggregated CO2-emission each. The amounts of these emissions change over time.
 
 
-```python
+```python { .notebook-cell }
 process_co2_emissions = {
     "glider": (10, 5, 2.5), # for 2020, 2030 and 2040
     "powertrain": (20, 10, 7.5),
@@ -167,7 +165,7 @@ You need `bw2io > 0.9.14`, which supports the import of `TemporalDistributions` 
 Please make sure you created and processed the biosphere and the background databases for 2020, 2030 and 2040 using the code above.
 
 
-```python
+```python { .notebook-cell }
 if "foreground" in bd.databases:
     del bd.databases["foreground"] # to make sure we import the foreground from scratch from the excel file
 
@@ -229,7 +227,7 @@ ei.write_database()
 let's check if the ExcelImporter imported the `TemporalDistributions` correctly:
 
 
-```python
+```python { .notebook-cell }
 driving = bd.get_node(database="foreground", name="driving an electric vehicle")
 ev_to_driving = next(exc for exc in driving.technosphere() if exc.input["name"] == "electricity")
 
@@ -262,7 +260,7 @@ ev_to_driving["temporal_distribution"].graph(resolution="M")
 
 
 
-```python
+```python { .notebook-cell }
 ev_to_driving["temporal_distribution"]
 ```
 
@@ -278,7 +276,7 @@ ev_to_driving["temporal_distribution"]
 Finally, we need some characterization method. Again, this is just a simple made-up one:
 
 
-```python
+```python { .notebook-cell }
 bd.Method(("GWP", "example")).write(
     [
         (("biosphere", "CO2"), 1),
@@ -292,14 +290,14 @@ bd.Method(("GWP", "example")).write(
 Now that the data is set up, we can get startet with the actual time-explicit LCA. As usual, we need to select a method first:
 
 
-```python
+```python { .notebook-cell }
 method = ("GWP", "example")
 ```
 
 `bw_timex` needs to know the representative time of the databases:
 
 
-```python
+```python { .notebook-cell }
 from datetime import datetime
 
 database_dates = {
@@ -315,19 +313,19 @@ Now, we can instantiate a `TimexLCA`. It's structure is similar to a normal `bw2
 Not sure about the required inputs? Check the documentation using `?`. All our classes and methods have docstrings!
 
 
-```python
+```python { .notebook-cell }
 from bw_timex import TimexLCA
 ```
 
 Let's create a `TimexLCA` object for our EV life cycle:
 
 
-```python
+```python { .notebook-cell }
 driving = bd.get_node(database="foreground", code="driving", name="driving an electric vehicle", unit="transport over an ev lifetime")
 ```
 
 
-```python
+```python { .notebook-cell }
 # intialize the TimexLCA object with the functional unit, method, and database dates
 tlca = TimexLCA({driving: 1}, method, database_dates)
 # build the timeline with a temporal grouping of "month"
@@ -344,7 +342,7 @@ tlca.lci()
 Let's check the dynamic invenrotry in a human readale format
 
 
-```python
+```python { .notebook-cell }
 tlca.create_labelled_dynamic_inventory_dataframe()
 ```
 
@@ -580,7 +578,7 @@ tlca.create_labelled_dynamic_inventory_dataframe()
 Now we can do all further analysis as detailed in the other example notebook [example_electric_vehicle_standalone](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_electric_vehicle_standalone.ipynb). Below you just find the quick calculations. For the full dynamic characterization please see the linked notebook.
 
 
-```python
+```python { .notebook-cell }
 # Static LCIA from time-explicit LCI
 tlca.static_lcia()
 tlca.static_score   #kg CO2-eq
@@ -596,7 +594,7 @@ tlca.static_score   #kg CO2-eq
 At this point, we can already compare these time-explicit results to the results of an "ordinary", completely static LCA. These already exist within the TimexLCA class, originally to set the priorities for the graph traversal:
 
 
-```python
+```python { .notebook-cell }
 # compare to fully static non time-explicit LCIA score
 tlca.base_lca.score
 ```
@@ -607,6 +605,3 @@ tlca.base_lca.score
     28089.199999794364
 
 
-
-
-</div>

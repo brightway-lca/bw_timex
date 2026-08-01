@@ -7,8 +7,6 @@ tags:
 
 
 <div hidden data-source-edit-path="docs/content/examples/example_electric_vehicle_premise.ipynb" data-source-view-path="docs/content/examples/example_electric_vehicle_premise.ipynb"></div>
-<div class="notebook-render" markdown>
-
 # Time-explicit LCA of an electric vehicle
 
 
@@ -20,7 +18,7 @@ More information on the inner workings of `bw_timex` can be found [here](https:/
 > **Note:** This is the "premise" version of this notebook that works with ecoinvent and premise data. If you don't have access to that, please check out the ["standalone" version](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_electric_vehicle_standalone.ipynb) of this notebook.
 
 
-```python
+```python { .notebook-cell }
 import bw2data as bd
 
 bd.projects.set_current("timex")
@@ -33,7 +31,7 @@ In the [premise documentation](https://premise.readthedocs.io/en/latest/) you ca
 
 
 
-```python
+```python { .notebook-cell }
 db_2020 = bd.Database("ei310_IMAGE_SSP2_RCP19_2020_electricity")
 db_2030 = bd.Database("ei310_IMAGE_SSP2_RCP19_2030_electricity")
 db_2040 = bd.Database("ei310_IMAGE_SSP2_RCP19_2040_electricity")
@@ -67,7 +65,7 @@ Now, we need to build this with brightway. If you are not interested in the mode
 For our ev model we make the following assumptions:
 
 
-```python
+```python { .notebook-cell }
 ELECTRICITY_CONSUMPTION = 0.2 # kWh/km
 MILEAGE = 150_000 # km
 LIFETIME = 15 # years
@@ -81,7 +79,7 @@ MASS_BATTERY = 280 # kg
 First, we create a new foreground database:
 
 
-```python
+```python { .notebook-cell }
 if "foreground" in bd.databases:
     del bd.databases["foreground"] # to make sure we create the foreground from scratch
 foreground = bd.Database("foreground")
@@ -92,7 +90,7 @@ Now, let's creating the foreground activities:
 
 
 
-```python
+```python { .notebook-cell }
 ev_production = foreground.new_node("ev_production", name="production of an electric vehicle", unit="unit")
 ev_production['reference product'] = "electric vehicle"
 ev_production.save()
@@ -109,7 +107,7 @@ used_ev.save()
 We take the actual process data from ecoinvent. However, the ecoinvent processes for the ev part production contain exchanges for the end of life treatment in the production processes already, which we want to separate. So let's fix that first by creating new activities without the eol processes:
 
 
-```python
+```python { .notebook-cell }
 for db in [db_2020, db_2030, db_2040]:
     for code in ["glider_production_without_eol", "powertrain_production_without_eol", "battery_production_without_eol"]:
         try:
@@ -148,7 +146,7 @@ for db in [db_2020, db_2030, db_2040]:
 Now, let's build the exchanges, starting with the ev production:
 
 
-```python
+```python { .notebook-cell }
 glider_production = db_2020.get(code="glider_production_without_eol")
 powertrain_production = db_2020.get(code="powertrain_production_without_eol")
 battery_production = db_2020.get(code="battery_production_without_eol")
@@ -175,7 +173,7 @@ battery_to_ev = ev_production.new_edge(
 ... the end of life:
 
 
-```python
+```python { .notebook-cell }
 glider_eol = db_2020.get(name="treatment of used glider, passenger car, shredding")
 powertrain_eol = db_2020.get(name="treatment of used powertrain for electric passenger car, manual dismantling")
 battery_eol = db_2020.get(name="market for used Li-ion battery")
@@ -202,7 +200,7 @@ used_ev_to_battery_eol = used_ev.new_edge(
 ...and, finally, driving:
 
 
-```python
+```python { .notebook-cell }
 electricity_production = db_2020.get(name="market group for electricity, low voltage", location="WEU")
 
 driving.new_edge(input=driving, amount=1, type="production").save()
@@ -246,7 +244,7 @@ Notably, in addition to the timestamp of the occurence of the process (which is 
 
 
 
-```python
+```python { .notebook-cell }
 from bw_temporalis import TemporalDistribution, easy_timedelta_distribution
 import numpy as np
 
@@ -282,7 +280,7 @@ td_treating_waste = TemporalDistribution(
 Let's explore what a `TemporalDistribution` looks like:
 
 
-```python
+```python { .notebook-cell }
 td_assembly_and_delivery.graph(resolution="M")
 ```
 
@@ -300,7 +298,7 @@ td_assembly_and_delivery.graph(resolution="M")
 
 
 
-```python
+```python { .notebook-cell }
 td_glider_production.graph(resolution="M")
 ```
 
@@ -320,7 +318,7 @@ td_glider_production.graph(resolution="M")
 Starting from the functional unit in our supply chain graph, the temporal distributions of consecutive edges get "multiplied", or more specifically, convolved. Let's look at an example to clarify this. The assembly and delivery of our ev happens either 2 or 3 months before we can start using it. Each of these occurences of this process demands a glider, which also has a temporal distribution that then gets convolved "back in time". Also pay attention to how the amounts get scaled.
 
 
-```python
+```python { .notebook-cell }
 (td_assembly_and_delivery * td_glider_production).graph(resolution="M")
 ```
 
@@ -341,7 +339,7 @@ We now add the temporal information to the exchanges of our EV. We add temporal 
 
 
 
-```python
+```python { .notebook-cell }
 glider_to_ev["temporal_distribution"] = td_glider_production
 glider_to_ev.save()
 
@@ -376,14 +374,14 @@ used_ev_to_battery_eol.save()
 As usual, we need to select an impact assessment method:
 
 
-```python
+```python { .notebook-cell }
 method = ('EF v3.1', 'climate change', 'global warming potential (GWP100)')
 ```
 
 `bw_timex` also needs to know the representative time of the databases:
 
 
-```python
+```python { .notebook-cell }
 from datetime import datetime
 
 database_dates = {
@@ -399,7 +397,7 @@ Now, we can instantiate a `TimexLCA`. It's structure is similar to a normal `bw2
 Not sure about the required inputs? Check the documentation using `?`. All our classes and methods have docstrings!
 
 
-```python
+```python { .notebook-cell }
 from bw_timex import TimexLCA
 TimexLCA?
 ```
@@ -470,7 +468,7 @@ TimexLCA?
 Let's instantiate a `TimexLCA` object for our "driving" activity:
 
 
-```python
+```python { .notebook-cell }
 tlca = TimexLCA({driving: 1}, method, database_dates)
 ```
 
@@ -491,7 +489,7 @@ So, let's build the timeline. We choose a monthly temporal grouping here because
 
 
 
-```python
+```python { .notebook-cell }
 tlca.build_timeline(temporal_grouping="month")
 ```
 
@@ -833,7 +831,7 @@ The temporal market shares in the timeline (right most column above) specify the
 Next, we calculate the time-explicit LCI. The `TimexLCA.lci()` function takes care of all the relinking, based on the information from the timeline. 
 
 
-```python
+```python { .notebook-cell }
 tlca.lci()
 ```
 
@@ -848,7 +846,7 @@ tlca.lci()
 Taking a look at the `dynamic_inventory` that was now created, we can see that it has more rows (emissions) than our usual biosphere3 flows. Instead of one row for each emission in the biosphere database we now get one row for each emission at each point in time.
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_inventory
 ```
 
@@ -863,7 +861,7 @@ tlca.dynamic_inventory
 The standard, non-dynamic inventory has far less rows because the temporal resolution is missing. Looking at the timeline again, we see that we have processes at 23 different points in time (only counting the ones that actually directly procude emissions), which exactly matches the ratio of the dimensions of our two inventories:
 
 
-```python
+```python { .notebook-cell }
 tlca.inventory.shape # (#rows, #cols)
 ```
 
@@ -875,7 +873,7 @@ tlca.inventory.shape # (#rows, #cols)
 
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_inventory.shape[0]/tlca.inventory.shape[0]
 ```
 
@@ -889,7 +887,7 @@ tlca.dynamic_inventory.shape[0]/tlca.inventory.shape[0]
 While under the hood, the dynamic inventory is calculated as a sparse matrix, there is also a more human-friendly version as a pandas DataFrame:
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_inventory_df
 ```
 
@@ -1010,7 +1008,7 @@ If we are only interested in the new overall time-explicit scores and don't care
 In case the timing of emissions is not important, one can directly calculate the LCIA the "standard way" using static characterization factors. Per default, the following calculates the static lcia score based on the impact method chosen in the very beginning:
 
 
-```python
+```python { .notebook-cell }
 tlca.static_lcia()
 tlca.static_score   #kg CO2-eq
 ```
@@ -1025,7 +1023,7 @@ tlca.static_score   #kg CO2-eq
 At this point, we can already compare these time-explicit results to the results of an "ordinary", completely static LCA. These already exist within the TimexLCA class, originally to set the priorities for the graph traversal:
 
 
-```python
+```python { .notebook-cell }
 tlca.base_lca.score
 ```
 
@@ -1050,7 +1048,7 @@ For the dynamic characterization, users can also choose the length of the consid
 Let's characterize our dynamic inventory, regarding radiative forcing with a fixed time horizon and the default time horizon length of 100 years:
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_lcia(metric="radiative_forcing", fixed_time_horizon=True)
 ```
 
@@ -1173,7 +1171,7 @@ tlca.dynamic_lcia(metric="radiative_forcing", fixed_time_horizon=True)
 The method call returns a dataframe of all the individual emissions at their respective timesteps (tlca.characterized_inventory), but we can also just look at the overall score:
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_score #W/m2 (radiative forcing)
 ```
 
@@ -1187,7 +1185,7 @@ tlca.dynamic_score #W/m2 (radiative forcing)
 To visualize the results, we provide a simple plotting functions:
 
 
-```python
+```python { .notebook-cell }
 tlca.plot_dynamic_characterized_inventory()  
 ```
 
@@ -1200,12 +1198,12 @@ tlca.plot_dynamic_characterized_inventory()
 This can be a bit messy, though, because all the individual impacts caused by individual emissions (e.g., CO2, CH4, N2O, ...) appear. Luckily, there is also an option to sum the emissions within each activity:
 
 
-```python
+```python { .notebook-cell }
 
 ```
 
 
-```python
+```python { .notebook-cell }
 tlca.plot_dynamic_characterized_inventory(sum_emissions_within_activity=True)
 ```
 
@@ -1218,7 +1216,7 @@ tlca.plot_dynamic_characterized_inventory(sum_emissions_within_activity=True)
 There is also a flag to plot the cumulative score over time:
 
 
-```python
+```python { .notebook-cell }
 tlca.plot_dynamic_characterized_inventory(sum_activities=True, cumsum=True)
 ```
 
@@ -1234,7 +1232,7 @@ tlca.plot_dynamic_characterized_inventory(sum_activities=True, cumsum=True)
 Similar options are available for the metric GWP, which compares the radiative forcing of a GHG to that of CO2 over a certain time horizon (commonly 100 years, but it can be set flexibly in `time_horizon`).
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_lcia(metric="GWP", fixed_time_horizon=False, time_horizon = 70)
 tlca.dynamic_score #kg CO2-eq (GWP)
 ```
@@ -1255,7 +1253,7 @@ tlca.dynamic_score #kg CO2-eq (GWP)
 Plotting the GWP results over time:
 
 
-```python
+```python { .notebook-cell }
 tlca.plot_dynamic_characterized_inventory(sum_emissions_within_activity=True)
 ```
 
@@ -1268,7 +1266,7 @@ tlca.plot_dynamic_characterized_inventory(sum_emissions_within_activity=True)
 Cumulative:
 
 
-```python
+```python { .notebook-cell }
 tlca.plot_dynamic_characterized_inventory(sum_emissions_within_activity=True, cumsum=True)
 ```
 
@@ -1286,7 +1284,7 @@ We compare the time-explicit results with those of an LCA for the year 2020 and 
 Time-explicit scores:
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_lcia(metric="GWP", fixed_time_horizon=False, time_horizon=100)
 tlca.dynamic_score
 ```
@@ -1307,7 +1305,7 @@ tlca.dynamic_score
 The 2020 (static) score has already been calculated by TimexLCA in the beginning, but we can still access the score:
 
 
-```python
+```python { .notebook-cell }
 tlca.base_lca.score
 ```
 
@@ -1321,7 +1319,7 @@ tlca.base_lca.score
 However, further down we also want to look at what part of the life cycle has what contribution. To get this info, we need some more calculations:
 
 
-```python
+```python { .notebook-cell }
 static_scores = {}
 for exc in driving.technosphere():
     if exc.input == ev_production:
@@ -1344,7 +1342,7 @@ for exc in driving.technosphere():
 Similarly, we calculate the 2040 (prospective) scores by just changing the database the exchanges point to:
 
 
-```python
+```python { .notebook-cell }
 import bw2calc as bc
 
 # first create a copy of the system and relink to processes from 2040 database
@@ -1411,7 +1409,7 @@ for exc in prospective_driving.technosphere():
 Lets compare the overall scores:
 
 
-```python
+```python { .notebook-cell }
 print("Static score: ", sum(static_scores.values())) # should be the same as tlca.base_lca.score
 print("Prospective score: ", sum(prospective_scores.values()))
 print("Time-explicit score: ", tlca.dynamic_score)
@@ -1425,7 +1423,7 @@ print("Time-explicit score: ", tlca.dynamic_score)
 To better understand what's going on, let's plot the scores as a waterfall chart  based on timing of emission. Also, we can look at the "first-level contributions":
 
 
-```python
+```python { .notebook-cell }
 from bw_timex.utils import plot_characterized_inventory_as_waterfall
 
 order_stacked_activities = (
@@ -1455,6 +1453,3 @@ plot_characterized_inventory_as_waterfall(
 
 
 One can see that the time-explicit results (in the middle) are somewhere in between the static and the prospective results. This makes sense as at each timestep, the underlying processes are sourced from progressively "cleaner" background databases, reaching a lower impact than if they are only sourced from the current database, but not so low as the prospective results, which are fully sourced from the most decarbonized database. Notably, the electricity consumption in the use-phase, modelled uniformly over the lifetime of the EV, contributes less and less to the score in the later years, since the electricity becomes cleaner in the future databases.
-
-
-</div>

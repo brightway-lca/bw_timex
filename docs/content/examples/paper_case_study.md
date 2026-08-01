@@ -7,8 +7,6 @@ tags:
 
 
 <div hidden data-source-edit-path="docs/content/examples/paper_case_study.ipynb" data-source-view-path="docs/content/examples/paper_case_study.ipynb"></div>
-<div class="notebook-render" markdown>
-
 # Time-explicit LCA of an electric vehicle
 
 
@@ -16,7 +14,7 @@ This notebook contains the code for the exemplary case study of out paper on tim
 
 
 
-```python
+```python { .notebook-cell }
 import bw2data as bd
 
 bd.projects.set_current("timex")
@@ -31,7 +29,7 @@ First, we set up the databases we need, starting with a new empty foreground dat
 
 
 
-```python
+```python { .notebook-cell }
 if "foreground" in bd.databases:
     del bd.databases["foreground"]  # to make sure we create the foreground from scratch
 foreground = bd.Database("foreground")
@@ -43,7 +41,7 @@ In the [premise documentation](https://premise.readthedocs.io/en/latest/) you ca
 
 
 
-```python
+```python { .notebook-cell }
 db_2020 = bd.Database("ei310_IMAGE_SSP2_RCP19_2020_electricity")
 db_2030 = bd.Database("ei310_IMAGE_SSP2_RCP19_2030_electricity")
 db_2040 = bd.Database("ei310_IMAGE_SSP2_RCP19_2040_electricity")
@@ -76,7 +74,7 @@ For our EV model, we make the following assumptions:
 
 
 
-```python
+```python { .notebook-cell }
 LIFETIME = 16  # years
 MILEAGE = 150_000  # km
 ELECTRICITY_CONSUMPTION = 0.2  # kWh/km
@@ -91,7 +89,7 @@ Now, we create the foreground processes:
 
 
 
-```python
+```python { .notebook-cell }
 ev_production = foreground.new_node(
     "ev_production", name="production of an electric vehicle", unit="unit"
 )
@@ -113,7 +111,7 @@ We take the actual process data from ecoinvent. However, the ecoinvent processes
 
 
 
-```python
+```python { .notebook-cell }
 for db in [db_2020, db_2030, db_2040]:
     for code in [
         "glider_production_without_eol",
@@ -173,7 +171,7 @@ Now, we add the intermediate flows, starting with the EV production:
 
 
 
-```python
+```python { .notebook-cell }
 glider_production = db_2020.get(code="glider_production_without_eol")
 powertrain_production = db_2020.get(code="powertrain_production_without_eol")
 battery_production = db_2020.get(code="battery_production_without_eol")
@@ -195,7 +193,7 @@ battery_to_ev = ev_production.new_edge(
 
 
 
-```python
+```python { .notebook-cell }
 glider_eol = db_2020.get(name="treatment of used glider, passenger car, shredding")
 powertrain_eol = db_2020.get(
     name="treatment of used powertrain for electric passenger car, manual dismantling"
@@ -227,7 +225,7 @@ used_ev_to_battery_eol = used_ev.new_edge(
 
 
 
-```python
+```python { .notebook-cell }
 electricity_production = db_2020.get(
     name="market group for electricity, low voltage", location="WEU"
 )
@@ -244,7 +242,7 @@ electricity_to_driving = driving.new_edge(
 ```
 
 
-```python
+```python { .notebook-cell }
 glider_to_ev.save()
 powertrain_to_ev.save()
 battery_to_ev.save()
@@ -260,7 +258,7 @@ To allow a comparison with a static LCA later, we calculate the radiative forcin
 
 
 
-```python
+```python { .notebook-cell }
 from datetime import datetime
 from bw_timex import TimexLCA
 
@@ -435,7 +433,7 @@ Now we create the relative `TemporalDistribution` objects:
 
 
 
-```python
+```python { .notebook-cell }
 from bw_temporalis import TemporalDistribution, easy_timedelta_distribution
 import numpy as np
 
@@ -472,7 +470,7 @@ We now add the rTDs to the intermediate flows of our EV system.
 
 
 
-```python
+```python { .notebook-cell }
 glider_to_ev["temporal_distribution"] = td_glider_production
 glider_to_ev.save()
 
@@ -505,7 +503,7 @@ Now that we have the temporal distributions, we can calculate the dynamic LCA fo
 
 
 
-```python
+```python { .notebook-cell }
 dlca = TimexLCA({driving: 1}, method, database_dates_dlca)
 dlca.build_timeline(starting_datetime="2024-01-01", temporal_grouping="month")
 dlca.lci()
@@ -687,7 +685,7 @@ Now that everything is set up, we can calculate a Time-explicit LCA, first setti
 
 
 
-```python
+```python { .notebook-cell }
 database_dates = {
     db_2020.name: datetime.strptime("2020", "%Y"),
     db_2030.name: datetime.strptime("2030", "%Y"),
@@ -1051,7 +1049,7 @@ Now we can expand the matrices:
 
 
 
-```python
+```python { .notebook-cell }
 tlca.lci()
 ```
 
@@ -1069,7 +1067,7 @@ Now we can calculate the GWI over the EV life cycle. We characterize the time-ex
 
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_lcia(metric="GWP")
 ```
 
@@ -1193,7 +1191,7 @@ To compare the time-explicit results to prospective LCA results, we do additiona
 
 
 
-```python
+```python { .notebook-cell }
 import bw2calc as bc
 from collections import defaultdict
 
@@ -1280,7 +1278,7 @@ Comparing the overall scores:
 
 
 
-```python
+```python { .notebook-cell }
 print("Score 2020", sum(prospective_scores[2020].values()))
 print("Score 2030: ", sum(prospective_scores[2030].values()))
 print("Score 2040: ", sum(prospective_scores[2040].values()))
@@ -1297,7 +1295,7 @@ Now we plot this as a waterfall chart, comparing the different approaches. The f
 
 
 
-```python
+```python { .notebook-cell }
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -1556,7 +1554,7 @@ def plot_characterized_inventory_as_waterfall(
 ```
 
 
-```python
+```python { .notebook-cell }
 order_stacked_activities = [
     glider_production_without_eol["name"],
     battery_production_without_eol["name"],
@@ -1608,7 +1606,7 @@ Next, we calculate the radiative forcing over the EV life cycle via dynamic char
 
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_lcia(metric="radiative_forcing")
 ```
 
@@ -1732,7 +1730,7 @@ We want to compare the time-explicit results to the ones from dynamic LCA with a
 
 
 
-```python
+```python { .notebook-cell }
 from functools import partial
 from bw_timex.utils import round_datetime
 
@@ -1781,7 +1779,7 @@ def create_plot_df(lca):
 ```
 
 
-```python
+```python { .notebook-cell }
 df_tlca = create_plot_df(tlca)
 df_dlca = create_plot_df(dlca)
 df_dlca_no_tds = create_plot_df(dlca_no_tds)
@@ -1791,7 +1789,7 @@ Providing initial zero value for cumulative plots:
 
 
 
-```python
+```python { .notebook-cell }
 df_tlca = pd.concat(
     [
         pd.DataFrame({col: [0] for col in df_tlca.columns}, index=[min(df_tlca.index)]),
@@ -1819,7 +1817,7 @@ Plotting:
 
 
 
-```python
+```python { .notebook-cell }
 import matplotlib.dates as mdates
 from matplotlib.ticker import NullLocator
 
@@ -2073,6 +2071,3 @@ plt.show()
 ![png](paper_case_study_files/output_56_0.png)
     
 
-
-
-</div>

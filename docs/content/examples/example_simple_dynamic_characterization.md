@@ -7,8 +7,6 @@ tags:
 
 
 <div hidden data-source-edit-path="docs/content/examples/example_simple_dynamic_characterization.ipynb" data-source-view-path="docs/content/examples/example_simple_dynamic_characterization.ipynb"></div>
-<div class="notebook-render" markdown>
-
 # Dynamic characterization
 This notebook is meant to explain the options for dynamic characterization in `bw_timex`.
 In this example, there is a very simple database containing only one node with a pulse emission of CH4, occuring at a 10 year delay.
@@ -17,7 +15,7 @@ Further down, there is an example with multiple greenhouse gases.
 
 
 
-```python
+```python { .notebook-cell }
 import bw2data as bd
 import numpy as np
 from bw_temporalis import TemporalDistribution
@@ -91,13 +89,13 @@ We select the demand and the method and calculate a LCA with `bw_timex`
 
 
 
-```python
+```python { .notebook-cell }
 demand = {("test", "A"): 1}
 gwp = ("GWP", "example")
 ```
 
 
-```python
+```python { .notebook-cell }
 from bw_timex import TimexLCA
 
 tlca = TimexLCA(demand, gwp)
@@ -108,7 +106,7 @@ tlca = TimexLCA(demand, gwp)
 
 
 
-```python
+```python { .notebook-cell }
 tlca.build_timeline()
 ```
 
@@ -152,12 +150,12 @@ tlca.build_timeline()
 
 
 
-```python
+```python { .notebook-cell }
 tlca.lci()
 ```
 
 
-```python
+```python { .notebook-cell }
 tlca.static_lcia()
 tlca.static_score
 ```
@@ -186,7 +184,7 @@ First, import the dynamic characterization function of CH4 and have a look at it
 
 
 
-```python
+```python { .notebook-cell }
 from bw_timex.dynamic_characterization import characterize_ch4
 
 characterize_ch4?
@@ -234,7 +232,7 @@ characterize_ch4?
 Then, we can create the characterization_functions where we map the function to the corresponding flow via its ID:
 
 
-```python
+```python { .notebook-cell }
 characterization_functions_ch4 = {
     bd.get_node(code="CH4").id: characterize_ch4,
 }
@@ -243,7 +241,7 @@ characterization_functions_ch4 = {
 Now, the dynamic LCIA can be calculated:
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_lcia(
     metric="radiative_forcing",
     fixed_time_horizon=False,
@@ -386,7 +384,7 @@ tlca.dynamic_lcia(
 
 
 
-```python
+```python { .notebook-cell }
 tlca.plot_dynamic_characterized_inventory()
 ```
 
@@ -400,7 +398,7 @@ CH4 has a half-life time of 8.6 years, so the decay curve is quite steep and it 
 
 
 
-```python
+```python { .notebook-cell }
 print(
     f"characterized dynamic score: {tlca.dynamic_score} [{tlca.metric} ({tlca.time_horizon} years)]"
 )
@@ -413,7 +411,7 @@ If we evaluate radiative forcing over a shorter time horizon, the score gets sma
 
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_lcia(
     metric="radiative_forcing",
     fixed_time_horizon=False,
@@ -433,7 +431,7 @@ With `fixed_time_horizon = True`, we evaluate all emissions from time of the fun
 
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_lcia(
     metric="radiative_forcing",
     fixed_time_horizon=True,
@@ -480,7 +478,7 @@ Let's evaluate GWP20:
 
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_lcia(
     metric="GWP",
     time_horizon=20,
@@ -503,7 +501,7 @@ With `fixed_time_horizon = True` and `time_horizon = 20` years, the difference i
 
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_lcia(
     metric="GWP",
     fixed_time_horizon=True,
@@ -529,7 +527,7 @@ Lastly, let's look at a system with multiple GHGs spread over time.
 
 
 
-```python
+```python { .notebook-cell }
 def write_database_multi_emission():
 
     project_name = "__test_database1__"
@@ -615,7 +613,7 @@ def write_database_multi_emission():
 ```
 
 
-```python
+```python { .notebook-cell }
 write_database_multi_emission()
 ```
 
@@ -638,7 +636,7 @@ Import additional default dynamic characterization function for N2O and calculat
 
 
 
-```python
+```python { .notebook-cell }
 from bw_timex.dynamic_characterization import characterize_n2o, characterize_co2
 
 demand = {("test", "A"): 1}
@@ -665,7 +663,7 @@ match dynamic charcterization functions to biosphere flows:
 
 
 
-```python
+```python { .notebook-cell }
 characterization_functions = {
     bd.get_node(code="CH4").id: characterize_ch4,
     bd.get_node(code="CO2").id: characterize_co2,
@@ -677,7 +675,7 @@ characterization_functions = {
 
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_lcia(
     metric="radiative_forcing",
     time_horizon=100,
@@ -700,7 +698,7 @@ print(
 
 
 
-```python
+```python { .notebook-cell }
 tlca.plot_dynamic_characterized_inventory(cumsum=True)
 ```
 
@@ -714,7 +712,7 @@ tlca.plot_dynamic_characterized_inventory(cumsum=True)
 
 
 
-```python
+```python { .notebook-cell }
 tlca.dynamic_lcia(
     metric="GWP",
     time_horizon=100,
@@ -743,7 +741,7 @@ Ultimately, let's compare how changing the length of the time horizon affects th
 
 
 
-```python
+```python { .notebook-cell }
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -836,7 +834,7 @@ df = pd.DataFrame(
 
 
 
-```python
+```python { .notebook-cell }
 df
 ```
 
@@ -934,6 +932,3 @@ df
 
 One can see that a longer time horizon leads to smaller differences between fixed (time horizon starts at FU for all flows) and flexible time horizons (time horizon starts at each emissions seperately). An increase in time horizon also leads to lower overall scores, because the system contains multiple short-lived GHGs, such as CH4 and N2O, whose CO2-equivalence value decreases when assessing longer time horizons.
 
-
-
-</div>
