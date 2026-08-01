@@ -79,6 +79,7 @@ features = [
   "navigation.path",
   "navigation.top",
   "navigation.tracking",
+  "header.autohide",
   "search.highlight",
   "search.share",
   "search.suggest",
