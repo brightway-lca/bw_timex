@@ -1,4 +1,3 @@
-*[LCA]: Life Cycle Assessment
 *[LCI]: Life Cycle Inventory
 *[LCIA]: Life Cycle Impact Assessment
 *[GWP]: Global Warming Potential
