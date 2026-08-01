@@ -183,3 +183,20 @@ filters = ["!^_", "!^__"]
 
 [project.markdown_extensions.zensical.extensions.preview]
 configurations = [{ targets.include = ["**"] }]
+
+[project.extra.tags]
+example = "example"
+premise = "premise"
+"dynamic characterization" = "dynchar"
+"case study" = "case-study"
+paper = "paper"
+excel = "excel"
+
+[project.theme.icon.tag]
+default = "lucide/hash"
+example = "lucide/flask-conical"
+premise = "lucide/leaf"
+dynchar = "lucide/trending-up"
+"case-study" = "lucide/file-text"
+paper = "lucide/scroll-text"
+excel = "lucide/table"
