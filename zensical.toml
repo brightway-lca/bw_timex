@@ -187,6 +187,10 @@ configurations = [{ targets.include = ["**"] }]
 
 [project.markdown_extensions.zensical.extensions.glightbox]
 
+[project.validation]
+invalid_links = true
+invalid_link_anchors = true
+
 [project.extra.tags]
 example = "example"
 premise = "premise"
