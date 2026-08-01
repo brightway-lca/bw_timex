@@ -1,7 +1,3 @@
----
-icon: lucide/code-2
----
-
 # API Reference
 
 This section contains the API documentation generated from the `bw_timex` source code docstrings.
