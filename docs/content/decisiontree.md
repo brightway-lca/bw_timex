@@ -9,9 +9,9 @@ Not only are there many "types" of LCA already, `bw_timex` also adds lots of fur
 ```mermaid
 flowchart TD
     %% Define node classes
-    classDef decision color:#222832, fill:#4a7c85, stroke:none;
+    classDef decision color:#222832, fill:#3fb1c5, stroke:none;
     classDef lcaType color:#222832, fill:#9c5ffd, stroke:none;
-    classDef codeNode color:#222832, fill:#6b7280, text-align:left, stroke:none;
+    classDef codeNode color:#222832, fill:#DBDBDB, text-align:left, stroke:none;
 
     TimingDecision{{"Do temporal aspects matter?"}}:::decision
     AspectDecision{{"Which aspects matter?"}}:::decision

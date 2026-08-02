@@ -112,20 +112,21 @@
   }
 }
 
-/* Mermaid nodes that need htmlLabels (hexagon `{{}}` decision shapes, or any
-   node whose label contains a literal newline) render their text as an HTML
-   <span class="nodeLabel"> inside a foreignObject instead of plain SVG
-   <text>. The theme's own `.nodeLabel { color: var(--md-mermaid-label-fg-color) }`
-   rule then wins over the mermaid classDef `color`, because it's an explicit
-   rule on the label element itself rather than an inherited one - so in dark
-   mode the (theme-default, light) text sits on the classDef's light fill
-   color and becomes unreadable. Nodes that render as plain SVG text (no
-   newline, non-hexagon shapes) are unaffected and don't need this override.
-   Pin these classDef'd node types back to their intended text color. */
-.mermaid .node.decision .nodeLabel,
-.mermaid .node.lcaType .nodeLabel,
-.mermaid .node.codeNode .nodeLabel {
-  color: #222832 !important;
+/* Verified via mermaid-cli: every flowchart node (not just hexagon/
+   multi-line ones) renders its text as an HTML <span class="nodeLabel">
+   inside a foreignObject, never as plain SVG <text>. The theme's own
+   `.nodeLabel { color: var(--md-mermaid-label-fg-color) }` (which tracks
+   the page's default text color, so it flips light/dark with the color
+   scheme) is an explicit rule on that span and always wins over a mermaid
+   classDef `color`, which only ever reaches the span as an inherited
+   value - inherited values lose to any explicit match regardless of
+   selector specificity. That's harmless on saturated fills (light-scheme
+   dark text and dark-scheme light text both read fine against them), but
+   the decisiontree.md "codeNode" class uses a near-white gray fill
+   (#DBDBDB), where dark-scheme (light) text becomes almost invisible.
+   Force that one label color, unconditionally. */
+.node.codeNode .nodeLabel {
+  color: black !important;
 }
 
 
