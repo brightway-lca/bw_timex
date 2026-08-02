@@ -4,7 +4,7 @@ icon: lucide/bot
 
 # Using `bw_timex` with an AI coding agent
 
-Most `bw_timex` studies start the same way: spin up a fresh environment, `pip install bw_timex`, and write a script or Jupyter notebook that sets up temporal distributions, background vintages, and a `TimexLCA`. If you're doing that with an AI coding agent (e.g. [Claude Code](https://claude.com/claude-code)), we maintain a **skill** that teaches it this workflow, including the parts agents most often get wrong (temporal distributions are relative to the *consumer*, not the producer; cross-vintage matching is by name/reference product/location, not by `code`) — so it writes correct `bw_timex` code on the first try instead of guessing at the API.
+Most `bw_timex` studies start the same way: spin up a fresh environment, `pip install bw_timex`, and write a script or Jupyter notebook that sets up temporal distributions, background vintages, and a `TimexLCA`. If you're doing that with an AI coding agent (e.g. [Claude Code](https://claude.com/claude-code)), we maintain a **skill** that teaches it this workflow, including the parts agents most often get wrong (temporal distribution dates default to being relative to the *consumer*, not the producer, but can also be set as absolute dates instead; cross-vintage matching is by name/reference product/location, not by `code`) — so it writes correct `bw_timex` code on the first try instead of guessing at the API.
 
 ## Installing the skill
 
