@@ -12,6 +12,10 @@ Below, you find a visualization of the time-explicit approach. Our [decision tre
 ![Time-explicit LCA overview](data/timeexplicit_lca_light.svg#only-light)
 ![Time-explicit LCA overview](data/timeexplicit_lca_dark.svg#only-dark)
 
+/// figure-caption
+Time-explicit LCA jointly considers temporal distribution and temporal evolution.
+///
+
 
 ## Data requirements
 
@@ -174,7 +178,7 @@ to the temporal resolution of the available databases.
 !!! example "Example: Timeline"
 
     Let's consider the following system: a process A consumes an
-    exchange b from a process B. Both A and B emit CO<sub>2</sub>. The emission of CO<sub>2</sub> from B decreases in the future. All exchanges occur at a certain point in time, relative to process A, which takes place "now" (2024). This example does not contain include temporal evolution of foregound exchanges.
+    exchange b from a process B. Both A and B emit CO~2~. The emission of CO~2~ from B decreases in the future. All exchanges occur at a certain point in time, relative to process A, which takes place "now" (2024). This example does not contain include temporal evolution of foregound exchanges.
     ```mermaid
     flowchart LR
     subgraph background[" "]
@@ -212,6 +216,10 @@ to the temporal resolution of the available databases.
     | 2024-01-01    | B             | 2024-01-01    | A             | 1.5    | {'background': 0.6, 'background_2030': 0.4}    |
     | 2024-01-01    | A             | 2024-01-01    | -1            | 1.0    | None                                           |
     | 2028-01-01    | B             | 2024-01-01    | A             | 0.6    | {'background': 0.2, 'background_2030': 0.8}    |
+
+    /// table-caption
+    Timeline output for the process A / process B example above.
+    ///
 
 ## Time mapping
 
@@ -286,7 +294,7 @@ created:
         ![Matrix modification step 4: dynamic biosphere](data/matrix4_light.svg#only-light)
         ![Matrix modification step 4: dynamic biosphere](data/matrix4_dark.svg#only-dark)
 
-    The timings from the timeline and the inventory information from the time-specific databases is inserted into the new time-explicit matrices. For each specific point in time that product b is demanded, temporal markets are created, distributing the demand for b between the time-specific background databases. The dynamic biosphere matrix is created, containing the timing of emissions. You can see that the CO<sub>2</sub> emission at process A occurs both in 2024 and 2025, based on the temporal distribution on this biosphere exchange.
+    The timings from the timeline and the inventory information from the time-specific databases is inserted into the new time-explicit matrices. For each specific point in time that product b is demanded, temporal markets are created, distributing the demand for b between the time-specific background databases. The dynamic biosphere matrix is created, containing the timing of emissions. You can see that the CO~2~ emission at process A occurs both in 2024 and 2025, based on the temporal distribution on this biosphere exchange.
 
 ## Static or dynamic impact assessment
 
@@ -298,8 +306,8 @@ level of `TimexLCA.dynamic_inventory`, dynamic LCIA can be applied, using `Timex
 Users can define or import their own dynamic LCIA functions. Out of the
 box, we provide dynamic LCIA functions for the climate change metrics
 \'radiative forcing\' and \'global warming potential (GWP)\' for all
-greenhouse gases in the [IPCC AR6 report Chapter 7 Table
-7.SM.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) from the brightway package [`dynamic_characterization`](https://github.com/brightway-lca/dynamic_characterization).
+greenhouse gases in the IPCC AR6 report, Chapter 7, Table 7.SM.7[^ipcc-ar6],
+from the brightway package [`dynamic_characterization`](https://github.com/brightway-lca/dynamic_characterization).
 
 The `time_horizon`, over which both metrics are evaluated,
 defaults to 100 years, but can be set flexibly in years. Additionally,
@@ -308,8 +316,7 @@ time horizon means that the all emissions are evaluated starting from
 the timing of the functional unit until the end of the time horizon,
 meaning that later emissions are counted for shorter, and flexible time
 horizon means that each emission is evaluated starting from its own
-timing until the end of the time horizon. The former is the approach of
-[Levasseur et al. 2010](https://pubs.acs.org/doi/10.1021/es9030003).
+timing until the end of the time horizon. The former is the approach of Levasseur et al.[^levasseur].
 This behavior is set with the boolean `fixed_time_horizon`.
 
 ## Contribution assessment of impacts
@@ -324,3 +331,6 @@ analysis and can be executed with `TimexLCA.dynamic_lcia(use_disaggregated_lci=T
  background processes, and uses these when calculating the dynamic LCIA results.
 
  Unsure about the different options? Check out the [decision tree](decisiontree.md) for guidance for your time-explicit LCA.
+
+[^ipcc-ar6]: IPCC, 2021: [Chapter 7: The Earth's Energy Budget, Climate Feedbacks and Climate Sensitivity](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/), in *Climate Change 2021: The Physical Science Basis*. Table 7.SM.7 provides the characterization factors used for the default dynamic LCIA functions.
+[^levasseur]: Levasseur, A., Lesage, P., Margni, M., Deschênes, L., Samson, R., 2010. [Considering Time in LCA: Dynamic LCA and Its Application to Global Warming Impact Assessments](https://pubs.acs.org/doi/10.1021/es9030003). *Environmental Science & Technology*, 44(8), 3169–3174.

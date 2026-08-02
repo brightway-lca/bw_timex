@@ -23,10 +23,10 @@ Claude Code picks it up automatically and loads it whenever your prompt looks li
 
 ## What it covers
 
-- Writing the Brightway model and multi-vintage background databases, and `database_dates`
-- Temporal distributions and temporal evolution on exchanges (`add_temporal_distribution_to_exchange`, `add_temporal_evolution_to_exchange`)
-- The full `TimexLCA` workflow: `build_timeline()`, `lci()`, `static_lcia()`/`dynamic_lcia()` and their key parameters
-- Contribution analysis, plotting, and a table of common mistakes
+- [x] Writing the Brightway model and multi-vintage background databases, and `database_dates`
+- [x] Temporal distributions and temporal evolution on exchanges (`add_temporal_distribution_to_exchange`, `add_temporal_evolution_to_exchange`)
+- [x] The full `TimexLCA` workflow: `build_timeline()`, `lci()`, `static_lcia()`/`dynamic_lcia()` and their key parameters
+- [x] Contribution analysis, plotting, and a table of common mistakes
 
 !!! note
 

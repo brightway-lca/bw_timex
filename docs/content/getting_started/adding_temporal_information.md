@@ -8,7 +8,7 @@ icon: lucide/clock
 
     Temporal distributions are the part agents most often get backwards — dates are relative to the *consumer*, not the producer. Our [bw_timex agent skill](../ai_agent_skill.md) covers this explicitly.
 
-To get you started with time-explicit LCA, we'll investigate this very simple production system with two "technosphere" nodes A and B and a "biosphere" node representing some CO<sub>2</sub> emissions. For the sake of this example, we'll assume that we demand Process A to run exactly once.
+To get you started with time-explicit LCA, we'll investigate this very simple production system with two "technosphere" nodes A and B and a "biosphere" node representing some CO~2~ emissions. For the sake of this example, we'll assume that we demand Process A to run exactly once.
 ```mermaid
 flowchart LR
 subgraph background[<i>background</i>]
@@ -197,7 +197,7 @@ end
 
 ## Time-specific process data
 
-While the temporal information above tells us when the processes occur, we also need information on how our processes change over time. So, for our simple example, let's say our background process B somehow evolves, so that it emits less CO<sub>2</sub> in the future. To make it precise, we assume that the original process we modeled above represents the process state in the year 2020, emitting 11 kg CO<sub>2</sub>, which reduces to 7 kg CO<sub>2</sub> by 2030:
+While the temporal information above tells us when the processes occur, we also need information on how our processes change over time. So, for our simple example, let's say our background process B somehow evolves, so that it emits less CO~2~ in the future. To make it precise, we assume that the original process we modeled above represents the process state in the year 2020, emitting 11 kg CO~2~, which reduces to 7 kg CO~2~ by 2030:
 
 
 ```mermaid

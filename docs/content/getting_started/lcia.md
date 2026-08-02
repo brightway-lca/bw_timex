@@ -47,7 +47,7 @@ tlca.dynamic_lcia(
 )
 ```
 
-This returns the (dynamic) characterized inventory, which shows you the radiative forcing [W/m<sup>2</sup>] by the CO<sup>2</sup> emissions in the system over the next 100 years:
+This returns the (dynamic) characterized inventory, which shows you the radiative forcing [W/m^2^] by the CO~2~ emissions in the system over the next 100 years:
 
 | date       | amount         | flow | activity |
 |------------|----------------|------|----------|

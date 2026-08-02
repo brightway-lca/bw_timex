@@ -65,11 +65,14 @@ data you start from.
 
 ### Terms used below
 
-A **production-time group** is a set of product units supplied or produced at the same time. In
-fleet and stock modelling, this is often called a **cohort**; for example, all vehicles produced in
-2030 are the 2030 cohort. A **process/product version date** is the date that fixes a foreground
-property of that group, such as vehicle efficiency or a material requirement. Some literature calls
-this a **vintage**.
+`production-time group`
+:   A set of product units supplied or produced at the same time. In fleet and stock modelling,
+    this is often called a **cohort**; for example, all vehicles produced in 2030 are the 2030
+    cohort.
+
+`process/product version date`
+:   The date that fixes a foreground property of a production-time group, such as vehicle
+    efficiency or a material requirement. Some literature calls this a **vintage**.
 
 ### When chimaera nodes are often pragmatic
 
