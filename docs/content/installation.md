@@ -108,22 +108,22 @@ icon: lucide/download
 
     3. In a console or terminal window, create a new virtual environment:
 
-    ```bash
-    python -m venv C:/Users/me/virtualenvs/timex
-    ```
+        ```bash
+        python -m venv C:/Users/me/virtualenvs/timex
+        ```
 
     4. Activate the virtual environment. The exact syntax depends on your operating system; it will look something like:
 
-    ```bash
-    source C:/Users/me/virtualenvs/timex/bin/activate # Linux/macOS
-    # or: C:\Users\me\virtualenvs\timex\Scripts\activate # Windows
-    ```
+        ```bash
+        source C:/Users/me/virtualenvs/timex/bin/activate # Linux/macOS
+        # or: C:\Users\me\virtualenvs\timex\Scripts\activate # Windows
+        ```
 
     5. Install `bw_timex`:
 
-    ```bash
-    pip install bw_timex pypardiso
-    ```
+        ```bash
+        pip install bw_timex pypardiso
+        ```
 
     You can also use pip to install useful libraries like `jupyterlab`.
 
@@ -137,29 +137,29 @@ icon: lucide/download
 
     2. Install the requirements for `SuiteSparse` via `homebrew`:
 
-    ```bash
-    brew install swig suite-sparse
-    ```
+        ```bash
+        brew install swig suite-sparse
+        ```
 
     3. In a terminal window, create a directory for your virtual environments. This can be anywhere; we will use the home directory here as an example:
 
-    ```bash
-    cd
-    mkdir virtualenvs
-    ```
+        ```bash
+        cd
+        mkdir virtualenvs
+        ```
 
     4. Create and activate a virtualenv:
 
-    ```bash
-    python -m venv virtualenvs/timex
-    source virtualenvs/timex/bin/activate
-    ```
+        ```bash
+        python -m venv virtualenvs/timex
+        source virtualenvs/timex/bin/activate
+        ```
 
     5. Install `bw_timex`:
 
-    ```bash
-    pip install bw_timex scikit-umfpack
-    ```
+        ```bash
+        pip install bw_timex scikit-umfpack
+        ```
 
     You can also use pip to install useful libraries like `jupyterlab`.
 
@@ -174,21 +174,21 @@ icon: lucide/download
 
     1. Create a new Conda environment with `bw_timex`:
 
-    ```bash
-    conda create -n timex -c conda-forge -c cmutel -c diepers bw_timex
-    ```
+        ```bash
+        conda create -n timex -c conda-forge -c cmutel -c diepers bw_timex
+        ```
 
     2. Activate the environment:
 
-    ```bash
-    conda activate timex
-    ```
+        ```bash
+        conda activate timex
+        ```
 
     3. (Optional but recommended) You can also use conda to install useful libraries like `jupyterlab`:
 
-    ```bash
-    conda install -c conda-forge jupyterlab
-    ```
+        ```bash
+        conda install -c conda-forge jupyterlab
+        ```
 
 === "macOS (Apple Silicon/ARM)"
 
@@ -198,18 +198,18 @@ icon: lucide/download
 
     1. Create a new Conda environment with `bw_timex`:
 
-    ```bash
-    conda create -n timex -c conda-forge -c cmutel -c diepers bw_timex brightway25_nosolver numpy">=2" scikit-umfpack">=0.4.2"
-    ```
+        ```bash
+        conda create -n timex -c conda-forge -c cmutel -c diepers bw_timex brightway25_nosolver numpy">=2" scikit-umfpack">=0.4.2"
+        ```
 
     2. Activate the environment:
 
-    ```bash
-    conda activate timex
-    ```
+        ```bash
+        conda activate timex
+        ```
 
     3. (Optional but recommended) You can also use conda to install useful libraries like `jupyterlab`:
 
-    ```bash
-    conda install -c conda-forge jupyterlab
-    ```
+        ```bash
+        conda install -c conda-forge jupyterlab
+        ```
