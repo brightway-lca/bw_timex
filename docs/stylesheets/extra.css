@@ -112,4 +112,20 @@
   }
 }
 
+/* Mermaid nodes that need htmlLabels (hexagon `{{}}` decision shapes, or any
+   node whose label contains a literal newline) render their text as an HTML
+   <span class="nodeLabel"> inside a foreignObject instead of plain SVG
+   <text>. The theme's own `.nodeLabel { color: var(--md-mermaid-label-fg-color) }`
+   rule then wins over the mermaid classDef `color`, because it's an explicit
+   rule on the label element itself rather than an inherited one - so in dark
+   mode the (theme-default, light) text sits on the classDef's light fill
+   color and becomes unreadable. Nodes that render as plain SVG text (no
+   newline, non-hexagon shapes) are unaffected and don't need this override.
+   Pin these classDef'd node types back to their intended text color. */
+.mermaid .node.decision .nodeLabel,
+.mermaid .node.lcaType .nodeLabel,
+.mermaid .node.codeNode .nodeLabel {
+  color: #222832 !important;
+}
+
 

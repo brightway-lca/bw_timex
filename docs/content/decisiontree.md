@@ -58,10 +58,13 @@ Brightway supports more than one way to represent inventory data. See the Bright
 overview on [processes, products, and something in between](https://docs.brightway.dev/en/latest/content/overview/inventory.html#processes-products-and-something-in-between)
 for the broader data-model discussion. In short:
 
-- **Explicit process/product** (`type="process"` + `type="product"`): products are separate
-  nouns, processes are separate verbs, and production edges connect processes to products.
-- **Chimaera** (`type="processwithreferenceproduct"`): one node acts as both process and
-  reference product. This is common in existing LCI databases and compact for many models.
+`Explicit process/product` (`type="process"` + `type="product"`)
+:   Products are separate nouns, processes are separate verbs, and production edges connect
+    processes to products.
+
+`Chimaera` (`type="processwithreferenceproduct"`)
+:   One node acts as both process and reference product. This is common in existing LCI
+    databases and compact for many models.
 
 Both paradigms are valid modelling choices. `bw_timex` aims to support both when building
 timelines and expanding matrices. The right choice depends on what you need to express and on the
