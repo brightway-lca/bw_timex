@@ -69,9 +69,12 @@ identical to a hand-written multi-vintage setup above.
 
 ## Temporal distributions (TDs)
 
-TDs live on **exchanges**, not activities. `date` is a `timedelta64` array
-**relative to the consuming process** (negative = earlier, positive = later);
-`amount` are shares that should sum to 1 unless you're intentionally scaling.
+TDs live on **exchanges**, not activities. `date` is usually a `timedelta64`
+array **relative to the consuming process** (negative = earlier, positive =
+later) — but it can also hold `datetime64` values for **absolute** dates
+instead, if you know exactly when an exchange happens regardless of the
+consumer's timing. `amount` are shares that should sum to 1 unless you're
+intentionally scaling.
 
 ```python
 import numpy as np
@@ -213,7 +216,7 @@ producers instead of one aggregated "temporal market" node.
 | Symptom | Cause / fix |
 |---|---|
 | `ValueError: Demand activity ... not marked 'dynamic'` | The demand's database is missing from `database_dates`, or listed with a `datetime` instead of `"dynamic"`. |
-| TD seems to shift the wrong process | `date` in a `TemporalDistribution` is relative to the **consumer**, not the producer. Negative = before the consuming process. |
+| TD seems to shift the wrong process | `date` in a `TemporalDistribution` is (by default) relative to the **consumer**, not the producer. Negative = before the consuming process. Use `datetime64` values instead of `timedelta64` if you want absolute, consumer-independent dates. |
 | Timeline / exchanges look unchanged after writing TDs | Forgot to `db.process()` after writing/modifying the database. |
 | `AttributeError: Timeline not yet built` | Call `build_timeline()` before `lci()`; call `lci()` before `static_lcia()`/`dynamic_lcia()`. |
 | `static_lcia` raises "expanded matrix" error | It requires `lci(expand_technosphere=True)` (the default) — you likely called `lci(expand_technosphere=False)`. |
@@ -224,6 +227,6 @@ producers instead of one aggregated "temporal market" node.
 
 ## Reference
 
-- Getting Started notebook: `notebooks/getting_started.ipynb` in this repo —
-  minimal end-to-end worked example this skill is distilled from.
+- Getting Started notebook: `notebooks/getting_started.ipynb` in the bw_timex
+  repo — minimal end-to-end worked example this skill is distilled from.
 - Full docs: https://docs.brightway.dev/projects/bw-timex/en/latest/
