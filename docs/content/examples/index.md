@@ -2,6 +2,10 @@
 
 Here are some examples on how you can use `bw_timex`.
 
+!!! tip "Building your own study?"
+
+    If you're using an AI coding agent to write it, check out our [agent skill](../ai_agent_skill.md) — it encodes this whole workflow so the agent gets it right without guessing at the API.
+
 <div class="grid cards" markdown>
 
 -   **🚗⚡ Life Cycle of an Electric Car**

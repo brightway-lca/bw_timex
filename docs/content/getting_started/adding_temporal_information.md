@@ -4,6 +4,10 @@ icon: lucide/clock
 
 # Step 1 - Adding temporal information
 
+!!! tip "AI agent writing this for you?"
+
+    Temporal distributions are the part agents most often get backwards — dates are relative to the *consumer*, not the producer. Our [bw_timex agent skill](../ai_agent_skill.md) covers this explicitly.
+
 To get you started with time-explicit LCA, we'll investigate this very simple production system with two "technosphere" nodes A and B and a "biosphere" node representing some CO<sub>2</sub> emissions. For the sake of this example, we'll assume that we demand Process A to run exactly once.
 ```mermaid
 flowchart LR

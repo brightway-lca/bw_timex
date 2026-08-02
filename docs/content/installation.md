@@ -10,6 +10,10 @@ icon: lucide/download
 
     `bw_timex` depends on Brightway25, and will install bw25-compatible versions of the bw packages. This means that it cannot be added to existing environments that are based on Brightway2, e.g., environments containing [Activity Browser](https://github.com/LCA-ActivityBrowser/activity-browser).
 
+!!! tip "Writing your study with an AI coding agent?"
+
+    Once your environment is set up, check out our [bw_timex agent skill](ai_agent_skill.md) — it teaches assistants like Claude Code the whole `bw_timex` workflow so they don't have to guess at the API.
+
 ## Installing `bw_timex` using `pip`
 
 === "Linux, Windows, or MacOS (x64)"

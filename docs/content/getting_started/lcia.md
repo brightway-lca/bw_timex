@@ -3,6 +3,11 @@ icon: lucide/gauge
 ---
 
 # Step 4 - Impact assessment
+
+!!! tip "AI agent writing this for you?"
+
+    Static vs. dynamic LCIA, the three scores (`base_score`/`static_score`/`dynamic_score`), and their prerequisites are all covered in our [bw_timex agent skill](../ai_agent_skill.md).
+
 To characterize the time-explicit inventory, we have two options: Static and dynamic life cycle impact assessment (LCIA).
 
 ## Static LCIA

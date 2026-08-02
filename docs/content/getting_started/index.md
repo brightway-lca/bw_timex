@@ -15,3 +15,7 @@ In the following sections, we'll walk through the steps 1-4, considering a very 
 !!! tip "You want more interaction?"
 
     [Launch this tutorial on Binder!](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb) In this interactive environment, you can directly run the bw_timex code yourself whilst following along.
+
+!!! tip "Writing this with an AI coding agent?"
+
+    Grab our [bw_timex agent skill](../ai_agent_skill.md) — it teaches Claude Code (or similar) this whole workflow, including the parts that are easy to get wrong.
