@@ -1,12 +1,12 @@
 import bw2data as bd
+import numpy as np
 import pytest
 from bw2data.tests import bw2test
+from bw_temporalis import TemporalDistribution
 
 
-@pytest.fixture
-@bw2test
-def same_date_db():
-    """Four static background databases on two dates.
+def _write_same_date_databases(with_background_chain: bool = False):
+    """Write four static background databases on two dates.
 
     `background_2020` / `background_2030` hold an untouched `electricity`
     process. `modified_2020` / `modified_2030` hold a copy of `steel` with its
@@ -17,6 +17,11 @@ def same_date_db():
 
     CO2 amounts differ per vintage so the interpolation is visible in the score:
     electricity 10 (2020) / 5 (2030), steel 20 (2020) / 10 (2030).
+
+    With `with_background_chain=True`, each modified database also holds a
+    `smelting` process that the copy consumes through a temporal distribution.
+    It exists only in the modified family and is reached only when the
+    background is traversed.
     """
     biosphere = bd.Database("biosphere")
     biosphere.write({("biosphere", "CO2"): {"type": "emission", "name": "carbon dioxide"}})
@@ -61,6 +66,29 @@ def same_date_db():
         steel_copy["reference product"] = "steel, without EOL"
         steel_copy.save()
 
+        if with_background_chain:
+            # Reached only by descending into the background. The 10-year offset
+            # pushes it towards the 2030 vintage of the modified family.
+            smelting = modified.new_node("smelting", name="smelting", unit="kg")
+            smelting["reference product"] = "smelting"
+            smelting["location"] = "GLO"
+            smelting.save()
+            smelting.new_edge(input=smelting, amount=1, type="production").save()
+            smelting.new_edge(
+                input=node_co2,
+                amount=amounts[f"background_{year}"]["steel"],
+                type="biosphere",
+            ).save()
+
+            copy_to_smelting = steel_copy.new_edge(
+                input=smelting, amount=1, type="technosphere"
+            )
+            copy_to_smelting["temporal_distribution"] = TemporalDistribution(
+                date=np.array([10], dtype="timedelta64[Y]"),
+                amount=np.array([1.0]),
+            )
+            copy_to_smelting.save()
+
     foreground = bd.Database("foreground")
     foreground.register()
     fu = foreground.new_node("fu", name="fu", unit="unit")
@@ -81,3 +109,17 @@ def same_date_db():
 
     for dbname in bd.databases:
         bd.Database(dbname).process()
+
+
+@pytest.fixture
+@bw2test
+def same_date_db():
+    """Four static background databases on two dates, no background chain."""
+    _write_same_date_databases()
+
+
+@pytest.fixture
+@bw2test
+def same_date_deep_db():
+    """Same as `same_date_db`, plus a `smelting` chain in the modified family."""
+    _write_same_date_databases(with_background_chain=True)

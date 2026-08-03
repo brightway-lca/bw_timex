@@ -112,18 +112,49 @@ class VariantBackgroundMixin:
     - ``self.cutoff`` and a ``self.edge_ff`` edge-filter callable.
     """
 
-    def _variant_shares_for_date(self, producer_date) -> dict:
+    def _candidate_databases_for_node(self, node_id: int) -> dict:
+        """``{date: database_name}`` for the static databases holding a match.
+
+        Candidates come from the interdatabase mapping (built up front by
+        ``TimexLCA.add_full_interdatabase_activity_mapping`` whenever the
+        background is traversed), plus the node's own database.
+        """
+        dates_static = getattr(self, "database_dates_static", None) or {}
+        try:
+            siblings = dict(self.interdatabase_activity_mapping[node_id])
+        except KeyError:
+            siblings = {}
+        db_names = set(siblings)
+        node = self.bw_node_proxies.get(node_id)
+        if node is not None:
+            db_names.add(node["database"])
+
+        candidates = {}
+        for db_name in sorted(db_names):
+            date = dates_static.get(db_name)
+            if date is None:
+                continue
+            if date in candidates:
+                raise ValueError(
+                    f"Node {node_id} was found in more than one database at "
+                    f"{date:%Y-%m-%d}: '{candidates[date]}' and '{db_name}'. "
+                    "bw_timex cannot tell which one to use. Give the copy a "
+                    "distinct name, reference product or location."
+                )
+            candidates[date] = db_name
+        return candidates
+
+    def _variant_shares_for_date(self, producer_date, node_id: int) -> dict:
         """Return ``{db_name: weight}`` interpolation shares for a cohort date.
 
-        Maps the producer's absolute cohort date onto the available static
-        background databases, using the same interpolation as the timeline
-        builder so leaf and descended routing agree.
+        Maps the producer's absolute cohort date onto the static background
+        databases that actually hold the producer, using the same interpolation
+        as the timeline builder so leaf and descended routing agree.
         """
         from datetime import datetime as _dt
 
-        dates_static = getattr(self, "database_dates_static", None) or {}
-        dates_to_db = {v: k for k, v in dates_static.items() if isinstance(v, _dt)}
-        sorted_dates = tuple(sorted(dates_to_db))
+        candidates = self._candidate_databases_for_node(node_id)
+        sorted_dates = tuple(sorted(candidates))
         if not sorted_dates:
             return {}
 
@@ -134,7 +165,7 @@ class VariantBackgroundMixin:
             weights = nearest_date_weight(producer_date, sorted_dates)
         else:
             weights = linear_interpolation_weights(producer_date, sorted_dates)
-        return {dates_to_db[d]: w for d, w in (weights or {}).items()}
+        return {candidates[d]: w for d, w in (weights or {}).items()}
 
     def _resolve_in_variant(self, node_id: int, db_name: str) -> int:
         """Return the id of ``node_id``'s sibling in database ``db_name``.
@@ -376,7 +407,9 @@ class VariantBackgroundMixin:
         # Route each producer cohort date to its variant(s).
         variant_keep: dict[str, dict] = {}
         for date in abs_td_producer.date:
-            for db_name, weight in self._variant_shares_for_date(date).items():
+            for db_name, weight in self._variant_shares_for_date(
+                date, producer_process
+            ).items():
                 variant_keep.setdefault(db_name, {})[date] = weight
 
         edges = []
