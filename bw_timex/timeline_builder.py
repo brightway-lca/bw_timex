@@ -1,6 +1,6 @@
 from bisect import bisect_left
 from datetime import datetime, timedelta
-from typing import Callable, KeysView, Union
+from typing import Callable, KeysView
 
 import bw2data as bd
 import numpy as np
@@ -505,6 +505,59 @@ class TimelineBuilder:
                 leaves.add(producer)
         return leaves
 
+    def candidate_databases_for_producers(self, producers: set) -> dict:
+        """Map each producer to the static databases that hold a match for it.
+
+        Returns ``{producer_id: {date: database_name}}``. A candidate is a static
+        background database containing a node with the same ``(name, reference
+        product, location)`` as the producer. Several databases may share a date;
+        if two of them hold a match for the same producer, the model is ambiguous
+        and this raises.
+
+        As a side effect, ``self.market_producer_matches`` is filled with
+        ``{producer_id: {database_name: node_id}}``, which is exactly what
+        ``TimexLCA.add_interdatabase_activity_mapping_from_timeline`` needs.
+        """
+        triplets = {}
+        for producer in producers:
+            node = self.nodes[producer]
+            key = (node["name"], node.get("reference product"), node["location"])
+            triplets.setdefault(key, []).append(producer)
+
+        candidates = {producer: {} for producer in producers}
+        matches = {producer: {} for producer in producers}
+        for node in self.nodes.values():
+            date = self.database_dates_static.get(node["database"])
+            if date is None:
+                continue
+            key = (node["name"], node.get("reference product"), node["location"])
+            for producer in triplets.get(key, ()):
+                already = candidates[producer].get(date)
+                if already is not None and already != node["database"]:
+                    raise ValueError(
+                        f"Producer '{node['name']}' was found in more than one database "
+                        f"at {date:%Y-%m-%d}: '{already}' and '{node['database']}'. "
+                        "bw_timex cannot tell which one its temporal market should use. "
+                        "Give the copy a distinct name, reference product or location."
+                    )
+                candidates[producer][date] = node["database"]
+                matches[producer][node["database"]] = node.id
+
+        number_of_dates = len(set(self.database_dates_static.values()))
+        for producer, producer_candidates in candidates.items():
+            if len(producer_candidates) < number_of_dates:
+                logger.warning(
+                    "Producer '{}' was only found in {} of {} time-explicit database "
+                    "date(s): {}. Its temporal market can only draw on those.",
+                    self.nodes[producer]["name"],
+                    len(producer_candidates),
+                    number_of_dates,
+                    sorted(producer_candidates.values()),
+                )
+
+        self.market_producer_matches = matches
+        return candidates
+
     def add_column_temporal_market_shares_to_timeline(
         self,
         tl_df: pd.DataFrame,
@@ -535,40 +588,10 @@ class TimelineBuilder:
             )
             return tl_df
 
-        dates_list = [
-            date
-            for date in self.database_dates_static.values()
-            if isinstance(date, datetime)
-        ]
         if "date_producer" not in list(tl_df.columns):
             raise ValueError("The timeline does not contain dates.")
 
-        sorted_dates = tuple(sorted(dates_list))
-
-        # create reversed dict {date: database} with only static "background" db's
-        self.reversed_database_dates = {
-            v: k
-            for k, v in self.database_dates_static.items()
-            if isinstance(v, datetime)
-        }
-
-        unique_producer_dates = tl_df["date_producer"].unique()
-
-        if interpolation_type == "nearest":
-            interpolation_weights = {
-                date: self.find_closest_date(date, sorted_dates)
-                for date in unique_producer_dates
-            }
-
-        elif interpolation_type == "linear":
-            interpolation_weights = {
-                date: self.get_weights_for_interpolation_between_nearest_years(
-                    date, sorted_dates, interpolation_type
-                )
-                for date in unique_producer_dates
-            }
-
-        else:
+        if interpolation_type not in ("linear", "nearest"):
             raise ValueError(
                 f"Sorry, but {interpolation_type} interpolation is not available yet."
             )
@@ -578,20 +601,42 @@ class TimelineBuilder:
         else:
             market_producers = self.node_collections["first_level_background_static"]
 
-        remapped_interpolation_weights = {
-            producer_date: {
-                self.reversed_database_dates[date]: share
-                for date, share in weights.items()
-            }
-            for producer_date, weights in interpolation_weights.items()
-        }
-
-        tl_df["temporal_market_shares"] = [
-            remapped_interpolation_weights[producer_date]
+        producers_in_timeline = {
+            producer
+            for producer in tl_df["producer"].unique()
             if producer in market_producers
-            else None
-            for producer, producer_date in zip(tl_df["producer"], tl_df["date_producer"])
-        ]
+        }
+        candidate_databases = self.candidate_databases_for_producers(
+            producers_in_timeline
+        )
+
+        weight_cache = {}
+        shares = []
+        for producer, producer_date in zip(tl_df["producer"], tl_df["date_producer"]):
+            if producer not in producers_in_timeline:
+                shares.append(None)
+                continue
+            candidates = candidate_databases[producer]
+            sorted_dates = tuple(sorted(candidates))
+            # The cache key must include which database each date maps to, not
+            # just the set of dates: two producers can share the same vintage
+            # dates while drawing from different database families (e.g. an
+            # untouched background producer vs. a foreground-modified copy
+            # kept in its own database), and only the mapping distinguishes them.
+            cache_key = (tuple(sorted(candidates.items())), producer_date)
+            if cache_key not in weight_cache:
+                if interpolation_type == "nearest":
+                    weights = self.find_closest_date(producer_date, sorted_dates)
+                else:
+                    weights = self.get_weights_for_interpolation_between_nearest_years(
+                        producer_date, sorted_dates, interpolation_type
+                    )
+                weight_cache[cache_key] = {
+                    candidates[date]: share for date, share in weights.items()
+                }
+            shares.append(weight_cache[cache_key])
+
+        tl_df["temporal_market_shares"] = shares
 
         return tl_df
 
@@ -663,34 +708,6 @@ class TimelineBuilder:
                 self._logged_reference_date_above_range = True
 
         return linear_interpolation_weights(reference_date, dates_list)
-
-    def add_interpolation_weights_at_intersection_to_background(
-        self, row
-    ) -> Union[dict, None]:
-        """
-        returns the interpolation weights to background databases only for those exchanges,
-        where the producing process actually comes from a background database (temporal markets).
-
-        Only these processes are receiving inputs from the background databases.
-        All other process in the timeline are not directly linked to the background,
-        so the interpolation weight info is not needed and set to None
-
-        Parameters
-        ----------
-        row : pd.Series
-            Row of the timeline DataFrame
-        Returns
-        -------
-        dict
-            Dictionary with the name of databases and interpolation weights.
-        """
-
-        if row["producer"] in self.node_collections["first_level_background_static"]:
-            return {
-                self.reversed_database_dates[x]: v
-                for x, v in row["temporal_market_shares"].items()
-            }
-        return None
 
     def get_consumer_name(self, idx: int) -> str:
         """
