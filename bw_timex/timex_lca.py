@@ -1523,6 +1523,15 @@ class TimexLCA:
                 "Timeline not yet built. Call TimexLCA.build_timeline() first."
             )
 
+        # The timeline builder already resolved every temporal-market producer to
+        # its counterparts while computing the market shares. Reuse that instead
+        # of scanning every background node a second time.
+        matches = getattr(self.timeline_builder, "market_producer_matches", None)
+        if matches:
+            self.interdatabase_activity_mapping.update(matches)
+            self.interdatabase_activity_mapping.make_reciprocal()
+            return
+
         filtered_timeline = self.timeline.loc[
             self.timeline.temporal_market_shares.notnull()
         ]

@@ -153,3 +153,26 @@ def test_background_traversal_same_triplet_at_same_date_raises(same_date_deep_db
             graph_traversal="bfs",
             traverse_background=True,
         )
+
+
+def test_interdatabase_mapping_is_filled_by_the_timeline_builder(same_date_db):
+    """The builder's triplet scan feeds the mapping; no second scan is needed."""
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    tlca.build_timeline(starting_datetime="2025-01-01")
+
+    steel_copy_2020 = bd.Database("modified_2020").get("steel_without_eol")
+    steel_copy_2030 = bd.Database("modified_2030").get("steel_without_eol")
+    assert (
+        tlca.interdatabase_activity_mapping.find_match(steel_copy_2020.id, "modified_2030")
+        == steel_copy_2030.id
+    )
+
+    electricity_2020 = bd.Database("background_2020").get("electricity")
+    electricity_2030 = bd.Database("background_2030").get("electricity")
+    assert (
+        tlca.interdatabase_activity_mapping.find_match(electricity_2020.id, "background_2030")
+        == electricity_2030.id
+    )
+    # The copy has no counterpart in the untouched family, and none is invented.
+    with pytest.raises(KeyError):
+        tlca.interdatabase_activity_mapping.find_match(steel_copy_2020.id, "background_2030")
