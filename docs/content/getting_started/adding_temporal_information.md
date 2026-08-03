@@ -299,8 +299,10 @@ those two, while an untouched process is sourced from the `ecoinvent_*` ones.
 
     Give your copies a distinct `name`, `reference product` or `location`. If the
     same triplet occurs in two databases that share a date, `bw_timex` cannot tell
-    which one you mean and raises an error. A process that exists in only some of
-    the points in time is used unchanged for all of them, and logs a warning.
+    which one you mean and raises an error. A process that exists at only some of
+    the points in time is sourced from the ones it does exist at: it is interpolated
+    between those, or — if it exists at only one of them — used unchanged for every
+    point in time. Either way, `bw_timex` logs a warning naming the databases it used.
 
 ## Temporal evolution of foreground exchanges (`bw_timex>0.3.4`)
 
