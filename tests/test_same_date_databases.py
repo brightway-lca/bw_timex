@@ -130,12 +130,16 @@ def test_background_traversal_same_triplet_at_same_date_raises(same_date_deep_db
     docstring), not via `TimelineBuilder`'s temporal-market leaf logic. The
     collision here is wired into `background_2020` only, never into the
     foreground, so it is invisible to anything except the interdatabase
-    mapping the extractor consults mid-descent. Matching on
-    "cannot tell which one to use" (rather than the more generic "more than
-    one database", used by `test_same_triplet_at_same_date_raises` above) is
-    what pins this down to `_candidate_databases_for_node`'s wording
-    specifically, as opposed to `TimelineBuilder.candidate_databases_for_producers`'s
-    similarly-worded but distinct "...its temporal market should use" message.
+    mapping the extractor consults mid-descent.
+
+    The assertion pins this down to `_candidate_databases_for_node`
+    specifically (rather than `TimelineBuilder.candidate_databases_for_producers`,
+    exercised by `test_same_triplet_at_same_date_raises` above) by matching on
+    the node identity `_candidate_databases_for_node` includes in its message
+    — name, reference product AND location — which only that path renders;
+    `TimelineBuilder`'s equivalent message names only the producer, not its
+    full triplet. This is about what's IN the message (the node under test),
+    not incidental differences in how the two messages are worded.
     """
     collision = bd.Database("background_2020").new_node(
         "smelting_collision", name="smelting", unit="kg"
@@ -147,12 +151,88 @@ def test_background_traversal_same_triplet_at_same_date_raises(same_date_deep_db
     bd.Database("background_2020").process()
 
     tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
-    with pytest.raises(ValueError, match="cannot tell which one to use"):
+    with pytest.raises(
+        ValueError,
+        match=r"'smelting' \(reference product: 'smelting', location: 'GLO'\)",
+    ):
         tlca.build_timeline(
             starting_datetime="2025-01-01",
             graph_traversal="bfs",
             traverse_background=True,
         )
+
+
+def test_partial_coverage_across_three_dates_interpolates_over_available(
+    same_date_db_three_dates,
+):
+    """A producer present at two of three configured points in time must
+    interpolate over the two it has, not collapse to a single candidate."""
+    bd.Database("modified_2040").get("steel_without_eol").delete()
+    bd.Database("modified_2040").process()
+
+    database_dates = {
+        "background_2020": datetime.strptime("2020", "%Y"),
+        "background_2030": datetime.strptime("2030", "%Y"),
+        "background_2040": datetime.strptime("2040", "%Y"),
+        "modified_2020": datetime.strptime("2020", "%Y"),
+        "modified_2030": datetime.strptime("2030", "%Y"),
+        "modified_2040": datetime.strptime("2040", "%Y"),
+        "foreground": "dynamic",
+    }
+
+    messages = []
+    sink_id = logger.add(messages.append, level="WARNING")
+    try:
+        tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, database_dates)
+        tlca.build_timeline(starting_datetime="2025-01-01")
+    finally:
+        logger.remove(sink_id)
+
+    shares = _shares_by_producer(tlca.timeline)
+    assert set(shares["steel, without EOL"]) == {"modified_2020", "modified_2030"}
+    assert shares["steel, without EOL"]["modified_2020"] == pytest.approx(0.5, abs=0.01)
+    assert any("steel, without EOL" in message for message in messages)
+
+
+def test_nearest_interpolation_stays_within_each_family(same_date_db):
+    """`interpolation_type="nearest"` must resolve each temporal market from
+    within its own family of same-date databases, exercising the `nearest`
+    branch of the per-producer loop with more than one database family
+    present at once."""
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    tlca.build_timeline(starting_datetime="2025-01-01", interpolation_type="nearest")
+    shares = _shares_by_producer(tlca.timeline)
+
+    assert shares["electricity"] in ({"background_2020": 1}, {"background_2030": 1})
+    assert shares["steel, without EOL"] in (
+        {"modified_2020": 1},
+        {"modified_2030": 1},
+    )
+
+
+def test_background_traversal_partial_coverage_warns(same_date_deep_db):
+    """A node reached mid-descent that exists in only one vintage of its
+    family must still trigger the partial-coverage warning, just like a
+    leaf temporal market does (`test_producer_in_a_single_vintage_warns_and_is_time_invariant`
+    above). Without this, a node pinned to a single vintage during background
+    traversal is silently pinned with no warning at all.
+    """
+    bd.Database("modified_2030").get("smelting").delete()
+    bd.Database("modified_2030").process()
+
+    messages = []
+    sink_id = logger.add(messages.append, level="WARNING")
+    try:
+        tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+        tlca.build_timeline(
+            starting_datetime="2025-01-01",
+            graph_traversal="bfs",
+            traverse_background=True,
+        )
+    finally:
+        logger.remove(sink_id)
+
+    assert any("smelting" in message for message in messages)
 
 
 def test_interdatabase_mapping_is_filled_by_the_timeline_builder(same_date_db):
