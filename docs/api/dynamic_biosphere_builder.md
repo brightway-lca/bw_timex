@@ -1,5 +1,9 @@
 ---
 icon: lucide/leaf
+tags:
+  - api
+  - inventory
+  - dynamic characterization
 ---
 
 # Dynamic Biosphere Builder

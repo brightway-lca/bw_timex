@@ -1,5 +1,9 @@
 ---
 icon: lucide/route
+tags:
+  - api
+  - timeline
+  - graph traversal
 ---
 
 # Timeline Builder

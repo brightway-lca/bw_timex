@@ -1,5 +1,8 @@
 ---
 icon: lucide/git-branch
+tags:
+  - theory
+  - temporal evolution
 ---
 
 # What LCA should I do?

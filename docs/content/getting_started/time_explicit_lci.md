@@ -1,5 +1,8 @@
 ---
 icon: lucide/calculator
+tags:
+  - tutorial
+  - inventory
 ---
 
 # Step 3 - Calculating the time-explicit LCI

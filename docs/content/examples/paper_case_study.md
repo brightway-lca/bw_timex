@@ -1,8 +1,9 @@
 ---
 icon: lucide/file-text
 tags:
-  - case study
+  - example
   - paper
+  - premise
 ---
 
 

@@ -1,5 +1,7 @@
 ---
 icon: lucide/component
+tags:
+  - api
 ---
 
 # TimexLCA

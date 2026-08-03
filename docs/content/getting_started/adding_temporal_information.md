@@ -1,5 +1,9 @@
 ---
 icon: lucide/clock
+tags:
+  - tutorial
+  - temporal distribution
+  - temporal evolution
 ---
 
 # Step 1 - Adding temporal information

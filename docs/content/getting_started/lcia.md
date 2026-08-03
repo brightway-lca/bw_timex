@@ -1,5 +1,8 @@
 ---
 icon: lucide/gauge
+tags:
+  - tutorial
+  - dynamic characterization
 ---
 
 # Step 4 - Impact assessment

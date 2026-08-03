@@ -3,6 +3,7 @@ icon: lucide/table
 tags:
   - example
   - excel
+  - temporal distribution
 ---
 
 

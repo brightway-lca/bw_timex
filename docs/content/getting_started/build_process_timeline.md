@@ -1,5 +1,9 @@
 ---
 icon: lucide/list-ordered
+tags:
+  - tutorial
+  - timeline
+  - background databases
 ---
 
 # Step 2 - Building the process timeline

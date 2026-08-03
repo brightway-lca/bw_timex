@@ -1,5 +1,9 @@
 ---
 icon: lucide/waypoints
+tags:
+  - api
+  - graph traversal
+  - temporal distribution
 ---
 
 # Edge Extractor

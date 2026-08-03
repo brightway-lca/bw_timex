@@ -3,6 +3,7 @@ icon: lucide/car-front
 tags:
   - example
   - premise
+  - dynamic characterization
 ---
 
 

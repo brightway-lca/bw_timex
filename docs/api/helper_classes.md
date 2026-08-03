@@ -1,5 +1,7 @@
 ---
 icon: lucide/puzzle
+tags:
+  - api
 ---
 
 # Helper Classes

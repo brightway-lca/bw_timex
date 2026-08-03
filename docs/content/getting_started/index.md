@@ -1,5 +1,7 @@
 ---
 icon: lucide/footprints
+tags:
+  - tutorial
 ---
 
 # Getting Started
