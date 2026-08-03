@@ -11,31 +11,29 @@ tags:
 # Time-explicit LCA of an electric vehicle
 
 
-This notebook shows how to use `bw_timex` with a cradle-to-grave case study of an electric vehicle. The case study is simplified, not meant to reflect the complexity of electric mobility but to demonstrate hot to use `bw_timex`. 
+This notebook shows how to use `bw_timex` with a cradle-to-grave case study of an electric vehicle (ev). The case study is simplified, not meant to reflect the complexity of electric mobility but to demonstrate how to use `bw_timex`. 
 
-More information on the inner workings of `bw_timex` can be found [here](https://timex.readthedocs.io/en/latest/content/theory.html).
+> **Note:** This is the "premise" version of this notebook that works with ecoinvent and premise data. Specifically, it expects a brightway project with ecoinvent v3.12 (cutoff) and prospective databases for 2020, 2030 and 2040, created from it with [`premise`](https://github.com/polca/premise) (all sectors updated, REMIND-EU SSP2-NDC). If you don't have access to that, please check out the ["standalone" version](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_electric_vehicle_standalone.ipynb) of this notebook.
 
-
-> **Note:** This is the "premise" version of this notebook that works with ecoinvent and premise data. If you don't have access to that, please check out the ["standalone" version](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_electric_vehicle_standalone.ipynb) of this notebook.
 
 
 ```python
 import bw2data as bd
 
-bd.projects.set_current("timex")
+bd.projects.set_current("ei312_REMIND_EU")
 ```
 
 ## Prospective background databases
 
-The `bw_timex` package itself does not provide any data - specifying prospective and dynamic information is up to the user. In this example, we use data from [ecoinvent v3.10](https://ecoinvent.org/), and create a set of prospective databases with [`premise`](https://github.com/polca/premise). We applied projections for the future electricity sectors using the SSP2-RCP19 pathway from the IAM IMAGE. We selected this pathway to simply demonstrate some future development in this case study, and many other models and pathways are available. 
+The `bw_timex` package itself does not provide any data - specifying prospective and dynamic information is up to the user. In this example, we use data from [ecoinvent v3.12](https://ecoinvent.org/) (cutoff), and create a set of prospective databases with [`premise`](https://github.com/polca/premise), updating all sectors along the SSP2-NDC pathway of the IAM REMIND-EU. We selected this pathway to simply demonstrate some future development in this case study, and many other models and pathways are available. 
 In the [premise documentation](https://premise.readthedocs.io/en/latest/) you can find instructions for the creation of prospective background databases. 
 
 
 
 ```python
-db_2020 = bd.Database("ei310_IMAGE_SSP2_RCP19_2020_electricity")
-db_2030 = bd.Database("ei310_IMAGE_SSP2_RCP19_2030_electricity")
-db_2040 = bd.Database("ei310_IMAGE_SSP2_RCP19_2040_electricity")
+db_2020 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2020")
+db_2030 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2030")
+db_2040 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2040")
 ```
 
 ## Case study setup
@@ -135,9 +133,9 @@ for db in [db_2020, db_2030, db_2040]:
         if exc.input["name"] == "market for used powertrain from electric passenger car, manual dismantling":
             exc.delete()
     
-    battery_production = db.get(name="battery production, Li-ion, LiMn2O4, rechargeable, prismatic")
+    battery_production = db.get(name="battery production, Li-ion, LiMn2O4, rechargeable")
     battery_production_without_eol = battery_production.copy(code="battery_production_without_eol", database=db.name)
-    battery_production_without_eol["name"] = "battery production, Li-ion, LiMn2O4, rechargeable, prismatic, without EOL"
+    battery_production_without_eol["name"] = "battery production, Li-ion, LiMn2O4, rechargeable, without EOL"
     # battery_production_without_eol["reference product"] = "battery"
     battery_production_without_eol.save()
     # For the battery, some waste treatment is buried in the process "battery cell production, Li-ion, 
@@ -202,7 +200,7 @@ used_ev_to_battery_eol = used_ev.new_edge(
 
 
 ```python
-electricity_production = db_2020.get(name="market group for electricity, low voltage", location="WEU")
+electricity_production = db_2020.get(name="market group for electricity, low voltage", location="DEU")
 
 driving.new_edge(input=driving, amount=1, type="production").save()
 
@@ -225,15 +223,15 @@ Now that the production system is modelled, we can add temporal distributions at
 
 ```mermaid
 flowchart LR
-    glider_production(glider production):::ei-->|"0-2 years prior \n &nbsp;"|ev_production
-    powertrain_production(powertrain production):::ei-->|"1 year prior \n &nbsp;"|ev_production
-    battery_production(battery production):::ei-->|"&nbsp; \n 1 year prior"|ev_production
-    ev_production(ev production):::fg-->|"0-3 months prior \n &nbsp;"|driving
-    electricity_generation(electricity generation):::ei-->|uniformly distributed \n over lifetime|driving
-    driving(driving):::fg-->|"after ev lifetime \n &nbsp;"|used_ev
-    used_ev(used ev):::fg-->|3 months after \n ev lifetime|glider_eol(glider eol):::ei
-    used_ev-->|3 months after \n ev lifetime|powertrain_eol(powertrain eol):::ei
-    used_ev-->|3 months after \n ev lifetime|battery_eol(battery eol):::ei
+    glider_production(glider production):::ei-->|0-2 years prior|ev_production
+    powertrain_production(powertrain production):::ei-->|1 year prior|ev_production
+    battery_production(battery production):::ei-->|1 year prior|ev_production
+    ev_production(ev production):::fg-->|2-3 months prior|driving
+    electricity_generation(electricity generation):::ei-->|uniformly distributed <br/> over lifetime|driving
+    driving(driving):::fg-->|after ev lifetime|used_ev
+    used_ev(used ev):::fg-->|3 months after <br/> ev lifetime|glider_eol(glider eol):::ei
+    used_ev-->|3 months after <br/> ev lifetime|powertrain_eol(powertrain eol):::ei
+    used_ev-->|3 months after <br/> ev lifetime|battery_eol(battery eol):::ei
 
     classDef ei color:#222832, fill:#3fb1c5, stroke:none;
     classDef fg color:#222832, fill:#9c5ffd, stroke:none;
@@ -288,7 +286,7 @@ td_assembly_and_delivery.graph(resolution="M")
 
 
 
-    <AxesSubplot:xlabel='Time (Months)', ylabel='Amount'>
+    <Axes: xlabel='Time (Months)', ylabel='Amount'>
 
 
 
@@ -306,7 +304,7 @@ td_glider_production.graph(resolution="M")
 
 
 
-    <AxesSubplot:xlabel='Time (Months)', ylabel='Amount'>
+    <Axes: xlabel='Time (Months)', ylabel='Amount'>
 
 
 
@@ -326,7 +324,7 @@ Starting from the functional unit in our supply chain graph, the temporal distri
 
 
 
-    <AxesSubplot:xlabel='Time (Months)', ylabel='Amount'>
+    <Axes: xlabel='Time (Months)', ylabel='Amount'>
 
 
 
@@ -369,6 +367,13 @@ used_ev_to_battery_eol["temporal_distribution"] = td_treating_waste
 used_ev_to_battery_eol.save()
 ```
 
+To make sure our changes to the foreground database are actually saved, we finally need to process the database:
+
+
+```python
+foreground.process()
+```
+
 ## LCA using `bw_timex`
 
 
@@ -376,7 +381,7 @@ As usual, we need to select an impact assessment method:
 
 
 ```python
-method = ('EF v3.1', 'climate change', 'global warming potential (GWP100)')
+method = ('ecoinvent-3.12', 'EF v3.1', 'climate change', 'global warming potential (GWP100)')
 ```
 
 `bw_timex` also needs to know the representative time of the databases:
@@ -403,36 +408,40 @@ from bw_timex import TimexLCA
 TimexLCA?
 ```
 
-    Init signature: TimexLCA(demand: dict, method: tuple, database_dates: dict = None) -> None
+    Init signature:
+    TimexLCA(
+        demand: dict,
+        method: tuple,
+        database_dates: dict = None,
+        use_global_lci_cache: bool = True,
+    ) -> None
     Docstring:     
     Class to perform time-explicit LCA calculations.
     
-    A TimexLCA retrieves the LCI of processes occuring at explicit points in time and relinks their technosphere
-    exchanges to match the technology landscape at that point in time, while keeping track of the timing of the
-    resulting emissions. As such, it combines prospective and dynamic LCA approaches.
+    A TimexLCA contains the LCI of processes occurring at explicit points in time. It tracks the timing of processes,
+    relinks their technosphere and biosphere exchanges to match the technology landscape at that point in time,
+    and also keeps track of the timing of the resulting emissions. As such, it combines prospective and dynamic LCA
+    approaches.
     
-    TimexLCA first calculates a static LCA, which informs a priority-first graph traversal. From the graph traversal,
-    temporal relationships between exchanges and processes are derived. Based on the timing of the processes, bw_timex
-    matches the processes at the intersection between foreground and background to the best available background
-    databases. This temporal relinking is achieved by using datapackages to add new time-specific processes. The new
-    processes and their exchanges to other technosphere processes or biosphere flows extent the technopshere and
+    TimexLCA first calculates a static LCA, which informs a priority-first graph traversal. From the
+    graph traversal, temporal relationships between exchanges and processes are derived. Based on
+    the timing of the processes, bw_timex matches the processes at the intersection between
+    foreground and background to the best available background databases. This temporal relinking is
+    achieved by using datapackages to add new time-specific processes. The new processes and their
+    exchanges to other technosphere processes or biosphere flows extent the technosphere and
     biosphere matrices.
     
-    Temporal information of both processes and biosphere flows are retained, allowing for dynamic LCIA.
-    
-    Currently absolute Temporal Distributions for biosphere exchanges are dealt with as a look up function:
-    If an activity happens at timestamp X then and the biosphere exchange has an absolute temporal
-    distribution (ATD), it looks up the amount from from the ATD correspnding to timestamp X.
-    E.g.: X = 2024, TD=(data=[2020,2021,2022,2023,2024,.....,2120 ], amount=[3,4,4,5,6,......,3]),
-    it will look up the value 6 corresponding 2024. If timestamp X does not exist it find the nearest
-    timestamp available (if two timestamps are equally close, it will take the first in order of
-    apearance (see numpy.argmin() for this behabiour).
-    
+    Temporal information of both processes and biosphere flows is retained, allowing for dynamic
+    LCIA.
     
     TimexLCA calculates:
-     1) a static LCA score (`TimexLCA.base_lca.score`, same as `bw2calc.lca.score`),
-     2) a static time-explicit LCA score (`TimexLCA.static_score`), which links LCIs to the respective background databases but without additional temporal dynamics of the biosphere flows,
-     3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and dynamic charaterization factors. These are provided for radiative forcing and GWP but can also be user-defined.
+     1) a static "base" LCA score (`TimexLCA.base_score`, same as `bw2calc.lca.score`),
+     2) a static time-explicit LCA score (`TimexLCA.static_score`), which links LCIs to the
+        respective background databases, but without dynamic characterization of the time-explicit inventory
+     3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and
+        dynamic characterization. These are provided for radiative forcing and GWP but can also be
+        user-defined.
+    
     
     Example
     -------
@@ -441,17 +450,20 @@ TimexLCA?
     >>> database_dates = {
             'my_background_database_one': datetime.strptime("2020", "%Y"),
             'my_background_database_two': datetime.strptime("2030", "%Y"),
+            'my_background_database_three': datetime.strptime("2040", "%Y"),
             'my_foreground_database':'dynamic'
         }
-    >>> bw_timex = TimexLCA(demand, method, database_dates)
-    >>> bw_timex.build_timeline() # you can pass many optional arguments here, also for the graph traversal
-    >>> bw_timex.lci()
-    >>> bw_timex.static_lcia()
-    >>> print(bw_timex.static_score)
-    >>> bw_timex.dynamic_lcia(metric="radiative_forcing") # different metrics can be used, e.g. "GWP", "radiative_forcing"
-    >>> print(bw_timex.dynamic_score)
+    >>> tlca = TimexLCA(demand, method, database_dates)
+    >>> tlca.build_timeline() # has many optional arguments
+    >>> tlca.lci()
+    >>> tlca.static_lcia()
+    >>> print(tlca.static_score)
+    >>> tlca.dynamic_lcia(metric="radiative_forcing") # also available: "GWP"
+    >>> print(tlca.dynamic_score)
     Init docstring:
-    Instantiating a `TimexLCA` object calculates a static LCA, initializes time mapping dicts for activities and biosphere flows, and stores useful subsets of ids in the node_collections.
+    Instantiating a `TimexLCA` object calculates a static LCA, initializes time mappings
+    for activities and biosphere flows, and stores useful subsets of ids in the
+    node_collections.
     
     Parameters
     ----------
@@ -459,9 +471,20 @@ TimexLCA?
             The demand for which the LCA will be calculated. The keys can be Brightway `Node`
             instances, `(database, code)` tuples, or integer ids.
     method : tuple
-            Tuple defining the LCIA method, such as `('foo', 'bar')` or default methods, such as `("EF v3.1", "climate change", "global warming potential (GWP100)")`
+            Tuple defining the LCIA method, such as `('foo', 'bar')` or default methods, such as
+            `("EF v3.1", "climate change", "global warming potential (GWP100)")`
     database_dates : dict, optional
             Dictionary mapping database names to dates.
+    use_global_lci_cache : bool, optional
+            If True (default), background unit LCI matrices are cached at
+            module level and reused across `TimexLCA` objects within the
+            same Python session. The cache is keyed by background process
+            identity plus the database's `modified` token, so edits to a
+            background database invalidate stale entries automatically. Set
+            to False to isolate this object's caching (e.g. when mutating
+            background databases via raw SQL that bypasses bw2data). The
+            module-level cache can be cleared with
+            `bw_timex.clear_background_lci_cache()`.
     File:           ~/Documents/Coding/bw_timex/bw_timex/timex_lca.py
     Type:           type
     Subclasses:     
@@ -473,8 +496,11 @@ Let's instantiate a `TimexLCA` object for our "driving" activity:
 tlca = TimexLCA({driving: 1}, method, database_dates)
 ```
 
-    /Users/timodiepers/anaconda3/envs/timex/lib/python3.10/site-packages/scikits/umfpack/umfpack.py:736: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.21e+13)
+    2026-08-03 14:24:50.200 | INFO     | bw_timex.timex_lca:__init__:136 - Initializing TimexLCA object...
+    2026-08-03 14:24:50.201 | INFO     | bw_timex.timex_lca:__init__:153 - Calculating base LCA...
+    /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.65e+13)
       warnings.warn(msg, UmfpackWarning)
+    2026-08-03 14:26:21.734 | INFO     | bw_timex.timex_lca:__init__:170 - Collecting node infos...
 
 
 Next, we build a timeline of the exchanges. To do this, we can call the `build_timeline()` method, which does the graph traversal and creates a timeline dataframe from the results. The exchanges (rows of the dataframe) are aggregated to the resolution specified in the argument `temporal_grouping`. There are also many more options to specify the timeline creation and graph traversal process. Here are the most important ones:
@@ -491,21 +517,14 @@ So, let's build the timeline. We choose a monthly temporal grouping here because
 
 
 ```python
-tlca.build_timeline(temporal_grouping="month")
+tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
 ```
 
-    /Users/timodiepers/Documents/Coding/bw_timex/bw_timex/timex_lca.py:194: UserWarning: No edge filter function provided. Skipping all edges within background databases.
-      warnings.warn(
-
-
-    Starting graph traversal
-    Calculation count: 9
-
-
-    /Users/timodiepers/Documents/Coding/bw_timex/bw_timex/timeline_builder.py:527: Warning: Reference date 2040-08-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
-      warnings.warn(
-    /Users/timodiepers/Documents/Coding/bw_timex/bw_timex/timeline_builder.py:527: Warning: Reference date 2040-11-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
-      warnings.warn(
+    2026-08-03 14:26:30.550 | INFO     | bw_timex.timex_lca:build_timeline:342 - No edge filter function provided. Skipping all edges in background databases.
+    2026-08-03 14:26:36.827 | INFO     | bw_timex.timex_lca:build_timeline:363 - Creating activity time mapping...
+    2026-08-03 14:26:36.968 | INFO     | bw_timex.timeline_builder:__init__:112 - Traversing supply chain graph...
+    2026-08-03 14:26:37.017 | INFO     | bw_timex.timeline_builder:build_timeline:186 - Building timeline...
+    2026-08-03 14:26:37.094 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:659 - Reference date 2040-08-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
 
 
 
@@ -520,306 +539,306 @@ tlca.build_timeline(temporal_grouping="month")
       <th>date_consumer</th>
       <th>consumer_name</th>
       <th>amount</th>
-      <th>interpolation_weights</th>
+      <th>temporal_market_shares</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <th>0</th>
-      <td>2022-05-01</td>
-      <td>glider production, passenger car, without EOL</td>
       <td>2024-05-01</td>
+      <td>glider production, passenger car, without EOL</td>
+      <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>588.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.567, 'ei31...</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>2022-06-01</td>
-      <td>glider production, passenger car, without EOL</td>
       <td>2024-06-01</td>
+      <td>glider production, passenger car, without EOL</td>
+      <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>588.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.558, 'ei31...</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>2023-05-01</td>
+      <td>2025-05-01</td>
       <td>glider production, passenger car, without EOL</td>
-      <td>2024-05-01</td>
+      <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>84.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.467, 'ei31...</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>2023-05-01</td>
+      <td>2025-05-01</td>
       <td>powertrain production, for electric passenger ...</td>
-      <td>2024-05-01</td>
+      <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>80.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.467, 'ei31...</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>2023-05-01</td>
+      <td>2025-05-01</td>
       <td>battery production, Li-ion, LiMn2O4, rechargea...</td>
-      <td>2024-05-01</td>
+      <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>280.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.467, 'ei31...</td>
     </tr>
     <tr>
       <th>5</th>
-      <td>2023-06-01</td>
+      <td>2025-06-01</td>
       <td>glider production, passenger car, without EOL</td>
-      <td>2024-06-01</td>
+      <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>84.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.459, 'ei31...</td>
     </tr>
     <tr>
       <th>6</th>
-      <td>2023-06-01</td>
+      <td>2025-06-01</td>
       <td>powertrain production, for electric passenger ...</td>
-      <td>2024-06-01</td>
+      <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>80.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.459, 'ei31...</td>
     </tr>
     <tr>
       <th>7</th>
-      <td>2023-06-01</td>
+      <td>2025-06-01</td>
       <td>battery production, Li-ion, LiMn2O4, rechargea...</td>
-      <td>2024-06-01</td>
+      <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>280.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.459, 'ei31...</td>
     </tr>
     <tr>
       <th>8</th>
-      <td>2024-05-01</td>
+      <td>2026-05-01</td>
       <td>glider production, passenger car, without EOL</td>
-      <td>2024-05-01</td>
+      <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>168.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.367, 'ei31...</td>
     </tr>
     <tr>
       <th>9</th>
-      <td>2024-05-01</td>
+      <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>0.2</td>
       <td>None</td>
     </tr>
     <tr>
       <th>10</th>
-      <td>2024-06-01</td>
+      <td>2026-06-01</td>
       <td>glider production, passenger car, without EOL</td>
-      <td>2024-06-01</td>
+      <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>168.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.359, 'ei31...</td>
     </tr>
     <tr>
       <th>11</th>
-      <td>2024-06-01</td>
+      <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>0.8</td>
       <td>None</td>
     </tr>
     <tr>
       <th>12</th>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.342, 'ei31...</td>
     </tr>
     <tr>
       <th>13</th>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>-1</td>
       <td>1.0</td>
       <td>None</td>
     </tr>
     <tr>
       <th>14</th>
-      <td>2025-08-01</td>
+      <td>2027-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.242, 'ei31...</td>
     </tr>
     <tr>
       <th>15</th>
-      <td>2026-08-01</td>
+      <td>2028-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.142, 'ei31...</td>
     </tr>
     <tr>
       <th>16</th>
-      <td>2027-08-01</td>
+      <td>2029-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.042, 'ei31...</td>
     </tr>
     <tr>
       <th>17</th>
-      <td>2028-08-01</td>
+      <td>2030-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2030': 0.942, 'ei31...</td>
     </tr>
     <tr>
       <th>18</th>
-      <td>2029-08-01</td>
+      <td>2031-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2020_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2030': 0.842, 'ei31...</td>
     </tr>
     <tr>
       <th>19</th>
-      <td>2030-08-01</td>
+      <td>2032-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2030_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2030': 0.742, 'ei31...</td>
     </tr>
     <tr>
       <th>20</th>
-      <td>2031-08-01</td>
+      <td>2033-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2030_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2030': 0.642, 'ei31...</td>
     </tr>
     <tr>
       <th>21</th>
-      <td>2032-08-01</td>
+      <td>2034-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2030_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2030': 0.542, 'ei31...</td>
     </tr>
     <tr>
       <th>22</th>
-      <td>2033-08-01</td>
+      <td>2035-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2030_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2030': 0.442, 'ei31...</td>
     </tr>
     <tr>
       <th>23</th>
-      <td>2034-08-01</td>
+      <td>2036-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2030_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2030': 0.342, 'ei31...</td>
     </tr>
     <tr>
       <th>24</th>
-      <td>2035-08-01</td>
+      <td>2037-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2030_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2030': 0.242, 'ei31...</td>
     </tr>
     <tr>
       <th>25</th>
-      <td>2036-08-01</td>
+      <td>2038-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2030_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2030': 0.142, 'ei31...</td>
     </tr>
     <tr>
       <th>26</th>
-      <td>2037-08-01</td>
+      <td>2039-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2030_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2030': 0.042, 'ei31...</td>
     </tr>
     <tr>
       <th>27</th>
-      <td>2038-08-01</td>
+      <td>2040-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2030_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2040': 1}</td>
     </tr>
     <tr>
       <th>28</th>
-      <td>2039-08-01</td>
+      <td>2041-08-01</td>
       <td>market group for electricity, low voltage</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>1875.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2030_electricity': 0....</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2040': 1}</td>
     </tr>
     <tr>
       <th>29</th>
-      <td>2040-08-01</td>
+      <td>2042-08-01</td>
       <td>used electric vehicle</td>
-      <td>2024-08-01</td>
+      <td>2026-08-01</td>
       <td>driving an electric vehicle</td>
       <td>-1.0</td>
       <td>None</td>
     </tr>
     <tr>
       <th>30</th>
-      <td>2040-11-01</td>
-      <td>market for used Li-ion battery</td>
-      <td>2040-08-01</td>
+      <td>2042-11-01</td>
+      <td>treatment of used glider, passenger car, shred...</td>
+      <td>2042-08-01</td>
       <td>used electric vehicle</td>
-      <td>-280.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2040_electricity': 1}</td>
+      <td>-840.0</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2040': 1}</td>
     </tr>
     <tr>
       <th>31</th>
-      <td>2040-11-01</td>
-      <td>treatment of used powertrain for electric pass...</td>
-      <td>2040-08-01</td>
+      <td>2042-11-01</td>
+      <td>market for used Li-ion battery</td>
+      <td>2042-08-01</td>
       <td>used electric vehicle</td>
-      <td>-80.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2040_electricity': 1}</td>
+      <td>-280.0</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2040': 1}</td>
     </tr>
     <tr>
       <th>32</th>
-      <td>2040-11-01</td>
-      <td>treatment of used glider, passenger car, shred...</td>
-      <td>2040-08-01</td>
+      <td>2042-11-01</td>
+      <td>treatment of used powertrain for electric pass...</td>
+      <td>2042-08-01</td>
       <td>used electric vehicle</td>
-      <td>-840.0</td>
-      <td>{'ei310_IMAGE_SSP2_RCP19_2040_electricity': 1}</td>
+      <td>-80.0</td>
+      <td>{'ei312_REMIND-EU_SSP2_NDC_2040': 1}</td>
     </tr>
   </tbody>
 </table>
@@ -837,15 +856,15 @@ Next, we calculate the time-explicit LCI. The `TimexLCA.lci()` function takes ca
 tlca.lci()
 ```
 
-    /Users/timodiepers/anaconda3/envs/timex/lib/python3.10/site-packages/bw2calc/lca_base.py:127: SparseEfficiencyWarning: splu converted its input to CSC format
-      self.solver = factorized(self.technosphere_matrix)
-    /Users/timodiepers/anaconda3/envs/timex/lib/python3.10/site-packages/scikits/umfpack/umfpack.py:736: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 5.78e+12)
+    2026-08-03 14:26:37.891 | INFO     | bw_timex.timex_lca:lci:513 - Expanding matrices...
+    2026-08-03 14:26:37.921 | INFO     | bw_timex.timex_lca:lci:532 - Calculating dynamic inventory...
+    /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 4.97e+12)
       warnings.warn(msg, UmfpackWarning)
-    /Users/timodiepers/anaconda3/envs/timex/lib/python3.10/site-packages/scikits/umfpack/umfpack.py:736: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 5.78e+12)
+    /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 4.97e+12)
       warnings.warn(msg, UmfpackWarning)
 
 
-Taking a look at the `dynamic_inventory` that was now created, we can see that it has more rows (emissions) than our usual biosphere3 flows. Instead of one row for each emission in the biosphere database we now get one row for each emission at each point in time.
+Taking a look at the `dynamic_inventory` that was now created, we can see that it is much larger than a standard static inventory: instead of one row per biosphere flow, we now get one row for each biosphere flow at each point in time.
 
 
 ```python
@@ -856,33 +875,33 @@ tlca.dynamic_inventory
 
 
     <Compressed Sparse Row sparse matrix of dtype 'float64'
-    	with 65859 stored elements and shape (61709, 80718)>
+    	with 81026 stored elements and shape (76843, 131071)>
 
 
 
-The standard, non-dynamic inventory has far less rows because the temporal resolution is missing. Looking at the timeline again, we see that we have processes at 23 different points in time (only counting the ones that actually directly procude emissions), which exactly matches the ratio of the dimensions of our two inventories:
+The standard, non-dynamic inventory has far fewer rows because the temporal resolution is missing. We can compare the dimensions of the two inventories:
 
 
 ```python
-tlca.inventory.shape # (#rows, #cols)
+tlca.base_lca.inventory.shape  # (#rows, #cols)
 ```
 
 
 
 
-    (2683, 80718)
+    (3341, 131038)
 
 
 
 
 ```python
-tlca.dynamic_inventory.shape[0]/tlca.inventory.shape[0]
+tlca.dynamic_inventory.shape
 ```
 
 
 
 
-    23.0
+    (76843, 131071)
 
 
 
@@ -908,39 +927,39 @@ tlca.dynamic_inventory_df
   </thead>
   <tbody>
     <tr>
-      <th>876</th>
-      <td>2022-05-01</td>
-      <td>3.281494e+04</td>
-      <td>1584</td>
-      <td>108727</td>
+      <th>606</th>
+      <td>2024-05-01</td>
+      <td>1.972265e+04</td>
+      <td>267655083917308008</td>
+      <td>342643947365249025</td>
     </tr>
     <tr>
-      <th>824</th>
-      <td>2022-05-01</td>
-      <td>8.636928e+03</td>
-      <td>1472</td>
-      <td>108727</td>
+      <th>2221</th>
+      <td>2024-05-01</td>
+      <td>5.665390e+03</td>
+      <td>267655084743585810</td>
+      <td>342643947365249025</td>
     </tr>
     <tr>
-      <th>1576</th>
-      <td>2022-05-01</td>
-      <td>4.231631e+03</td>
-      <td>3193</td>
-      <td>108727</td>
+      <th>1346</th>
+      <td>2024-05-01</td>
+      <td>3.248506e+03</td>
+      <td>267655084294795269</td>
+      <td>342643947365249025</td>
     </tr>
     <tr>
-      <th>578</th>
-      <td>2022-05-01</td>
-      <td>4.201366e+03</td>
-      <td>842</td>
-      <td>108727</td>
+      <th>269</th>
+      <td>2024-05-01</td>
+      <td>3.220865e+03</td>
+      <td>267655083611123782</td>
+      <td>342643947365249025</td>
     </tr>
     <tr>
-      <th>875</th>
-      <td>2022-05-01</td>
-      <td>9.198843e+02</td>
-      <td>1583</td>
-      <td>108727</td>
+      <th>68</th>
+      <td>2024-05-01</td>
+      <td>2.278072e+03</td>
+      <td>267655083426574452</td>
+      <td>342643947365249025</td>
     </tr>
     <tr>
       <th>...</th>
@@ -950,65 +969,65 @@ tlca.dynamic_inventory_df
       <td>...</td>
     </tr>
     <tr>
-      <th>62048</th>
-      <td>2040-11-01</td>
-      <td>-4.535713e-08</td>
-      <td>1819</td>
-      <td>108757</td>
+      <th>78846</th>
+      <td>2042-11-01</td>
+      <td>-1.082068e-07</td>
+      <td>267655084651311170</td>
+      <td>342643947365249056</td>
     </tr>
     <tr>
-      <th>62282</th>
-      <td>2040-11-01</td>
-      <td>-1.478520e-07</td>
-      <td>1922</td>
-      <td>108757</td>
+      <th>79500</th>
+      <td>2042-11-01</td>
+      <td>-3.356238e-07</td>
+      <td>267655084760363100</td>
+      <td>342643947365249056</td>
     </tr>
     <tr>
-      <th>64549</th>
-      <td>2040-11-01</td>
-      <td>-3.534886e-02</td>
-      <td>3721</td>
-      <td>108758</td>
+      <th>75085</th>
+      <td>2042-11-01</td>
+      <td>-4.204561e-07</td>
+      <td>267655084043137053</td>
+      <td>342643947365249055</td>
     </tr>
     <tr>
-      <th>61017</th>
-      <td>2040-11-01</td>
-      <td>-4.156468e-01</td>
-      <td>1030</td>
-      <td>108759</td>
+      <th>75084</th>
+      <td>2042-11-01</td>
+      <td>-3.128459e-06</td>
+      <td>267655084043137053</td>
+      <td>342643947365249056</td>
     </tr>
     <tr>
-      <th>61019</th>
-      <td>2040-11-01</td>
-      <td>-3.893688e+00</td>
-      <td>1030</td>
-      <td>108757</td>
+      <th>79175</th>
+      <td>2042-11-01</td>
+      <td>-2.091494e-02</td>
+      <td>267655084705837177</td>
+      <td>342643947365249057</td>
     </tr>
   </tbody>
 </table>
-<p>65859 rows × 4 columns</p>
+<p>81026 rows × 4 columns</p>
 
 
 
 
 If we are only interested in the new overall time-explicit scores and don't care about the timing of the emissions, we can set `build_dynamic_biosphere=False` (default is `True`), which saves time and memory. In that case, you only get the `TimexLCA.inventory`, but not the `TimexLCA.dynamic_inventory`.
 
-In case the timing of emissions is not important, one can directly calculate the LCIA the "standard way" using static characterization factors. Per default, the following calculates the static lcia score based on the impact method chosen in the very beginning:
+In case the timing of emissions is not important, one can directly calculate the LCIA the "standard way" using static characterization methods. Per default, the following calculates the static LCIA score based on the impact method chosen in the very beginning:
 
 
 ```python
 tlca.static_lcia()
-tlca.static_score   #kg CO2-eq
+tlca.static_score  # kg CO2-eq
 ```
 
 
 
 
-    11821.850158724601
+    10744.473494732374
 
 
 
-At this point, we can already compare these time-explicit results to the results of an "ordinary", completely static LCA. These already exist within the TimexLCA class, originally to set the priorities for the graph traversal:
+At this point, we can already compare these time-explicit results to the results of an "ordinary", completely static LCA. These already exist within the `TimexLCA` class, originally to set the priorities for the graph traversal:
 
 
 ```python
@@ -1018,12 +1037,12 @@ tlca.base_lca.score
 
 
 
-    20858.470012031627
+    23247.15112358249
 
 
 
 ## Dynamic Characterization
-In addition to the standard static characterization, the time-explicit, dynamic inventory generated by a `TimexLCA` allows for dynamic characterization. Users can provide their own dynamic characterization functions and link them to corresponding biosphere flows (see example on [dynamic characterization](https://github.com/TimoDiepers/timex/blob/main/notebooks/example_simple_dynamic_characterization.ipynb)). 
+In addition to the standard static characterization, the time-explicit, dynamic inventory generated by a `TimexLCA` allows for dynamic characterization. Users can provide their own dynamic characterization functions and link them to corresponding biosphere flows (see example on [dynamic characterization](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_simple_dynamic_characterization.ipynb)). 
 
 Alternatively, you can use the functions from our separate (but fully compatible) package [dynamic_characterization](https://dynamic-characterization.readthedocs.io/en/latest/). We provide two different metrics for dynamic LCIA of Climate Change: Radiative forcing [W/m2] and Global Warming Potential (GWP) [kg CO2-eq]. For both of these metrics, we have parameterized dynamic characterization functions for all GHG's that [IPCC AR6](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) provides data for.
 
@@ -1033,15 +1052,14 @@ For the dynamic characterization, users can also choose the length of the consid
 ### Radiative forcing
 
 
-Let's characterize our dynamic inventory, regarding radiative forcing with a fixed time horizon and the default time horizon length of 100 years:
+Because we are using real ecoinvent/premise biosphere flows here, `bw_timex` automatically maps the matching parameterized characterization functions (IPCC AR6) to the corresponding flows. So, unlike when working with custom biosphere flows, we don't need to define and pass the `characterization_functions` ourselves and can directly run the dynamic characterization:
 
 
 ```python
 tlca.dynamic_lcia(metric="radiative_forcing", fixed_time_horizon=True)
 ```
 
-    /Users/timodiepers/anaconda3/envs/timex/lib/python3.10/site-packages/dynamic_characterization/dynamic_characterization.py:80: UserWarning: No custom dynamic characterization functions provided. Using default dynamic characterization functions from `dynamic_characterization` meant to work with biosphere3 flows. The flows that are characterized are based on the selection of the initially chosen impact category. You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_functions.
-      warnings.warn(
+    2026-08-03 14:27:06.154 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
 
 
 
@@ -1060,38 +1078,38 @@ tlca.dynamic_lcia(metric="radiative_forcing", fixed_time_horizon=True)
   <tbody>
     <tr>
       <th>0</th>
-      <td>2023-05-01 05:49:12</td>
-      <td>5.049646e-13</td>
-      <td>1031</td>
-      <td>108703</td>
+      <td>2024-12-31 05:49:12</td>
+      <td>-2.087224e-17</td>
+      <td>267655083766312992</td>
+      <td>342643947365249026</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>2023-05-01 05:49:12</td>
-      <td>2.470251e-18</td>
-      <td>3792</td>
-      <td>108703</td>
+      <td>2024-12-31 05:49:12</td>
+      <td>-5.218035e-18</td>
+      <td>267655083766312992</td>
+      <td>342643947365249025</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>2023-05-01 05:49:12</td>
-      <td>6.890517e-19</td>
-      <td>4217</td>
-      <td>108703</td>
+      <td>2024-12-31 05:49:12</td>
+      <td>-1.352591e-18</td>
+      <td>267655084332544077</td>
+      <td>342643947365249026</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>2023-05-01 05:49:12</td>
-      <td>3.461317e-18</td>
-      <td>1366</td>
-      <td>108703</td>
+      <td>2024-12-31 05:49:12</td>
+      <td>-3.381524e-19</td>
+      <td>267655084332544077</td>
+      <td>342643947365249025</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>2023-05-01 05:49:12</td>
-      <td>1.463020e-18</td>
-      <td>1374</td>
-      <td>108703</td>
+      <td>2024-12-31 05:49:12</td>
+      <td>2.323448e-41</td>
+      <td>267655084806500426</td>
+      <td>342643947365249025</td>
     </tr>
     <tr>
       <th>...</th>
@@ -1101,80 +1119,75 @@ tlca.dynamic_lcia(metric="radiative_forcing", fixed_time_horizon=True)
       <td>...</td>
     </tr>
     <tr>
-      <th>146565</th>
-      <td>2123-11-02 03:03:36</td>
-      <td>2.669520e-16</td>
-      <td>1034</td>
-      <td>108734</td>
+      <th>164271</th>
+      <td>2126-01-01 14:42:00</td>
+      <td>3.862480e-16</td>
+      <td>267655084441595931</td>
+      <td>342643947365249052</td>
     </tr>
     <tr>
-      <th>146566</th>
-      <td>2123-11-02 03:03:36</td>
-      <td>1.487574e-21</td>
-      <td>1369</td>
-      <td>108733</td>
+      <th>164272</th>
+      <td>2126-01-01 14:42:00</td>
+      <td>2.367176e-15</td>
+      <td>267655084861026358</td>
+      <td>342643947365249052</td>
     </tr>
     <tr>
-      <th>146567</th>
-      <td>2123-11-02 03:03:36</td>
-      <td>2.640643e-21</td>
-      <td>226</td>
-      <td>108733</td>
+      <th>164273</th>
+      <td>2126-01-01 14:42:00</td>
+      <td>5.069502e-15</td>
+      <td>267655084705837075</td>
+      <td>342643947365249052</td>
     </tr>
     <tr>
-      <th>146568</th>
-      <td>2123-11-02 03:03:36</td>
-      <td>7.511111e-17</td>
-      <td>1390</td>
-      <td>108733</td>
+      <th>164274</th>
+      <td>2126-01-01 14:42:00</td>
+      <td>9.429912e-15</td>
+      <td>267655084475150457</td>
+      <td>342643947365249052</td>
     </tr>
     <tr>
-      <th>146569</th>
-      <td>2123-11-02 03:03:36</td>
-      <td>3.126878e-48</td>
-      <td>1152</td>
-      <td>108734</td>
+      <th>164275</th>
+      <td>2126-01-01 14:42:00</td>
+      <td>9.521703e-15</td>
+      <td>267655083896336466</td>
+      <td>342643947365249052</td>
     </tr>
   </tbody>
 </table>
-<p>146570 rows × 4 columns</p>
+<p>164276 rows × 4 columns</p>
 
 
 
 
-The method call returns a dataframe of all the individual emissions at their respective timesteps (tlca.characterized_inventory), but we can also just look at the overall score:
+The method call returns a dataframe of all the individual emissions at their respective timesteps, but we can also just look at the overall score:
 
 
 ```python
-tlca.dynamic_score #W/m2 (radiative forcing)
+tlca.dynamic_score
 ```
 
 
 
 
-    1.0214828094580987e-09
+    np.float64(9.417047753177288e-10)
 
 
 
-To visualize the results, we provide a simple plotting functions:
+To visualize the results, we provide simple plotting functions:
 
 
 ```python
-tlca.plot_dynamic_characterized_inventory()  
+tlca.plot_dynamic_characterized_inventory()
 ```
 
 
     
-![png](example_electric_vehicle_premise_files/output_64_0.png)
+![png](example_electric_vehicle_premise_files/output_66_0.png)
     
 
 
 This can be a bit messy, though, because all the individual impacts caused by individual emissions (e.g., CO2, CH4, N2O, ...) appear. Luckily, there is also an option to sum the emissions within each activity:
-
-
-```python
-
-```
 
 
 ```python
@@ -1183,7 +1196,7 @@ tlca.plot_dynamic_characterized_inventory(sum_emissions_within_activity=True)
 
 
     
-![png](example_electric_vehicle_premise_files/output_67_0.png)
+![png](example_electric_vehicle_premise_files/output_68_0.png)
     
 
 
@@ -1196,7 +1209,7 @@ tlca.plot_dynamic_characterized_inventory(sum_activities=True, cumsum=True)
 
 
     
-![png](example_electric_vehicle_premise_files/output_69_0.png)
+![png](example_electric_vehicle_premise_files/output_70_0.png)
     
 
 
@@ -1207,20 +1220,17 @@ Similar options are available for the metric GWP, which compares the radiative f
 
 
 ```python
-tlca.dynamic_lcia(metric="GWP", fixed_time_horizon=False, time_horizon = 70)
+tlca.dynamic_lcia(metric="GWP", fixed_time_horizon=False, time_horizon = 100)
 tlca.dynamic_score #kg CO2-eq (GWP)
 ```
 
-    /Users/timodiepers/anaconda3/envs/timex/lib/python3.10/site-packages/dynamic_characterization/dynamic_characterization.py:80: UserWarning: No custom dynamic characterization functions provided. Using default dynamic characterization functions from `dynamic_characterization` meant to work with biosphere3 flows. The flows that are characterized are based on the selection of the initially chosen impact category. You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_functions.
-      warnings.warn(
-    /Users/timodiepers/anaconda3/envs/timex/lib/python3.10/site-packages/dynamic_characterization/dynamic_characterization.py:262: UserWarning: Using bw_timex's default CO2 characterization function for GWP reference.
-      warnings.warn(
+    2026-08-03 14:27:11.751 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
 
 
 
 
 
-    11996.445963730823
+    np.float64(10655.763775235002)
 
 
 
@@ -1233,7 +1243,7 @@ tlca.plot_dynamic_characterized_inventory(sum_emissions_within_activity=True)
 
 
     
-![png](example_electric_vehicle_premise_files/output_74_0.png)
+![png](example_electric_vehicle_premise_files/output_75_0.png)
     
 
 
@@ -1246,7 +1256,7 @@ tlca.plot_dynamic_characterized_inventory(sum_emissions_within_activity=True, cu
 
 
     
-![png](example_electric_vehicle_premise_files/output_76_0.png)
+![png](example_electric_vehicle_premise_files/output_77_0.png)
     
 
 
@@ -1263,16 +1273,13 @@ tlca.dynamic_lcia(metric="GWP", fixed_time_horizon=False, time_horizon=100)
 tlca.dynamic_score
 ```
 
-    /Users/timodiepers/anaconda3/envs/timex/lib/python3.10/site-packages/dynamic_characterization/dynamic_characterization.py:80: UserWarning: No custom dynamic characterization functions provided. Using default dynamic characterization functions from `dynamic_characterization` meant to work with biosphere3 flows. The flows that are characterized are based on the selection of the initially chosen impact category. You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_functions.
-      warnings.warn(
-    /Users/timodiepers/anaconda3/envs/timex/lib/python3.10/site-packages/dynamic_characterization/dynamic_characterization.py:262: UserWarning: Using bw_timex's default CO2 characterization function for GWP reference.
-      warnings.warn(
+    2026-08-03 14:27:16.752 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
 
 
 
 
 
-    11653.498778351013
+    np.float64(10655.763775235002)
 
 
 
@@ -1286,7 +1293,7 @@ tlca.base_lca.score
 
 
 
-    20858.470012031627
+    23247.15112358249
 
 
 
@@ -1309,7 +1316,7 @@ for exc in driving.technosphere():
         static_scores[exc.input["name"]] = tlca.base_lca.score
 ```
 
-    /Users/timodiepers/anaconda3/envs/timex/lib/python3.10/site-packages/scikits/umfpack/umfpack.py:736: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.21e+13)
+    /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.65e+13)
       warnings.warn(msg, UmfpackWarning)
 
 
@@ -1374,9 +1381,11 @@ for exc in prospective_driving.technosphere():
         prospective_scores[exc.input["name"]] = lca.score
 ```
 
-    /Users/timodiepers/anaconda3/envs/timex/lib/python3.10/site-packages/bw2calc/lca_base.py:127: SparseEfficiencyWarning: splu converted its input to CSC format
-      self.solver = factorized(self.technosphere_matrix)
-    /Users/timodiepers/anaconda3/envs/timex/lib/python3.10/site-packages/scikits/umfpack/umfpack.py:736: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 2.48e+12)
+    14:27:36+0200 [info     ] Changed code to avoid conflict with existing value: {self['code']} to {data['code']}
+    14:27:37+0200 [info     ] Changed code to avoid conflict with existing value: {self['code']} to {data['code']}
+
+
+    /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.38e+13)
       warnings.warn(msg, UmfpackWarning)
 
 
@@ -1389,9 +1398,9 @@ print("Prospective score: ", sum(prospective_scores.values()))
 print("Time-explicit score: ", tlca.dynamic_score)
 ```
 
-    Static score:  20858.470012031674
-    Prospective score:  6522.389036408176
-    Time-explicit score:  11653.498778351013
+    Static score:  23247.151123582487
+    Prospective score:  4927.8914576999105
+    Time-explicit score:  10655.763775235002
 
 
 To better understand what's going on, let's plot the scores as a waterfall chart  based on timing of emission. Also, we can look at the "first-level contributions":
@@ -1422,7 +1431,7 @@ plot_characterized_inventory_as_waterfall(
 
 
     
-![png](example_electric_vehicle_premise_files/output_89_0.png)
+![png](example_electric_vehicle_premise_files/output_90_0.png)
     
 
 

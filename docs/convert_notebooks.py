@@ -30,7 +30,7 @@ NOTEBOOK_META: dict[str, tuple[str, list[str]]] = {
     ),
     "example_electric_vehicle_premise": (
         "lucide/car-front",
-        ["example", "premise"],
+        ["example", "premise", "dynamic characterization"],
     ),
     "example_simple_dynamic_characterization": (
         "lucide/trending-up",
@@ -38,11 +38,11 @@ NOTEBOOK_META: dict[str, tuple[str, list[str]]] = {
     ),
     "paper_case_study": (
         "lucide/file-text",
-        ["case study", "paper"],
+        ["example", "paper", "premise"],
     ),
     "example_Importing_model_from_excel": (
         "lucide/table",
-        ["example", "excel"],
+        ["example", "excel", "temporal distribution"],
     ),
 }
 
