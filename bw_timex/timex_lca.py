@@ -32,7 +32,7 @@ from ._lci_cache import BACKGROUND_UNIT_LCI_CACHE, LCI_SOLVE_CACHE, NODES_CACHE
 FACTORIZE_SOLVES_THRESHOLD = 8
 
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
-from .helper_classes import InterDatabaseMapping, TimeMappingDict
+from .helper_classes import InterDatabaseMapping, LazyActivity, TimeMappingDict
 from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
 from .utils import (
@@ -150,6 +150,10 @@ class TimexLCA:
             demand=self.demand, method=self.method, database_dates=self.database_dates
         )
 
+        # Filled in by `prepare_base_lca_inputs`: the databases the base LCA
+        # covers, which is a subset of `database_dates` plus their dependents.
+        self._base_lca_database_names = set()
+
         logger.info("Calculating base LCA...")
         # Calculate static LCA results using a custom prepare_lca_inputs function that includes all
         # background databases in the LCA. We need all the IDs for the time mapping dict.
@@ -190,10 +194,11 @@ class TimexLCA:
             key = ("nodes", project, db, modified)
             db_nodes = self._nodes_cache.get(key)
             if db_nodes is None:
-                rows = bd.backends.ActivityDataset.select().where(
-                    bd.backends.ActivityDataset.database == db
-                )
-                db_nodes = {row.id: bd.backends.Activity(row) for row in rows}
+                # Only the scalar columns are read here; the pickled `data`
+                # blob of a node is loaded lazily, if it is needed at all.
+                columns = [getattr(AD, name) for name in LazyActivity.COLUMN_NAMES]
+                rows = AD.select(*columns).where(AD.database == db).tuples()
+                db_nodes = {row[0]: LazyActivity(row) for row in rows}
                 self._nodes_cache[key] = db_nodes
             self.nodes.update(db_nodes)
             for node in db_nodes.values():
@@ -1229,7 +1234,20 @@ class TimexLCA:
         data_objs = []
         remapping_dicts = None
 
-        demand_database_names = list(self.database_dates.keys())
+        # The base LCA only needs the databases that the demand depends on: the
+        # dynamic (foreground) ones, the ones holding the demand, and whatever
+        # those link to. Time-specific background databases that nothing
+        # depends on would only inflate the base technosphere matrix here; they
+        # are brought in later, when `lci()` relinks the processes to them.
+        dynamic_database_names = {
+            db
+            for db, date in self.database_dates.items()
+            if not isinstance(date, datetime)
+        }
+        demand_database_names = list(
+            dynamic_database_names
+            | {bd.get_node(id=get_id(key))["database"] for key in (demand or {})}
+        )
 
         if demand_database_names:
             database_names = set.union(
@@ -1243,6 +1261,11 @@ class TimexLCA:
                 database_names = [
                     x for x in database_names if x not in demand_database_names
                 ] + demand_database_names
+
+            # Remembered so that `create_activity_time_mapping` knows for which
+            # databases the base LCA's matrix is the authority on which nodes
+            # get a technosphere column.
+            self._base_lca_database_names = set(database_names)
 
             data_objs.extend([Database(obj).datapackage() for obj in database_names])
 
@@ -1439,11 +1462,18 @@ class TimexLCA:
             demand_dependent_database_names & self.database_dates_static.keys()
         )
 
-        background = {
-            node.id
-            for db in demand_dependent_background_database_names
-            for node in bd.Database(db)
-        }
+        # Only the ids are needed here, so we query them directly instead of
+        # instantiating a node proxy (and unpickling its data blob) for every
+        # process in the background databases.
+        if demand_dependent_background_database_names:
+            background = {
+                row[0]
+                for row in AD.select(AD.id)
+                .where(AD.database << list(demand_dependent_background_database_names))
+                .tuples()
+            }
+        else:
+            background = set()
         self.node_collections["background"] = background
 
         first_level_background_static = set()
@@ -1623,9 +1653,23 @@ class TimexLCA:
             db: time for db, time in self.database_dates.items() if isinstance(time, str)
         }
 
-        for idx in self.base_lca.dicts.activity.keys():  # activity ids
-            key = self.base_lca.remapping_dicts["activity"][idx]  # ('database', 'code')
+        # Only nodes that occupy a technosphere column are mapped. For the
+        # databases in the base LCA, its matrix says exactly which those are;
+        # the remaining time-specific databases are not in that matrix (they
+        # are relinked to later), so there we go by node type, excluding
+        # explicit product nodes, which are rows only.
+        base_activity_ids = set(self.base_lca.dicts.activity.keys())
+        base_lca_databases = self._base_lca_database_names
+        product_node_types = set(bd.labels.product_node_types)
+
+        for idx, node in self.nodes.items():  # activity ids
+            key = node.key  # ('database', 'code')
             db_name = key[0]
+            if db_name in base_lca_databases:
+                if idx not in base_activity_ids:
+                    continue
+            elif node.get("type") in product_node_types:
+                continue
             if db_name in dynamic_db_time_mapping:
                 self.activity_time_mapping.add(
                     (key, dynamic_db_time_mapping[db_name]), unique_id=idx

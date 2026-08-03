@@ -1,6 +1,90 @@
 import warnings
 
+from bw2data.backends.proxies import Activity
+from bw2data.backends.schema import ActivityDataset
 from loguru import logger
+
+
+class LazyActivity(Activity):
+    """An `Activity` proxy that reads its pickled `data` blob only when needed.
+
+    `TimexLCA` keeps a proxy for every node of every database in
+    `database_dates`, which is hundreds of thousands of nodes for real
+    background databases, while only a handful of them are ever used for
+    anything but their metadata. Unpickling the `data` blob of all of them
+    dominates the setup time, so this proxy is built from the scalar columns of
+    `ActivityDataset` instead. Those cover the keys that are read in bulk
+    (`name`, `reference product`, `location`, `code`, `database`, `type`); any
+    other key, and anything that needs the full dataset (exchange iteration,
+    saving, ...), loads the row from the database on first use.
+    """
+
+    # Keys that are stored as their own column, and therefore don't require the
+    # `data` blob. Values are the position in the row tuple passed to __init__.
+    _COLUMNS = {
+        "id": 0,
+        "code": 1,
+        "database": 2,
+        "name": 3,
+        "location": 4,
+        "reference product": 5,
+        "type": 6,
+    }
+
+    #: The columns to select, in the order `__init__` expects them.
+    COLUMN_NAMES = ("id", "code", "database", "name", "location", "product", "type")
+
+    def __init__(self, row: tuple):
+        """`row` holds the columns named in `COLUMN_NAMES`, in that order."""
+        self._row = row
+        self._lazy_document = None
+        self._lazy_data = None
+
+    @property
+    def _document(self):
+        if self._lazy_document is None:
+            self._lazy_document = ActivityDataset.get_by_id(self._row[0])
+        return self._lazy_document
+
+    @_document.setter
+    def _document(self, value):
+        self._lazy_document = value
+
+    @property
+    def _data(self):
+        if self._lazy_data is None:
+            document = self._document
+            self._lazy_data = document.data
+            self._lazy_data["code"] = document.code
+            self._lazy_data["database"] = document.database
+            self._lazy_data["id"] = document.id
+        return self._lazy_data
+
+    @_data.setter
+    def _data(self, value):
+        self._lazy_data = value
+
+    @property
+    def id(self):
+        return self._row[0]
+
+    @property
+    def key(self):
+        return (self._row[2], self._row[1])
+
+    def __getitem__(self, key):
+        if key == 0:
+            return self._row[2]
+        if key == 1:
+            return self._row[1]
+        position = self._COLUMNS.get(key)
+        if position is not None:
+            value = self._row[position]
+            if value is not None:
+                return value
+            # A `None` column may mean "not set" or "not synced", so fall back
+            # to the blob to keep `Activity`'s KeyError behaviour exact.
+        return super().__getitem__(key)
 
 
 class SetList:
