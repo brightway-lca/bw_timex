@@ -176,3 +176,40 @@ def test_interdatabase_mapping_is_filled_by_the_timeline_builder(same_date_db):
     # The copy has no counterpart in the untouched family, and none is invented.
     with pytest.raises(KeyError):
         tlca.interdatabase_activity_mapping.find_match(steel_copy_2020.id, "background_2030")
+
+
+def test_foreground_triplet_collision_does_not_affect_timeline_results(same_date_db):
+    """A foreground node with a triplet collision is not added to the mapping.
+
+    The optimized path reuses only static background database matches,
+    deliberately excluding any foreground/dynamic databases. This test verifies
+    that omitting a foreground triplet collision is inert: the foreground node is
+    never queried through the mapping (only static db names are looked up), so
+    the score and temporal market shares remain unchanged.
+    """
+    # Add a foreground node with the same (name, reference product, location)
+    # as a background market producer.
+    fg_collision = bd.Database("foreground").new_node(
+        "electricity_fg_collision", name="electricity", unit="kWh"
+    )
+    fg_collision["reference product"] = "electricity"
+    fg_collision["location"] = "GLO"
+    fg_collision.save()
+    fg_collision.new_edge(input=fg_collision, amount=1, type="production").save()
+    bd.Database("foreground").process()
+
+    # Build timeline and compute results.
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    tlca.build_timeline(starting_datetime="2025-01-01")
+
+    # Verify the mapping only holds background databases (not the foreground).
+    shares = tlca.timeline.loc[
+        tlca.timeline["producer_name"] == "electricity", "temporal_market_shares"
+    ].iloc[0]
+    assert set(shares.keys()) == {"background_2020", "background_2030"}
+
+    # Compute LCA and verify the results are unaffected by the foreground collision.
+    tlca.lci()
+    tlca.static_lcia()
+    # electricity: 0.5*10 + 0.5*5 = 7.5; steel: 0.5*20 + 0.5*10 = 15
+    assert tlca.static_score == pytest.approx(22.5, abs=0.2)

@@ -1591,6 +1591,9 @@ class TimexLCA:
         # The timeline builder already resolved every temporal-market producer to
         # its counterparts while computing the market shares. Reuse that instead
         # of scanning every background node a second time.
+        # The builder's scan is scoped to static databases only; this is inert
+        # because the mapping is only ever queried for static db names (drawn
+        # from temporal_market_shares in the timeline, which excludes foreground).
         matches = getattr(self.timeline_builder, "market_producer_matches", None)
         if matches:
             self.interdatabase_activity_mapping.update(matches)
