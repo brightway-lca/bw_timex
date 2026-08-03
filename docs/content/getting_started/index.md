@@ -16,6 +16,6 @@ In the following sections, we'll walk through the steps 1-4, considering a very 
 
     [Launch this tutorial on Binder!](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb) In this interactive environment, you can directly run the bw_timex code yourself whilst following along.
 
-!!! tip "Writing this with an AI coding agent?"
+!!! tip "Using an AI coding agent?"
 
-    Grab our [bw_timex agent skill](../ai_agent_skill.md) — it teaches Claude Code (or similar) this whole workflow, including the parts that are easy to get wrong.
+    Install our [Brightway agent skills](https://github.com/TimoDiepers/brightway-skills) — they teach Claude Code (or any other [agentskills.io](https://agentskills.io)-compatible agent) this workflow, including the parts that are easy to get wrong.

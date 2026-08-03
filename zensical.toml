@@ -29,7 +29,6 @@ nav = [
       { "Step 4 - Impact assessment" = "content/getting_started/lcia.md" },
     ]},
     { "What LCA should I do?" = "content/decisiontree.md" },
-    { "Using an AI Coding Agent" = "content/ai_agent_skill.md" },
   ]},
   { Theory = "content/theory.md" },
   { Examples = [
