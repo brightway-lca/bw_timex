@@ -81,8 +81,25 @@ def test_producer_in_a_single_vintage_warns_and_is_time_invariant(same_date_db):
 
 
 def test_background_traversal_routes_within_the_modified_family(same_date_deep_db):
-    """Descending into the background must not confuse same-date databases."""
-    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    """Descending into the background must not confuse same-date databases.
+
+    ``database_dates`` is given with the ``modified_*`` entries FIRST here
+    (unlike ``DATABASE_DATES`` above), so that a routing bug which resolves a
+    cohort date through a global, insertion-order-dependent ``{date:
+    database}`` inversion would pick ``background_*`` — the wrong family for
+    ``smelting``/``coke``, which exist only under ``modified_*`` — instead of
+    coincidentally landing on the right family. With the ordering used by the
+    other tests in this file, that same bug happens to resolve to the right
+    family by accident and this test would not catch it.
+    """
+    database_dates = {
+        "modified_2020": datetime.strptime("2020", "%Y"),
+        "modified_2030": datetime.strptime("2030", "%Y"),
+        "background_2020": datetime.strptime("2020", "%Y"),
+        "background_2030": datetime.strptime("2030", "%Y"),
+        "foreground": "dynamic",
+    }
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, database_dates)
     tlca.build_timeline(
         starting_datetime="2025-01-01",
         graph_traversal="bfs",
@@ -101,3 +118,38 @@ def test_background_traversal_routes_within_the_modified_family(same_date_deep_d
     tlca.lci()
     tlca.static_lcia()
     assert tlca.static_score > 0
+
+
+def test_background_traversal_same_triplet_at_same_date_raises(same_date_deep_db):
+    """A same-date, same-triplet collision reached only through background
+    descent must still raise loudly.
+
+    `smelting` is resolved to its candidate databases via
+    `_candidate_databases_for_node` (it is the node whose split the `coke`
+    input in `same_date_deep_db` was added to trigger — see that fixture's
+    docstring), not via `TimelineBuilder`'s temporal-market leaf logic. The
+    collision here is wired into `background_2020` only, never into the
+    foreground, so it is invisible to anything except the interdatabase
+    mapping the extractor consults mid-descent. Matching on
+    "cannot tell which one to use" (rather than the more generic "more than
+    one database", used by `test_same_triplet_at_same_date_raises` above) is
+    what pins this down to `_candidate_databases_for_node`'s wording
+    specifically, as opposed to `TimelineBuilder.candidate_databases_for_producers`'s
+    similarly-worded but distinct "...its temporal market should use" message.
+    """
+    collision = bd.Database("background_2020").new_node(
+        "smelting_collision", name="smelting", unit="kg"
+    )
+    collision["reference product"] = "smelting"
+    collision["location"] = "GLO"
+    collision.save()
+    collision.new_edge(input=collision, amount=1, type="production").save()
+    bd.Database("background_2020").process()
+
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    with pytest.raises(ValueError, match="cannot tell which one to use"):
+        tlca.build_timeline(
+            starting_datetime="2025-01-01",
+            graph_traversal="bfs",
+            traverse_background=True,
+        )

@@ -19,9 +19,15 @@ def _write_same_date_databases(with_background_chain: bool = False):
     electricity 10 (2020) / 5 (2030), steel 20 (2020) / 10 (2030).
 
     With `with_background_chain=True`, each modified database also holds a
-    `smelting` process that the copy consumes through a temporal distribution.
-    It exists only in the modified family and is reached only when the
-    background is traversed.
+    `smelting` process that the copy consumes through a temporal distribution,
+    and `smelting` in turn consumes a `coke` process via a plain technosphere
+    edge. Both exist only in the modified family and are reached only when the
+    background is traversed. `smelting` having its own technosphere input
+    (`coke`) matters: `_emit_variant_split` only splits a producer that itself
+    has further technosphere inputs, so without `coke`, `smelting` would be a
+    technosphere dead end and never reach the per-node routing code at all —
+    it would fall through as an ordinary background leaf, resolved entirely by
+    `TimelineBuilder`'s (already-correct) temporal-market logic instead.
     """
     biosphere = bd.Database("biosphere")
     biosphere.write({("biosphere", "CO2"): {"type": "emission", "name": "carbon dioxide"}})
@@ -31,6 +37,7 @@ def _write_same_date_databases(with_background_chain: bool = False):
         "background_2020": {"electricity": 10, "steel": 20},
         "background_2030": {"electricity": 5, "steel": 10},
     }
+    coke_co2_amounts = {"2020": 30, "2030": 15}
 
     for year in ("2020", "2030"):
         background = bd.Database(f"background_{year}")
@@ -89,6 +96,23 @@ def _write_same_date_databases(with_background_chain: bool = False):
             )
             copy_to_smelting.save()
 
+            # `smelting`'s own technosphere input, so the split guard
+            # (`producer has technosphere inputs`) is satisfied and `smelting`
+            # is resolved to its candidate databases via
+            # `_candidate_databases_for_node` rather than falling through as a
+            # technosphere-dead-end leaf.
+            coke = modified.new_node("coke", name="coke", unit="kg")
+            coke["reference product"] = "coke"
+            coke["location"] = "GLO"
+            coke.save()
+            coke.new_edge(input=coke, amount=1, type="production").save()
+            coke.new_edge(
+                input=node_co2,
+                amount=coke_co2_amounts[year],
+                type="biosphere",
+            ).save()
+            smelting.new_edge(input=coke, amount=1, type="technosphere").save()
+
     foreground = bd.Database("foreground")
     foreground.register()
     fu = foreground.new_node("fu", name="fu", unit="unit")
@@ -121,5 +145,6 @@ def same_date_db():
 @pytest.fixture
 @bw2test
 def same_date_deep_db():
-    """Same as `same_date_db`, plus a `smelting` chain in the modified family."""
+    """Same as `same_date_db`, plus a `smelting` -> `coke` chain in the
+    modified family."""
     _write_same_date_databases(with_background_chain=True)
