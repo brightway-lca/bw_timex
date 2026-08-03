@@ -558,6 +558,7 @@ class TimexLCA:
                     self.interdatabase_activity_mapping,
                     expand_technosphere=True,
                     background_unit_lci_cache=self._background_unit_lci_cache,
+                    nodes=self.nodes,
                 )
                 pending = shadow.count_pending_background_solves()
                 self._lci_pending_solves = pending
@@ -612,6 +613,7 @@ class TimexLCA:
                     self.interdatabase_activity_mapping,
                     expand_technosphere=False,
                     background_unit_lci_cache=self._background_unit_lci_cache,
+                    nodes=self.nodes,
                 )
                 pending = shadow.count_pending_background_solves()
                 self._lci_pending_solves = pending
@@ -1067,6 +1069,7 @@ class TimexLCA:
             self.interdatabase_activity_mapping,
             expand_technosphere=expand_technosphere,
             background_unit_lci_cache=self._background_unit_lci_cache,
+            nodes=self.nodes,
         )
 
         # The pending-solve count + factorize decision is now made upfront
