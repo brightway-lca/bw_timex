@@ -183,6 +183,9 @@ class TimexLCA:
         # database's `modified` token) so repeated TimexLCA objects in the same
         # session reuse them instead of re-querying. Opt out via
         # `use_global_lci_cache=False`.
+        logger.info(
+            f"Loading node metadata from {len(self.database_dates)} database(s)..."
+        )
         self._nodes_cache = NODES_CACHE if use_global_lci_cache else {}
         project = bd.projects.current
         self.nodes = {}
@@ -216,6 +219,8 @@ class TimexLCA:
         self._lci_used_cached_solve = False
         # Whether the last lci() call LU-factorized the expanded technosphere.
         self._lci_did_factorize = False
+
+        logger.info("TimexLCA initialized.")
 
     ########################################
     # Main functions to be called by users #
@@ -1178,6 +1183,36 @@ class TimexLCA:
     # For setup #
     #############
 
+    def clean_databases(self) -> None:
+        """
+        Reprocess the databases that have been modified since they were last processed.
+
+        Editing a database invalidates its datapackage, and the next calculation has to
+        rebuild it. For large background databases that takes tens of seconds each, so
+        the databases concerned are logged instead of the calculation appearing to hang.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """
+        modified_databases = sorted(
+            name for name in databases if databases[name].get("dirty")
+        )
+        if not modified_databases:
+            return
+
+        logger.info(
+            f"Reprocessing {len(modified_databases)} modified database(s) before "
+            f"calculating: {', '.join(modified_databases)}. "
+            "This can take a while for large databases."
+        )
+        databases.clean()
+        logger.info("Done reprocessing modified databases.")
+
     def prepare_base_lca_inputs(
         self,
         demand=None,
@@ -1230,7 +1265,7 @@ class TimexLCA:
                 "Please use `projects.migrate_project_25` before calculating using Brightway 2.5"
             )
 
-        databases.clean()
+        self.clean_databases()
         data_objs = []
         remapping_dicts = None
 
@@ -1361,7 +1396,7 @@ class TimexLCA:
                 "Please use `projects.migrate_project_25` before calculating using Brightway 2.5"
             )
 
-        databases.clean()
+        self.clean_databases()
         data_objs = []
         remapping_dicts = None
 
