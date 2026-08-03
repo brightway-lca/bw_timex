@@ -37,7 +37,7 @@ dependencies = [
     "pandas",
     "tqdm",
     "bw_temporalis>=1.1",
-    "dynamic_characterization>=1.4",
+    "dynamic_characterization>=1.4.1",
     "matplotlib",
     "seaborn",
     "loguru",

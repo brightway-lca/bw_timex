@@ -232,7 +232,7 @@ requires-dist = [
     { name = "bw-temporalis", specifier = ">=1.1" },
     { name = "bw2calc", specifier = ">=2.4" },
     { name = "bw2data", specifier = ">=4.6" },
-    { name = "dynamic-characterization", specifier = ">=1.4" },
+    { name = "dynamic-characterization", specifier = ">=1.4.1" },
     { name = "ipython" },
     { name = "ipython", marker = "extra == 'docs'" },
     { name = "ipywidgets" },
@@ -723,7 +723,7 @@ wheels = [
 
 [[package]]
 name = "dynamic-characterization"
-version = "1.4.0"
+version = "1.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bw2data" },
@@ -733,9 +733,9 @@ dependencies = [
     { name = "openpyxl" },
     { name = "pandas" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/03/5c/bdfab9d8020edb7f261c4e0c42d3eec2055a7d625da8e1906ddbe8dccc5f/dynamic_characterization-1.4.0.tar.gz", hash = "sha256:0450ffa6c3294716d245778973971e2ea39d20064a23d264294915648f4ebc05", size = 1208156, upload-time = "2026-05-17T20:52:57.657Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2d/2f/97c2d636ffc2126903afd1c2216441b2b3dd44c1e2c3888e9265186a6411/dynamic_characterization-1.4.1.tar.gz", hash = "sha256:4e8e6116c96270940f5e557e388d4dfeb7eef6b25621d7f8bb8afa073f0a134c", size = 1209732, upload-time = "2026-08-03T10:56:58.578Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9f/b2/3602121d51ea9a6fb8a7d2d1af1e283c14e67fb3121e252bb7d013ff13b8/dynamic_characterization-1.4.0-py3-none-any.whl", hash = "sha256:8573cd56001b1b33e38b015d444562fc071eba689b0fe3547064abf9114db9d1", size = 1268112, upload-time = "2026-05-17T20:52:56.328Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/5d/59c7a9f13193e1dfc5304a5eb0ddfbea33d7d010b21531837ec65b173a29/dynamic_characterization-1.4.1-py3-none-any.whl", hash = "sha256:1dcbc14174358651c1558087c64734f0c2ef377ef5a73bb9dbc16c8ebdf630d0", size = 1268258, upload-time = "2026-08-03T10:56:56.915Z" },
 ]
 
 [[package]]
