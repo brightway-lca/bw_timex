@@ -78,3 +78,26 @@ def test_producer_in_a_single_vintage_warns_and_is_time_invariant(same_date_db):
     shares = _shares_by_producer(tlca.timeline)
     assert shares["steel, without EOL"] == {"modified_2020": 1}
     assert any("steel, without EOL" in message for message in messages)
+
+
+def test_background_traversal_routes_within_the_modified_family(same_date_deep_db):
+    """Descending into the background must not confuse same-date databases."""
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    tlca.build_timeline(
+        starting_datetime="2025-01-01",
+        graph_traversal="bfs",
+        traverse_background=True,
+    )
+    producers = set(tlca.timeline["producer_name"])
+    assert "smelting" in producers
+
+    # `smelting` exists only in the modified family, so no background_* database
+    # may be picked up for it.
+    smelting_rows = tlca.timeline[tlca.timeline["producer_name"] == "smelting"]
+    for shares in smelting_rows["temporal_market_shares"]:
+        if shares:
+            assert set(shares) <= {"modified_2020", "modified_2030"}
+
+    tlca.lci()
+    tlca.static_lcia()
+    assert tlca.static_score > 0
