@@ -5,8 +5,10 @@ from bw2data.tests import bw2test
 from bw_temporalis import TemporalDistribution
 
 
-def _write_same_date_databases(with_background_chain: bool = False):
-    """Write four static background databases on two dates.
+def _write_same_date_databases(
+    with_background_chain: bool = False, years: tuple[str, ...] = ("2020", "2030")
+):
+    """Write static background databases on the given dates (two by default).
 
     `background_2020` / `background_2030` hold an untouched `electricity`
     process. `modified_2020` / `modified_2030` hold a copy of `steel` with its
@@ -16,7 +18,11 @@ def _write_same_date_databases(with_background_chain: bool = False):
     own family of databases.
 
     CO2 amounts differ per vintage so the interpolation is visible in the score:
-    electricity 10 (2020) / 5 (2030), steel 20 (2020) / 10 (2030).
+    electricity 10 (2020) / 5 (2030) / 2 (2040), steel 20 (2020) / 10 (2030) /
+    5 (2040). Passing a third year via `years` (e.g. `("2020", "2030",
+    "2040")`) writes a third `background_*` / `modified_*` pair without
+    touching the amounts used by the two-year fixtures, whose scores other
+    tests assert.
 
     With `with_background_chain=True`, each modified database also holds a
     `smelting` process that the copy consumes through a temporal distribution,
@@ -34,12 +40,13 @@ def _write_same_date_databases(with_background_chain: bool = False):
     node_co2 = biosphere.get("CO2")
 
     amounts = {
-        "background_2020": {"electricity": 10, "steel": 20},
-        "background_2030": {"electricity": 5, "steel": 10},
+        "2020": {"electricity": 10, "steel": 20},
+        "2030": {"electricity": 5, "steel": 10},
+        "2040": {"electricity": 2, "steel": 5},
     }
-    coke_co2_amounts = {"2020": 30, "2030": 15}
+    coke_co2_amounts = {"2020": 30, "2030": 15, "2040": 8}
 
-    for year in ("2020", "2030"):
+    for year in years:
         background = bd.Database(f"background_{year}")
         background.register()
         modified = bd.Database(f"modified_{year}")
@@ -52,7 +59,7 @@ def _write_same_date_databases(with_background_chain: bool = False):
         electricity.new_edge(input=electricity, amount=1, type="production").save()
         electricity.new_edge(
             input=node_co2,
-            amount=amounts[f"background_{year}"]["electricity"],
+            amount=amounts[year]["electricity"],
             type="biosphere",
         ).save()
 
@@ -63,7 +70,7 @@ def _write_same_date_databases(with_background_chain: bool = False):
         steel.new_edge(input=steel, amount=1, type="production").save()
         steel.new_edge(
             input=node_co2,
-            amount=amounts[f"background_{year}"]["steel"],
+            amount=amounts[year]["steel"],
             type="biosphere",
         ).save()
 
@@ -83,7 +90,7 @@ def _write_same_date_databases(with_background_chain: bool = False):
             smelting.new_edge(input=smelting, amount=1, type="production").save()
             smelting.new_edge(
                 input=node_co2,
-                amount=amounts[f"background_{year}"]["steel"],
+                amount=amounts[year]["steel"],
                 type="biosphere",
             ).save()
 
@@ -148,3 +155,12 @@ def same_date_deep_db():
     """Same as `same_date_db`, plus a `smelting` -> `coke` chain in the
     modified family."""
     _write_same_date_databases(with_background_chain=True)
+
+
+@pytest.fixture
+@bw2test
+def same_date_db_three_dates():
+    """Same as `same_date_db`, but with a third `2040` vintage in each
+    family, so partial-coverage interpolation across more than two
+    candidate dates can be exercised."""
+    _write_same_date_databases(years=("2020", "2030", "2040"))
