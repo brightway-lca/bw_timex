@@ -135,6 +135,9 @@ def convert(
     # Strip ANSI codes
     body = strip_ansi(body)
 
+    # Fold cells the notebook collapses in Jupyter (e.g. bulk setup code)
+    body = collapse_hidden_input_cells(body, notebook_path)
+
     # Pandas exports DataFrames wrapped in a <div> with an inline <style scoped>
     # block. Unwrap down to the bare <table>, matching what the Markdown table
     # extension itself emits - the theme's own JS wraps every <table> in

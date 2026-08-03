@@ -44,106 +44,108 @@ flowchart LR
 Building this system is standard brightway modelling, without anything `bw_timex`-specific, so the cell below just does it in one go (unfold it if you are curious).
 
 
-```python
-# Standard brightway modelling of the ev system - nothing time-explicit yet.
+??? note "Show the code that builds the ev system"
 
-ELECTRICITY_CONSUMPTION = 0.2  # kWh/km
-MILEAGE = 150_000  # km
-LIFETIME = 15  # years
-MASS_GLIDER = 840  # kg
-MASS_POWERTRAIN = 80  # kg
-MASS_BATTERY = 280  # kg
+    ```python
+    # Standard brightway modelling of the ev system - nothing time-explicit yet.
 
-db_2020 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2020")
-db_2030 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2030")
-db_2040 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2040")
+    ELECTRICITY_CONSUMPTION = 0.2  # kWh/km
+    MILEAGE = 150_000  # km
+    LIFETIME = 15  # years
+    MASS_GLIDER = 840  # kg
+    MASS_POWERTRAIN = 80  # kg
+    MASS_BATTERY = 280  # kg
 
-# The ecoinvent processes for the ev parts already contain their end-of-life treatment.
-# We want to model the end of life separately, so we create copies without it.
-for db in [db_2020, db_2030, db_2040]:
-    for name, code_, eol_name in [
-        (
-            "glider production, passenger car",
-            "glider_production_without_eol",
-            "market for used glider, passenger car",
-        ),
-        (
-            "powertrain production, for electric passenger car",
-            "powertrain_production_without_eol",
-            "market for used powertrain from electric passenger car, manual dismantling",
-        ),
-        # For the battery, some waste treatment is buried in the cell production.
-        # For simplicity, we just leave it in there.
-        ("battery production, Li-ion, LiMn2O4, rechargeable", "battery_production_without_eol", None),
-    ]:
-        try:
-            db.get(code=code_).delete()
-        except Exception:
-            pass
-        without_eol = db.get(name=name).copy(code=code_, database=db.name)
-        without_eol["name"] = f"{name}, without EOL"
-        without_eol.save()
-        if eol_name:
-            for exc in without_eol.exchanges():
-                if exc.input["name"] == eol_name:
-                    exc.delete()
+    db_2020 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2020")
+    db_2030 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2030")
+    db_2040 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2040")
 
-# Background processes our foreground links to
-glider_production = db_2020.get(code="glider_production_without_eol")
-powertrain_production = db_2020.get(code="powertrain_production_without_eol")
-battery_production = db_2020.get(code="battery_production_without_eol")
-glider_eol = db_2020.get(name="treatment of used glider, passenger car, shredding")
-powertrain_eol = db_2020.get(
-    name="treatment of used powertrain for electric passenger car, manual dismantling"
-)
-battery_eol = db_2020.get(name="market for used Li-ion battery")
-electricity_production = db_2020.get(
-    name="market group for electricity, low voltage", location="DEU"
-)
+    # The ecoinvent processes for the ev parts already contain their end-of-life treatment.
+    # We want to model the end of life separately, so we create copies without it.
+    for db in [db_2020, db_2030, db_2040]:
+        for name, code_, eol_name in [
+            (
+                "glider production, passenger car",
+                "glider_production_without_eol",
+                "market for used glider, passenger car",
+            ),
+            (
+                "powertrain production, for electric passenger car",
+                "powertrain_production_without_eol",
+                "market for used powertrain from electric passenger car, manual dismantling",
+            ),
+            # For the battery, some waste treatment is buried in the cell production.
+            # For simplicity, we just leave it in there.
+            ("battery production, Li-ion, LiMn2O4, rechargeable", "battery_production_without_eol", None),
+        ]:
+            try:
+                db.get(code=code_).delete()
+            except Exception:
+                pass
+            without_eol = db.get(name=name).copy(code=code_, database=db.name)
+            without_eol["name"] = f"{name}, without EOL"
+            without_eol.save()
+            if eol_name:
+                for exc in without_eol.exchanges():
+                    if exc.input["name"] == eol_name:
+                        exc.delete()
 
-# Foreground
-if "foreground" in bd.databases:
-    del bd.databases["foreground"]
-foreground = bd.Database("foreground")
-foreground.register()
+    # Background processes our foreground links to
+    glider_production = db_2020.get(code="glider_production_without_eol")
+    powertrain_production = db_2020.get(code="powertrain_production_without_eol")
+    battery_production = db_2020.get(code="battery_production_without_eol")
+    glider_eol = db_2020.get(name="treatment of used glider, passenger car, shredding")
+    powertrain_eol = db_2020.get(
+        name="treatment of used powertrain for electric passenger car, manual dismantling"
+    )
+    battery_eol = db_2020.get(name="market for used Li-ion battery")
+    electricity_production = db_2020.get(
+        name="market group for electricity, low voltage", location="DEU"
+    )
 
-ev_production = foreground.new_node(
-    "ev_production", name="production of an electric vehicle", unit="unit"
-)
-ev_production["reference product"] = "electric vehicle"
-ev_production.save()
+    # Foreground
+    if "foreground" in bd.databases:
+        del bd.databases["foreground"]
+    foreground = bd.Database("foreground")
+    foreground.register()
 
-driving = foreground.new_node(
-    "driving", name="driving an electric vehicle", unit="transport over an ev lifetime"
-)
-driving["reference product"] = "transport"
-driving.save()
+    ev_production = foreground.new_node(
+        "ev_production", name="production of an electric vehicle", unit="unit"
+    )
+    ev_production["reference product"] = "electric vehicle"
+    ev_production.save()
 
-used_ev = foreground.new_node("used_ev", name="used electric vehicle", unit="unit")
-used_ev["reference product"] = "used electric vehicle"
-used_ev.save()
+    driving = foreground.new_node(
+        "driving", name="driving an electric vehicle", unit="transport over an ev lifetime"
+    )
+    driving["reference product"] = "transport"
+    driving.save()
 
-ev_production.new_edge(input=ev_production, amount=1, type="production").save()
-ev_production.new_edge(input=glider_production, amount=MASS_GLIDER, type="technosphere").save()
-ev_production.new_edge(input=powertrain_production, amount=MASS_POWERTRAIN, type="technosphere").save()
-ev_production.new_edge(input=battery_production, amount=MASS_BATTERY, type="technosphere").save()
+    used_ev = foreground.new_node("used_ev", name="used electric vehicle", unit="unit")
+    used_ev["reference product"] = "used electric vehicle"
+    used_ev.save()
 
-used_ev.new_edge(input=used_ev, amount=-1, type="production").save()  # -1: gets rid of a used car
-used_ev.new_edge(input=glider_eol, amount=-MASS_GLIDER, type="technosphere").save()
-used_ev.new_edge(input=powertrain_eol, amount=-MASS_POWERTRAIN, type="technosphere").save()
-used_ev.new_edge(input=battery_eol, amount=-MASS_BATTERY, type="technosphere").save()
+    ev_production.new_edge(input=ev_production, amount=1, type="production").save()
+    ev_production.new_edge(input=glider_production, amount=MASS_GLIDER, type="technosphere").save()
+    ev_production.new_edge(input=powertrain_production, amount=MASS_POWERTRAIN, type="technosphere").save()
+    ev_production.new_edge(input=battery_production, amount=MASS_BATTERY, type="technosphere").save()
 
-driving.new_edge(input=driving, amount=1, type="production").save()
-driving.new_edge(input=ev_production, amount=1, type="technosphere").save()
-driving.new_edge(input=used_ev, amount=-1, type="technosphere").save()
-driving.new_edge(
-    input=electricity_production,
-    amount=ELECTRICITY_CONSUMPTION * MILEAGE,
-    type="technosphere",
-).save()
+    used_ev.new_edge(input=used_ev, amount=-1, type="production").save()  # -1: gets rid of a used car
+    used_ev.new_edge(input=glider_eol, amount=-MASS_GLIDER, type="technosphere").save()
+    used_ev.new_edge(input=powertrain_eol, amount=-MASS_POWERTRAIN, type="technosphere").save()
+    used_ev.new_edge(input=battery_eol, amount=-MASS_BATTERY, type="technosphere").save()
 
-foreground.process()
-```
+    driving.new_edge(input=driving, amount=1, type="production").save()
+    driving.new_edge(input=ev_production, amount=1, type="technosphere").save()
+    driving.new_edge(input=used_ev, amount=-1, type="technosphere").save()
+    driving.new_edge(
+        input=electricity_production,
+        amount=ELECTRICITY_CONSUMPTION * MILEAGE,
+        type="technosphere",
+    ).save()
+
+    foreground.process()
+    ```
 
 ## Adding temporal information
 
