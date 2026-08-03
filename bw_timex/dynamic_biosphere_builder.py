@@ -32,6 +32,7 @@ class DynamicBiosphereBuilder:
         interdatabase_activity_mapping: SetList,
         expand_technosphere: bool = True,
         background_unit_lci_cache: dict | None = None,
+        nodes: dict | None = None,
     ) -> None:
         """
         Initializes the DynamicBiosphereBuilder object.
@@ -66,6 +67,10 @@ class DynamicBiosphereBuilder:
         expand_technosphere : bool, optional
             A boolean indicating if the dynamic biosphere matrix is built via expanded matrices or directly from the timeline.
             Default is True.
+        nodes : dict, optional
+            A dictionary mapping node ids to their bw2data node proxies, as collected by
+            `TimexLCA`. Used to resolve producers by id instead of by code, which is only
+            unique within a database.
 
         Returns
         -------
@@ -117,6 +122,7 @@ class DynamicBiosphereBuilder:
         self.database_dates_static = database_dates_static
         self.timeline = timeline
         self.interdatabase_activity_mapping = interdatabase_activity_mapping
+        self.nodes = nodes if nodes is not None else {}
         self._matrix_entries = {}  # (row, col) -> amount
         # Biosphere exchanges of foreground/background producers are read
         # from the bw2data SQL store; share results across TimexLCA objects.
@@ -244,7 +250,9 @@ class DynamicBiosphereBuilder:
                     )
 
                 for input_id, exc_amount, temporal_distribution in (
-                    self.get_biosphere_exchanges(original_db, original_code)
+                    self.get_biosphere_exchanges(
+                        original_db, original_code, producer_id=row.producer
+                    )
                 ):
                     if temporal_distribution:
                         td_dates = temporal_distribution.date
@@ -465,12 +473,25 @@ class DynamicBiosphereBuilder:
         if key not in self._matrix_entries:
             self._matrix_entries[key] = amount
 
-    def get_biosphere_exchanges(self, original_db, original_code):
+    def get_biosphere_exchanges(self, original_db, original_code, producer_id=None):
         """Return cached biosphere exchanges for a producer.
 
         Keyed by the source database's `modified` token so foreground or
         background edits invalidate stale entries automatically.
+
+        Temporalized producers are stored in the activity time mapping under
+        the pseudo-database "temporalized", which does not identify a node:
+        codes are only unique *within* a database, so the same code can exist
+        in several databases of a project (e.g. a benchmark copy of a
+        foreground, or a background process copied into every vintage). The
+        timeline's `producer` id is unambiguous, so resolve the real node from
+        it and key the cache on its actual database.
         """
+        act = None
+        if original_db == "temporalized" and producer_id is not None:
+            act = self.nodes.get(producer_id) or bd.get_node(id=producer_id)
+            original_db = act["database"]
+
         modified = (
             bd.databases[original_db].get("modified")
             if original_db in bd.databases
@@ -478,10 +499,11 @@ class DynamicBiosphereBuilder:
         )
         cache_key = (bd.projects.current, original_db, original_code, modified)
         if cache_key not in self._activity_biosphere_exchange_cache:
-            if original_db == "temporalized":
-                act = bd.get_node(code=original_code)
-            else:
-                act = bd.get_node(database=original_db, code=original_code)
+            if act is None:
+                if original_db == "temporalized":
+                    act = bd.get_node(code=original_code)
+                else:
+                    act = bd.get_node(database=original_db, code=original_code)
             self._activity_biosphere_exchange_cache[cache_key] = [
                 (exc.input.id, exc["amount"], exc.get("temporal_distribution"))
                 for exc in act.biosphere()

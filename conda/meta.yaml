@@ -25,7 +25,7 @@ requirements:
     - bw2data >=4.6
     - bw_graph_tools >=0.4
     - bw_temporalis >=1.1
-    - dynamic_characterization >=1.4
+    - dynamic_characterization >=1.4.1
     - numpy
     - pandas
     - tqdm
