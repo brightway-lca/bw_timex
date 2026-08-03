@@ -13,6 +13,7 @@ Run this script from the project root before building the docs:
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import sys
@@ -71,6 +72,41 @@ PANDAS_TABLE_STYLE_CLOSE = re.compile(
 
 def strip_ansi(text: str) -> str:
     return ANSI_ESCAPE.sub("", text)
+
+
+def collapse_hidden_input_cells(body: str, notebook_path: Path) -> str:
+    """Fold code cells tagged `hide-input` into a collapsed admonition.
+
+    `jupyter.source_hidden` only collapses a cell inside JupyterLab; nbconvert
+    renders it as an ordinary code block, so a setup cell the reader is meant to
+    skip would dominate the page. Wrap those cells in a `???` block instead,
+    which Zensical renders collapsed. The admonition title comes from the cell's
+    `docs_summary` metadata.
+    """
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+
+    for cell in notebook["cells"]:
+        metadata = cell.get("metadata", {})
+        if cell["cell_type"] != "code" or "hide-input" not in metadata.get("tags", []):
+            continue
+
+        source = "".join(cell["source"])
+        code_block = f"```python\n{source}\n```"
+        if code_block not in body:
+            print(
+                f"WARNING: could not fold the hide-input cell of {notebook_path.name} "
+                "- its exported code block was not found verbatim",
+                file=sys.stderr,
+            )
+            continue
+
+        title = metadata.get("docs_summary", "Show the code")
+        indented = "\n".join(
+            f"    {line}" if line.strip() else "" for line in code_block.split("\n")
+        )
+        body = body.replace(code_block, f'??? note "{title}"\n\n{indented}')
+
+    return body
 
 
 def convert(
