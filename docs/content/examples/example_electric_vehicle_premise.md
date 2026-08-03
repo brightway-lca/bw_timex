@@ -41,7 +41,7 @@ db_2040 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2040")
 
 In this study, we consider the following production system for our ev. Purple boxes are foreground, cyan boxes are background (i.e., ecoinvent/premise).
 
-```mermaid
+```{mermaid}
 flowchart LR
     glider_production(glider production):::ei-->ev_production
     powertrain_production(powertrain production):::ei-->ev_production
@@ -107,16 +107,35 @@ We take the actual process data from ecoinvent. However, the ecoinvent processes
 
 
 ```python
+# Older versions of this notebook wrote the "without EOL" copies directly into the
+# premise databases db_2020/db_2030/db_2040. If you ran one of those versions, those
+# leftover copies are still there, and they now share their (name, reference product,
+# location) with the copies this notebook creates below in ev_background_<year> - same
+# date, different database. bw_timex would then refuse to resolve the resulting
+# ambiguity. This cleanup is safe: these nodes were created by this notebook, not premise.
 for db in [db_2020, db_2030, db_2040]:
     for code in ["glider_production_without_eol", "powertrain_production_without_eol", "battery_production_without_eol"]:
         try:
-            act = db.get(code=code)
-            act.delete()
-        except:
+            db.get(code=code).delete()
+        except Exception:
             pass
-    
+
+# The ecoinvent processes for the ev part production contain exchanges for the end of
+# life treatment already, which we want to separate. We create copies without them, and
+# put those copies into our own databases - one per point in time - so the premise
+# databases stay untouched. bw_timex allows several databases to share a date.
+modified_dbs = {}
+for db in [db_2020, db_2030, db_2040]:
+    year = db.name[-4:]
+    modified_name = f"ev_background_{year}"
+    if modified_name in bd.databases:
+        del bd.databases[modified_name]
+    modified_db = bd.Database(modified_name)
+    modified_db.register()
+    modified_dbs[db.name] = modified_db
+
     glider_production = db.get(name="glider production, passenger car")
-    glider_production_without_eol = glider_production.copy(code="glider_production_without_eol", database=db.name)
+    glider_production_without_eol = glider_production.copy(code="glider_production_without_eol", database=modified_name)
     glider_production_without_eol["name"] = "glider production, passenger car, without EOL"
     # glider_production_without_eol["reference product"] = "glider"
     glider_production_without_eol.save()
@@ -125,7 +144,7 @@ for db in [db_2020, db_2030, db_2040]:
             exc.delete()
     
     powertrain_production = db.get(name="powertrain production, for electric passenger car")
-    powertrain_production_without_eol = powertrain_production.copy(code="powertrain_production_without_eol", database=db.name)
+    powertrain_production_without_eol = powertrain_production.copy(code="powertrain_production_without_eol", database=modified_name)
     powertrain_production_without_eol["name"] = "powertrain production, for electric passenger car, without EOL"
     # powertrain_production_without_eol["reference product"] = "powertrain"
     powertrain_production_without_eol.save()
@@ -134,21 +153,24 @@ for db in [db_2020, db_2030, db_2040]:
             exc.delete()
     
     battery_production = db.get(name="battery production, Li-ion, LiMn2O4, rechargeable")
-    battery_production_without_eol = battery_production.copy(code="battery_production_without_eol", database=db.name)
+    battery_production_without_eol = battery_production.copy(code="battery_production_without_eol", database=modified_name)
     battery_production_without_eol["name"] = "battery production, Li-ion, LiMn2O4, rechargeable, without EOL"
     # battery_production_without_eol["reference product"] = "battery"
     battery_production_without_eol.save()
     # For the battery, some waste treatment is buried in the process "battery cell production, Li-ion, 
     # LiMn2O4" - but not for the whole mass of the battery(?). For simplicity, we just leave it in there.
+
+    modified_db.process()
 ```
 
 Now, let's build the exchanges, starting with the ev production:
 
 
 ```python
-glider_production = db_2020.get(code="glider_production_without_eol")
-powertrain_production = db_2020.get(code="powertrain_production_without_eol")
-battery_production = db_2020.get(code="battery_production_without_eol")
+ev_background_2020 = modified_dbs[db_2020.name]
+glider_production = ev_background_2020.get(code="glider_production_without_eol")
+powertrain_production = ev_background_2020.get(code="powertrain_production_without_eol")
+battery_production = ev_background_2020.get(code="battery_production_without_eol")
 
 ev_production.new_edge(input=ev_production, amount=1, type="production").save()
 
@@ -221,7 +243,7 @@ electricity_to_driving = driving.new_edge(
 
 Now that the production system is modelled, we can add temporal distributions at the exchange level. The temporal information we want to embed in our product system looks somewhat like this:
 
-```mermaid
+```{mermaid}
 flowchart LR
     glider_production(glider production):::ei-->|0-2 years prior|ev_production
     powertrain_production(powertrain production):::ei-->|1 year prior|ev_production
@@ -394,6 +416,9 @@ database_dates = {
     db_2020.name: datetime.strptime("2020", "%Y"),
     db_2030.name: datetime.strptime("2030", "%Y"),
     db_2040.name: datetime.strptime("2040", "%Y"),
+    "ev_background_2020": datetime.strptime("2020", "%Y"),
+    "ev_background_2030": datetime.strptime("2030", "%Y"),
+    "ev_background_2040": datetime.strptime("2040", "%Y"),
     "foreground": "dynamic", # flag databases that should be temporally distributed with "dynamic"
 }
 ```
@@ -408,87 +433,6 @@ from bw_timex import TimexLCA
 TimexLCA?
 ```
 
-    Init signature:
-    TimexLCA(
-        demand: dict,
-        method: tuple,
-        database_dates: dict = None,
-        use_global_lci_cache: bool = True,
-    ) -> None
-    Docstring:     
-    Class to perform time-explicit LCA calculations.
-    
-    A TimexLCA contains the LCI of processes occurring at explicit points in time. It tracks the timing of processes,
-    relinks their technosphere and biosphere exchanges to match the technology landscape at that point in time,
-    and also keeps track of the timing of the resulting emissions. As such, it combines prospective and dynamic LCA
-    approaches.
-    
-    TimexLCA first calculates a static LCA, which informs a priority-first graph traversal. From the
-    graph traversal, temporal relationships between exchanges and processes are derived. Based on
-    the timing of the processes, bw_timex matches the processes at the intersection between
-    foreground and background to the best available background databases. This temporal relinking is
-    achieved by using datapackages to add new time-specific processes. The new processes and their
-    exchanges to other technosphere processes or biosphere flows extent the technosphere and
-    biosphere matrices.
-    
-    Temporal information of both processes and biosphere flows is retained, allowing for dynamic
-    LCIA.
-    
-    TimexLCA calculates:
-     1) a static "base" LCA score (`TimexLCA.base_score`, same as `bw2calc.lca.score`),
-     2) a static time-explicit LCA score (`TimexLCA.static_score`), which links LCIs to the
-        respective background databases, but without dynamic characterization of the time-explicit inventory
-     3) a dynamic time-explicit LCA score (`TimexLCA.dynamic_score`), with dynamic inventory and
-        dynamic characterization. These are provided for radiative forcing and GWP but can also be
-        user-defined.
-    
-    
-    Example
-    -------
-    >>> demand = {('my_foreground_database', 'my_process'): 1}
-    >>> method = ("some_method_family", "some_category", "some_method")
-    >>> database_dates = {
-            'my_background_database_one': datetime.strptime("2020", "%Y"),
-            'my_background_database_two': datetime.strptime("2030", "%Y"),
-            'my_background_database_three': datetime.strptime("2040", "%Y"),
-            'my_foreground_database':'dynamic'
-        }
-    >>> tlca = TimexLCA(demand, method, database_dates)
-    >>> tlca.build_timeline() # has many optional arguments
-    >>> tlca.lci()
-    >>> tlca.static_lcia()
-    >>> print(tlca.static_score)
-    >>> tlca.dynamic_lcia(metric="radiative_forcing") # also available: "GWP"
-    >>> print(tlca.dynamic_score)
-    Init docstring:
-    Instantiating a `TimexLCA` object calculates a static LCA, initializes time mappings
-    for activities and biosphere flows, and stores useful subsets of ids in the
-    node_collections.
-    
-    Parameters
-    ----------
-    demand : dict[object: float]
-            The demand for which the LCA will be calculated. The keys can be Brightway `Node`
-            instances, `(database, code)` tuples, or integer ids.
-    method : tuple
-            Tuple defining the LCIA method, such as `('foo', 'bar')` or default methods, such as
-            `("EF v3.1", "climate change", "global warming potential (GWP100)")`
-    database_dates : dict, optional
-            Dictionary mapping database names to dates.
-    use_global_lci_cache : bool, optional
-            If True (default), background unit LCI matrices are cached at
-            module level and reused across `TimexLCA` objects within the
-            same Python session. The cache is keyed by background process
-            identity plus the database's `modified` token, so edits to a
-            background database invalidate stale entries automatically. Set
-            to False to isolate this object's caching (e.g. when mutating
-            background databases via raw SQL that bypasses bw2data). The
-            module-level cache can be cleared with
-            `bw_timex.clear_background_lci_cache()`.
-    File:           ~/Documents/Coding/bw_timex/bw_timex/timex_lca.py
-    Type:           type
-    Subclasses:     
-
 Let's instantiate a `TimexLCA` object for our "driving" activity:
 
 
@@ -496,11 +440,21 @@ Let's instantiate a `TimexLCA` object for our "driving" activity:
 tlca = TimexLCA({driving: 1}, method, database_dates)
 ```
 
-    2026-08-03 14:24:50.200 | INFO     | bw_timex.timex_lca:__init__:136 - Initializing TimexLCA object...
-    2026-08-03 14:24:50.201 | INFO     | bw_timex.timex_lca:__init__:153 - Calculating base LCA...
-    /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.65e+13)
+    2026-08-03 22:00:28.394 | INFO     | bw_timex.timex_lca:__init__:136 - Initializing TimexLCA object...
+
+
+    2026-08-03 22:00:28.394 | INFO     | bw_timex.timex_lca:__init__:157 - Calculating base LCA...
+
+
+    /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 3.90e+13)
       warnings.warn(msg, UmfpackWarning)
-    2026-08-03 14:26:21.734 | INFO     | bw_timex.timex_lca:__init__:170 - Collecting node infos...
+    2026-08-03 22:00:29.136 | INFO     | bw_timex.timex_lca:__init__:174 - Collecting node infos...
+
+
+    2026-08-03 22:00:29.174 | INFO     | bw_timex.timex_lca:__init__:186 - Loading node metadata from 7 database(s)...
+
+
+    2026-08-03 22:00:29.943 | INFO     | bw_timex.timex_lca:__init__:223 - TimexLCA initialized.
 
 
 Next, we build a timeline of the exchanges. To do this, we can call the `build_timeline()` method, which does the graph traversal and creates a timeline dataframe from the results. The exchanges (rows of the dataframe) are aggregated to the resolution specified in the argument `temporal_grouping`. There are also many more options to specify the timeline creation and graph traversal process. Here are the most important ones:
@@ -520,11 +474,19 @@ So, let's build the timeline. We choose a monthly temporal grouping here because
 tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
 ```
 
-    2026-08-03 14:26:30.550 | INFO     | bw_timex.timex_lca:build_timeline:342 - No edge filter function provided. Skipping all edges in background databases.
-    2026-08-03 14:26:36.827 | INFO     | bw_timex.timex_lca:build_timeline:363 - Creating activity time mapping...
-    2026-08-03 14:26:36.968 | INFO     | bw_timex.timeline_builder:__init__:112 - Traversing supply chain graph...
-    2026-08-03 14:26:37.017 | INFO     | bw_timex.timeline_builder:build_timeline:186 - Building timeline...
-    2026-08-03 14:26:37.094 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:659 - Reference date 2040-08-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
+    2026-08-03 22:00:29.946 | INFO     | bw_timex.timex_lca:build_timeline:352 - No edge filter function provided. Skipping all edges in background databases.
+
+
+    2026-08-03 22:00:35.353 | INFO     | bw_timex.timex_lca:build_timeline:373 - Creating activity time mapping...
+
+
+    2026-08-03 22:00:35.443 | INFO     | bw_timex.timeline_builder:__init__:112 - Traversing supply chain graph...
+
+
+    2026-08-03 22:00:35.474 | INFO     | bw_timex.timeline_builder:build_timeline:186 - Building timeline...
+
+
+    2026-08-03 22:00:35.545 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:704 - Reference date 2040-08-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
 
 
 
@@ -550,7 +512,7 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
       <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>588.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.567, 'ei31...</td>
+      <td>{'ev_background_2020': 0.567, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>1</th>
@@ -559,7 +521,7 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
       <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>588.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.558, 'ei31...</td>
+      <td>{'ev_background_2020': 0.558, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>2</th>
@@ -568,7 +530,7 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
       <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>84.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.467, 'ei31...</td>
+      <td>{'ev_background_2020': 0.467, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>3</th>
@@ -577,7 +539,7 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
       <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>80.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.467, 'ei31...</td>
+      <td>{'ev_background_2020': 0.467, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>4</th>
@@ -586,7 +548,7 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
       <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>280.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.467, 'ei31...</td>
+      <td>{'ev_background_2020': 0.467, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>5</th>
@@ -595,7 +557,7 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
       <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>84.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.459, 'ei31...</td>
+      <td>{'ev_background_2020': 0.459, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>6</th>
@@ -604,7 +566,7 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
       <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>80.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.459, 'ei31...</td>
+      <td>{'ev_background_2020': 0.459, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>7</th>
@@ -613,7 +575,7 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
       <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>280.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.459, 'ei31...</td>
+      <td>{'ev_background_2020': 0.459, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>8</th>
@@ -622,7 +584,7 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
       <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>168.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.367, 'ei31...</td>
+      <td>{'ev_background_2020': 0.367, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>9</th>
@@ -640,7 +602,7 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
       <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>168.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.359, 'ei31...</td>
+      <td>{'ev_background_2020': 0.359, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>11</th>
@@ -856,10 +818,16 @@ Next, we calculate the time-explicit LCI. The `TimexLCA.lci()` function takes ca
 tlca.lci()
 ```
 
-    2026-08-03 14:26:37.891 | INFO     | bw_timex.timex_lca:lci:513 - Expanding matrices...
-    2026-08-03 14:26:37.921 | INFO     | bw_timex.timex_lca:lci:532 - Calculating dynamic inventory...
+    2026-08-03 22:00:35.925 | INFO     | bw_timex.timex_lca:lci:523 - Expanding matrices...
+
+
+    2026-08-03 22:00:35.940 | INFO     | bw_timex.timex_lca:lci:542 - Calculating dynamic inventory...
+
+
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 4.97e+12)
       warnings.warn(msg, UmfpackWarning)
+
+
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 4.97e+12)
       warnings.warn(msg, UmfpackWarning)
 
@@ -889,7 +857,7 @@ tlca.base_lca.inventory.shape  # (#rows, #cols)
 
 
 
-    (3341, 131038)
+    (3341, 43654)
 
 
 
@@ -931,35 +899,35 @@ tlca.dynamic_inventory_df
       <td>2024-05-01</td>
       <td>1.972265e+04</td>
       <td>267655083917308008</td>
-      <td>342643947365249025</td>
+      <td>342758637819838465</td>
     </tr>
     <tr>
       <th>2221</th>
       <td>2024-05-01</td>
       <td>5.665390e+03</td>
       <td>267655084743585810</td>
-      <td>342643947365249025</td>
+      <td>342758637819838465</td>
     </tr>
     <tr>
       <th>1346</th>
       <td>2024-05-01</td>
       <td>3.248506e+03</td>
       <td>267655084294795269</td>
-      <td>342643947365249025</td>
+      <td>342758637819838465</td>
     </tr>
     <tr>
       <th>269</th>
       <td>2024-05-01</td>
       <td>3.220865e+03</td>
       <td>267655083611123782</td>
-      <td>342643947365249025</td>
+      <td>342758637819838465</td>
     </tr>
     <tr>
       <th>68</th>
       <td>2024-05-01</td>
       <td>2.278072e+03</td>
       <td>267655083426574452</td>
-      <td>342643947365249025</td>
+      <td>342758637819838465</td>
     </tr>
     <tr>
       <th>...</th>
@@ -973,35 +941,35 @@ tlca.dynamic_inventory_df
       <td>2042-11-01</td>
       <td>-1.082068e-07</td>
       <td>267655084651311170</td>
-      <td>342643947365249056</td>
+      <td>342758637819838496</td>
     </tr>
     <tr>
       <th>79500</th>
       <td>2042-11-01</td>
       <td>-3.356238e-07</td>
       <td>267655084760363100</td>
-      <td>342643947365249056</td>
+      <td>342758637819838496</td>
     </tr>
     <tr>
       <th>75085</th>
       <td>2042-11-01</td>
       <td>-4.204561e-07</td>
       <td>267655084043137053</td>
-      <td>342643947365249055</td>
+      <td>342758637819838495</td>
     </tr>
     <tr>
       <th>75084</th>
       <td>2042-11-01</td>
       <td>-3.128459e-06</td>
       <td>267655084043137053</td>
-      <td>342643947365249056</td>
+      <td>342758637819838496</td>
     </tr>
     <tr>
       <th>79175</th>
       <td>2042-11-01</td>
       <td>-2.091494e-02</td>
       <td>267655084705837177</td>
-      <td>342643947365249057</td>
+      <td>342758637819838497</td>
     </tr>
   </tbody>
 </table>
@@ -1059,7 +1027,7 @@ Because we are using real ecoinvent/premise biosphere flows here, `bw_timex` aut
 tlca.dynamic_lcia(metric="radiative_forcing", fixed_time_horizon=True)
 ```
 
-    2026-08-03 14:27:06.154 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
+    2026-08-03 22:00:48.111 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
 
 
 
@@ -1081,35 +1049,35 @@ tlca.dynamic_lcia(metric="radiative_forcing", fixed_time_horizon=True)
       <td>2024-12-31 05:49:12</td>
       <td>-2.087224e-17</td>
       <td>267655083766312992</td>
-      <td>342643947365249026</td>
+      <td>342758637819838466</td>
     </tr>
     <tr>
       <th>1</th>
       <td>2024-12-31 05:49:12</td>
       <td>-5.218035e-18</td>
       <td>267655083766312992</td>
-      <td>342643947365249025</td>
+      <td>342758637819838465</td>
     </tr>
     <tr>
       <th>2</th>
       <td>2024-12-31 05:49:12</td>
       <td>-1.352591e-18</td>
       <td>267655084332544077</td>
-      <td>342643947365249026</td>
+      <td>342758637819838466</td>
     </tr>
     <tr>
       <th>3</th>
       <td>2024-12-31 05:49:12</td>
       <td>-3.381524e-19</td>
       <td>267655084332544077</td>
-      <td>342643947365249025</td>
+      <td>342758637819838465</td>
     </tr>
     <tr>
       <th>4</th>
       <td>2024-12-31 05:49:12</td>
       <td>2.323448e-41</td>
       <td>267655084806500426</td>
-      <td>342643947365249025</td>
+      <td>342758637819838465</td>
     </tr>
     <tr>
       <th>...</th>
@@ -1123,35 +1091,35 @@ tlca.dynamic_lcia(metric="radiative_forcing", fixed_time_horizon=True)
       <td>2126-01-01 14:42:00</td>
       <td>3.862480e-16</td>
       <td>267655084441595931</td>
-      <td>342643947365249052</td>
+      <td>342758637819838492</td>
     </tr>
     <tr>
       <th>164272</th>
       <td>2126-01-01 14:42:00</td>
       <td>2.367176e-15</td>
       <td>267655084861026358</td>
-      <td>342643947365249052</td>
+      <td>342758637819838492</td>
     </tr>
     <tr>
       <th>164273</th>
       <td>2126-01-01 14:42:00</td>
       <td>5.069502e-15</td>
       <td>267655084705837075</td>
-      <td>342643947365249052</td>
+      <td>342758637819838492</td>
     </tr>
     <tr>
       <th>164274</th>
       <td>2126-01-01 14:42:00</td>
       <td>9.429912e-15</td>
       <td>267655084475150457</td>
-      <td>342643947365249052</td>
+      <td>342758637819838492</td>
     </tr>
     <tr>
       <th>164275</th>
       <td>2126-01-01 14:42:00</td>
       <td>9.521703e-15</td>
       <td>267655083896336466</td>
-      <td>342643947365249052</td>
+      <td>342758637819838492</td>
     </tr>
   </tbody>
 </table>
@@ -1224,7 +1192,7 @@ tlca.dynamic_lcia(metric="GWP", fixed_time_horizon=False, time_horizon = 100)
 tlca.dynamic_score #kg CO2-eq (GWP)
 ```
 
-    2026-08-03 14:27:11.751 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
+    2026-08-03 22:00:50.046 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
 
 
 
@@ -1273,7 +1241,7 @@ tlca.dynamic_lcia(metric="GWP", fixed_time_horizon=False, time_horizon=100)
 tlca.dynamic_score
 ```
 
-    2026-08-03 14:27:16.752 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
+    2026-08-03 22:00:50.285 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
 
 
 
@@ -1316,7 +1284,7 @@ for exc in driving.technosphere():
         static_scores[exc.input["name"]] = tlca.base_lca.score
 ```
 
-    /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.65e+13)
+    /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 3.90e+13)
       warnings.warn(msg, UmfpackWarning)
 
 
@@ -1340,12 +1308,10 @@ for exc in prospective_driving.technosphere():
         exc.input = prospective_ev_production
         exc.save()
         for subexc in prospective_ev_production.technosphere():
-            subexc.input = bd.get_node(
-                database=db_2040.name,
-                name=subexc.input["name"],
-                product=subexc.input["reference product"],
-                location=subexc.input["location"],
-            )
+            # The glider/powertrain/battery "without EOL" copies live in our own
+            # ev_background_<year> databases, not in the premise database itself -
+            # look them up there, matched by their stable code.
+            subexc.input = modified_dbs[db_2040.name].get(code=subexc.input["code"])
             subexc.save()
     elif exc.input == used_ev:
         prospective_used_ev = used_ev.copy(name="used electric vehicle in 2040")
@@ -1381,8 +1347,10 @@ for exc in prospective_driving.technosphere():
         prospective_scores[exc.input["name"]] = lca.score
 ```
 
-    14:27:36+0200 [info     ] Changed code to avoid conflict with existing value: {self['code']} to {data['code']}
-    14:27:37+0200 [info     ] Changed code to avoid conflict with existing value: {self['code']} to {data['code']}
+    22:00:53+0200 [info     ] Changed code to avoid conflict with existing value: {self['code']} to {data['code']}
+
+
+    22:00:53+0200 [info     ] Changed code to avoid conflict with existing value: {self['code']} to {data['code']}
 
 
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.38e+13)

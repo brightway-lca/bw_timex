@@ -60,9 +60,37 @@ Building this system is standard brightway modelling, without anything `bw_timex
     db_2030 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2030")
     db_2040 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2040")
 
-    # The ecoinvent processes for the ev parts already contain their end-of-life treatment.
-    # We want to model the end of life separately, so we create copies without it.
+    # Older versions of this notebook wrote the "without EOL" copies directly into the
+    # premise databases above. If you ran one of those versions, those leftover copies are
+    # still there, and they now share their (name, reference product, location) with the
+    # copies this notebook creates below in ev_background_<year> - same date, different
+    # database. bw_timex would then refuse to resolve the resulting ambiguity. This cleanup
+    # is safe: these nodes were created by this notebook, not premise.
     for db in [db_2020, db_2030, db_2040]:
+        for code_ in [
+            "glider_production_without_eol",
+            "powertrain_production_without_eol",
+            "battery_production_without_eol",
+        ]:
+            try:
+                db.get(code=code_).delete()
+            except Exception:
+                pass
+
+    # The ecoinvent processes for the ev parts already contain their end-of-life treatment.
+    # We want to model the end of life separately, so we create copies without it. Those
+    # copies live in our own databases - one per point in time - so the premise databases
+    # stay untouched. bw_timex allows several databases to share a date.
+    modified_dbs = {}
+    for db in [db_2020, db_2030, db_2040]:
+        year = db.name[-4:]
+        modified_name = f"ev_background_{year}"
+        if modified_name in bd.databases:
+            del bd.databases[modified_name]
+        modified_db = bd.Database(modified_name)
+        modified_db.register()
+        modified_dbs[db.name] = modified_db
+
         for name, code_, eol_name in [
             (
                 "glider production, passenger car",
@@ -76,13 +104,13 @@ Building this system is standard brightway modelling, without anything `bw_timex
             ),
             # For the battery, some waste treatment is buried in the cell production.
             # For simplicity, we just leave it in there.
-            ("battery production, Li-ion, LiMn2O4, rechargeable", "battery_production_without_eol", None),
+            (
+                "battery production, Li-ion, LiMn2O4, rechargeable",
+                "battery_production_without_eol",
+                None,
+            ),
         ]:
-            try:
-                db.get(code=code_).delete()
-            except Exception:
-                pass
-            without_eol = db.get(name=name).copy(code=code_, database=db.name)
+            without_eol = db.get(name=name).copy(code=code_, database=modified_name)
             without_eol["name"] = f"{name}, without EOL"
             without_eol.save()
             if eol_name:
@@ -90,10 +118,13 @@ Building this system is standard brightway modelling, without anything `bw_timex
                     if exc.input["name"] == eol_name:
                         exc.delete()
 
+        modified_db.process()
+
     # Background processes our foreground links to
-    glider_production = db_2020.get(code="glider_production_without_eol")
-    powertrain_production = db_2020.get(code="powertrain_production_without_eol")
-    battery_production = db_2020.get(code="battery_production_without_eol")
+    ev_background_2020 = modified_dbs[db_2020.name]
+    glider_production = ev_background_2020.get(code="glider_production_without_eol")
+    powertrain_production = ev_background_2020.get(code="powertrain_production_without_eol")
+    battery_production = ev_background_2020.get(code="battery_production_without_eol")
     glider_eol = db_2020.get(name="treatment of used glider, passenger car, shredding")
     powertrain_eol = db_2020.get(
         name="treatment of used powertrain for electric passenger car, manual dismantling"
@@ -232,21 +263,21 @@ from bw_timex.utils import add_temporal_distribution_to_exchange
 add_temporal_distribution_to_exchange(
     td_glider_production,
     input_name="glider production, passenger car, without EOL",
-    input_database=db_2020.name,
+    input_database=ev_background_2020.name,
     output_name="production of an electric vehicle",
     output_database="foreground",
 )
 add_temporal_distribution_to_exchange(
     td_powertrain_and_battery_production,
     input_name="powertrain production, for electric passenger car, without EOL",
-    input_database=db_2020.name,
+    input_database=ev_background_2020.name,
     output_name="production of an electric vehicle",
     output_database="foreground",
 )
 add_temporal_distribution_to_exchange(
     td_powertrain_and_battery_production,
     input_name="battery production, Li-ion, LiMn2O4, rechargeable, without EOL",
-    input_database=db_2020.name,
+    input_database=ev_background_2020.name,
     output_name="production of an electric vehicle",
     output_database="foreground",
 )
@@ -295,15 +326,31 @@ add_temporal_distribution_to_exchange(
 )
 ```
 
-    2026-08-03 14:15:54.925 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 840 kilogram 'glider production, passenger car, without EOL' (kilogram, GLO, None) to 'production of an electric vehicle' (unit, GLO, None).
-    2026-08-03 14:15:55.047 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 80 kilogram 'powertrain production, for electric passenger car, without EOL' (kilogram, GLO, None) to 'production of an electric vehicle' (unit, GLO, None).
-    2026-08-03 14:15:55.172 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 280 kilogram 'battery production, Li-ion, LiMn2O4, rechargeable, without EOL' (kilogram, GLO, None) to 'production of an electric vehicle' (unit, GLO, None).
-    2026-08-03 14:15:55.177 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 1 unit 'production of an electric vehicle' (unit, GLO, None) to 'driving an electric vehicle' (transport over an ev lifetime, GLO, None).
-    2026-08-03 14:15:55.303 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 30000.0 kilowatt hour 'market group for electricity, low voltage' (kilowatt hour, DEU, None) to 'driving an electric vehicle' (transport over an ev lifetime, GLO, None).
-    2026-08-03 14:15:55.307 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -1 unit 'used electric vehicle' (unit, GLO, None) to 'driving an electric vehicle' (transport over an ev lifetime, GLO, None).
-    2026-08-03 14:15:55.432 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -840 kilogram 'treatment of used glider, passenger car, shredding' (kilogram, GLO, None) to 'used electric vehicle' (unit, GLO, None).
-    2026-08-03 14:15:55.553 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -80 kilogram 'treatment of used powertrain for electric passenger car, manual dismantling' (kilogram, GLO, None) to 'used electric vehicle' (unit, GLO, None).
-    2026-08-03 14:15:55.685 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -280 kilogram 'market for used Li-ion battery' (kilogram, GLO, None) to 'used electric vehicle' (unit, GLO, None).
+    2026-08-03 21:55:31.362 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 840 kilogram 'glider production, passenger car, without EOL' (kilogram, GLO, None) to 'production of an electric vehicle' (unit, GLO, None).
+
+
+    2026-08-03 21:55:31.367 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 80 kilogram 'powertrain production, for electric passenger car, without EOL' (kilogram, GLO, None) to 'production of an electric vehicle' (unit, GLO, None).
+
+
+    2026-08-03 21:55:31.371 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 280 kilogram 'battery production, Li-ion, LiMn2O4, rechargeable, without EOL' (kilogram, GLO, None) to 'production of an electric vehicle' (unit, GLO, None).
+
+
+    2026-08-03 21:55:31.374 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 1 unit 'production of an electric vehicle' (unit, GLO, None) to 'driving an electric vehicle' (transport over an ev lifetime, GLO, None).
+
+
+    2026-08-03 21:55:31.495 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 30000.0 kilowatt hour 'market group for electricity, low voltage' (kilowatt hour, DEU, None) to 'driving an electric vehicle' (transport over an ev lifetime, GLO, None).
+
+
+    2026-08-03 21:55:31.499 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -1 unit 'used electric vehicle' (unit, GLO, None) to 'driving an electric vehicle' (transport over an ev lifetime, GLO, None).
+
+
+    2026-08-03 21:55:31.619 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -840 kilogram 'treatment of used glider, passenger car, shredding' (kilogram, GLO, None) to 'used electric vehicle' (unit, GLO, None).
+
+
+    2026-08-03 21:55:31.731 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -80 kilogram 'treatment of used powertrain for electric passenger car, manual dismantling' (kilogram, GLO, None) to 'used electric vehicle' (unit, GLO, None).
+
+
+    2026-08-03 21:55:31.849 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -280 kilogram 'market for used Li-ion battery' (kilogram, GLO, None) to 'used electric vehicle' (unit, GLO, None).
 
 
 ## Time-explicit LCA
@@ -322,6 +369,9 @@ database_dates = {
     db_2020.name: datetime.strptime("2020", "%Y"),
     db_2030.name: datetime.strptime("2030", "%Y"),
     db_2040.name: datetime.strptime("2040", "%Y"),
+    "ev_background_2020": datetime.strptime("2020", "%Y"),
+    "ev_background_2030": datetime.strptime("2030", "%Y"),
+    "ev_background_2040": datetime.strptime("2040", "%Y"),
     "foreground": "dynamic",
 }
 ```
@@ -335,11 +385,27 @@ from bw_timex import TimexLCA
 tlca = TimexLCA(functional_unit, method, database_dates)
 ```
 
-    2026-08-03 14:15:55.695 | INFO     | bw_timex.timex_lca:__init__:136 - Initializing TimexLCA object...
-    2026-08-03 14:15:55.696 | INFO     | bw_timex.timex_lca:__init__:153 - Calculating base LCA...
-    /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.65e+13)
+    2026-08-03 21:55:31.856 | INFO     | bw_timex.timex_lca:__init__:136 - Initializing TimexLCA object...
+
+
+    2026-08-03 21:55:31.856 | INFO     | bw_timex.timex_lca:__init__:157 - Calculating base LCA...
+
+
+    2026-08-03 21:55:31.856 | INFO     | bw_timex.timex_lca:clean_databases:1208 - Reprocessing 4 modified database(s) before calculating: ei312_REMIND-EU_SSP2_NDC_2020, ei312_REMIND-EU_SSP2_NDC_2030, ei312_REMIND-EU_SSP2_NDC_2040, foreground. This can take a while for large databases.
+
+
+    2026-08-03 21:56:45.535 | INFO     | bw_timex.timex_lca:clean_databases:1214 - Done reprocessing modified databases.
+
+
+    /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 3.90e+13)
       warnings.warn(msg, UmfpackWarning)
-    2026-08-03 14:17:22.072 | INFO     | bw_timex.timex_lca:__init__:170 - Collecting node infos...
+    2026-08-03 21:56:46.243 | INFO     | bw_timex.timex_lca:__init__:174 - Collecting node infos...
+
+
+    2026-08-03 21:56:46.284 | INFO     | bw_timex.timex_lca:__init__:186 - Loading node metadata from 7 database(s)...
+
+
+    2026-08-03 21:56:48.509 | INFO     | bw_timex.timex_lca:__init__:223 - TimexLCA initialized.
 
 
 First, `bw_timex` traverses the supply chain and collects when each process occurs in a timeline:
@@ -352,11 +418,19 @@ tlca.build_timeline(
     )
 ```
 
-    2026-08-03 14:17:29.332 | INFO     | bw_timex.timex_lca:build_timeline:342 - No edge filter function provided. Skipping all edges in background databases.
-    2026-08-03 14:17:34.986 | INFO     | bw_timex.timex_lca:build_timeline:363 - Creating activity time mapping...
-    2026-08-03 14:17:35.127 | INFO     | bw_timex.timeline_builder:__init__:112 - Traversing supply chain graph...
-    2026-08-03 14:17:35.178 | INFO     | bw_timex.timeline_builder:build_timeline:186 - Building timeline...
-    2026-08-03 14:17:35.234 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:659 - Reference date 2040-08-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
+    2026-08-03 21:56:48.513 | INFO     | bw_timex.timex_lca:build_timeline:352 - No edge filter function provided. Skipping all edges in background databases.
+
+
+    2026-08-03 21:56:53.663 | INFO     | bw_timex.timex_lca:build_timeline:373 - Creating activity time mapping...
+
+
+    2026-08-03 21:56:53.753 | INFO     | bw_timex.timeline_builder:__init__:112 - Traversing supply chain graph...
+
+
+    2026-08-03 21:56:53.774 | INFO     | bw_timex.timeline_builder:build_timeline:186 - Building timeline...
+
+
+    2026-08-03 21:56:53.868 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:704 - Reference date 2040-08-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
 
 
 
@@ -382,7 +456,7 @@ tlca.build_timeline(
       <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>588.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.567, 'ei31...</td>
+      <td>{'ev_background_2020': 0.567, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>1</th>
@@ -391,7 +465,7 @@ tlca.build_timeline(
       <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>588.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.558, 'ei31...</td>
+      <td>{'ev_background_2020': 0.558, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>2</th>
@@ -400,7 +474,7 @@ tlca.build_timeline(
       <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>84.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.467, 'ei31...</td>
+      <td>{'ev_background_2020': 0.467, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>3</th>
@@ -409,7 +483,7 @@ tlca.build_timeline(
       <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>80.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.467, 'ei31...</td>
+      <td>{'ev_background_2020': 0.467, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>4</th>
@@ -418,7 +492,7 @@ tlca.build_timeline(
       <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>280.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.467, 'ei31...</td>
+      <td>{'ev_background_2020': 0.467, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>5</th>
@@ -427,7 +501,7 @@ tlca.build_timeline(
       <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>84.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.459, 'ei31...</td>
+      <td>{'ev_background_2020': 0.459, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>6</th>
@@ -436,7 +510,7 @@ tlca.build_timeline(
       <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>80.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.459, 'ei31...</td>
+      <td>{'ev_background_2020': 0.459, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>7</th>
@@ -445,7 +519,7 @@ tlca.build_timeline(
       <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>280.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.459, 'ei31...</td>
+      <td>{'ev_background_2020': 0.459, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>8</th>
@@ -454,7 +528,7 @@ tlca.build_timeline(
       <td>2026-05-01</td>
       <td>production of an electric vehicle</td>
       <td>168.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.367, 'ei31...</td>
+      <td>{'ev_background_2020': 0.367, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>9</th>
@@ -472,7 +546,7 @@ tlca.build_timeline(
       <td>2026-06-01</td>
       <td>production of an electric vehicle</td>
       <td>168.0</td>
-      <td>{'ei312_REMIND-EU_SSP2_NDC_2020': 0.359, 'ei31...</td>
+      <td>{'ev_background_2020': 0.359, 'ev_background_2...</td>
     </tr>
     <tr>
       <th>11</th>
@@ -685,10 +759,16 @@ Next, we calculate the time-explicit inventory. This relinks all processes to th
 tlca.lci()
 ```
 
-    2026-08-03 14:17:35.876 | INFO     | bw_timex.timex_lca:lci:513 - Expanding matrices...
-    2026-08-03 14:17:35.893 | INFO     | bw_timex.timex_lca:lci:532 - Calculating dynamic inventory...
+    2026-08-03 21:56:54.230 | INFO     | bw_timex.timex_lca:lci:523 - Expanding matrices...
+
+
+    2026-08-03 21:56:54.245 | INFO     | bw_timex.timex_lca:lci:542 - Calculating dynamic inventory...
+
+
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 4.97e+12)
       warnings.warn(msg, UmfpackWarning)
+
+
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 4.97e+12)
       warnings.warn(msg, UmfpackWarning)
 
@@ -732,7 +812,7 @@ tlca.dynamic_lcia(metric="GWP")
 tlca.dynamic_score  # kg CO2-eq (GWP100)
 ```
 
-    2026-08-03 14:17:49.679 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
+    2026-08-03 21:57:06.436 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
 
 
 
