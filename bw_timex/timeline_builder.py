@@ -538,7 +538,8 @@ class TimelineBuilder:
                         f"Producer '{node['name']}' was found in more than one database "
                         f"at {date:%Y-%m-%d}: '{already}' and '{node['database']}'. "
                         "bw_timex cannot tell which one its temporal market should use. "
-                        "Give the copy a distinct name, reference product or location."
+                        "Give the copy a distinct name, reference product or location, "
+                        "or remove one of the two databases from `database_dates`."
                     )
                 candidates[producer][date] = node["database"]
                 matches[producer][node["database"]] = node.id
