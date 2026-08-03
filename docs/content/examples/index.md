@@ -18,6 +18,19 @@ Here are some examples on how you can use `bw_timex`.
     ![](./data/ev_lifecycle_light.svg#only-light)
     ![](./data/ev_lifecycle_dark.svg#only-dark)
 
+    [:material-arrow-right: View Example](./example_electric_vehicle_premise_simple.md)
+
+    *by @TimoDiepers*
+
+-   **🚗🔍 Life Cycle of an Electric Car (in detail)**
+
+    ---
+
+    Same case study, but with all the modelling steps and the additional options of `bw_timex` spelled out.
+
+    ![](./data/ev_lifecycle_light.svg#only-light)
+    ![](./data/ev_lifecycle_dark.svg#only-dark)
+
     [:material-arrow-right: View Example](./example_electric_vehicle_premise.md)
 
     *by @TimoDiepers*

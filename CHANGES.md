@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+* Added name-based exchange lookup to `get_exchange`, `add_temporal_distribution_to_exchange` and `add_temporal_evolution_to_exchange`, via `input_name`/`output_name` (optionally narrowed down with `input_location`/`output_location` and `input_product`/`output_product`), which avoids having to know the machine-generated codes of e.g. ecoinvent nodes
 * Fixed supply scaling in `lci(expand_technosphere=False)` for processes with a production amount other than 1, whose supplies were mis-scaled and, for negative production amounts (waste treatment), sign-flipped
 * Fixed `temporal_market_lcis` being corrupted when several timeline rows share a time-mapped temporal market
 * Added the pending-solve planning and technosphere factorization to `lci(expand_technosphere=False)`, which previously only ran for the expanded path

@@ -24,6 +24,10 @@ OUTPUT_DIR = REPO_ROOT / "docs" / "content" / "examples"
 
 # Map notebook stem → (Zensical icon, list of tags)
 NOTEBOOK_META: dict[str, tuple[str, list[str]]] = {
+    "example_electric_vehicle_premise_simple": (
+        "lucide/car-front",
+        ["example", "premise", "temporal distribution"],
+    ),
     "example_electric_vehicle_premise": (
         "lucide/car-front",
         ["example", "premise"],

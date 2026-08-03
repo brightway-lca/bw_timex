@@ -33,7 +33,8 @@ nav = [
   { Theory = "content/theory.md" },
   { Examples = [
     "content/examples/index.md",
-    { "Life Cycle of an Electric Car" = "content/examples/example_electric_vehicle_premise.md" },
+    { "Life Cycle of an Electric Car" = "content/examples/example_electric_vehicle_premise_simple.md" },
+    { "Life Cycle of an Electric Car (in detail)" = "content/examples/example_electric_vehicle_premise.md" },
     { "Dynamic Characterization" = "content/examples/example_simple_dynamic_characterization.md" },
     { "EV Case Study for our Paper" = "content/examples/paper_case_study.md" },
     { "Import from Excel" = "content/examples/example_Importing_model_from_excel.md" },
