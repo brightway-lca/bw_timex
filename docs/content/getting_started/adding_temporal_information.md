@@ -270,6 +270,34 @@ database_dates = {
 You can use whatever data source you want for the time-specific process data. A nice package from the Brightway cosmos that can help you is [premise](https://premise.readthedocs.io/en/latest/introduction.html).
 :::
 
+### Several databases for the same point in time
+
+More than one database may carry the same date. This is useful when you modify
+background processes: keep the modified copies in your own database per point in
+time, instead of writing them into ecoinvent or premise.
+
+```python
+database_dates = {
+    "ecoinvent_2020": datetime.strptime("2020", "%Y"),
+    "ecoinvent_2030": datetime.strptime("2030", "%Y"),
+    "my_background_2020": datetime.strptime("2020", "%Y"),  # your modified copies
+    "my_background_2030": datetime.strptime("2030", "%Y"),
+    "foreground": "dynamic",
+}
+```
+
+For each process, `bw_timex` interpolates only between the databases that actually
+contain it, matched on `name`, `reference product` and `location`. A copy that only
+exists in `my_background_2020` and `my_background_2030` is therefore sourced from
+those two, while an untouched process is sourced from the `ecoinvent_*` ones.
+
+!!! warning
+
+    Give your copies a distinct `name`, `reference product` or `location`. If the
+    same triplet occurs in two databases that share a date, `bw_timex` cannot tell
+    which one you mean and raises an error. A process that exists in only some of
+    the points in time is used unchanged for all of them, and logs a warning.
+
 ## Temporal evolution of foreground exchanges (`bw_timex>0.3.4`)
 
 The approaches above handle temporal variation in the *background* system — different database snapshots for different points in time. But what if a *foreground* exchange itself changes over time? For example, an industrial process might become more energy-efficient over the years, so its electricity consumption per unit of output decreases.
