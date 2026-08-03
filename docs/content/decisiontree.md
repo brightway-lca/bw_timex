@@ -11,7 +11,7 @@ flowchart TD
     %% Define node classes
     classDef decision color:#222832, fill:#3fb1c5, stroke:none;
     classDef lcaType color:#222832, fill:#9c5ffd, stroke:none;
-    classDef codeNode color:#222832, fill:#DBDBDB, text-align:left, stroke:none;
+    classDef codeNode text-align:left;
 
     TimingDecision{{"Do temporal aspects matter?"}}:::decision
     AspectDecision{{"Which aspects matter?"}}:::decision

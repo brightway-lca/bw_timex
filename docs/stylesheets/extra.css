@@ -112,21 +112,3 @@
   }
 }
 
-/* Verified via mermaid-cli: every flowchart node (not just hexagon/
-   multi-line ones) renders its text as an HTML <span class="nodeLabel">
-   inside a foreignObject, never as plain SVG <text>. The theme's own
-   `.nodeLabel { color: var(--md-mermaid-label-fg-color) }` (which tracks
-   the page's default text color, so it flips light/dark with the color
-   scheme) is an explicit rule on that span and always wins over a mermaid
-   classDef `color`, which only ever reaches the span as an inherited
-   value - inherited values lose to any explicit match regardless of
-   selector specificity. That's harmless on saturated fills (light-scheme
-   dark text and dark-scheme light text both read fine against them), but
-   the decisiontree.md "codeNode" class uses a near-white gray fill
-   (#DBDBDB), where dark-scheme (light) text becomes almost invisible.
-   Force that one label color, unconditionally. */
-.node.codeNode .nodeLabel {
-  color: black !important;
-}
-
-
