@@ -6,4 +6,4 @@
 *[EV]: Electric Vehicle
 *[TD]: Temporal Distribution
 *[BFS]: Breadth-First Search
-*[IPCC]: Intergovernmental Panel on Climate Change
+*[IPCC AR6]: Intergovernmental Panel on Climate Change, Assessment Report 6

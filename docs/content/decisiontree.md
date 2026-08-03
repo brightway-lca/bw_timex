@@ -9,7 +9,7 @@ Not only are there many "types" of LCA already, `bw_timex` also adds lots of fur
 ```mermaid
 flowchart TD
     %% Define node classes
-    classDef decision color:#222832, fill:#3fb1c5, stroke:none;
+    classDef decision color:#222832!important, fill:#3fb1c5, stroke:none;
     classDef lcaType color:#222832, fill:#9c5ffd, stroke:none;
     classDef codeNode text-align:left;
 

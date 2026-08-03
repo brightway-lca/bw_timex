@@ -306,7 +306,7 @@ level of `TimexLCA.dynamic_inventory`, dynamic LCIA can be applied, using `Timex
 Users can define or import their own dynamic LCIA functions. Out of the
 box, we provide dynamic LCIA functions for the climate change metrics
 \'radiative forcing\' and \'global warming potential (GWP)\' for all
-greenhouse gases in the IPCC AR6 report, Chapter 7, Table 7.SM.7[^ipcc-ar6],
+greenhouse gases in the IPCC AR6, Chapter 7, Table 7.SM.7[^ipcc-ar6],
 from the brightway package [`dynamic_characterization`](https://github.com/brightway-lca/dynamic_characterization).
 
 The `time_horizon`, over which both metrics are evaluated,

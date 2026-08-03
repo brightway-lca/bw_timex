@@ -4,10 +4,6 @@ icon: lucide/clock
 
 # Step 1 - Adding temporal information
 
-!!! tip "AI agent writing this for you?"
-
-    Temporal distributions are the part agents most often get backwards — dates are relative to the *consumer*, not the producer. Our [bw_timex agent skill](../ai_agent_skill.md) covers this explicitly.
-
 To get you started with time-explicit LCA, we'll investigate this very simple production system with two "technosphere" nodes A and B and a "biosphere" node representing some CO~2~ emissions. For the sake of this example, we'll assume that we demand Process A to run exactly once.
 ```mermaid
 flowchart LR
@@ -342,15 +338,10 @@ Examples:
 - A foreground repair process becomes more efficient over calendar time.
 - A foreground input is reduced by a retrofit or operational learning that applies to all active product/process versions in that year.
 
-Rule of thumb:
+!!! tip "Rule of thumb"
 
-```text
-Is the change a property of the foreground process/product version date?
--> use consumer
-
-Is the change a property of the calendar year when the exchange happens?
--> use producer
-```
+    - Is the change a property of the foreground process/product version date? → use `consumer`
+    - Is the change a property of the calendar year when the exchange happens? → use `producer`
 
 This choice is independent of whether you model with chimaera nodes or explicit process/product
 nodes. Explicit process/product models can make the distinction easier to see because a product can
