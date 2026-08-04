@@ -1,5 +1,5 @@
 function applyNotebookSourceOverrides() {
-  const override = document.querySelector("[data-source-edit-path][data-source-view-path]");
+  const override = document.querySelector("[data-source-edit-url][data-source-view-url]");
   if (!override) return;
 
   // Mark this page as notebook-derived so the primary-color code-cell
@@ -12,20 +12,23 @@ function applyNotebookSourceOverrides() {
     content.classList.add("notebook-page");
   }
 
-  const editPath = override.getAttribute("data-source-edit-path");
-  const viewPath = override.getAttribute("data-source-view-path");
-  if (!editPath || !viewPath) return;
+  // Full URLs, built at conversion time - they carry the git ref the docs were
+  // built from, so a branch or PR preview links into that branch rather than
+  // into main, where a renamed notebook may not exist (yet).
+  const editUrl = override.getAttribute("data-source-edit-url");
+  const viewUrl = override.getAttribute("data-source-view-url");
+  if (!editUrl || !viewUrl) return;
 
   const editButton = document.querySelector('.md-content__button[rel="edit"]');
   if (editButton) {
-    editButton.href = `https://github.com/brightway-lca/bw_timex/edit/main/${editPath}`;
+    editButton.href = editUrl;
   }
 
   const viewButton = document.querySelector(
     '.md-content__button:not([rel="edit"])[title="View source of this page"]'
   );
   if (viewButton) {
-    viewButton.href = `https://github.com/brightway-lca/bw_timex/blob/main/${viewPath}`;
+    viewButton.href = viewUrl;
   }
 }
 

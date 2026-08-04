@@ -29,6 +29,12 @@ jobs:
           uv pip install -r docs/requirements.txt
           uv pip install -e .
       - name: Convert notebooks
+        # The checkout is detached, so tell the converter which ref the GitHub
+        # links on the generated pages (edit/view buttons included) should
+        # point at - otherwise they resolve against main, where a notebook
+        # added or renamed on this branch does not exist yet.
+        env:
+          DOCS_SOURCE_REF: ${{ github.head_ref || github.ref_name }}
         run: uv run python docs/convert_notebooks.py
       - name: Build site
         run: uv run zensical build

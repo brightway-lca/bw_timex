@@ -23,13 +23,49 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
 NOTEBOOKS_ROOT = REPO_ROOT / "notebooks"
 OUTPUT_ROOT = REPO_ROOT / "docs" / "content" / "examples"
-GITHUB_BLOB = "https://github.com/brightway-lca/bw_timex/blob/main"
+GITHUB_REPO = "https://github.com/brightway-lca/bw_timex"
+
+
+def source_ref() -> str:
+    """The git ref the docs are being built from.
+
+    Every GitHub link on a generated page - the edit/view buttons included -
+    points into this ref. Hardcoding "main" would break a branch or PR preview
+    the moment a notebook is added or renamed, because the link would resolve
+    against a main that doesn't have it yet.
+
+    Read the Docs exposes the ref it checked out; in CI or locally we fall back
+    to the checked-out branch, and to "main" when there is nothing to read (a
+    detached HEAD, a tarball, no git).
+    """
+    for variable in ("DOCS_SOURCE_REF", "READTHEDOCS_GIT_IDENTIFIER"):
+        ref = os.environ.get(variable)
+        if ref:
+            return ref
+
+    try:
+        ref = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "main"
+
+    return ref if ref and ref != "HEAD" else "main"
+
+
+SOURCE_REF = source_ref()
+GITHUB_BLOB = f"{GITHUB_REPO}/blob/{SOURCE_REF}"
 
 # Notebook path (relative to notebooks/) → (Zensical icon, list of tags).
 # The category is the first path segment: it decides both the docs
@@ -432,8 +468,8 @@ def convert(
     source_path = f"notebooks/{notebook_rel}"
     source_override = (
         "\n"
-        f'<div hidden data-source-edit-path="{source_path}" '
-        f'data-source-view-path="{source_path}"></div>\n'
+        f'<div hidden data-source-edit-url="{GITHUB_REPO}/edit/{SOURCE_REF}/{source_path}" '
+        f'data-source-view-url="{GITHUB_BLOB}/{source_path}"></div>\n'
     )
 
     # Build YAML front-matter lines
