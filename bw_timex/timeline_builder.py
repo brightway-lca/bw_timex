@@ -63,7 +63,7 @@ class TimelineBuilder:
         database_dates_static: dict
             same as database_dates, but excluding the "dynamic" foreground databases.
         activity_time_mapping: dict
-          A dictionary to map processes to specific times.
+            A dictionary to map processes to specific times.
         node_collections: dict
             A dictionary collecting useful subsets of node ids.
         nodes: dict
@@ -173,9 +173,6 @@ class TimelineBuilder:
 
         - "closest": closest database is assigned 1
 
-        Parameters
-        ----------
-        None
             (all are already passed during instantiation)
 
         Returns
@@ -717,7 +714,7 @@ class TimelineBuilder:
 
         Parameters
         ----------
-        id : int
+        idx : int
             Id of node.
 
         Returns

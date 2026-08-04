@@ -191,3 +191,52 @@
     border-radius: 0;
   }
 }
+
+/* "See Also" docstring sections. mkdocstrings turns every numpydoc section
+   it doesn't parse itself into an admonition whose class is the slugified
+   section title, so a `See Also` section arrives here as `details.see-also`.
+   That is not one of the theme's built-in admonition types, so it would
+   otherwise fall back to the unstyled default - give it the same treatment
+   the built-in types get. */
+:root {
+  --md-admonition-icon--see-also: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>');
+}
+
+.md-typeset .admonition.see-also,
+.md-typeset details.see-also {
+  border-color: #00b8d4;
+}
+
+.md-typeset .admonition.see-also:focus-within,
+.md-typeset details.see-also:focus-within {
+  box-shadow: 0 0 0 0.2rem #00b8d41a;
+}
+
+.md-typeset .see-also > .admonition-title,
+.md-typeset .see-also > summary {
+  background-color: #00b8d41a;
+}
+
+.md-typeset .see-also > .admonition-title::before,
+.md-typeset .see-also > summary::before {
+  background-color: #00b8d4;
+  -webkit-mask-image: var(--md-admonition-icon--see-also);
+  mask-image: var(--md-admonition-icon--see-also);
+}
+
+.md-typeset .see-also > .admonition-title::after,
+.md-typeset .see-also > summary::after {
+  color: #00b8d4;
+}
+
+/* The list of references in a "See Also" section is the whole body of the
+   admonition, so it doesn't need the bullets or the extra leading indent. */
+.md-typeset .see-also > ul {
+  list-style: none;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.md-typeset .see-also > ul > li {
+  margin-left: 0;
+}
