@@ -13,8 +13,6 @@ In this example, there is a very simple database containing only one node with a
 
 Further down, there is an example with multiple greenhouse gases.
 
-
-
 ```python
 import bw2data as bd
 import numpy as np
@@ -75,18 +73,13 @@ bd.Method(("GWP", "example")).write(
     Not able to determine geocollections for all datasets. This database is not ready for regionalization.
     100%|██████████| 1/1 [00:00<00:00, 17189.77it/s]
     Vacuuming database 
-    
-
 
 We select the demand and the method and calculate a LCA with `bw_timex`
-
-
 
 ```python
 demand = {("test", "A"): 1}
 gwp = ("GWP", "example")
 ```
-
 
 ```python
 from bw_timex import TimexLCA
@@ -97,8 +90,6 @@ tlca = TimexLCA(demand, gwp)
     /Users/timodiepers/Documents/Coding/timex/bw_timex/bw_timex.py:100: UserWarning: No database_dates provided. Treating the databases containing the functional unit as dynamic. No remapping to time explicit databases will be done.
       warnings.warn(
 
-
-
 ```python
 tlca.build_timeline()
 ```
@@ -108,10 +99,6 @@ tlca.build_timeline()
       warnings.warn(
     /Users/timodiepers/Documents/Coding/timex/bw_timex/timeline_builder.py:191: Warning: No time-explicit databases are provided. Mapping to time-explicit databases is not possible.
       warnings.warn(
-
-
-
-
 
 <table>
   <thead>
@@ -139,25 +126,16 @@ tlca.build_timeline()
 </table>
 
 
-
-
-
 ```python
 tlca.lci()
 ```
-
 
 ```python
 tlca.static_lcia()
 tlca.static_score
 ```
 
-
-
-
     29.799999237060547
-
-
 
 ## Dynamic characterization
 
@@ -171,10 +149,7 @@ Conventional metrics usually consider a time horizon of 100 years, but this has 
 Fixed time horizon means that the time horizon for all emissions (no matter when they occur) starts counting at the time of the functional unit, resulting in shorter time horizons for emissions occuring later. This approach has been proposed by [Levasseur et al. 2010](https://pubs.acs.org/doi/10.1021/es9030003) to harmonize the time frame chosen for the analysis and the time period covered by the LCA results.
 If the time horizon is not fixed (this is what conventional impact assessment factors assume), it starts counting from the timing of the emission.
 
-
 First, import the dynamic characterization function of CH4 and have a look at it:
-
-
 
 ```python
 from bw_timex.dynamic_characterization import characterize_ch4
@@ -185,17 +160,13 @@ characterize_ch4?
     Signature: characterize_ch4(series, period: int = 100, cumulative=False) -> pandas.core.frame.DataFrame
     Docstring:
     Calculate the cumulative or marginal radiative forcing (CRF) from CH4 for each year in a given period. 
-    
     Based on characterize_methane from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
-    
     This DOES include indirect effects of CH4 on ozone and water vapor, but DOES NOT include the decay to CO2. 
     For more info on that, see the deprecated version of bw_temporalis.
-    
     If `cumulative` is True, the cumulative CRF is calculated. If `cumulative` is False, the marginal CRF is calculated.
     Takes a single row of the TimeSeries Pandas DataFrame (corresponding to a set of (`date`/`amount`/`flow`/`activity`).
     For earch year in the given period, the CRF is calculated.
     Units are watts/square meter/kilogram of CH4.
-    
     Parameters
     ----------
     series : array-like
@@ -204,7 +175,6 @@ characterize_ch4?
         Time period for calculation (number of years), by default 100
     cumulative : bool, optional
         Should the RF amounts be summed over time?
-    
     Returns
     -------
     A TimeSeries dataframe with the following columns:
@@ -212,7 +182,6 @@ characterize_ch4?
     - amount: float
     - flow: str
     - activity: str
-    
     See also
     --------
     Joos2013: Relevant scientific publication on CRF: https://doi.org/10.5194/acp-13-2793-2013
@@ -223,7 +192,6 @@ characterize_ch4?
 
 Then, we can create the characterization_functions where we map the function to the corresponding flow via its ID:
 
-
 ```python
 characterization_functions_ch4 = {
     bd.get_node(code="CH4").id: characterize_ch4,
@@ -232,7 +200,6 @@ characterization_functions_ch4 = {
 
 Now, the dynamic LCIA can be calculated:
 
-
 ```python
 tlca.dynamic_lcia(
     metric="radiative_forcing",
@@ -240,9 +207,6 @@ tlca.dynamic_lcia(
     characterization_functions=characterization_functions_ch4,
 )
 ```
-
-
-
 
 <table>
   <thead>
@@ -373,22 +337,13 @@ tlca.dynamic_lcia(
 <p>99 rows × 7 columns</p>
 
 
-
-
-
 ```python
 tlca.plot_dynamic_characterized_inventory()
 ```
 
-
-    
 ![png](example_simple_dynamic_characterization_files/output_15_0.png)
-    
-
 
 CH4 has a half-life time of 8.6 years, so the decay curve is quite steep and it doesn't cause much atmospheric warming in later years.
-
-
 
 ```python
 print(
@@ -398,10 +353,7 @@ print(
 
     characterized dynamic score: 2.3651673669270527e-12 [radiative_forcing (100 years)]
 
-
 If we evaluate radiative forcing over a shorter time horizon, the score gets smaller. This is equivalent to taking a shorter integral of the radiative forcing curve above.
-
-
 
 ```python
 tlca.dynamic_lcia(
@@ -418,10 +370,7 @@ print(
 
     characterized dynamic score: 1.892909832719887e-12 [radiative_forcing (20 years)]
 
-
 With `fixed_time_horizon = True`, we evaluate all emissions from time of the functional unit, regardless when they actually occur. As our CH4 emission occurs 10 year later than the functional unit, this means that it is only assessed for 90 years (100 years time horizon - 10 years of delay in emission). As CH4 is barely causing warming between year 90 to 100, this doesn't change the overall score too much, but can cause larger differences for more long-lived GHGs.
-
-
 
 ```python
 tlca.dynamic_lcia(
@@ -440,18 +389,11 @@ tlca.plot_dynamic_characterized_inventory()
 
     characterized dynamic score: 2.3644506236849053e-12 [radiative_forcing (100 years)]
 
-
-
-    
 ![png](example_simple_dynamic_characterization_files/output_21_1.png)
-    
-
 
 Note that the tail of the curve stops in 21**2**4 (100 years after the functional unit), in 21**3**4 (100 years after the emission) in the figure a few cells above.
 
-
 ### Global warming potential (GWP)
-
 
 GWP describes the warming of a GHG in comparison to that of the reference gas CO2. As such, it divides the integral of radiative forcing of a GHG over a certain time horizon by the integral of radiative forcing of the reference gas CO2 over the same time horizon:
 
@@ -459,16 +401,12 @@ GWP describes the warming of a GHG in comparison to that of the reference gas CO
 
 [KTH, 2014](https://www.energy.kth.se/applied-thermodynamics/key-research-areas/heating-systems/low-gwp-news/nagot-om-hur-gwp-varden-bestams-1.474589)
 
-
 GWP can be calculated in `bw_timex` with the same options as radiative forcing:
 
 - time horizon can vary (default 100 years)
 - fixed or flexible time horizon
 
-
 Let's evaluate GWP20:
-
-
 
 ```python
 tlca.dynamic_lcia(
@@ -486,10 +424,7 @@ print(
     /Users/timodiepers/Documents/Coding/timex/bw_timex/dynamic_characterization.py:122: UserWarning: Using bw_timex's default CO2 characterization function for GWP reference.
       warnings.warn(
 
-
 With `fixed_time_horizon = True` and `time_horizon = 20` years, the difference in results is substantial, as the 10-years delayed CH4 emission is only counted for 10 years (20 year time horizon starting at the functional unit - 10 year emissiond delay).
-
-
 
 ```python
 tlca.dynamic_lcia(
@@ -508,12 +443,9 @@ print(
     /Users/timodiepers/Documents/Coding/timex/bw_timex/dynamic_characterization.py:122: UserWarning: Using bw_timex's default CO2 characterization function for GWP reference.
       warnings.warn(
 
-
 ## Example with more GHGs
 
 Lastly, let's look at a system with multiple GHGs spread over time.
-
-
 
 ```python
 def write_database_multi_emission():
@@ -600,7 +532,6 @@ def write_database_multi_emission():
     )
 ```
 
-
 ```python
 write_database_multi_emission()
 ```
@@ -610,12 +541,8 @@ write_database_multi_emission()
     Not able to determine geocollections for all datasets. This database is not ready for regionalization.
     100%|██████████| 1/1 [00:00<00:00, 25420.02it/s]
     Vacuuming database 
-    
-
 
 Import additional default dynamic characterization function for N2O and calculate time-explicit LCA.
-
-
 
 ```python
 from bw_timex.dynamic_characterization import characterize_n2o, characterize_co2
@@ -637,10 +564,7 @@ tlca.static_lcia()
     /Users/timodiepers/Documents/Coding/timex/bw_timex/timeline_builder.py:191: Warning: No time-explicit databases are provided. Mapping to time-explicit databases is not possible.
       warnings.warn(
 
-
 match dynamic charcterization functions to biosphere flows:
-
-
 
 ```python
 characterization_functions = {
@@ -651,8 +575,6 @@ characterization_functions = {
 ```
 
 ### Radiative forcing:
-
-
 
 ```python
 tlca.dynamic_lcia(
@@ -667,29 +589,17 @@ print(
 )
 ```
 
-
-    
 ![png](example_simple_dynamic_characterization_files/output_38_0.png)
-    
-
 
     characterized dynamic score: 4.121262160040557e-12 [radiative_forcing (100)]
-
-
 
 ```python
 tlca.plot_dynamic_characterized_inventory(cumsum=True)
 ```
 
-
-    
 ![png](example_simple_dynamic_characterization_files/output_39_0.png)
-    
-
 
 ### Global warming potential:
-
-
 
 ```python
 tlca.dynamic_lcia(
@@ -706,19 +616,11 @@ print(
     /Users/timodiepers/Documents/Coding/timex/bw_timex/dynamic_characterization.py:122: UserWarning: Using bw_timex's default CO2 characterization function for GWP reference.
       warnings.warn(
 
-
-
-    
 ![png](example_simple_dynamic_characterization_files/output_41_1.png)
-    
-
 
     characterized dynamic score: 46.53439734089549 [GWP (100)]
 
-
 Ultimately, let's compare how changing the length of the time horizon affects the GWP results:
-
-
 
 ```python
 import pandas as pd
@@ -811,14 +713,9 @@ df = pd.DataFrame(
     /Users/timodiepers/Documents/Coding/timex/bw_timex/dynamic_characterization.py:122: UserWarning: Using bw_timex's default CO2 characterization function for GWP reference.
       warnings.warn(
 
-
-
 ```python
 df
 ```
-
-
-
 
 <table>
   <thead>
@@ -894,7 +791,4 @@ df
 </table>
 
 
-
-
 One can see that a longer time horizon leads to smaller differences between fixed (time horizon starts at FU for all flows) and flexible time horizons (time horizon starts at each emissions seperately). An increase in time horizon also leads to lower overall scores, because the system contains multiple short-lived GHGs, such as CH4 and N2O, whose CO2-equivalence value decreases when assessing longer time horizons.
-

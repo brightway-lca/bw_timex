@@ -69,9 +69,65 @@ PANDAS_TABLE_STYLE_CLOSE = re.compile(
     r"(</table>\s*(?:<p>[\d,]+ rows [x×] [\d,]+ columns</p>\s*)?)</div>", re.DOTALL
 )
 
+# An nbconvert output line: the 4-space indent that makes Markdown treat it as
+# a code block, plus something other than whitespace on it.
+INDENTED_OUTPUT_LINE = re.compile(r"^ {4}.*\S")
+
 
 def strip_ansi(text: str) -> str:
     return ANSI_ESCAPE.sub("", text)
+
+
+def tighten_output_blocks(body: str) -> str:
+    """Drop the blank lines nbconvert leaves between a cell's output blocks.
+
+    Outputs of different types (a stream and an execute_result, say) can't be
+    merged in the notebook, so nbconvert emits them as separate indented blocks
+    separated by blank lines - and Markdown folds adjacent indented blocks into
+    one code block, turning each separator into an empty line inside the output.
+    Extracted images leave whitespace-only indented lines behind the same way,
+    which render as an empty code block. Removing every blank line that sits
+    between two output lines makes a cell's outputs one contiguous block, as in
+    Jupyter.
+
+    Fenced blocks are skipped, so indented content inside them (the Mermaid
+    diagrams in the intro cells) is left untouched.
+    """
+    lines = body.split("\n")
+    result: list[str] = []
+    in_fence = False
+    index = 0
+
+    while index < len(lines):
+        line = lines[index]
+
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            result.append(line)
+            index += 1
+            continue
+
+        if in_fence or line.strip():
+            result.append(line)
+            index += 1
+            continue
+
+        # A run of blank (or whitespace-only) lines: keep a single empty line,
+        # unless output lines sit on both sides of it.
+        end = index
+        while end < len(lines) and not lines[end].strip():
+            end += 1
+
+        previous = result[-1] if result else ""
+        following = lines[end] if end < len(lines) else ""
+        if not (
+            INDENTED_OUTPUT_LINE.match(previous)
+            and INDENTED_OUTPUT_LINE.match(following)
+        ):
+            result.append("")
+        index = end
+
+    return "\n".join(result)
 
 
 def merge_stream_outputs(notebook) -> None:
@@ -183,6 +239,11 @@ def convert(
 
     # Strip ANSI codes
     body = strip_ansi(body)
+
+    # Squeeze out the blank lines between a cell's output blocks. Runs before
+    # the hide-input folding below, whose indented admonition bodies rely on
+    # their own blank lines.
+    body = tighten_output_blocks(body)
 
     # Fold cells the notebook collapses in Jupyter (e.g. bulk setup code)
     body = collapse_hidden_input_cells(body, notebook_path)

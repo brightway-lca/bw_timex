@@ -10,12 +10,9 @@ tags:
 <div hidden data-source-edit-path="docs/content/examples/example_electric_vehicle_premise.ipynb" data-source-view-path="docs/content/examples/example_electric_vehicle_premise.ipynb"></div>
 # Time-explicit LCA of an electric vehicle
 
-
 This notebook shows how to use `bw_timex` with a cradle-to-grave case study of an electric vehicle (ev). The case study is simplified, not meant to reflect the complexity of electric mobility but to demonstrate how to use `bw_timex`. 
 
 > **Note:** This is the "premise" version of this notebook that works with ecoinvent and premise data. Specifically, it expects a brightway project with ecoinvent v3.12 (cutoff) and prospective databases for 2020, 2030 and 2040, created from it with [`premise`](https://github.com/polca/premise) (all sectors updated, REMIND-EU SSP2-NDC). If you don't have access to that, please check out the ["standalone" version](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_electric_vehicle_standalone.ipynb) of this notebook.
-
-
 
 ```python
 import bw2data as bd
@@ -28,8 +25,6 @@ bd.projects.set_current("ei312_REMIND_EU")
 The `bw_timex` package itself does not provide any data - specifying prospective and dynamic information is up to the user. In this example, we use data from [ecoinvent v3.12](https://ecoinvent.org/) (cutoff), and create a set of prospective databases with [`premise`](https://github.com/polca/premise), updating all sectors along the SSP2-NDC pathway of the IAM REMIND-EU. We selected this pathway to simply demonstrate some future development in this case study, and many other models and pathways are available. 
 In the [premise documentation](https://premise.readthedocs.io/en/latest/) you can find instructions for the creation of prospective background databases. 
 
-
-
 ```python
 db_2020 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2020")
 db_2030 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2030")
@@ -37,7 +32,6 @@ db_2040 = bd.Database("ei312_REMIND-EU_SSP2_NDC_2040")
 ```
 
 ## Case study setup
-
 
 In this study, we consider the following production system for our ev. Purple boxes are foreground, cyan boxes are background (i.e., ecoinvent/premise).
 
@@ -63,7 +57,6 @@ Now, we need to build this with brightway. If you are not interested in the mode
 
 For our ev model we make the following assumptions:
 
-
 ```python
 ELECTRICITY_CONSUMPTION = 0.2 # kWh/km
 MILEAGE = 150_000 # km
@@ -77,7 +70,6 @@ MASS_BATTERY = 280 # kg
 
 First, we create a new foreground database:
 
-
 ```python
 if "foreground" in bd.databases:
     del bd.databases["foreground"] # to make sure we create the foreground from scratch
@@ -86,8 +78,6 @@ foreground.register()
 ```
 
 Now, let's creating the foreground activities:
-
-
 
 ```python
 ev_production = foreground.new_node("ev_production", name="production of an electric vehicle", unit="unit")
@@ -104,7 +94,6 @@ used_ev.save()
 ```
 
 We take the actual process data from ecoinvent. However, the ecoinvent processes for the ev part production contain exchanges for the end of life treatment in the production processes already, which we want to separate. So let's fix that first by creating new activities without the eol processes:
-
 
 ```python
 # Older versions of this notebook wrote the "without EOL" copies directly into the
@@ -165,7 +154,6 @@ for db in [db_2020, db_2030, db_2040]:
 
 Now, let's build the exchanges, starting with the ev production:
 
-
 ```python
 ev_background_2020 = modified_dbs[db_2020.name]
 glider_production = ev_background_2020.get(code="glider_production_without_eol")
@@ -193,7 +181,6 @@ battery_to_ev = ev_production.new_edge(
 
 ... the end of life:
 
-
 ```python
 glider_eol = db_2020.get(name="treatment of used glider, passenger car, shredding")
 powertrain_eol = db_2020.get(name="treatment of used powertrain for electric passenger car, manual dismantling")
@@ -219,7 +206,6 @@ used_ev_to_battery_eol = used_ev.new_edge(
 ```
 
 ...and, finally, driving:
-
 
 ```python
 electricity_production = db_2020.get(name="market group for electricity, low voltage", location="DEU")
@@ -263,8 +249,6 @@ To include this temopral information, we use the `TemporalDistribution` class fr
 
 Notably, in addition to the timestamp of the occurence of the process (which is shown in the flowchart above), we also need to specify the amount share of the exchange that happens at that time to fully define a `TemporalDistribution`.
 
-
-
 ```python
 from bw_temporalis import TemporalDistribution, easy_timedelta_distribution
 import numpy as np
@@ -300,65 +284,33 @@ td_treating_waste = TemporalDistribution(
 
 Let's explore what a `TemporalDistribution` looks like:
 
-
 ```python
 td_assembly_and_delivery.graph(resolution="M")
 ```
 
-
-
-
     <Axes: xlabel='Time (Months)', ylabel='Amount'>
 
-
-
-
-    
 ![png](example_electric_vehicle_premise_files/output_25_1.png)
-    
-
-
 
 ```python
 td_glider_production.graph(resolution="M")
 ```
 
-
-
-
     <Axes: xlabel='Time (Months)', ylabel='Amount'>
 
-
-
-
-    
 ![png](example_electric_vehicle_premise_files/output_26_1.png)
-    
-
 
 Starting from the functional unit in our supply chain graph, the temporal distributions of consecutive edges get "multiplied", or more specifically, convolved. Let's look at an example to clarify this. The assembly and delivery of our ev happens either 2 or 3 months before we can start using it. Each of these occurences of this process demands a glider, which also has a temporal distribution that then gets convolved "back in time". Also pay attention to how the amounts get scaled.
-
 
 ```python
 (td_assembly_and_delivery * td_glider_production).graph(resolution="M")
 ```
 
-
-
-
     <Axes: xlabel='Time (Months)', ylabel='Amount'>
 
-
-
-
-    
 ![png](example_electric_vehicle_premise_files/output_28_1.png)
-    
-
 
 We now add the temporal information to the exchanges of our EV. We add temporal distributions to all (technosphere) exchanges, but you don't have to.
-
-
 
 ```python
 glider_to_ev["temporal_distribution"] = td_glider_production
@@ -391,23 +343,19 @@ used_ev_to_battery_eol.save()
 
 To make sure our changes to the foreground database are actually saved, we finally need to process the database:
 
-
 ```python
 foreground.process()
 ```
 
 ## LCA using `bw_timex`
 
-
 As usual, we need to select an impact assessment method:
-
 
 ```python
 method = ('ecoinvent-3.12', 'EF v3.1', 'climate change', 'global warming potential (GWP100)')
 ```
 
 `bw_timex` also needs to know the representative time of the databases:
-
 
 ```python
 from datetime import datetime
@@ -427,14 +375,12 @@ Now, we can instantiate a `TimexLCA`. It's structure is similar to a normal `bw2
 
 Not sure about the required inputs? Check the documentation using `?`. All our classes and methods have docstrings!
 
-
 ```python
 from bw_timex import TimexLCA
 TimexLCA?
 ```
 
 Let's instantiate a `TimexLCA` object for our "driving" activity:
-
 
 ```python
 tlca = TimexLCA({driving: 1}, method, database_dates)
@@ -448,7 +394,6 @@ tlca = TimexLCA({driving: 1}, method, database_dates)
     2026-08-03 22:00:29.174 | INFO     | bw_timex.timex_lca:__init__:186 - Loading node metadata from 7 database(s)...
     2026-08-03 22:00:29.943 | INFO     | bw_timex.timex_lca:__init__:223 - TimexLCA initialized.
 
-
 Next, we build a timeline of the exchanges. To do this, we can call the `build_timeline()` method, which does the graph traversal and creates a timeline dataframe from the results. The exchanges (rows of the dataframe) are aggregated to the resolution specified in the argument `temporal_grouping`. There are also many more options to specify the timeline creation and graph traversal process. Here are the most important ones:
 - `temporal_grouping`: temporal resolution to which processes will be aggregated,"year" (default), "month", "day" or "hour"
 - `interpolation_type`: How the best fitting background database is selected: "linear"(default), "closest"
@@ -460,8 +405,6 @@ For all these options, we provide sensible default values. Of course you can alw
 
 So, let's build the timeline. We choose a monthly temporal grouping here because we use that resolution in our temporal distributions.
 
-
-
 ```python
 tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
 ```
@@ -471,10 +414,6 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
     2026-08-03 22:00:35.443 | INFO     | bw_timex.timeline_builder:__init__:112 - Traversing supply chain graph...
     2026-08-03 22:00:35.474 | INFO     | bw_timex.timeline_builder:build_timeline:186 - Building timeline...
     2026-08-03 22:00:35.545 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:704 - Reference date 2040-08-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
-
-
-
-
 
 <table>
   <thead>
@@ -790,13 +729,10 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
 </table>
 
 
-
-
 The temporal market shares in the timeline (right most column above) specify the share of the amount of an exchange to be sourced from the respective database. 
 `None` means that the exchange is in the foreground supply chain, and not at the intersection with the background system.  
 
 Next, we calculate the time-explicit LCI. The `TimexLCA.lci()` function takes care of all the relinking, based on the information from the timeline. 
-
 
 ```python
 tlca.lci()
@@ -809,57 +745,34 @@ tlca.lci()
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 4.97e+12)
       warnings.warn(msg, UmfpackWarning)
 
-
 Taking a look at the `dynamic_inventory` that was now created, we can see that it is much larger than a standard static inventory: instead of one row per biosphere flow, we now get one row for each biosphere flow at each point in time.
-
 
 ```python
 tlca.dynamic_inventory
 ```
 
-
-
-
     <Compressed Sparse Row sparse matrix of dtype 'float64'
     	with 81026 stored elements and shape (76843, 131071)>
 
-
-
 The standard, non-dynamic inventory has far fewer rows because the temporal resolution is missing. We can compare the dimensions of the two inventories:
-
 
 ```python
 tlca.base_lca.inventory.shape  # (#rows, #cols)
 ```
 
-
-
-
     (3341, 43654)
-
-
-
 
 ```python
 tlca.dynamic_inventory.shape
 ```
 
-
-
-
     (76843, 131071)
 
-
-
 While under the hood, the dynamic inventory is calculated as a sparse matrix, there is also a more human-friendly version as a pandas DataFrame:
-
 
 ```python
 tlca.dynamic_inventory_df
 ```
-
-
-
 
 <table>
   <thead>
@@ -954,38 +867,24 @@ tlca.dynamic_inventory_df
 <p>81026 rows × 4 columns</p>
 
 
-
-
 If we are only interested in the new overall time-explicit scores and don't care about the timing of the emissions, we can set `build_dynamic_biosphere=False` (default is `True`), which saves time and memory. In that case, you only get the `TimexLCA.inventory`, but not the `TimexLCA.dynamic_inventory`.
 
 In case the timing of emissions is not important, one can directly calculate the LCIA the "standard way" using static characterization methods. Per default, the following calculates the static LCIA score based on the impact method chosen in the very beginning:
-
 
 ```python
 tlca.static_lcia()
 tlca.static_score  # kg CO2-eq
 ```
 
-
-
-
     10744.473494732374
 
-
-
 At this point, we can already compare these time-explicit results to the results of an "ordinary", completely static LCA. These already exist within the `TimexLCA` class, originally to set the priorities for the graph traversal:
-
 
 ```python
 tlca.base_lca.score
 ```
 
-
-
-
     23247.15112358249
-
-
 
 ## Dynamic Characterization
 In addition to the standard static characterization, the time-explicit, dynamic inventory generated by a `TimexLCA` allows for dynamic characterization. Users can provide their own dynamic characterization functions and link them to corresponding biosphere flows (see example on [dynamic characterization](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_simple_dynamic_characterization.ipynb)). 
@@ -994,22 +893,15 @@ Alternatively, you can use the functions from our separate (but fully compatible
 
 For the dynamic characterization, users can also choose the length of the considered time horizon (`time_horizon`) and whether it is a fixed time horizon (`fixed_time_horizon`). Fixed means that the time horizon for all emissions (no matter when they occur) starts counting at the time of the functional unit, resulting in shorter time horizons for emissions occuring later. If the time horizon is not fixed (this is what conventional impact assessment factors assume), it starts counting from the timing of the emission.
 
-
 ### Radiative forcing
 
-
 Because we are using real ecoinvent/premise biosphere flows here, `bw_timex` automatically maps the matching parameterized characterization functions (IPCC AR6) to the corresponding flows. So, unlike when working with custom biosphere flows, we don't need to define and pass the `characterization_functions` ourselves and can directly run the dynamic characterization:
-
 
 ```python
 tlca.dynamic_lcia(metric="radiative_forcing", fixed_time_horizon=True)
 ```
 
     2026-08-03 22:00:48.111 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
-
-
-
-
 
 <table>
   <thead>
@@ -1104,66 +996,41 @@ tlca.dynamic_lcia(metric="radiative_forcing", fixed_time_horizon=True)
 <p>164276 rows × 4 columns</p>
 
 
-
-
 The method call returns a dataframe of all the individual emissions at their respective timesteps, but we can also just look at the overall score:
-
 
 ```python
 tlca.dynamic_score
 ```
 
-
-
-
     np.float64(9.417047753177288e-10)
 
-
-
 To visualize the results, we provide simple plotting functions:
-
 
 ```python
 tlca.plot_dynamic_characterized_inventory()
 ```
 
-
-    
 ![png](example_electric_vehicle_premise_files/output_66_0.png)
-    
-
 
 This can be a bit messy, though, because all the individual impacts caused by individual emissions (e.g., CO2, CH4, N2O, ...) appear. Luckily, there is also an option to sum the emissions within each activity:
-
 
 ```python
 tlca.plot_dynamic_characterized_inventory(sum_emissions_within_activity=True)
 ```
 
-
-    
 ![png](example_electric_vehicle_premise_files/output_68_0.png)
-    
-
 
 There is also a flag to plot the cumulative score over time:
-
 
 ```python
 tlca.plot_dynamic_characterized_inventory(sum_activities=True, cumsum=True)
 ```
 
-
-    
 ![png](example_electric_vehicle_premise_files/output_70_0.png)
-    
-
 
 ### GWP
 
-
 Similar options are available for the metric GWP, which compares the radiative forcing of a GHG to that of CO2 over a certain time horizon (commonly 100 years, but it can be set flexibly in `time_horizon`).
-
 
 ```python
 tlca.dynamic_lcia(metric="GWP", fixed_time_horizon=False, time_horizon = 100)
@@ -1171,40 +1038,23 @@ tlca.dynamic_score #kg CO2-eq (GWP)
 ```
 
     2026-08-03 22:00:50.046 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
-
-
-
-
-
     np.float64(10655.763775235002)
 
-
-
 Plotting the GWP results over time:
-
 
 ```python
 tlca.plot_dynamic_characterized_inventory(sum_emissions_within_activity=True)
 ```
 
-
-    
 ![png](example_electric_vehicle_premise_files/output_75_0.png)
-    
-
 
 Cumulative:
-
 
 ```python
 tlca.plot_dynamic_characterized_inventory(sum_emissions_within_activity=True, cumsum=True)
 ```
 
-
-    
 ![png](example_electric_vehicle_premise_files/output_77_0.png)
-    
-
 
 ### Comparison of time-explicit results to static results
 It's helpful to understand how the time-explicit results differ from those using static assessments. 
@@ -1213,38 +1063,23 @@ We compare the time-explicit results with those of an LCA for the year 2020 and 
 
 Time-explicit scores:
 
-
 ```python
 tlca.dynamic_lcia(metric="GWP", fixed_time_horizon=False, time_horizon=100)
 tlca.dynamic_score
 ```
 
     2026-08-03 22:00:50.285 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
-
-
-
-
-
     np.float64(10655.763775235002)
 
-
-
 The 2020 (static) score has already been calculated by TimexLCA in the beginning, but we can still access the score:
-
 
 ```python
 tlca.base_lca.score
 ```
 
-
-
-
     23247.15112358249
 
-
-
 However, further down we also want to look at what part of the life cycle has what contribution. To get this info, we need some more calculations:
-
 
 ```python
 static_scores = {}
@@ -1265,9 +1100,7 @@ for exc in driving.technosphere():
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 3.90e+13)
       warnings.warn(msg, UmfpackWarning)
 
-
 Similarly, we calculate the 2040 (prospective) scores by just changing the database the exchanges point to:
-
 
 ```python
 import bw2calc as bc
@@ -1330,9 +1163,7 @@ for exc in prospective_driving.technosphere():
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.38e+13)
       warnings.warn(msg, UmfpackWarning)
 
-
 Lets compare the overall scores:
-
 
 ```python
 print("Static score: ", sum(static_scores.values())) # should be the same as tlca.base_lca.score
@@ -1344,9 +1175,7 @@ print("Time-explicit score: ", tlca.dynamic_score)
     Prospective score:  4927.8914576999105
     Time-explicit score:  10655.763775235002
 
-
 To better understand what's going on, let's plot the scores as a waterfall chart  based on timing of emission. Also, we can look at the "first-level contributions":
-
 
 ```python
 from bw_timex.utils import plot_characterized_inventory_as_waterfall
@@ -1371,10 +1200,6 @@ plot_characterized_inventory_as_waterfall(
 )
 ```
 
-
-    
 ![png](example_electric_vehicle_premise_files/output_90_0.png)
-    
-
 
 One can see that the time-explicit results (in the middle) are somewhere in between the static and the prospective results. This makes sense as at each timestep, the underlying processes are sourced from progressively "cleaner" background databases, reaching a lower impact than if they are only sourced from the current database, but not so low as the prospective results, which are fully sourced from the most decarbonized database. Notably, the electricity consumption in the use-phase, modelled uniformly over the lifetime of the EV, contributes less and less to the score in the later years, since the electricity becomes cleaner in the future databases.

@@ -10,10 +10,7 @@ tags:
 <div hidden data-source-edit-path="docs/content/examples/paper_case_study.ipynb" data-source-view-path="docs/content/examples/paper_case_study.ipynb"></div>
 # Time-explicit LCA of an electric vehicle
 
-
 This notebook contains the code for the exemplary case study of out paper on time-explicit LCA. Here, we do a time-explicit LCA of the life cycle of an electric vehicle (EV) and compare the results to the results from static and dynamic LCAs.
-
-
 
 ```python
 import bw2data as bd
@@ -25,10 +22,7 @@ bd.projects.set_current("timex")
 
 ### Database setup
 
-
 First, we set up the databases we need, starting with a new empty foreground database:
-
-
 
 ```python
 if "foreground" in bd.databases:
@@ -40,8 +34,6 @@ foreground.register()
 Next, we load our prospective background databases. In this study, we use data from [ecoinvent v3.10](https://ecoinvent.org/), and create a set of prospective databases with [`premise`](https://github.com/polca/premise). We applied projections for the future electricity sectors using the SSP2-RCP19 pathway from the IAM IMAGE.
 In the [premise documentation](https://premise.readthedocs.io/en/latest/) you can find instructions for the creation of prospective background databases.
 
-
-
 ```python
 db_2020 = bd.Database("ei310_IMAGE_SSP2_RCP19_2020_electricity")
 db_2030 = bd.Database("ei310_IMAGE_SSP2_RCP19_2030_electricity")
@@ -50,9 +42,7 @@ db_2040 = bd.Database("ei310_IMAGE_SSP2_RCP19_2040_electricity")
 
 ### Modeling the production system
 
-
 In this study, we consider the following production system for the EV. Purple boxes are foreground, cyan boxes are background (i.e., ecoinvent/premise).
-
 
 ```mermaid
 flowchart LR
@@ -70,10 +60,7 @@ flowchart LR
     classDef fg color:#222832, fill:#9c5ffd, stroke:none;
 ```
 
-
 For our EV model, we make the following assumptions:
-
-
 
 ```python
 LIFETIME = 16  # years
@@ -87,8 +74,6 @@ MASS_BATTERY = 280  # kg
 ```
 
 Now, we create the foreground processes:
-
-
 
 ```python
 ev_production = foreground.new_node(
@@ -109,8 +94,6 @@ used_ev.save()
 ```
 
 We take the actual process data from ecoinvent. However, the ecoinvent processes for the EV part production contain intermediate flows for the end of life treatment in the production processes already, which we want to separate. We fix this first by creating new processes without the EOL:
-
-
 
 ```python
 for db in [db_2020, db_2030, db_2040]:
@@ -170,8 +153,6 @@ for db in [db_2020, db_2030, db_2040]:
 
 Now, we add the intermediate flows, starting with the EV production:
 
-
-
 ```python
 glider_production = db_2020.get(code="glider_production_without_eol")
 powertrain_production = db_2020.get(code="powertrain_production_without_eol")
@@ -191,8 +172,6 @@ battery_to_ev = ev_production.new_edge(
 ```
 
 ... the EOL:
-
-
 
 ```python
 glider_eol = db_2020.get(name="treatment of used glider, passenger car, shredding")
@@ -224,8 +203,6 @@ used_ev_to_battery_eol = used_ev.new_edge(
 
 ...and, finally, driving:
 
-
-
 ```python
 electricity_production = db_2020.get(
     name="market group for electricity, low voltage", location="WEU"
@@ -242,7 +219,6 @@ electricity_to_driving = driving.new_edge(
 )
 ```
 
-
 ```python
 glider_to_ev.save()
 powertrain_to_ev.save()
@@ -256,8 +232,6 @@ used_ev_to_battery_eol.save()
 ```
 
 To allow a comparison with a static LCA later, we calculate the radiative forcing results at this point, before temporalization:
-
-
 
 ```python
 from datetime import datetime
@@ -298,10 +272,6 @@ dlca_no_tds.dynamic_lcia(metric="radiative_forcing")
       warnings.warn(msg, UmfpackWarning)
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/dynamic_characterization/dynamic_characterization.py:81: UserWarning: No custom dynamic characterization functions provided. Using default dynamic characterization functions.                The flows that are characterized are based on the selection of the initially chosen impact category.                You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_functions.
       warnings.warn(
-
-
-
-
 
 <table>
   <thead>
@@ -396,10 +366,7 @@ dlca_no_tds.dynamic_lcia(metric="radiative_forcing")
 <p>37209 rows × 4 columns</p>
 
 
-
-
 ### Adding temporal distributions
-
 
 Now that the production system is modelled, we can add temporal distributions at the intermediate flow level. The temporal information we want to embed in our product system looks like this:
 
@@ -421,10 +388,7 @@ flowchart LR
 
 To include this temopral information, we use the `TemporalDistribution` class from `bw_temporalis`. For more info, take a look at the [bw_temporalis documentation](https://github.com/brightway-lca/bw_temporalis).
 
-
 Now we create the relative `TemporalDistribution` objects:
-
-
 
 ```python
 from bw_temporalis import TemporalDistribution, easy_timedelta_distribution
@@ -461,8 +425,6 @@ td_treating_waste = TemporalDistribution(
 
 We now add the rTDs to the intermediate flows of our EV system.
 
-
-
 ```python
 glider_to_ev["temporal_distribution"] = td_glider_production
 glider_to_ev.save()
@@ -493,8 +455,6 @@ used_ev_to_battery_eol.save()
 ```
 
 Now that we have the temporal distributions, we can calculate the dynamic LCA for later comparison.
-
-
 
 ```python
 dlca = TimexLCA({driving: 1}, method, database_dates_dlca)
@@ -549,10 +509,6 @@ dlca.dynamic_lcia(metric="radiative_forcing")
       warnings.warn(msg, UmfpackWarning)
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/dynamic_characterization/dynamic_characterization.py:81: UserWarning: No custom dynamic characterization functions provided. Using default dynamic characterization functions.                The flows that are characterized are based on the selection of the initially chosen impact category.                You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_functions.
       warnings.warn(
-
-
-
-
 
 <table>
   <thead>
@@ -647,14 +603,9 @@ dlca.dynamic_lcia(metric="radiative_forcing")
 <p>154154 rows × 4 columns</p>
 
 
-
-
 ## Time-explicit LCA calculations
 
-
 Now that everything is set up, we can calculate a Time-explicit LCA, first setting up a new `TimexLCA` object and building the timeline:
-
-
 
 ```python
 database_dates = {
@@ -676,10 +627,6 @@ tlca.build_timeline(starting_datetime="2024-01-01", temporal_grouping="month")
     2025-02-07 10:18:54.722 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2040-04-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
     2025-02-07 10:18:54.722 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2040-04-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
     Calculation count: 9
-
-
-
-
 
 <table>
   <thead>
@@ -995,11 +942,7 @@ tlca.build_timeline(starting_datetime="2024-01-01", temporal_grouping="month")
 </table>
 
 
-
-
 Now we can expand the matrices:
-
-
 
 ```python
 tlca.lci()
@@ -1012,12 +955,9 @@ tlca.lci()
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/scikits/umfpack/umfpack.py:736: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 5.78e+12)
       warnings.warn(msg, UmfpackWarning)
 
-
 ### GWI via GWP100
 
 Now we can calculate the GWI over the EV life cycle. We characterize the time-explicit inventory using GWP100 with a time horizon of 100 years counting from the time of each emissions. We use the implementations from the [`dynamic_characterization` library](https://dynamic-characterization.readthedocs.io/en/latest/).
-
-
 
 ```python
 tlca.dynamic_lcia(metric="GWP")
@@ -1025,10 +965,6 @@ tlca.dynamic_lcia(metric="GWP")
 
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/dynamic_characterization/dynamic_characterization.py:81: UserWarning: No custom dynamic characterization functions provided. Using default dynamic characterization functions.                The flows that are characterized are based on the selection of the initially chosen impact category.                You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_functions.
       warnings.warn(
-
-
-
-
 
 <table>
   <thead>
@@ -1123,11 +1059,7 @@ tlca.dynamic_lcia(metric="GWP")
 <p>2291 rows × 4 columns</p>
 
 
-
-
 To compare the time-explicit results to prospective LCA results, we do additional calculations for cases where the entire supply chain comes from the years 2020, 2030 and 2040.
-
-
 
 ```python
 import bw2calc as bc
@@ -1211,10 +1143,7 @@ for year, db in zip([2020, 2030, 2040], [db_2020, db_2030, db_2040]):
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/scikits/umfpack/umfpack.py:736: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.21e+13)
       warnings.warn(msg, UmfpackWarning)
 
-
 Comparing the overall scores:
-
-
 
 ```python
 print("Score 2020", sum(prospective_scores[2020].values()))
@@ -1228,10 +1157,7 @@ print("Time-explicit score: ", tlca.dynamic_score)
     Score 2040:  6522.389036408176
     Time-explicit score:  12076.393848996586
 
-
 Now we plot this as a waterfall chart, comparing the different approaches. The function below, that directly produces the Figure used in the paper, is a slightly customized version of the bw_timex utility function `bw_timex.utils.plot_characterized_inventory_as_waterfall()`.
-
-
 
 ```python
 import pandas as pd
@@ -1491,7 +1417,6 @@ def plot_characterized_inventory_as_waterfall(
     plt.show()
 ```
 
-
 ```python
 order_stacked_activities = [
     glider_production_without_eol["name"],
@@ -1531,18 +1456,11 @@ plot_characterized_inventory_as_waterfall(
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/matplotlib/text.py:568: FutureWarning: Calling float on a single element Series is deprecated and will raise a TypeError in the future. Use float(ser.iloc[0]) instead
       posy = float(self.convert_yunits(self._y))
 
-
-
-    
 ![png](paper_case_study_files/output_47_1.png)
-    
-
 
 ### Radiative forcing
 
 Next, we calculate the radiative forcing over the EV life cycle via dynamic characterization.
-
-
 
 ```python
 tlca.dynamic_lcia(metric="radiative_forcing")
@@ -1550,10 +1468,6 @@ tlca.dynamic_lcia(metric="radiative_forcing")
 
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/dynamic_characterization/dynamic_characterization.py:81: UserWarning: No custom dynamic characterization functions provided. Using default dynamic characterization functions.                The flows that are characterized are based on the selection of the initially chosen impact category.                You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_functions.
       warnings.warn(
-
-
-
-
 
 <table>
   <thead>
@@ -1648,11 +1562,7 @@ tlca.dynamic_lcia(metric="radiative_forcing")
 <p>154151 rows × 4 columns</p>
 
 
-
-
 We want to compare the time-explicit results to the ones from dynamic LCA with and without having defined temporal distributions. These were calculated in the beginning. To format the dynamic inventories correctly, we introduce a helper function here:
-
-
 
 ```python
 from functools import partial
@@ -1702,7 +1612,6 @@ def create_plot_df(lca):
     return final_data / 1e-11
 ```
 
-
 ```python
 df_tlca = create_plot_df(tlca)
 df_dlca = create_plot_df(dlca)
@@ -1710,8 +1619,6 @@ df_dlca_no_tds = create_plot_df(dlca_no_tds)
 ```
 
 Providing initial zero value for cumulative plots:
-
-
 
 ```python
 df_tlca = pd.concat(
@@ -1738,8 +1645,6 @@ df_dlca_no_tds = pd.concat(
 ```
 
 Plotting:
-
-
 
 ```python
 import matplotlib.dates as mdates
@@ -1990,8 +1895,4 @@ plt.tight_layout(w_pad=-0.4)
 plt.show()
 ```
 
-
-    
 ![png](paper_case_study_files/output_56_0.png)
-    
-

@@ -10,9 +10,7 @@ tags:
 <div hidden data-source-edit-path="docs/content/examples/example_Importing_model_from_excel.ipynb" data-source-view-path="docs/content/examples/example_Importing_model_from_excel.ipynb"></div>
 # Loading your LCA model with temporal distributions from an excel file
 
-
 This notebook is essentially a short version of the [example_electric_vehicle_standalone](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_electric_vehicle_standalone.ipynb) example notebook, but shows how to import the foreground model from an [excel file](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/data/example_electric_vehicle_standalone.xlsx). For a more detailed explaination of how timex works, and the the different temporal distributions, please see one of the other notebooks. 
-
 
 The example Excel file can be found [HERE](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/data/example_electric_vehicle_standalone.xlsx). 
 
@@ -42,10 +40,7 @@ The following formats are accepted:
 | easy_td        |    |      | Y | 14  | 16 | 3 | normal | 3 |
 | easy_timedelta_distribution | | | y | 0 | 15 | 16 | | | if td_kind and td_param are left empty a uniform td is assumed |
 
-
 Analoguesly absolute temporal distritbutions are supported. 
-
-
 
 ```python
 # Set up a bw project
@@ -55,13 +50,11 @@ import bw2data as bd
 bd.projects.set_current("electric_vehicle_standalone_excel")
 ```
 
-
 ```python
 # Fresh start
 for db in list(bd.databases):
     del bd.databases[db]
 ```
-
 
 ```python
 # Add some background databases
@@ -99,11 +92,8 @@ background_databases = [
 
     100%|██████████| 1/1 [00:00<00:00, 7256.58it/s]
     17:01:00+0200 [info     ] Vacuuming database            
-    
-
 
 We now create some very simple processes within these databases. These process get only one aggregated CO2-emission each. The amounts of these emissions change over time.
-
 
 ```python
 process_co2_emissions = {
@@ -136,7 +126,6 @@ for db in bd.databases:
 
 ## Case study setup
 
-
 In this study, we consider the following production system for our ev. Purple boxes are foreground, cyan boxes are background (i.e., ecoinvent/premise).
 
 ```mermaid
@@ -161,7 +150,6 @@ As an alternative to generating your temporal foreground system in code as above
 You need `bw2io > 0.9.14`, which supports the import of `TemporalDistributions` in the ExcelImporter or CSVImporter. You can consult the sample excel file under notebooks/data for valid input formats for the TDs.
 
 Please make sure you created and processed the biosphere and the background databases for 2020, 2030 and 2040 using the code above.
-
 
 ```python
 if "foreground" in bd.databases:
@@ -208,17 +196,12 @@ ei.write_database()
     	background_2020: 7
     	foreground: 5
     0 unique unlinked edges (0 total):
-    
-    
     17:01:00+0200 [warning  ] Not able to determine geocollections for all datasets. This database is not ready for regionalization.
     100%|██████████| 3/3 [00:00<00:00, 4463.61it/s]
     17:01:00+0200 [info     ] Vacuuming database            
     Created database: foreground
-    
-
 
 let's check if the ExcelImporter imported the `TemporalDistributions` correctly:
-
 
 ```python
 driving = bd.get_node(database="foreground", name="driving an electric vehicle")
@@ -237,37 +220,19 @@ ev_to_driving["temporal_distribution"].graph(resolution="M")
     [0.0625 0.0625 0.0625 0.0625 0.0625 0.0625 0.0625 0.0625 0.0625 0.0625
      0.0625 0.0625 0.0625 0.0625 0.0625 0.0625]
     timedelta64[s]
-
-
-
-
-
     <Axes: xlabel='Time (Months)', ylabel='Amount'>
 
-
-
-
-    
 ![png](example_Importing_model_from_excel_files/output_13_2.png)
-    
-
-
 
 ```python
 ev_to_driving["temporal_distribution"]
 ```
 
-
-
-
     TemporalDistribution instance with 16 values and total: 1
-
-
 
 ### Add a characterization method
 
 Finally, we need some characterization method. Again, this is just a simple made-up one:
-
 
 ```python
 bd.Method(("GWP", "example")).write(
@@ -279,16 +244,13 @@ bd.Method(("GWP", "example")).write(
 
 ## LCA using `bw_timex`
 
-
 Now that the data is set up, we can get startet with the actual time-explicit LCA. As usual, we need to select a method first:
-
 
 ```python
 method = ("GWP", "example")
 ```
 
 `bw_timex` needs to know the representative time of the databases:
-
 
 ```python
 from datetime import datetime
@@ -305,18 +267,15 @@ Now, we can instantiate a `TimexLCA`. It's structure is similar to a normal `bw2
 
 Not sure about the required inputs? Check the documentation using `?`. All our classes and methods have docstrings!
 
-
 ```python
 from bw_timex import TimexLCA
 ```
 
 Let's create a `TimexLCA` object for our EV life cycle:
 
-
 ```python
 driving = bd.get_node(database="foreground", code="driving", name="driving an electric vehicle", unit="transport over an ev lifetime")
 ```
-
 
 ```python
 # intialize the TimexLCA object with the functional unit, method, and database dates
@@ -331,16 +290,11 @@ tlca.lci()
     2026-06-25 17:01:01.438 | INFO     | bw_timex.timex_lca:__init__:131 - Calculating base LCA...
     2026-06-25 17:01:01.447 | INFO     | bw_timex.timex_lca:__init__:148 - Collecting node infos...
 
-
 Let's check the dynamic invenrotry in a human readale format
-
 
 ```python
 tlca.create_labelled_dynamic_inventory_dataframe()
 ```
-
-
-
 
 <table>
   <thead>
@@ -567,10 +521,7 @@ tlca.create_labelled_dynamic_inventory_dataframe()
 </table>
 
 
-
-
 Now we can do all further analysis as detailed in the other example notebook [example_electric_vehicle_standalone](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_electric_vehicle_standalone.ipynb). Below you just find the quick calculations. For the full dynamic characterization please see the linked notebook.
-
 
 ```python
 # Static LCIA from time-explicit LCI
@@ -578,24 +529,13 @@ tlca.static_lcia()
 tlca.static_score   #kg CO2-eq
 ```
 
-
-
-
     34122.72503901273
 
-
-
 At this point, we can already compare these time-explicit results to the results of an "ordinary", completely static LCA. These already exist within the TimexLCA class, originally to set the priorities for the graph traversal:
-
 
 ```python
 # compare to fully static non time-explicit LCIA score
 tlca.base_lca.score
 ```
 
-
-
-
     28089.199999794364
-
-

@@ -14,7 +14,6 @@ This notebook is a compact walk-through of a time-explicit LCA with `bw_timex`, 
 
 > **Note:** This notebook uses ecoinvent and premise data. It expects a brightway project with ecoinvent v3.12 (cutoff) and prospective databases for 2020, 2030 and 2040, created from it with [`premise`](https://github.com/polca/premise) (all sectors updated, REMIND-EU SSP2-NDC). If you don't have access to that, please check out the ["standalone" version](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/example_electric_vehicle_standalone.ipynb) of this notebook, which creates all its data from scratch. A more detailed version of this example, which explains all the modelling steps and the additional options of `bw_timex`, is [here](example_electric_vehicle_premise.md).
 
-
 ```python
 import bw2data as bd
 
@@ -42,7 +41,6 @@ flowchart LR
 ```
 
 Building this system is standard brightway modelling, without anything `bw_timex`-specific, so the cell below just does it in one go (unfold it if you are curious).
-
 
 ??? note "Show the code that builds the ev system"
 
@@ -200,7 +198,6 @@ flowchart LR
 
 Such timing information is stored as a `TemporalDistribution` from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis): a set of points in time (here relative to the consuming process), and the share of the exchange amount that occurs at each of them.
 
-
 ```python
 import numpy as np
 from bw_temporalis import TemporalDistribution, easy_timedelta_distribution
@@ -236,26 +233,15 @@ td_treating_waste = TemporalDistribution(
 
 Let's look at one of them:
 
-
 ```python
 td_glider_production.graph(resolution="M")
 ```
 
-
-
-
     <Axes: xlabel='Time (Months)', ylabel='Amount'>
 
-
-
-
-    
 ![png](example_electric_vehicle_premise_simple_files/output_8_1.png)
-    
-
 
 Now we attach the temporal distributions to the exchanges they belong to. The helper function `add_temporal_distribution_to_exchange` from `bw_timex.utils` finds an exchange for you, based on the process it comes from (`input_...`) and the process it goes to (`output_...`). We identify the processes by their name and database here, adding the location where the name alone is not unique.
-
 
 ```python
 from bw_timex.utils import add_temporal_distribution_to_exchange
@@ -336,11 +322,9 @@ add_temporal_distribution_to_exchange(
     2026-08-03 21:55:31.731 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -80 kilogram 'treatment of used powertrain for electric passenger car, manual dismantling' (kilogram, GLO, None) to 'used electric vehicle' (unit, GLO, None).
     2026-08-03 21:55:31.849 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -280 kilogram 'market for used Li-ion battery' (kilogram, GLO, None) to 'used electric vehicle' (unit, GLO, None).
 
-
 ## Time-explicit LCA
 
 Besides the functional unit and the impact assessment method, `bw_timex` needs to know which point in time each background database represents. Databases that carry temporal distributions - here our foreground - are flagged as `"dynamic"`.
-
 
 ```python
 from datetime import datetime
@@ -362,7 +346,6 @@ database_dates = {
 
 With that, we can set up a `TimexLCA`. It works like a normal `bw2calc.LCA`, with `database_dates` as the extra argument:
 
-
 ```python
 from bw_timex import TimexLCA
 
@@ -379,9 +362,7 @@ tlca = TimexLCA(functional_unit, method, database_dates)
     2026-08-03 21:56:46.284 | INFO     | bw_timex.timex_lca:__init__:186 - Loading node metadata from 7 database(s)...
     2026-08-03 21:56:48.509 | INFO     | bw_timex.timex_lca:__init__:223 - TimexLCA initialized.
 
-
 First, `bw_timex` traverses the supply chain and collects when each process occurs in a timeline:
-
 
 ```python
 tlca.build_timeline(
@@ -395,10 +376,6 @@ tlca.build_timeline(
     2026-08-03 21:56:53.753 | INFO     | bw_timex.timeline_builder:__init__:112 - Traversing supply chain graph...
     2026-08-03 21:56:53.774 | INFO     | bw_timex.timeline_builder:build_timeline:186 - Building timeline...
     2026-08-03 21:56:53.868 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:704 - Reference date 2040-08-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
-
-
-
-
 
 <table>
   <thead>
@@ -714,10 +691,7 @@ tlca.build_timeline(
 </table>
 
 
-
-
 Next, we calculate the time-explicit inventory. This relinks all processes to the background databases matching their timing:
-
 
 ```python
 tlca.lci()
@@ -730,40 +704,26 @@ tlca.lci()
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 4.97e+12)
       warnings.warn(msg, UmfpackWarning)
 
-
 Now we can get the time-explicit score, using the static characterization method we chose above:
-
 
 ```python
 tlca.static_lcia()
 tlca.static_score  # kg CO2-eq
 ```
 
-
-
-
     10744.473494732374
 
-
-
 For comparison, a conventional LCA with a fixed background database (here: 2020) - `bw_timex` calculated this along the way:
-
 
 ```python
 tlca.base_lca.score  # kg CO2-eq
 ```
 
-
-
-
     23247.15112358249
-
-
 
 ## Dynamic characterization
 
 Since we know *when* each emission occurs, we can also characterize them dynamically, instead of lumping everything together at one point in time. `bw_timex` automatically maps the parameterized characterization functions from [`dynamic_characterization`](https://dynamic-characterization.readthedocs.io/en/latest/) (based on IPCC AR6) to the ecoinvent biosphere flows:
-
 
 ```python
 tlca.dynamic_lcia(metric="GWP")
@@ -771,17 +731,9 @@ tlca.dynamic_score  # kg CO2-eq (GWP100)
 ```
 
     2026-08-03 21:57:06.436 | INFO     | dynamic_characterization.dynamic_characterization:characterize:126 - No custom dynamic characterization functions provided. Using default dynamic             characterization functions. The flows that are characterized are based on the selection                of the initially chosen impact category.
-
-
-
-
-
     np.float64(10655.763775235002)
 
-
-
 And plot how that impact is distributed over time, stacked by the processes causing it:
-
 
 ```python
 from bw_timex.utils import plot_characterized_inventory_as_waterfall
@@ -789,11 +741,7 @@ from bw_timex.utils import plot_characterized_inventory_as_waterfall
 plot_characterized_inventory_as_waterfall(tlca)
 ```
 
-
-    
 ![png](example_electric_vehicle_premise_simple_files/output_26_0.png)
-    
-
 
 That's it: same modelling as a normal LCA, plus temporal distributions on the exchanges, and the background databases are chosen according to when things actually happen.
 
