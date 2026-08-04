@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fixed supply scaling in `lci(expand_technosphere=False)` for processes with a production amount other than 1, whose supplies were mis-scaled and, for negative production amounts (waste treatment), sign-flipped
 * Fixed `temporal_market_lcis` being corrupted when several timeline rows share a time-mapped temporal market
 * Added the pending-solve planning and technosphere factorization to `lci(expand_technosphere=False)`, which previously only ran for the expanded path
+* Improved `TimexLCA` setup speed by making it independent of the background database size, via lazy node proxies and a base LCA restricted to the demand-relevant databases ([#204](https://github.com/brightway-lca/bw_timex/pull/204))
 
 ## [1.1.2]
 * Fixed the option to calculate the lci from the timeline. This option is called with lci(expand_technosphere=False) which speeds up the calculation significantly for for large systems, but does not allow for detailed contribution analysis of background processes. https://github.com/brightway-lca/bw_timex/commit/12853dbd799764f6d2d2fa2335d6f6f19a97abed
