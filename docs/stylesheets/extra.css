@@ -101,15 +101,14 @@
 }
 
 /* Cell outputs (nbconvert emits them as indented blocks, so they come out as
-   .language-text) get the same shape as a code cell but no primary-color bar
-   and a slightly recessed background, so they read as belonging to the cell
-   above without competing with it. */
+   .language-text) keep the theme's own code background - they're set apart
+   from the cell above by the missing primary-color bar and by the log-line
+   colouring below, not by a different shade. */
 .md-content__inner.notebook-page.md-typeset .language-text.highlight {
   box-shadow: none;
 }
 
 .md-content__inner.notebook-page.md-typeset .language-text.highlight > pre > code {
-  background-color: var(--md-default-fg-color--lightest);
   border-radius: 0.4rem;
 }
 
