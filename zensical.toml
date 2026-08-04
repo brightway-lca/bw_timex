@@ -33,11 +33,21 @@ nav = [
   { Theory = "content/theory.md" },
   { Examples = [
     "content/examples/index.md",
-    { "Life Cycle of an Electric Car" = "content/examples/example_electric_vehicle_premise_simple.md" },
-    { "Life Cycle of an Electric Car (in detail)" = "content/examples/example_electric_vehicle_premise.md" },
-    { "Dynamic Characterization" = "content/examples/example_simple_dynamic_characterization.md" },
-    { "EV Case Study for our Paper" = "content/examples/paper_case_study.md" },
-    { "Import from Excel" = "content/examples/example_Importing_model_from_excel.md" },
+    { Tutorials = [
+      { "Electric Car from Scratch" = "content/examples/tutorials/electric_vehicle_from_scratch.md" },
+      { "Dynamic Characterization" = "content/examples/tutorials/dynamic_characterization.md" },
+      { "Import from Excel" = "content/examples/tutorials/import_model_from_excel.md" },
+    ]},
+    { "Case Studies" = [
+      { "Electric Car with premise" = "content/examples/examples/electric_vehicle_premise.md" },
+      { "Electric Car with premise (in detail)" = "content/examples/examples/electric_vehicle_premise_detailed.md" },
+      { "EV Case Study for our Paper" = "content/examples/examples/paper_case_study.md" },
+    ]},
+    { Advanced = [
+      { "Temporal Distributions in the Background" = "content/examples/advanced/background_temporal_distributions.md" },
+      { "Background Temporalization with premise" = "content/examples/advanced/background_temporal_distributions_premise.md" },
+      { "Uncertainty with Datapackages" = "content/examples/advanced/uncertainty_with_datapackages.md" },
+    ]},
   ]},
   { "API Reference" = [
     "api/index.md",
@@ -113,7 +123,7 @@ name = "Open this Repo on GitHub"
 
 [[project.extra.social]]
 icon = "lucide/rocket"
-link = "https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb"
+link = "https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Ftutorials%2F1_getting_started.ipynb"
 name = "Launch interactive Demo on Binder"
 
 [project.markdown_extensions.abbr]
@@ -203,6 +213,9 @@ premise = "premise"
 paper = "paper"
 excel = "excel"
 tutorial = "tutorial"
+advanced = "advanced"
+uncertainty = "uncertainty"
+datapackages = "datapackages"
 installation = "installation"
 "temporal distribution" = "temporal-distribution"
 "temporal evolution" = "temporal-evolution"
@@ -220,6 +233,9 @@ dynchar = "lucide/trending-up"
 paper = "lucide/scroll-text"
 excel = "lucide/table"
 tutorial = "lucide/footprints"
+advanced = "lucide/sliders-horizontal"
+uncertainty = "lucide/dices"
+datapackages = "lucide/package"
 installation = "lucide/download"
 "temporal-distribution" = "lucide/chart-column-increasing"
 "temporal-evolution" = "lucide/chart-spline"

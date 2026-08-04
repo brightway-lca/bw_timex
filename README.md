@@ -12,7 +12,7 @@
 [![Conda Version](https://img.shields.io/conda/v/diepers/bw_timex?label=conda)](https://anaconda.org/diepers/bw_timex)
 [![Conda - License](https://img.shields.io/conda/l/diepers/bw_timex)](https://github.com/brightway-lca/bw_timex/blob/main/LICENSE)
 [![status](https://joss.theoj.org/papers/eb9021af0207b86e02439768a4841670/status.svg)](https://joss.theoj.org/papers/eb9021af0207b86e02439768a4841670)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Ftutorials%2F1_getting_started.ipynb)
 
 **`bw_timex` makes your LCA use the right data for the right point in time.** It's a python package for [time-explicit Life Cycle Assessment](https://docs.brightway.dev/projects/bw-timex/en/latest/content/theory.html#terminology), built on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
 

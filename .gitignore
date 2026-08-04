@@ -198,3 +198,10 @@ pyrightconfig.json
 
 # Zensical build output
 /site
+
+# Docs pages generated from notebooks/ by docs/convert_notebooks.py - the
+# notebooks are the source of truth, and both the Read the Docs build and the
+# preview workflow run the script before building.
+/docs/content/examples/tutorials/
+/docs/content/examples/examples/
+/docs/content/examples/advanced/

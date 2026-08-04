@@ -1,9 +1,15 @@
-"""Convert Jupyter notebooks in notebooks/ to Markdown for the docs.
+"""Convert the Jupyter notebooks under notebooks/ to Markdown for the docs.
 
-For each notebook listed in NOTEBOOKS:
-- Runs nbconvert (markdown output) into docs/content/examples/
+notebooks/ is the single source of truth - the docs pages are generated from
+it, so no notebook is ever maintained in two places. Everything the docs need
+but a notebook shouldn't carry (page links instead of notebook links, plain
+mermaid fences, docs-relative asset paths) is adapted here, on the way out.
+
+For each notebook listed in NOTEBOOK_META:
+- Runs nbconvert (markdown output) into docs/content/examples/<category>/
 - Strips ANSI escape sequences from every output cell
 - Moves output images into a <stem>_files/ subdirectory
+- Rewrites links to other notebooks, and copies referenced data assets
 - Prepends YAML front-matter (icon + tags) required by Zensical
 
 Run this script from the project root before building the docs:
@@ -14,42 +20,81 @@ Run this script from the project root before building the docs:
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
-NOTEBOOKS_DIR = REPO_ROOT / "docs" / "content" / "examples"
-OUTPUT_DIR = REPO_ROOT / "docs" / "content" / "examples"
+NOTEBOOKS_ROOT = REPO_ROOT / "notebooks"
+OUTPUT_ROOT = REPO_ROOT / "docs" / "content" / "examples"
+GITHUB_BLOB = "https://github.com/brightway-lca/bw_timex/blob/main"
 
-# Map notebook stem → (Zensical icon, list of tags)
+# Notebook path (relative to notebooks/) → (Zensical icon, list of tags).
+# The category is the first path segment: it decides both the docs
+# sub-directory and the section of the Examples nav the page lands in.
+# notebooks/teaching/ and notebooks/development/ are deliberately not
+# published - they're course material and benchmarking scratch space.
 NOTEBOOK_META: dict[str, tuple[str, list[str]]] = {
-    "example_electric_vehicle_premise_simple": (
+    "tutorials/2_electric_vehicle_from_scratch.ipynb": (
+        "lucide/car-front",
+        ["tutorial", "temporal distribution", "dynamic characterization"],
+    ),
+    "tutorials/3_dynamic_characterization.ipynb": (
+        "lucide/trending-up",
+        ["tutorial", "dynamic characterization"],
+    ),
+    "tutorials/4_import_model_from_excel.ipynb": (
+        "lucide/table",
+        ["tutorial", "excel", "temporal distribution"],
+    ),
+    "examples/electric_vehicle_premise.ipynb": (
         "lucide/car-front",
         ["example", "premise", "temporal distribution"],
     ),
-    "example_electric_vehicle_premise": (
+    "examples/electric_vehicle_premise_detailed.ipynb": (
         "lucide/car-front",
         ["example", "premise", "dynamic characterization"],
     ),
-    "example_simple_dynamic_characterization": (
-        "lucide/trending-up",
-        ["example", "dynamic characterization"],
-    ),
-    "paper_case_study": (
+    "examples/paper_case_study.ipynb": (
         "lucide/file-text",
         ["example", "paper", "premise"],
     ),
-    "example_Importing_model_from_excel": (
-        "lucide/table",
-        ["example", "excel", "temporal distribution"],
+    "advanced/background_temporal_distributions.ipynb": (
+        "lucide/layers",
+        ["advanced", "temporal distribution", "background databases"],
+    ),
+    "advanced/background_temporal_distributions_premise.ipynb": (
+        "lucide/layers",
+        ["advanced", "temporal distribution", "background databases", "premise"],
+    ),
+    "advanced/uncertainty_with_datapackages.ipynb": (
+        "lucide/dices",
+        ["advanced", "uncertainty", "datapackages"],
     ),
 }
 
-NOTEBOOK_SOURCE_PATHS: dict[str, str] = {
-    stem: f"docs/content/examples/{stem}.ipynb" for stem in NOTEBOOK_META
-}
+# A tutorial's leading "N_" orders the notebooks in the file listing; the docs
+# nav carries that order itself, so keep it out of the page's URL.
+ORDERING_PREFIX = re.compile(r"^\d+_")
+
+# Assets that can be copied into the docs and rendered there. Anything else a
+# notebook links to (the Excel model, say) is linked on GitHub instead.
+RENDERABLE_ASSET_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
+
+# Markdown lines carrying this marker are dropped from the docs page - for
+# notebook-only asides ("a rendered version of this notebook is in the docs")
+# that would be nonsense once rendered.
+HIDE_IN_DOCS = "<!-- hide-in-docs -->"
+
+# Jupyter renders ```{mermaid} (the MyST spelling); the docs renderer wants a
+# plain ```mermaid fence.
+MERMAID_FENCE = re.compile(r"^(\s*)```\{mermaid\}", re.MULTILINE)
+
+# A markdown link or an HTML src=/href= pointing at a notebook-relative path.
+MARKDOWN_LINK = re.compile(r"(!?)\[([^\]]*)\]\((?!https?:|#|mailto:)([^)\s]+)\)")
+HTML_ATTR_LINK = re.compile(r"""(src|href)=(["'])(?!https?:|#|data:)([^"']+)\2""")
 
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*[mK]")
 # Pandas wraps its <table> in <div><style scoped>...</style>...</div>, but the
@@ -204,12 +249,102 @@ def collapse_hidden_input_cells(body: str, notebook_path: Path) -> str:
     return body
 
 
+def page_path(notebook_rel: str) -> Path:
+    """Docs page for a notebook, as a path relative to OUTPUT_ROOT."""
+    rel = Path(notebook_rel)
+    return rel.parent / f"{ORDERING_PREFIX.sub('', rel.stem)}.md"
+
+
+PAGES: dict[str, Path] = {rel: page_path(rel) for rel in NOTEBOOK_META}
+
+
+def drop_hidden_lines(body: str) -> str:
+    """Drop the markdown lines a notebook marks as notebook-only."""
+    return "\n".join(
+        line for line in body.split("\n") if HIDE_IN_DOCS not in line
+    )
+
+
+def rewrite_target(target: str, notebook_rel: str, copied: set[Path]) -> str | None:
+    """Rewrite one notebook-relative link *target* for the docs page.
+
+    Notebooks link to each other and to notebooks/data/ with paths that work
+    while reading them in Jupyter. On a docs page those paths mean nothing, so:
+
+    - a link to a published notebook becomes a relative link to its page,
+    - a link to an unpublished notebook becomes a GitHub link,
+    - a renderable asset (an image) is copied into docs/content/examples/data/
+      and linked there,
+    - any other asset (the Excel model) becomes a GitHub link.
+
+    Returns None for targets that aren't notebook-relative (nbconvert's own
+    output_N_M.png refs, anchors, ...), which the caller leaves untouched.
+    """
+    clean = target.split("#", 1)[0]
+    if not clean:
+        return None
+
+    resolved = (NOTEBOOKS_ROOT / Path(notebook_rel).parent / clean).resolve()
+    try:
+        rel_to_notebooks = resolved.relative_to(NOTEBOOKS_ROOT.resolve())
+    except ValueError:
+        return None
+    if not resolved.exists():
+        print(
+            f"WARNING: {notebook_rel} links to {target}, which does not exist",
+            file=sys.stderr,
+        )
+        return None
+
+    rel_posix = rel_to_notebooks.as_posix()
+
+    if rel_posix in PAGES:
+        here = OUTPUT_ROOT / PAGES[notebook_rel]
+        there = OUTPUT_ROOT / PAGES[rel_posix]
+        return os.path.relpath(there, here.parent)
+
+    if resolved.suffix.lower() in RENDERABLE_ASSET_SUFFIXES:
+        destination = OUTPUT_ROOT / "data" / resolved.name
+        if destination not in copied:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(resolved, destination)
+            copied.add(destination)
+        depth = len(PAGES[notebook_rel].parts) - 1
+        return "../" * depth + f"data/{resolved.name}"
+
+    return f"{GITHUB_BLOB}/notebooks/{rel_posix}"
+
+
+def rewrite_notebook_relative_links(
+    body: str, notebook_rel: str, files_dir_name: str, copied: set[Path]
+) -> str:
+    """Point every notebook-relative link in *body* at something the docs serve."""
+
+    def markdown(match: re.Match) -> str:
+        bang, text, target = match.groups()
+        if target.startswith(f"{files_dir_name}/"):
+            return match.group(0)  # an image nbconvert just extracted
+        rewritten = rewrite_target(target, notebook_rel, copied)
+        return match.group(0) if rewritten is None else f"{bang}[{text}]({rewritten})"
+
+    def html(match: re.Match) -> str:
+        attribute, quote, target = match.groups()
+        rewritten = rewrite_target(target, notebook_rel, copied)
+        if rewritten is None:
+            return match.group(0)
+        return f"{attribute}={quote}{rewritten}{quote}"
+
+    body = MARKDOWN_LINK.sub(markdown, body)
+    return HTML_ATTR_LINK.sub(html, body)
+
+
 def convert(
-    notebook_path: Path, output_dir: Path, icon: str, tags: list[str]
+    notebook_rel: str, icon: str, tags: list[str], copied: set[Path]
 ) -> Path:
-    """Convert *notebook_path* to Markdown in *output_dir*, strip ANSI codes,
-    organise images into a <stem>_files/ sub-directory, and inject the Zensical
-    icon and tags front-matter.  Returns the output file path."""
+    """Convert the notebook at *notebook_rel* (relative to notebooks/) to a
+    Markdown page under OUTPUT_ROOT, strip ANSI codes, organise images into a
+    <stem>_files/ sub-directory, adapt notebook-relative links, and inject the
+    Zensical icon and tags front-matter.  Returns the output file path."""
     try:
         from nbconvert.exporters import MarkdownExporter
     except ImportError:
@@ -220,8 +355,10 @@ def convert(
         )
         sys.exit(1)
 
-    stem = notebook_path.stem
-    files_dir_name = f"{stem}_files"
+    notebook_path = NOTEBOOKS_ROOT / notebook_rel
+    md_path = OUTPUT_ROOT / PAGES[notebook_rel]
+    output_dir = md_path.parent
+    files_dir_name = f"{md_path.stem}_files"
     files_dir = output_dir / files_dir_name
 
     import nbformat
@@ -283,21 +420,21 @@ def convert(
             body,
         )
 
-    # Rewrite notebook-local data asset paths for rendered docs pages.
-    # In notebooks, assets live at data/<file>; in the generated docs source,
-    # they should remain relative to the examples section root. The builder
-    # then rebases them correctly for /content/examples/<page>/ URLs.
-    body = re.sub(r"src=(['\"])data/", r"src=\1data/", body)
-    body = body.replace("](../data/", "](data/")
+    # Adapt what only makes sense while reading the notebook itself: links to
+    # sibling notebooks and to notebooks/data/, the MyST mermaid fence, and
+    # asides that would read as nonsense on the rendered page.
+    body = rewrite_notebook_relative_links(body, notebook_rel, files_dir_name, copied)
+    body = MERMAID_FENCE.sub(r"\1```mermaid", body)
+    body = drop_hidden_lines(body)
 
-    source_path = NOTEBOOK_SOURCE_PATHS.get(stem)
-    source_override = ""
-    if source_path:
-        source_override = (
-            "\n"
-            f'<div hidden data-source-edit-path="{source_path}" '
-            f'data-source-view-path="{source_path}"></div>\n'
-        )
+    # The edit/view buttons point at the notebook this page was generated from,
+    # not at the generated Markdown (see docs/javascripts/source-overrides.js).
+    source_path = f"notebooks/{notebook_rel}"
+    source_override = (
+        "\n"
+        f'<div hidden data-source-edit-path="{source_path}" '
+        f'data-source-view-path="{source_path}"></div>\n'
+    )
 
     # Build YAML front-matter lines
     tags_yaml = "\n".join(f"  - {t}" for t in tags)
@@ -313,7 +450,7 @@ def convert(
     body = frontmatter + source_override + body
 
     # Write markdown file
-    md_path = output_dir / f"{stem}.md"
+    output_dir.mkdir(parents=True, exist_ok=True)
     md_path.write_text(body, encoding="utf-8")
 
     # Write image files into the _files/ subdirectory
@@ -327,20 +464,20 @@ def convert(
 
 
 def main() -> None:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 
-    # Clean up any stray image files left over from a previous run that wrote
-    # images directly into OUTPUT_DIR (old behaviour of FilesWriter)
-    for leftover in OUTPUT_DIR.glob("output_*.png"):
-        leftover.unlink()
+    # Regenerate every category directory from scratch, so a renamed or
+    # dropped notebook can't leave a stale page (or its images) behind.
+    for category in sorted({Path(rel).parts[0] for rel in NOTEBOOK_META}):
+        shutil.rmtree(OUTPUT_ROOT / category, ignore_errors=True)
 
-    for stem, (icon, tags) in NOTEBOOK_META.items():
-        notebook_path = NOTEBOOKS_DIR / f"{stem}.ipynb"
-        if not notebook_path.exists():
-            print(f"WARNING: notebook not found: {notebook_path}", file=sys.stderr)
+    copied: set[Path] = set()
+    for notebook_rel, (icon, tags) in NOTEBOOK_META.items():
+        if not (NOTEBOOKS_ROOT / notebook_rel).exists():
+            print(f"WARNING: notebook not found: {notebook_rel}", file=sys.stderr)
             continue
-        out = convert(notebook_path, OUTPUT_DIR, icon, tags)
-        print(f"Converted {notebook_path.name} → {out.relative_to(REPO_ROOT)}")
+        out = convert(notebook_rel, icon, tags, copied)
+        print(f"Converted notebooks/{notebook_rel} → {out.relative_to(REPO_ROOT)}")
 
 
 if __name__ == "__main__":
