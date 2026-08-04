@@ -87,6 +87,9 @@ class TimexLCA:
             'my_background_database_one': datetime.strptime("2020", "%Y"),
             'my_background_database_two': datetime.strptime("2030", "%Y"),
             'my_background_database_three': datetime.strptime("2040", "%Y"),
+            # Several databases may share the same date, e.g. to keep your own
+            # modified copies of background processes in their own database:
+            'my_modified_background_2020': datetime.strptime("2020", "%Y"),
             'my_foreground_database':'dynamic'
         }
     >>> tlca = TimexLCA(demand, method, database_dates)
@@ -120,7 +123,10 @@ class TimexLCA:
                 Tuple defining the LCIA method, such as `('foo', 'bar')` or default methods, such as
                 `("EF v3.1", "climate change", "global warming potential (GWP100)")`
         database_dates : dict, optional
-                Dictionary mapping database names to dates.
+                Dictionary mapping database names to dates. Several databases may
+                share the same date, e.g. to keep your own modified copies of
+                background processes in their own database instead of writing
+                them into the shared background database for that vintage.
         use_global_lci_cache : bool, optional
                 If True (default), background unit LCI matrices are cached at
                 module level and reused across `TimexLCA` objects within the
@@ -1587,6 +1593,18 @@ class TimexLCA:
             raise AttributeError(
                 "Timeline not yet built. Call TimexLCA.build_timeline() first."
             )
+
+        # The timeline builder already resolved every temporal-market producer to
+        # its counterparts while computing the market shares. Reuse that instead
+        # of scanning every background node a second time.
+        # The builder's scan is scoped to static databases only; this is inert
+        # because the mapping is only ever queried for static db names (drawn
+        # from temporal_market_shares in the timeline, which excludes foreground).
+        matches = getattr(self.timeline_builder, "market_producer_matches", None)
+        if matches:
+            self.interdatabase_activity_mapping.update(matches)
+            self.interdatabase_activity_mapping.make_reciprocal()
+            return
 
         filtered_timeline = self.timeline.loc[
             self.timeline.temporal_market_shares.notnull()
