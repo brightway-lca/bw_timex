@@ -74,6 +74,45 @@ def strip_ansi(text: str) -> str:
     return ANSI_ESCAPE.sub("", text)
 
 
+def merge_stream_outputs(notebook) -> None:
+    """Merge consecutive stream outputs of a cell into a single output.
+
+    Loguru (and anything else that flushes per line) produces one `stream`
+    output per line. nbconvert renders each output as its own indented block,
+    joined by a blank line, and Markdown then folds those adjacent indented
+    blocks into one code block full of blank lines - the docs pages end up
+    double-spaced wherever log messages appear. Concatenating the text of
+    adjacent stream outputs (stdout and stderr alike, they render identically)
+    collapses them into one block.
+    """
+    for cell in notebook.get("cells", []):
+        outputs = cell.get("outputs")
+        if not outputs:
+            continue
+
+        merged = []
+        for output in outputs:
+            if (
+                output.get("output_type") == "stream"
+                and merged
+                and merged[-1].get("output_type") == "stream"
+            ):
+                previous = merged[-1]
+                previous_text = previous["text"]
+                if isinstance(previous_text, list):
+                    previous_text = "".join(previous_text)
+                text = output["text"]
+                if isinstance(text, list):
+                    text = "".join(text)
+                if previous_text and not previous_text.endswith("\n"):
+                    previous_text += "\n"
+                previous["text"] = previous_text + text
+            else:
+                merged.append(output)
+
+        cell["outputs"] = merged
+
+
 def collapse_hidden_input_cells(body: str, notebook_path: Path) -> str:
     """Fold code cells tagged `hide-input` into a collapsed admonition.
 
@@ -129,8 +168,18 @@ def convert(
     files_dir_name = f"{stem}_files"
     files_dir = output_dir / files_dir_name
 
+    import nbformat
+
+    notebook = nbformat.read(str(notebook_path), as_version=4)
+    merge_stream_outputs(notebook)
+
     exporter = MarkdownExporter()
-    body, resources = exporter.from_filename(str(notebook_path))
+    # from_notebook_node instead of from_filename so the merged outputs above
+    # are what gets exported. Leaving resources["unique_key"] unset keeps the
+    # extracted image names at output_<cell>_<index>.png, as before.
+    body, resources = exporter.from_notebook_node(
+        notebook, resources={"metadata": {"path": str(notebook_path.parent)}}
+    )
 
     # Strip ANSI codes
     body = strip_ansi(body)

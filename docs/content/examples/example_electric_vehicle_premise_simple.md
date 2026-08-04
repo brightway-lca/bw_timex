@@ -327,29 +327,13 @@ add_temporal_distribution_to_exchange(
 ```
 
     2026-08-03 21:55:31.362 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 840 kilogram 'glider production, passenger car, without EOL' (kilogram, GLO, None) to 'production of an electric vehicle' (unit, GLO, None).
-
-
     2026-08-03 21:55:31.367 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 80 kilogram 'powertrain production, for electric passenger car, without EOL' (kilogram, GLO, None) to 'production of an electric vehicle' (unit, GLO, None).
-
-
     2026-08-03 21:55:31.371 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 280 kilogram 'battery production, Li-ion, LiMn2O4, rechargeable, without EOL' (kilogram, GLO, None) to 'production of an electric vehicle' (unit, GLO, None).
-
-
     2026-08-03 21:55:31.374 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 1 unit 'production of an electric vehicle' (unit, GLO, None) to 'driving an electric vehicle' (transport over an ev lifetime, GLO, None).
-
-
     2026-08-03 21:55:31.495 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: 30000.0 kilowatt hour 'market group for electricity, low voltage' (kilowatt hour, DEU, None) to 'driving an electric vehicle' (transport over an ev lifetime, GLO, None).
-
-
     2026-08-03 21:55:31.499 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -1 unit 'used electric vehicle' (unit, GLO, None) to 'driving an electric vehicle' (transport over an ev lifetime, GLO, None).
-
-
     2026-08-03 21:55:31.619 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -840 kilogram 'treatment of used glider, passenger car, shredding' (kilogram, GLO, None) to 'used electric vehicle' (unit, GLO, None).
-
-
     2026-08-03 21:55:31.731 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -80 kilogram 'treatment of used powertrain for electric passenger car, manual dismantling' (kilogram, GLO, None) to 'used electric vehicle' (unit, GLO, None).
-
-
     2026-08-03 21:55:31.849 | INFO     | bw_timex.utils:add_temporal_distribution_to_exchange:670 - Added temporal distribution to exchange Exchange: -280 kilogram 'market for used Li-ion battery' (kilogram, GLO, None) to 'used electric vehicle' (unit, GLO, None).
 
 
@@ -386,25 +370,13 @@ tlca = TimexLCA(functional_unit, method, database_dates)
 ```
 
     2026-08-03 21:55:31.856 | INFO     | bw_timex.timex_lca:__init__:136 - Initializing TimexLCA object...
-
-
     2026-08-03 21:55:31.856 | INFO     | bw_timex.timex_lca:__init__:157 - Calculating base LCA...
-
-
     2026-08-03 21:55:31.856 | INFO     | bw_timex.timex_lca:clean_databases:1208 - Reprocessing 4 modified database(s) before calculating: ei312_REMIND-EU_SSP2_NDC_2020, ei312_REMIND-EU_SSP2_NDC_2030, ei312_REMIND-EU_SSP2_NDC_2040, foreground. This can take a while for large databases.
-
-
     2026-08-03 21:56:45.535 | INFO     | bw_timex.timex_lca:clean_databases:1214 - Done reprocessing modified databases.
-
-
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 3.90e+13)
       warnings.warn(msg, UmfpackWarning)
     2026-08-03 21:56:46.243 | INFO     | bw_timex.timex_lca:__init__:174 - Collecting node infos...
-
-
     2026-08-03 21:56:46.284 | INFO     | bw_timex.timex_lca:__init__:186 - Loading node metadata from 7 database(s)...
-
-
     2026-08-03 21:56:48.509 | INFO     | bw_timex.timex_lca:__init__:223 - TimexLCA initialized.
 
 
@@ -419,17 +391,9 @@ tlca.build_timeline(
 ```
 
     2026-08-03 21:56:48.513 | INFO     | bw_timex.timex_lca:build_timeline:352 - No edge filter function provided. Skipping all edges in background databases.
-
-
     2026-08-03 21:56:53.663 | INFO     | bw_timex.timex_lca:build_timeline:373 - Creating activity time mapping...
-
-
     2026-08-03 21:56:53.753 | INFO     | bw_timex.timeline_builder:__init__:112 - Traversing supply chain graph...
-
-
     2026-08-03 21:56:53.774 | INFO     | bw_timex.timeline_builder:build_timeline:186 - Building timeline...
-
-
     2026-08-03 21:56:53.868 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:704 - Reference date 2040-08-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
 
 
@@ -760,15 +724,9 @@ tlca.lci()
 ```
 
     2026-08-03 21:56:54.230 | INFO     | bw_timex.timex_lca:lci:523 - Expanding matrices...
-
-
     2026-08-03 21:56:54.245 | INFO     | bw_timex.timex_lca:lci:542 - Calculating dynamic inventory...
-
-
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 4.97e+12)
       warnings.warn(msg, UmfpackWarning)
-
-
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 4.97e+12)
       warnings.warn(msg, UmfpackWarning)
 

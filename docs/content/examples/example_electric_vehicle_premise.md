@@ -441,19 +441,11 @@ tlca = TimexLCA({driving: 1}, method, database_dates)
 ```
 
     2026-08-03 22:00:28.394 | INFO     | bw_timex.timex_lca:__init__:136 - Initializing TimexLCA object...
-
-
     2026-08-03 22:00:28.394 | INFO     | bw_timex.timex_lca:__init__:157 - Calculating base LCA...
-
-
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 3.90e+13)
       warnings.warn(msg, UmfpackWarning)
     2026-08-03 22:00:29.136 | INFO     | bw_timex.timex_lca:__init__:174 - Collecting node infos...
-
-
     2026-08-03 22:00:29.174 | INFO     | bw_timex.timex_lca:__init__:186 - Loading node metadata from 7 database(s)...
-
-
     2026-08-03 22:00:29.943 | INFO     | bw_timex.timex_lca:__init__:223 - TimexLCA initialized.
 
 
@@ -475,17 +467,9 @@ tlca.build_timeline(temporal_grouping="month", graph_traversal="bfs")
 ```
 
     2026-08-03 22:00:29.946 | INFO     | bw_timex.timex_lca:build_timeline:352 - No edge filter function provided. Skipping all edges in background databases.
-
-
     2026-08-03 22:00:35.353 | INFO     | bw_timex.timex_lca:build_timeline:373 - Creating activity time mapping...
-
-
     2026-08-03 22:00:35.443 | INFO     | bw_timex.timeline_builder:__init__:112 - Traversing supply chain graph...
-
-
     2026-08-03 22:00:35.474 | INFO     | bw_timex.timeline_builder:build_timeline:186 - Building timeline...
-
-
     2026-08-03 22:00:35.545 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:704 - Reference date 2040-08-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
 
 
@@ -819,15 +803,9 @@ tlca.lci()
 ```
 
     2026-08-03 22:00:35.925 | INFO     | bw_timex.timex_lca:lci:523 - Expanding matrices...
-
-
     2026-08-03 22:00:35.940 | INFO     | bw_timex.timex_lca:lci:542 - Calculating dynamic inventory...
-
-
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 4.97e+12)
       warnings.warn(msg, UmfpackWarning)
-
-
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 4.97e+12)
       warnings.warn(msg, UmfpackWarning)
 
@@ -1348,11 +1326,7 @@ for exc in prospective_driving.technosphere():
 ```
 
     22:00:53+0200 [info     ] Changed code to avoid conflict with existing value: {self['code']} to {data['code']}
-
-
     22:00:53+0200 [info     ] Changed code to avoid conflict with existing value: {self['code']} to {data['code']}
-
-
     /Users/timodiepers/Documents/Coding/bw_timex/.venv/lib/python3.12/site-packages/scikits/umfpack/umfpack.py:737: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.38e+13)
       warnings.warn(msg, UmfpackWarning)
 

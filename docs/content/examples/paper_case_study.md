@@ -278,11 +278,7 @@ dlca_no_tds.dynamic_lcia(metric="radiative_forcing")
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/scikits/umfpack/umfpack.py:736: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 3.13e+13)
       warnings.warn(msg, UmfpackWarning)
     2025-02-07 10:18:19.799 | INFO     | bw_timex.timex_lca:build_timeline:216 - No edge filter function provided. Skipping all edges in background databases.
-
-
     Starting graph traversal
-
-
     2025-02-07 10:18:23.932 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2024-01-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
     2025-02-07 10:18:23.933 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2024-01-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
     2025-02-07 10:18:23.933 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2024-01-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
@@ -293,11 +289,7 @@ dlca_no_tds.dynamic_lcia(metric="radiative_forcing")
     2025-02-07 10:18:23.934 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2024-01-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
     2025-02-07 10:18:23.934 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2024-01-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
     2025-02-07 10:18:23.935 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2024-01-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
-
-
     Calculation count: 9
-
-
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/bw2calc/lca_base.py:127: SparseEfficiencyWarning: splu converted its input to CSC format
       self.solver = factorized(self.technosphere_matrix)
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/scikits/umfpack/umfpack.py:736: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.86e+12)
@@ -514,11 +506,7 @@ dlca.dynamic_lcia(metric="radiative_forcing")
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/scikits/umfpack/umfpack.py:736: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 3.13e+13)
       warnings.warn(msg, UmfpackWarning)
     2025-02-07 10:18:28.827 | INFO     | bw_timex.timex_lca:build_timeline:216 - No edge filter function provided. Skipping all edges in background databases.
-
-
     Starting graph traversal
-
-
     2025-02-07 10:18:33.034 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2021-10-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
     2025-02-07 10:18:33.035 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2021-11-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
     2025-02-07 10:18:33.035 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2022-10-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
@@ -552,11 +540,7 @@ dlca.dynamic_lcia(metric="radiative_forcing")
     2025-02-07 10:18:33.041 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2040-04-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
     2025-02-07 10:18:33.041 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2040-04-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
     2025-02-07 10:18:33.042 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2040-04-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
-
-
     Calculation count: 9
-
-
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/bw2calc/lca_base.py:127: SparseEfficiencyWarning: splu converted its input to CSC format
       self.solver = factorized(self.technosphere_matrix)
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/scikits/umfpack/umfpack.py:736: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.86e+12)
@@ -687,16 +671,10 @@ tlca.build_timeline(starting_datetime="2024-01-01", temporal_grouping="month")
     /Users/timodiepers/anaconda3/envs/timex/lib/python3.11/site-packages/scikits/umfpack/umfpack.py:736: UmfpackWarning: (almost) singular matrix! (estimated cond. number: 1.21e+13)
       warnings.warn(msg, UmfpackWarning)
     2025-02-07 10:18:41.537 | INFO     | bw_timex.timex_lca:build_timeline:216 - No edge filter function provided. Skipping all edges in background databases.
-
-
     Starting graph traversal
-
-
     2025-02-07 10:18:54.722 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2040-04-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
     2025-02-07 10:18:54.722 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2040-04-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
     2025-02-07 10:18:54.722 | INFO     | bw_timex.timeline_builder:get_weights_for_interpolation_between_nearest_years:522 - Reference date 2040-04-01 00:00:00 is higher than all provided dates. Data will be taken from the closest lower year.
-
-
     Calculation count: 9
 
 

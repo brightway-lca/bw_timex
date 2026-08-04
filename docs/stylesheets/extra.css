@@ -100,6 +100,84 @@
   border-radius: 0.4rem;
 }
 
+/* Cell outputs (nbconvert emits them as indented blocks, so they come out as
+   .language-text) get the same shape as a code cell but no primary-color bar
+   and a slightly recessed background, so they read as belonging to the cell
+   above without competing with it. */
+.md-content__inner.notebook-page.md-typeset .language-text.highlight {
+  box-shadow: none;
+}
+
+.md-content__inner.notebook-page.md-typeset .language-text.highlight > pre > code {
+  background-color: var(--md-default-fg-color--lightest);
+  border-radius: 0.4rem;
+}
+
+/* Log-line tokens, applied at runtime by docs/javascripts/source-overrides.js.
+   Colours are set here (rather than reusing --md-code-hl-*) so the output
+   palette stays deliberately quieter than the Python token palette. */
+.md-content__inner.notebook-page.md-typeset .nb-log-time {
+  color: var(--md-default-fg-color--light);
+  opacity: 0.7;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-origin {
+  color: var(--md-default-fg-color--light);
+  opacity: 0.7;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-message {
+  color: var(--md-default-fg-color);
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-level {
+  font-weight: 700;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-level--info {
+  color: #3f6fd8;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-level--success {
+  color: #2e7d4f;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-level--warning {
+  color: #a86400;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-level--error {
+  color: #c0392b;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-level--debug {
+  color: var(--md-default-fg-color--light);
+}
+
+[data-md-color-scheme="slate"]
+  .md-content__inner.notebook-page.md-typeset
+  .nb-log-level--info {
+  color: #7fa8ff;
+}
+
+[data-md-color-scheme="slate"]
+  .md-content__inner.notebook-page.md-typeset
+  .nb-log-level--success {
+  color: #6fcf97;
+}
+
+[data-md-color-scheme="slate"]
+  .md-content__inner.notebook-page.md-typeset
+  .nb-log-level--warning {
+  color: #e0a03c;
+}
+
+[data-md-color-scheme="slate"]
+  .md-content__inner.notebook-page.md-typeset
+  .nb-log-level--error {
+  color: #ff8a80;
+}
+
 /* Below the theme's own mobile breakpoint, the code cell (like the table
    and the code block itself) bleeds all the way to the true screen edge
    rather than just to the edge of an inset content column - a rounded
@@ -109,7 +187,8 @@
    off here, since above this breakpoint the cell still has visible page
    margin around it and the rounding reads as intentional. */
 @media screen and (max-width: 44.984375em) {
-  .md-content__inner.notebook-page.md-typeset .language-python.highlight > pre > code {
+  .md-content__inner.notebook-page.md-typeset .language-python.highlight > pre > code,
+  .md-content__inner.notebook-page.md-typeset .language-text.highlight > pre > code {
     border-radius: 0;
   }
 }

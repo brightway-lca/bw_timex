@@ -71,17 +71,10 @@ bd.Method(("GWP", "example")).write(
 ```
 
     100%|██████████| 1/1 [00:00<00:00, 4369.07it/s]
-
-
     Vacuuming database 
     Not able to determine geocollections for all datasets. This database is not ready for regionalization.
-
-
     100%|██████████| 1/1 [00:00<00:00, 17189.77it/s]
-
     Vacuuming database 
-
-
     
 
 
@@ -111,8 +104,6 @@ tlca.build_timeline()
 ```
 
     Calculation count: 0
-
-
     /Users/timodiepers/Documents/Coding/timex/bw_timex/bw_timex.py:182: UserWarning: No edge filter function provided. Skipping all edges within background databases.
       warnings.warn(
     /Users/timodiepers/Documents/Coding/timex/bw_timex/timeline_builder.py:191: Warning: No time-explicit databases are provided. Mapping to time-explicit databases is not possible.
@@ -492,8 +483,6 @@ print(
 ```
 
     characterized dynamic score: 81.38137397247695 [GWP (20)]
-
-
     /Users/timodiepers/Documents/Coding/timex/bw_timex/dynamic_characterization.py:122: UserWarning: Using bw_timex's default CO2 characterization function for GWP reference.
       warnings.warn(
 
@@ -516,8 +505,6 @@ print(
 ```
 
     characterized dynamic score: 54.271464562232225 [GWP (20)]
-
-
     /Users/timodiepers/Documents/Coding/timex/bw_timex/dynamic_characterization.py:122: UserWarning: Using bw_timex's default CO2 characterization function for GWP reference.
       warnings.warn(
 
@@ -619,17 +606,10 @@ write_database_multi_emission()
 ```
 
     100%|██████████| 3/3 [00:00<00:00, 46091.25it/s]
-
-
     Vacuuming database 
     Not able to determine geocollections for all datasets. This database is not ready for regionalization.
-
-
     100%|██████████| 1/1 [00:00<00:00, 25420.02it/s]
-
     Vacuuming database 
-
-
     
 
 
@@ -650,8 +630,6 @@ tlca.static_lcia()
 ```
 
     Calculation count: 0
-
-
     /Users/timodiepers/Documents/Coding/timex/bw_timex/bw_timex.py:100: UserWarning: No database_dates provided. Treating the databases containing the functional unit as dynamic. No remapping to time explicit databases will be done.
       warnings.warn(
     /Users/timodiepers/Documents/Coding/timex/bw_timex/bw_timex.py:182: UserWarning: No edge filter function provided. Skipping all edges within background databases.

@@ -98,10 +98,7 @@ background_databases = [
 ```
 
     100%|██████████| 1/1 [00:00<00:00, 7256.58it/s]
-
     17:01:00+0200 [info     ] Vacuuming database            
-
-
     
 
 
@@ -214,14 +211,9 @@ ei.write_database()
     
     
     17:01:00+0200 [warning  ] Not able to determine geocollections for all datasets. This database is not ready for regionalization.
-
-
     100%|██████████| 3/3 [00:00<00:00, 4463.61it/s]
-
     17:01:00+0200 [info     ] Vacuuming database            
     Created database: foreground
-
-
     
 
 
