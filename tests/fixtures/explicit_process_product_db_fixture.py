@@ -3,7 +3,7 @@ from datetime import datetime
 import bw2data as bd
 import numpy as np
 import pytest
-from bw_temporalis import TemporalDistribution
+from bw_timex import TemporalDistribution
 
 
 @pytest.fixture

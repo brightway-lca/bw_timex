@@ -151,7 +151,7 @@ end
 
 ```python
 import numpy as np
-from bw_temporalis import TemporalDistribution
+from bw_timex import TemporalDistribution
 from bw_timex.utils import add_temporal_distribution_to_exchange
 
 # Starting with the exchange between A and B

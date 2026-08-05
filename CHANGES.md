@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+* Added a flat top-level namespace: `TemporalDistribution`, `easy_timedelta_distribution` and `easy_datetime_distribution` are re-exported from `bw_temporalis`, and the user-facing helpers from `bw_timex.utils` (`add_temporal_distribution_to_exchange`, `add_temporal_evolution_to_exchange`, `add_flows_to_characterization_functions`, `get_exchange`, `get_temporal_evolution_factor`, `interactive_td_widget`, `plot_characterized_inventory_as_waterfall`) are now importable directly from `bw_timex`
 * Fixed `lci()` raising `MultipleResults` when a temporalized process' code also exists in another database of the project, by resolving producers by node id instead of by code ([#203](https://github.com/brightway-lca/bw_timex/pull/203))
 * Fixed supply scaling in `lci(expand_technosphere=False)` for processes with a production amount other than 1, whose supplies were mis-scaled and, for negative production amounts (waste treatment), sign-flipped ([#200](https://github.com/brightway-lca/bw_timex/pull/200))
 * Fixed `temporal_market_lcis` being corrupted when several timeline rows share a time-mapped temporal market ([#200](https://github.com/brightway-lca/bw_timex/pull/200))

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from bw2data.tests import bw2test
-from bw_temporalis import TemporalDistribution
+from bw_timex import TemporalDistribution
 from dynamic_characterization.classes import CharacterizedRow
 
 from bw_timex import TimexLCA
