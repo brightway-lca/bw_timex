@@ -2,7 +2,7 @@ from datetime import datetime
 
 import bw2data as bd
 import numpy as np
-from bw_temporalis import TemporalDistribution
+from bw_timex import TemporalDistribution
 
 from bw_timex import TimexLCA
 

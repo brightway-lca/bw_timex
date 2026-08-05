@@ -9,7 +9,7 @@ import bw2calc as bc
 import bw2data as bd
 import numpy as np
 import pytest
-from bw_temporalis import TemporalDistribution
+from bw_timex import TemporalDistribution
 
 from bw_timex import TimexLCA
 

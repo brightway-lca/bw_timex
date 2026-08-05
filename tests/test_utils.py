@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from bw2data.errors import MultipleResults, UnknownObject
-from bw_temporalis import TemporalDistribution
+from bw_timex import TemporalDistribution
 
 from bw_timex.utils import (
     add_flows_to_characterization_functions,

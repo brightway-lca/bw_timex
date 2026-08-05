@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-from bw_temporalis import TemporalDistribution
+from bw_timex import TemporalDistribution
 
 from bw_timex.edge_extractor import _join_datetime_and_timedelta_distributions
 
