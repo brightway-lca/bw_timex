@@ -7,7 +7,7 @@ tags:
 
 # Theory
 
-This section explains some of the theory behind time-explicit LCAs with `bw_timex`. In contrast to the [Getting Started section](getting_started/index.md), we explain a bit more of what`s going on in the background here. If this is still too vague for you, you can always check out our [API reference](../api/index.md).
+This section explains some of the theory behind time-explicit LCAs with `bw_timex`. In contrast to the [Walkthrough](getting_started/index.md), we explain a bit more of what`s going on in the background here. If this is still too vague for you, you can always check out our [API reference](../api/index.md).
 
 ## Terminology
 LCA terminology can be confusing sometimes, also for experienced practitioners. Particularly, we found the terminology around temporal aspects of LCA confusing, where different terms have been used to describe the same temporal aspect or the same term has been used to describe different temporal aspects.
@@ -60,7 +60,7 @@ To determine the timing of the exchanges within the production system, we add th
 
     ```python
     import numpy as np
-    from bw_temporalis import TemporalDistribution
+    from bw_timex import TemporalDistribution
 
     two_and_four_years_ahead = TemporalDistribution(
         date=np.array([2, 4], dtype="timedelta64[Y]"),

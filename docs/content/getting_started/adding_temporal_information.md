@@ -109,21 +109,9 @@ style biosphere fill:none, stroke:none;
 
 Now, if you want to consider time in your LCA, you need to somehow add temporal information. For time-explicit LCA, we consider two kinds of temporal information, that will be discussed in the following.
 
-!!! note "Chimaera nodes vs. separate process and product nodes"
+!!! tip "Chimaera nodes vs. separate process and product nodes"
 
-    Brightway can represent inventory data either with separate process and product nodes or with
-    chimaera process+product nodes. See the Brightway inventory overview on
-    [processes, products, and something in between](https://docs.brightway.dev/en/latest/content/overview/inventory.html#processes-products-and-something-in-between).
-
-    This getting-started page uses the common chimaera style, where Process A is also its reference
-    product. The temporal concepts below also apply to explicit process/product models; the main
-    difference is where output-side timing can be attached. If you want to represent several
-    production-time groups of the same product, you can do this in either paradigm. In a chimaera
-    model, this timing is often represented with an intermediary foreground edge. In an explicit
-    model, it can live directly on the process→product production edge.
-
-    Which paradigm fits your model, and what each one costs you, is discussed in
-    [What LCA should I do?](../decisiontree.md#modeling-paradigm-option-chimaera-vs-explicit-processproduct).
+    This model setup assumes processes are "chimaera nodes" aka. processes with a single specific reference product. However, its also possible to separate process and product nodes explicitly. For an overview of these different paradigms, see [What LCA should I do?](../decisiontree.md#modeling-paradigm-option-chimaera-vs-explicit-processproduct).
 
 ## Temporal distributions
 To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges. To carry the temporal information, we use the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class is a *container for a series of amount spread over time*, so it tells you what share of an exchange happens at what point in time. So, let's include this information in our production system - first visually:
@@ -160,7 +148,7 @@ end
 
     ```python
     import numpy as np
-    from bw_temporalis import TemporalDistribution
+    from bw_timex import TemporalDistribution
     from bw_timex.utils import add_temporal_distribution_to_exchange
 
     # Starting with the exchange between A and B
@@ -273,7 +261,7 @@ database_dates = {
 }
 ```
 
-!!! note
+!!! tip "Data sources"
 
     You can use whatever data source you want for the time-specific process data. A nice package from the Brightway cosmos that can help you is [premise](https://premise.readthedocs.io/en/latest/introduction.html).
 

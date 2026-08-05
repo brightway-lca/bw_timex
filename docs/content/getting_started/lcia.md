@@ -36,6 +36,9 @@ characterization_functions = {
 }
 ```
 
+!!! tip "Using ecoinvent / biosphere3?"
+    Then you don't need to do this. `dynamic_characterization` automatically maps the biosphere flows to matching characterization functions, so you can just skip the `characterization_functions` argument.
+
 So, let's characterize our inventory. As a metric we choose radiative forcing, and a time horizon of 100 years:
 
 ```python

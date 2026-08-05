@@ -20,8 +20,9 @@ nav = [
     { Funding = "content/funding.md" },
   ]},
   { "User Guide" = [
+    { "Quick Start" = "content/getting_started/quickstart.md" },
     { Installation = "content/installation.md" },
-    { "Getting Started" = [
+    { Walkthrough = [
       "content/getting_started/index.md",
       { "Step 1 - Adding temporal information" = "content/getting_started/adding_temporal_information.md" },
       { "Step 2 - Building the process timeline" = "content/getting_started/build_process_timeline.md" },

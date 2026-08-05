@@ -20,8 +20,9 @@ You *can* work around this by hand: split each exchange into one copy per point 
 Most useful for long-lived products, strongly evolving production systems, and biogenic carbon. Still unsure whether you need time-explicit LCA? [Check out our decision tree](content/decisiontree.md) for some guidance.
 
 ## 👩‍💻 Getting Started
+- [Quick Start](content/getting_started/quickstart.md)
 - [Installation Guide](content/installation.md)
-- [Getting Started Tutorial](content/getting_started/index.md)
+- [Walkthrough](content/getting_started/index.md)
 - [Example Collection](content/examples/index.md)
 
 ## 📚 Citation
