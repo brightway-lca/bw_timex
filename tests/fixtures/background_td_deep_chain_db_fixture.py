@@ -2,7 +2,7 @@ import bw2data as bd
 import numpy as np
 import pytest
 from bw2data.tests import bw2test
-from bw_temporalis import TemporalDistribution
+from bw_timex import TemporalDistribution
 
 # Length of the linear background chain bg_0 -> bg_1 -> ... -> bg_{N-1}.
 CHAIN_LEN = 6

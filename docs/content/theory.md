@@ -54,7 +54,7 @@ Let's say we have two temporal distributions. The first dates 30% of some exchan
 
 ```python
 import numpy as np
-from bw_temporalis import TemporalDistribution
+from bw_timex import TemporalDistribution
 
 two_and_four_years_ahead = TemporalDistribution(
     date=np.array([2, 4], dtype="timedelta64[Y]"),
