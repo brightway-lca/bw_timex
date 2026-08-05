@@ -33,9 +33,10 @@ You *can* work around this by hand: split each exchange into one copy per point 
 Most useful for long-lived products, strongly evolving production systems, and biogenic carbon. Still unsure whether you need time-explicit LCA? [Check out our decision tree](https://docs.brightway.dev/projects/bw-timex/en/latest/content/decisiontree.html) for some guidance.
 
 ## 👩‍💻 Getting Started
+- [Quick Start](https://docs.brightway.dev/projects/bw-timex/en/latest/content/getting_started/quickstart.html)
 - [Installation Guide](https://docs.brightway.dev/projects/bw-timex/en/latest/content/installation.html)
-- [Getting Started Tutorial](https://docs.brightway.dev/projects/bw-timex/en/latest/content/getting_started/index.html)
-- [Example Collection](https://docs.brightway.dev/projects/bw-timex/en/latest/content/examples/index.html)
+- [Walkthrough](https://docs.brightway.dev/projects/bw-timex/en/latest/content/getting_started/)
+- [Example Collection](https://docs.brightway.dev/projects/bw-timex/en/latest/content/examples/)
 
 ## 📚 Citation
 If `bw_timex` supports your scientific work, please consider citing our companion publications:
