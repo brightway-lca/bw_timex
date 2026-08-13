@@ -5,6 +5,10 @@ import bw2data as bd
 from bw_temporalis import TemporalDistribution
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+DynamicLCIAMetric = Literal[
+    "radiative_forcing", "GWP", "pGWP", "pGTP", "prospective_radiative_forcing"
+]
+
 
 class TimexLCAInputs(BaseModel):
     """Validates inputs to TimexLCA.__init__"""
@@ -147,7 +151,7 @@ class DynamicLCIAInputs(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    metric: Literal["radiative_forcing", "GWP"] = "radiative_forcing"
+    metric: DynamicLCIAMetric = "radiative_forcing"
     time_horizon: int = Field(default=100, gt=0)
     fixed_time_horizon: bool = False
     time_horizon_start: Optional[datetime] = None

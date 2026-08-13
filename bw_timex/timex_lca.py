@@ -97,7 +97,8 @@ class TimexLCA:
     >>> tlca.lci()
     >>> tlca.static_lcia()
     >>> print(tlca.static_score)
-    >>> tlca.dynamic_lcia(metric="radiative_forcing") # also available: "GWP"
+    >>> tlca.dynamic_lcia(metric="radiative_forcing") # also available:
+    >>> # "GWP", "pGWP", "pGTP", "prospective_radiative_forcing"
     >>> print(tlca.dynamic_score)
 
     """ """"""
@@ -781,7 +782,8 @@ class TimexLCA:
         of the chosen static climate change impact category. If there is no characterization
         function for a biosphere flow, it will be ignored.
 
-        Two dynamic climate change metrics are supported: "GWP" and "radiative_forcing".
+        Dynamic climate change metrics are supported for "GWP", "radiative_forcing",
+        "pGWP", "pGTP", and "prospective_radiative_forcing".
         The time horizon for the impact assessment can be set with the `time_horizon` parameter,
         defaulting to 100 years. The `fixed_time_horizon` parameter determines whether the emission
         time horizon for all emissions is calculated from a specific starting point `time_horizon_start`
@@ -793,7 +795,8 @@ class TimexLCA:
         ----------
         metric : str, optional
             the metric for which the dynamic LCIA should be calculated. Default is
-            "radiative_forcing". Available: "GWP" and "radiative_forcing"
+            "radiative_forcing". Available: "GWP", "radiative_forcing", "pGWP",
+            "pGTP", and "prospective_radiative_forcing"
         time_horizon: int, optional
             the time horizon for the impact assessment. Unit is years. Default is 100.
         fixed_time_horizon: bool, optional
@@ -2074,6 +2077,9 @@ class TimexLCA:
         metric_ylabels = {
             "radiative_forcing": "radiative forcing [W/m²]",
             "GWP": f"GWP{self.current_time_horizon} [kg CO₂-eq]",
+            "pGWP": f"pGWP{self.current_time_horizon} [kg CO₂-eq]",
+            "pGTP": f"pGTP{self.current_time_horizon} [kg CO₂-eq]",
+            "prospective_radiative_forcing": "prospective radiative forcing [W/m²]",
         }
 
         # Fetch the inventory to use in plotting, modify based on flags

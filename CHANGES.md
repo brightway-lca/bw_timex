@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Improved `TimexLCA` setup speed by making it independent of the background database size, via lazy node proxies and a base LCA restricted to the demand-relevant databases ([#204](https://github.com/brightway-lca/bw_timex/pull/204))
 * Added support for several background databases sharing the same point in time in `database_dates`, by resolving temporal market shares per producer instead of per date ([#205](https://github.com/brightway-lca/bw_timex/pull/205))
 
+## [1.1.3] - 2026-08-13
+* Fixed `dynamic_lcia()` input validation to accept the prospective metrics supported by `dynamic_characterization`: `pGWP`, `pGTP`, and `prospective_radiative_forcing`
+
 ## [1.1.2]
 * Fixed the option to calculate the lci from the timeline. This option is called with lci(expand_technosphere=False) which speeds up the calculation significantly for for large systems, but does not allow for detailed contribution analysis of background processes. https://github.com/brightway-lca/bw_timex/commit/12853dbd799764f6d2d2fa2335d6f6f19a97abed
 
