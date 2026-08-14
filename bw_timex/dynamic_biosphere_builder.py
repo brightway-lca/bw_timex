@@ -33,6 +33,7 @@ class DynamicBiosphereBuilder:
         expand_technosphere: bool = True,
         background_unit_lci_cache: dict | None = None,
         nodes: dict | None = None,
+        keep_activity_dimension: bool = True,
     ) -> None:
         """
         Initializes the DynamicBiosphereBuilder object.
@@ -92,6 +93,11 @@ class DynamicBiosphereBuilder:
         # matrix is rebuilt to *this* lca_obj's biosphere/technosphere
         # index space (see `_rebuild_unit_lci`).
         self._expand_technosphere = bool(expand_technosphere)
+        # With the activity dimension dropped, every emission goes into a single
+        # column, already scaled by its activity's supply. That is all a score -
+        # static or dynamic - needs, and it keeps the entry count proportional to
+        # the number of (flow, time) pairs instead of (flow, time, activity).
+        self.keep_activity_dimension = bool(keep_activity_dimension)
 
         if expand_technosphere:
             self.technosphere_matrix = (
@@ -99,6 +105,9 @@ class DynamicBiosphereBuilder:
             )  # convert to csc as this is only used for column slicing
             self.dynamic_supply_array = lca_obj.supply_array
             self.activity_dict = lca_obj.dicts.activity
+            # Only used when building from the timeline, where each row is its
+            # own column; with expanded matrices the columns already collapse.
+            self.collapsed_market_rows = set()
         else:
             # `timeline.amount` is the LOCAL, per-edge exchange amount (per unit
             # of the immediate consumer); it does not carry the upstream
@@ -108,8 +117,8 @@ class DynamicBiosphereBuilder:
             # `Edge.cumulative_amount_producer` / `_join_cumulative_amount`) and
             # is the correct quantity to scale each timeline row's biosphere/
             # market contribution by.
-            self.dynamic_supply_array = self._supply_array_from_timeline(
-                timeline, node_collections
+            self.dynamic_supply_array, self.collapsed_market_rows = (
+                self._supply_array_from_timeline(timeline, node_collections)
             )
 
         self.activity_time_mapping = activity_time_mapping
@@ -148,7 +157,7 @@ class DynamicBiosphereBuilder:
     @staticmethod
     def _supply_array_from_timeline(
         timeline: pd.DataFrame, node_collections: dict
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, set]:
         """Per-timeline-row supply, used instead of a solved supply array when
         the dynamic inventory is built directly from the timeline.
 
@@ -160,19 +169,39 @@ class DynamicBiosphereBuilder:
         biosphere exchanges are read (those are per production amount, not per
         unit of product), which the expanded technosphere gets for free from the
         solve. So convert those rows to process units here.
+
+        Rows that share a time-mapped temporal market are collapsed onto the
+        first of them: they all carry the same background LCI per unit of market
+        output, so the inventory only depends on their summed supply. Returns
+        the supply array and the positions of the collapsed-away rows, whose
+        columns are left empty.
         """
         supply = timeline.cumulative_amount.values.astype(float)
         temporalized = node_collections["temporalized_processes"]
+        markets = node_collections["temporal_markets"]
         production_amounts = {}
+        market_positions = {}
         for position, row in enumerate(timeline.itertuples()):
-            if row.time_mapped_producer not in temporalized:
-                continue
-            if row.producer not in production_amounts:
-                production_amounts[row.producer] = (
-                    get_reference_product_production_amount(row.producer)
+            if row.time_mapped_producer in temporalized:
+                if row.producer not in production_amounts:
+                    production_amounts[row.producer] = (
+                        get_reference_product_production_amount(row.producer)
+                    )
+                supply[position] /= production_amounts[row.producer]
+            elif row.time_mapped_producer in markets:
+                market_positions.setdefault(row.time_mapped_producer, []).append(
+                    position
                 )
-            supply[position] /= production_amounts[row.producer]
-        return supply
+
+        collapsed_market_rows = set()
+        for positions in market_positions.values():
+            if len(positions) == 1:
+                continue
+            keep, rest = positions[0], positions[1:]
+            supply[keep] += supply[rest].sum()
+            supply[rest] = 0.0
+            collapsed_market_rows.update(rest)
+        return supply, collapsed_market_rows
 
     def build_dynamic_biosphere_matrix(
         self,
@@ -213,6 +242,9 @@ class DynamicBiosphereBuilder:
 
         for row in self.timeline.itertuples():
             idx = row.time_mapped_producer
+            # Deduplicates repeated (flow, time) entries within one activity,
+            # which the per-activity columns do implicitly.
+            seen_rows = set()
 
             if expand_technosphere:
                 process_col_index = self.activity_dict[
@@ -291,10 +323,11 @@ class DynamicBiosphereBuilder:
                         )
 
                         # populate lists with which sparse matrix is constructed
-                        self.add_matrix_entry_for_biosphere_flows(
+                        self._add_entry(
                             row=time_mapped_matrix_idx,
                             col=process_col_index,
                             amount=amount,
+                            seen_rows=seen_rows,
                         )
 
             elif idx in self.node_collections["temporal_markets"]:
@@ -302,6 +335,10 @@ class DynamicBiosphereBuilder:
                     # Several timeline rows (one per consumer) can share a
                     # time-mapped market, but with expanded matrices they all
                     # map to the same column, whose supply already sums them up.
+                    continue
+                if row.Index in self.collapsed_market_rows:
+                    # Built from the timeline: this row's market is served by
+                    # another row's column, which carries their summed supply.
                     continue
                 self.temporal_market_cols.append(process_col_index)
                 (
@@ -329,43 +366,53 @@ class DynamicBiosphereBuilder:
                             else unit_lci_total + unit_lci
                         )
 
-                    aggregated_inventory = unit_lci_total.sum(axis=1)
+                    aggregated_inventory = np.asarray(
+                        unit_lci_total.sum(axis=1)
+                    ).ravel()
 
-                    # multiply LCI with supply of temporal market
-                    scaled_lci = (
-                        unit_lci_total * self.dynamic_supply_array[process_col_index]
-                    )
-                    if idx not in temporal_market_lcis:
-                        temporal_market_lcis[idx] = scaled_lci
-                    else:
-                        temporal_market_lcis[idx] += scaled_lci
+                    if expand_technosphere:
+                        # Only used to disaggregate the background of temporal
+                        # markets, which needs the expanded technosphere. Keeping
+                        # one scaled LCI per market row otherwise just burns
+                        # memory (real background systems have hundreds of
+                        # thousands of market rows).
+                        scaled_lci = (
+                            unit_lci_total * self.dynamic_supply_array[process_col_index]
+                        )
+                        if idx not in temporal_market_lcis:
+                            temporal_market_lcis[idx] = scaled_lci
+                        else:
+                            temporal_market_lcis[idx] += scaled_lci
 
-                    for row_idx, amount in enumerate(aggregated_inventory.A1):
+                    time_in_datetime = convert_date_string_to_datetime(
+                        self.temporal_grouping, str(time)
+                    )  # now time is a datetime
+
+                    date = TemporalDistribution(
+                        date=np.array([str(time_in_datetime)], dtype=self.time_res),
+                        amount=np.array([1]),
+                    ).date[0]
+
+                    # A background LCI touches a few hundred of the thousands of
+                    # biosphere flows; the rest would only add explicit zeros.
+                    for row_idx in np.flatnonzero(aggregated_inventory):
                         bioflow = self.lca_obj.dicts.biosphere.reversed[row_idx]
-                        ((_, _), time) = self.activity_time_mapping.reversed[idx]
-
-                        time_in_datetime = convert_date_string_to_datetime(
-                            self.temporal_grouping, str(time)
-                        )  # now time is a datetime
-
-                        td_producer = TemporalDistribution(
-                            date=np.array([str(time_in_datetime)], dtype=self.time_res),
-                            amount=np.array([1]),
-                        ).date
-                        date = td_producer[0]
 
                         time_mapped_matrix_idx = self.biosphere_time_mapping.add(
                             (bioflow, date)
                         )
 
-                        self.add_matrix_entry_for_biosphere_flows(
+                        self._add_entry(
                             row=time_mapped_matrix_idx,
                             col=process_col_index,
-                            amount=amount,
+                            amount=aggregated_inventory[row_idx],
+                            seen_rows=seen_rows,
                         )
 
         # now build the dynamic biosphere matrix
-        if expand_technosphere:
+        if not self.keep_activity_dimension:
+            ncols = 1
+        elif expand_technosphere:
             ncols = len(self.activity_time_mapping)
         else:
             ncols = len(self.timeline)
@@ -373,15 +420,19 @@ class DynamicBiosphereBuilder:
         if not self._matrix_entries:
             return sp.csr_matrix((0, ncols)), temporal_market_lcis
 
-        rows = []
-        cols = []
-        values = []
-        for (row, col), amount in self._matrix_entries.items():
-            rows.append(row)
-            cols.append(col)
-            values.append(amount)
+        # Filled element-wise into pre-sized arrays rather than via Python
+        # lists: real background systems reach tens of millions of entries,
+        # where boxed ints cost several GB more than the arrays themselves.
+        n_entries = len(self._matrix_entries)
+        rows = np.empty(n_entries, dtype=np.int64)
+        cols = np.empty(n_entries, dtype=np.int64)
+        values = np.empty(n_entries, dtype=float)
+        for position, ((row, col), amount) in enumerate(self._matrix_entries.items()):
+            rows[position] = row
+            cols[position] = col
+            values[position] = amount
 
-        shape = (max(rows) + 1, ncols)
+        shape = (rows.max() + 1, ncols)
         dynamic_biosphere_matrix = sp.coo_matrix(
             (values, (rows, cols)), shape
         )
@@ -446,6 +497,27 @@ class DynamicBiosphereBuilder:
         }
 
         return demand
+
+    def _add_entry(self, row, col, amount, seen_rows=None):
+        """Add one dynamic biosphere entry, honouring `keep_activity_dimension`.
+
+        With the activity dimension dropped, entries of different activities land
+        in the same column, so they are summed rather than deduplicated - and the
+        activity's supply is applied here, since there is no per-activity column
+        left to scale afterwards. `seen_rows` keeps the deduplication *within* an
+        activity that `add_matrix_entry_for_biosphere_flows` does.
+        """
+        if self.keep_activity_dimension:
+            self.add_matrix_entry_for_biosphere_flows(row=row, col=col, amount=amount)
+            return
+        if row in seen_rows:
+            return
+        seen_rows.add(row)
+        key = (row, 0)
+        self._matrix_entries[key] = (
+            self._matrix_entries.get(key, 0.0)
+            + amount * self.dynamic_supply_array[col]
+        )
 
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
         """
@@ -617,6 +689,9 @@ class DynamicBiosphereBuilder:
         pending_keys = set()
         for row in self.timeline.itertuples():
             idx = row.time_mapped_producer
+            # Deduplicates repeated (flow, time) entries within one activity,
+            # which the per-activity columns do implicitly.
+            seen_rows = set()
             if idx not in self.node_collections["temporal_markets"]:
                 continue
             if self._expand_technosphere:

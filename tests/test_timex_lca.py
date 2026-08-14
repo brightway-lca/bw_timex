@@ -132,24 +132,32 @@ class TestTimexLCALabellingMethods:
         assert all(isinstance(v, str) for v in df["flow"].unique())
         assert all(isinstance(v, str) for v in df["activity"].unique())
 
-    def test_static_lcia_without_expand_raises(self):
+    def test_static_lcia_without_expand_characterizes_dynamic_inventory(self):
+        """Without the expanded matrices the static score is characterized from
+        the dynamic inventory, and must match the expanded one."""
         fu = bd.get_node(database="foreground", code="A")
         database_dates = {
             "db_2022": datetime.strptime("2022", "%Y"),
             "db_2024": datetime.strptime("2024", "%Y"),
             "foreground": "dynamic",
         }
-        tlca2 = TimexLCA(
-            demand={fu.key: 1},
-            method=("GWP", "example"),
-            database_dates=database_dates,
-        )
-        tlca2.build_timeline(
-            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
-        )
-        tlca2.lci(expand_technosphere=False, build_dynamic_biosphere=True)
-        with pytest.raises(ValueError, match="expanded matrix"):
-            tlca2.static_lcia()
+
+        def score(expand_technosphere):
+            tlca = TimexLCA(
+                demand={fu.key: 1},
+                method=("GWP", "example"),
+                database_dates=database_dates,
+            )
+            tlca.build_timeline(
+                starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+            )
+            tlca.lci(
+                expand_technosphere=expand_technosphere, build_dynamic_biosphere=True
+            )
+            tlca.static_lcia()
+            return tlca.static_score
+
+        assert score(False) == pytest.approx(score(True), rel=1e-9)
 
 
 # ─── Edge cases ───

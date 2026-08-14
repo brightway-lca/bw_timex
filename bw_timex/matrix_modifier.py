@@ -57,6 +57,11 @@ class MatrixModifier:
         self.name = name
         self.temporalized_process_ids = set()
         self.temporal_market_ids = set()
+        # Self-consumption of time-explicit processes (a process consuming its
+        # own product), accumulated per time-mapped id. It belongs on the
+        # diagonal, where the production entry already sits, so it is netted
+        # into that entry instead of being added as its own one.
+        self.self_consumption = {}
 
     def create_datapackage(self) -> None:
         """
@@ -105,12 +110,18 @@ class MatrixModifier:
                 new_nodes,
             )
 
-        # Adding the production exchanges for new nodes
+        # Adding the production exchanges for new nodes, net of any
+        # self-consumption (which shares the same diagonal position; the
+        # datapackage does not sum duplicate indices, so one would silently
+        # overwrite the other).
         for node_id, production_amount in new_nodes:
             datapackage_technosphere.add_persistent_vector(
                 matrix="technosphere_matrix",
                 name=uuid.uuid4().hex,
-                data_array=np.array([production_amount], dtype=float),
+                data_array=np.array(
+                    [production_amount - self.self_consumption.get(node_id, 0.0)],
+                    dtype=float,
+                ),
                 indices_array=np.array([(node_id, node_id)], dtype=bwp.INDICES_DTYPE),
             )
 
@@ -253,17 +264,25 @@ class MatrixModifier:
             )
             scaled_amount *= factor
 
-        # Add entry between exploded consumer and exploded producer (not in background database)
-        datapackage.add_persistent_vector(
-            matrix="technosphere_matrix",
-            name=uuid.uuid4().hex,
-            data_array=np.array([scaled_amount], dtype=float),
-            indices_array=np.array(
-                [(new_producer_id, new_consumer_id)],
-                dtype=bwp.INDICES_DTYPE,
-            ),
-            flip_array=np.array([True], dtype=bool),
-        )
+        if new_producer_id == new_consumer_id:
+            # A process consuming its own product: this lands on the diagonal,
+            # where the production entry goes too. Collect it and let that entry
+            # carry the net, so the loop survives into the matrix.
+            self.self_consumption[new_producer_id] = (
+                self.self_consumption.get(new_producer_id, 0.0) + scaled_amount
+            )
+        else:
+            # Add entry between exploded consumer and exploded producer (not in background database)
+            datapackage.add_persistent_vector(
+                matrix="technosphere_matrix",
+                name=uuid.uuid4().hex,
+                data_array=np.array([scaled_amount], dtype=float),
+                indices_array=np.array(
+                    [(new_producer_id, new_consumer_id)],
+                    dtype=bwp.INDICES_DTYPE,
+                ),
+                flip_array=np.array([True], dtype=bool),
+            )
 
         # A row is a temporal market iff it carries temporal_market_shares.
         # Leaf producers (background frontier) carry shares; producers traversed

@@ -12,6 +12,12 @@ from .fixtures.background_td_multdate_consumer_fixture import (
     background_td_multidate_consumer_db,
 )
 from .fixtures.duplicate_code_db_fixture import duplicate_code_db
+from .fixtures.duplicate_exchange_db_fixture import (
+    duplicate_exchange_db,
+    duplicate_exchange_td_db,
+    self_loop_db,
+    self_loop_with_td_db,
+)
 from .fixtures.dynamic_biomatrix_db_fixture import dynamic_biosphere_matrix_db
 from .fixtures.explicit_process_product_db_fixture import explicit_process_product_db
 from .fixtures.nonunitary_db_fixture import nonunitary_db
@@ -23,6 +29,7 @@ from .fixtures.same_date_databases_fixture import (
     same_date_db_three_dates,
     same_date_deep_db,
 )
+from .fixtures.shared_market_db_fixture import shared_market_db
 from .fixtures.substitution_db_fixture import substitution_db
 from .fixtures.temporal_grouping_fixture import (
     temporal_grouping_db_daily,
@@ -34,4 +41,9 @@ from .fixtures.temporal_evolution_db_fixture import (
     temporal_evolution_db,
 )
 from .fixtures.vehicle_db_fixture import vehicle_db
+from .fixtures.zero_weight_background_td_db_fixture import (
+    single_date_background_td_db,
+    zero_weight_background_td_db,
+    zero_weight_first_background_td_db,
+)
 from .fixtures.vehicle_explicit_db_fixture import vehicle_explicit_db

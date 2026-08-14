@@ -7,9 +7,11 @@ from numbers import Number
 from typing import Callable
 
 import numpy as np
+from bw2data import labels
 from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import ExchangeDataset as ED
 from bw_temporalis import TemporalDistribution, TemporalisLCA, loader_registry
+from bw_temporalis.lca import NoExchange
 from loguru import logger
 
 from .utils import (
@@ -87,6 +89,165 @@ def extract_temporal_evolution(exc_data: dict) -> dict | None:
     if has_factors:
         return exc_data["temporal_evolution_factors"]
     return None
+
+
+def load_temporal_distribution(value):
+    """Restore a ``TemporalDistribution`` that was serialized with a loader."""
+    if isinstance(value, str) and "__loader__" in value:
+        data = json.loads(value)
+        return loader_registry[data["__loader__"]](data)
+    return value
+
+
+class MergedExchange:
+    """Stand-in for a single ``ExchangeDataset`` when several exchanges link the
+    same (input, output) pair. Exposes ``.data``, which is what the edge
+    extractors read from an exchange.
+
+    ``netted_types`` marks the case where the duplicates have different types
+    (a process consuming its own product), so the technosphere matrix holds
+    their net rather than any single edge's amount. ``consuming_amount`` is
+    then the amount of the consuming part alone, which is what a traversal
+    following that input edge needs.
+    """
+
+    def __init__(self, data: dict, *, netted_types=False, consuming_amount=None):
+        self.data = data
+        self.netted_types = netted_types
+        self.consuming_amount = consuming_amount
+
+
+def carries_temporal_information(exchange_data: dict) -> bool:
+    """Whether an exchange has a temporal distribution or temporal evolution."""
+    return any(
+        exchange_data.get(key) is not None
+        for key in (
+            "temporal_distribution",
+            "temporal_evolution_amounts",
+            "temporal_evolution_factors",
+        )
+    )
+
+
+def _merge_untimed_exchanges_of_different_types(
+    exchange_datas: list[dict],
+) -> "MergedExchange":
+    """Merge duplicates of different types, none of which is temporalized.
+
+    A process consuming its own product is the common case: the same node pair
+    then carries both a ``production`` and a ``technosphere`` exchange. The
+    technosphere matrix holds their net, so the merged exchange reports which
+    type governs that net (so the sign comes out right) and keeps the consuming
+    amount separately, for traversals that follow the consuming edge.
+    """
+    positive_types = set(labels.technosphere_positive_edge_types)
+
+    def is_positive(data):
+        return data.get("type", "technosphere") in positive_types
+
+    net = sum(
+        data["amount"] if is_positive(data) else -data["amount"]
+        for data in exchange_datas
+    )
+    governing = [data for data in exchange_datas if is_positive(data) == (net >= 0)][0]
+
+    merged = dict(governing)
+    merged["amount"] = abs(net)
+    return MergedExchange(
+        merged,
+        netted_types=True,
+        consuming_amount=sum(
+            data["amount"] for data in exchange_datas if not is_positive(data)
+        ),
+    )
+
+
+def merge_duplicate_exchanges(exchange_datas: list[dict]) -> "MergedExchange":
+    """Merge several exchanges between the same two nodes into one.
+
+    Multiple exchanges between the same pair of nodes are a legitimate
+    modelling choice, and common in ecoinvent/premise background data. The
+    technosphere matrix already holds their sum, so the merged exchange carries
+    the summed ``amount`` and the amount-weighted combination of the individual
+    temporal distributions (duplicates without one count as happening at
+    timedelta 0) and temporal evolutions.
+    """
+    if len(exchange_datas) == 1:
+        return MergedExchange(exchange_datas[0])
+
+    types = {data.get("type", "technosphere") for data in exchange_datas}
+    if len(types) > 1:
+        if not any(carries_temporal_information(data) for data in exchange_datas):
+            # Nothing to merge in time, so the differing types are harmless.
+            return _merge_untimed_exchanges_of_different_types(exchange_datas)
+        raise ValueError(
+            f"Found {len(exchange_datas)} exchanges between "
+            f"{exchange_datas[0].get('input')} and {exchange_datas[0].get('output')} "
+            f"with different types ({sorted(types)}), at least one of them carrying "
+            f"temporal information. Merging those in time is ambiguous, because "
+            f"they enter the technosphere matrix with opposite signs."
+        )
+
+    amounts = [data["amount"] for data in exchange_datas]
+    total_amount = sum(amounts)
+    # Weights are only meaningful if the duplicates don't cancel out. If they
+    # do, the edge contributes nothing anyway, so weigh them equally.
+    if total_amount:
+        weights = [amount / total_amount for amount in amounts]
+    else:
+        weights = [1 / len(amounts)] * len(amounts)
+
+    merged = dict(exchange_datas[0])
+    merged["amount"] = total_amount
+
+    tds = [
+        load_temporal_distribution(data.get("temporal_distribution"))
+        for data in exchange_datas
+    ]
+    if any(isinstance(td, TemporalDistribution) for td in tds):
+        date_dtype = next(
+            td.date.dtype for td in tds if isinstance(td, TemporalDistribution)
+        )
+        combined_td = None
+        for td, weight in zip(tds, weights):
+            if not isinstance(td, TemporalDistribution):
+                # No temporal distribution means the exchange happens at the
+                # same time as its consumer, i.e. a unit pulse at timedelta 0.
+                td = TemporalDistribution(
+                    date=np.array([0], dtype=date_dtype),
+                    amount=np.array([1.0]),
+                )
+            part = td * weight
+            combined_td = part if combined_td is None else combined_td + part
+        merged["temporal_distribution"] = combined_td.simplify()
+    else:
+        merged.pop("temporal_distribution", None)
+
+    evolutions = [extract_temporal_evolution(data) for data in exchange_datas]
+    if any(evolution is not None for evolution in evolutions):
+        dates = set()
+        for evolution in evolutions:
+            if evolution is not None:
+                dates.update(evolution)
+        for evolution in evolutions:
+            if evolution is not None and set(evolution) != dates:
+                raise ValueError(
+                    f"Found {len(exchange_datas)} exchanges between "
+                    f"{exchange_datas[0].get('input')} and "
+                    f"{exchange_datas[0].get('output')} whose temporal evolutions "
+                    f"are given for different points in time. Merging them "
+                    f"requires the same dates on all of them."
+                )
+        merged.pop("temporal_evolution_amounts", None)
+        merged["temporal_evolution_factors"] = {
+            date: sum(
+                weight * (1.0 if evolution is None else evolution[date])
+                for evolution, weight in zip(evolutions, weights)
+            )
+            for date in dates
+        }
+
+    return MergedExchange(merged)
 
 
 class VariantBackgroundMixin:
@@ -251,32 +412,31 @@ class VariantBackgroundMixin:
         ``(td_or_amount, edge_type, temporal_evolution)`` tuple.
         """
         consumer = self.bw_node_proxies[output_id]
-        exc = None
-        for candidate in consumer.technosphere():
-            if candidate.input.id == input_id:
-                exc = candidate
-                break
-        if exc is None:
-            for candidate in consumer.exchanges():
-                if (
-                    candidate.input.id == input_id
-                    and candidate.get("type") != "production"
-                ):
-                    exc = candidate
-                    break
-        if exc is None:
+        # Several exchanges between the same two nodes are legitimate, so
+        # collect them all and merge them into one.
+        excs = [
+            candidate
+            for candidate in consumer.technosphere()
+            if candidate.input.id == input_id
+        ]
+        if not excs:
+            excs = [
+                candidate
+                for candidate in consumer.exchanges()
+                if candidate.input.id == input_id
+                and candidate.get("type") != "production"
+            ]
+        if not excs:
             raise ValueError(
                 f"No exchange from {input_id} to {output_id} found on proxy."
             )
 
-        edge_type = exc.get("type", "technosphere")
-        amount = exc["amount"]
-        temporal_evolution = extract_temporal_evolution(exc.as_dict())
+        exc_data = merge_duplicate_exchanges([exc.as_dict() for exc in excs]).data
+        edge_type = exc_data.get("type", "technosphere")
+        amount = exc_data["amount"]
+        temporal_evolution = extract_temporal_evolution(exc_data)
 
-        td = exc.get("temporal_distribution")
-        if isinstance(td, str) and "__loader__" in td:
-            data = json.loads(td)
-            td = loader_registry[data["__loader__"]](data)
+        td = load_temporal_distribution(exc_data.get("temporal_distribution"))
         if isinstance(td, TemporalDistribution):
             return td * amount, edge_type, temporal_evolution
         return amount, edge_type, temporal_evolution
@@ -564,6 +724,14 @@ class VariantBackgroundMixin:
                 queue.popleft()
             )
 
+            # A cohort that carries no amount contributes nothing, and everything
+            # below it would be zero too. It arises e.g. when the variant split
+            # routes a zero-weight date to one variant and the rest to another.
+            # Convolving it on would yield an empty TemporalDistribution, which
+            # `TemporalDistribution` refuses to construct, so stop here.
+            if isinstance(cur_td, TemporalDistribution) and not np.any(cur_td.amount):
+                continue
+
             production_amount = self._proxy_production_amount(cur_id)
             input_ids = self._proxy_technosphere_inputs(cur_id)
 
@@ -731,6 +899,22 @@ class EdgeExtractor(VariantBackgroundMixin, TemporalisLCA):
         # keyed by ``unique_id`` and contain only the referenced variant.
         self.variant_resolved_producers: set[int] = set()
         self.bw_node_proxies: dict = {}
+
+    def get_technosphere_exchange(self, input_id: int, output_id: int):
+        """Look up the exchange between two nodes.
+
+        Overrides ``TemporalisLCA.get_technosphere_exchange``, which raises
+        ``MultipleTechnosphereExchanges`` when several exchanges link the same
+        two nodes. That is a legitimate modelling choice and common in
+        background databases, so merge the duplicates into a single exchange
+        instead (see ``merge_duplicate_exchanges``).
+        """
+        exchanges = self._exchange_iterator(input_id, output_id)
+        if not exchanges:
+            return NoExchange
+        if len(exchanges) == 1:
+            return exchanges[0]
+        return merge_duplicate_exchanges([exc.data for exc in exchanges])
 
     def build_edge_timeline(self) -> list:
         """
@@ -1141,7 +1325,10 @@ class EdgeExtractorBFS(VariantBackgroundMixin):
         return self._ad_cache[activity_id]
 
     def _get_exchange(self, input_id: int, output_id: int):
-        """Look up exchange between two activities. Returns ExchangeDataset or None."""
+        """Look up exchange between two activities. Returns ExchangeDataset or None.
+
+        Several exchanges between the same two activities are merged into one
+        (see ``merge_duplicate_exchanges``)."""
         inp = self._get_activity_dataset(input_id)
         outp = self._get_activity_dataset(output_id)
         exchanges = list(
@@ -1155,9 +1342,7 @@ class EdgeExtractorBFS(VariantBackgroundMixin):
         if len(exchanges) == 1:
             return exchanges[0]
         elif len(exchanges) > 1:
-            raise ValueError(
-                f"Found {len(exchanges)} exchanges between {input_id} and {output_id}"
-            )
+            return merge_duplicate_exchanges([exc.data for exc in exchanges])
         return None
 
     def _get_exchange_td_and_type(self, input_id: int, output_id: int):
@@ -1179,8 +1364,17 @@ class EdgeExtractorBFS(VariantBackgroundMixin):
             return sign * matrix_value, "technosphere", None
 
         edge_type = exchange.data["type"]
-        sign = -1 if edge_type in ("generic consumption", "technosphere") else 1
-        amount = sign * matrix_value
+        if getattr(exchange, "netted_types", False):
+            # A process consuming its own product. The matrix cell holds the net
+            # of its production and its consumption, i.e. the process's net
+            # output - not the amount of the input edge being walked here. Take
+            # that from the exchange, so the loop is walked with its real
+            # coefficient (and converges like any other loop).
+            edge_type = "technosphere"
+            amount = exchange.consuming_amount
+        else:
+            sign = -1 if edge_type in ("generic consumption", "technosphere") else 1
+            amount = sign * matrix_value
 
         temporal_evolution = extract_temporal_evolution(exchange.data)
 
@@ -1465,6 +1659,13 @@ class EdgeExtractorBFS(VariantBackgroundMixin):
                     and self._is_static_background(node_id)
                     and self._is_static_background(producer_process)
                     and bool(self._proxy_technosphere_inputs(producer_process))
+                    # A process consuming its own product is not a crossing into
+                    # the background - it is already there. Splitting it would
+                    # emit the loop edge once per variant here AND once more
+                    # inside the variant descent, which is the same exchange
+                    # twice. Walk it like any other loop instead: the repeated
+                    # visits carry the amplification, bounded by cutoff/max_calc.
+                    and producer_process != node_id
                 )
 
                 if not variant_split:

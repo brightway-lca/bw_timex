@@ -5,6 +5,10 @@ import bw2data as bd
 from bw_temporalis import TemporalDistribution
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+DynamicLCIAMetric = Literal[
+    "radiative_forcing", "GWP", "pGWP", "pGTP", "prospective_radiative_forcing"
+]
+
 
 class TimexLCAInputs(BaseModel):
     """Validates inputs to TimexLCA.__init__"""
@@ -130,6 +134,7 @@ class LCIInputs(BaseModel):
 
     build_dynamic_biosphere: bool = True
     expand_technosphere: bool = True
+    keep_activity_dimension: bool = True
 
     @model_validator(mode="after")
     def validate_combination(self) -> "LCIInputs":
@@ -139,6 +144,11 @@ class LCIInputs(BaseModel):
                 "biosphere when building the inventories from the timeline. "
                 "Please either set build_dynamic_biosphere=True or expand_technosphere=True."
             )
+        if not self.keep_activity_dimension and not self.build_dynamic_biosphere:
+            raise ValueError(
+                "keep_activity_dimension=False only applies to the dynamic biosphere, "
+                "which is not being built. Please set build_dynamic_biosphere=True."
+            )
         return self
 
 
@@ -147,7 +157,7 @@ class DynamicLCIAInputs(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    metric: Literal["radiative_forcing", "GWP"] = "radiative_forcing"
+    metric: DynamicLCIAMetric = "radiative_forcing"
     time_horizon: int = Field(default=100, gt=0)
     fixed_time_horizon: bool = False
     time_horizon_start: Optional[datetime] = None

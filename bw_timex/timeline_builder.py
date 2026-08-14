@@ -304,6 +304,8 @@ class TimelineBuilder:
         grouped_edges["hash_producer"] = grouped_edges["date_producer"].map(hash_cache)
         grouped_edges["hash_consumer"] = grouped_edges["date_consumer"].map(hash_cache)
 
+        grouped_edges = self._drop_edges_of_unsupplied_consumers(grouped_edges)
+
         # add new processes to activity_time_mapping
         static_dbs = set(self.database_dates_static.keys()) if self.traverse_background else set()
         for row in grouped_edges.itertuples():
@@ -455,6 +457,48 @@ class TimelineBuilder:
 
         raise TypeError(f"Unrecognized type in this edge: {edge_type}")
 
+    @staticmethod
+    def _drop_edges_of_unsupplied_consumers(grouped_edges: pd.DataFrame) -> pd.DataFrame:
+        """Drop edges whose consumer cohort is never produced.
+
+        Edges with ``amount == 0`` are dropped before grouping, so a node cohort
+        that is only reached via zero-amount edges (e.g. a background temporal
+        distribution with a zero weight at one of its dates) has no producing
+        row left. The edges *out* of that cohort do survive, because their own
+        exchange amounts are non-zero - but they carry no throughput, since
+        nothing supplies their consumer. Keeping them would ask the activity
+        time mapping for a consumer that was never registered (only producers
+        are), so drop them, and iteratively whatever hangs off them.
+        """
+        n_before = len(grouped_edges)
+        producer_instance = (
+            grouped_edges["producer"].astype(str)
+            + "|"
+            + grouped_edges["producer_grouping_time"]
+        )
+        consumer_instance = (
+            grouped_edges["consumer"].astype(str)
+            + "|"
+            + grouped_edges["consumer_grouping_time"]
+        )
+        is_functional_unit = grouped_edges["consumer"] == -1
+        while True:
+            # Dropping edges can orphan their producer, so iterate to a fixpoint.
+            keep = is_functional_unit | consumer_instance.isin(set(producer_instance))
+            if keep.all():
+                break
+            grouped_edges = grouped_edges[keep]
+            producer_instance = producer_instance[keep]
+            consumer_instance = consumer_instance[keep]
+            is_functional_unit = is_functional_unit[keep]
+
+        if len(grouped_edges) < n_before:
+            logger.info(
+                f"Dropped {n_before - len(grouped_edges)} edge(s) from the timeline "
+                f"whose consuming process received no supply."
+            )
+        return grouped_edges.reset_index(drop=True)
+
     def get_time_mapping_key(self, node_id: int, node_hash: int) -> int:
         """
         Returns the time_mapping_id (key) from the activity_time_mapping for a given node.
@@ -484,19 +528,17 @@ class TimelineBuilder:
         background db. These are the temporal-market frontier."""
         consumers = set(edges_df["consumer"].unique())
         static_dbs = set(self.database_dates_static.keys())
-        # Producers that the BFS already resolved to their respective variant
-        # database during a variant-aware descent are temporalized (rebuilt from
-        # their own real db), not temporal markets — otherwise their already
-        # variant-routed amounts would be re-interpolated.
-        variant_resolved = getattr(
-            self.edge_extractor, "variant_resolved_producers", set()
-        )
         leaves = set()
         for producer in edges_df["producer"].unique():
             if producer in consumers:
                 continue  # traversed into -> temporalized, not a market
-            if producer in variant_resolved:
-                continue  # already variant-resolved -> temporalized
+            # Producers the descent resolved to their variant database but never
+            # descended into (cut off by `cutoff` or the `max_calc` budget) are
+            # leaves like any other: nothing upstream of them is in the timeline,
+            # so they need their full background LCI. Their already-resolved
+            # variant is preserved by pinning their market to their own database
+            # in `add_column_temporal_market_shares_to_timeline`, so the routing
+            # made during the descent is not interpolated a second time.
             node = self.nodes.get(producer)
             if node is not None and node["database"] in static_dbs:
                 leaves.add(producer)
@@ -608,11 +650,21 @@ class TimelineBuilder:
             producers_in_timeline
         )
 
+        # Producers the background descent already routed to a specific variant
+        # database. When such a producer ends up a market (descent stopped there),
+        # it keeps that database instead of being interpolated a second time.
+        variant_resolved = getattr(
+            self.edge_extractor, "variant_resolved_producers", set()
+        )
+
         weight_cache = {}
         shares = []
         for producer, producer_date in zip(tl_df["producer"], tl_df["date_producer"]):
             if producer not in producers_in_timeline:
                 shares.append(None)
+                continue
+            if producer in variant_resolved:
+                shares.append({self.nodes[producer]["database"]: 1})
                 continue
             candidates = candidate_databases[producer]
             sorted_dates = tuple(sorted(candidates))
