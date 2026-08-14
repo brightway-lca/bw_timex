@@ -87,7 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0] - 2024-09-13
 * Added utility function [`utils.add_temporal_distribution_to_exchange()`](https://github.com/brightway-lca/bw_timex/blob/a85349bdc43d98be559a7ce17d0b686098decec6/bw_timex/utils.py#L341) for easier temporalization of existing models
-* Added more clarifying docstrings, created a "Getting Started" section in the docs as well as a [`getting_started.ipynb`](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/getting_started.ipynb). Also overhauled existing example notebooks.
+* Added more clarifying docstrings, created a "Getting Started" section in the docs as well as a [`getting_started.ipynb`](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/tutorials/1_getting_started.ipynb). Also overhauled existing example notebooks.
 * Changed naming of the different score attributes to be more clear and [turned them into a @property:](https://github.com/brightway-lca/bw_timex/blob/a85349bdc43d98be559a7ce17d0b686098decec6/bw_timex/timex_lca.py#L437)
     * `TimexLCA.base_score` := `TimexLCA.static_lca.score` (no time-explicit information)
     * `TimexLCA.static_score` := `TimexLCA.lca.score` (time-explicit LCI w/ static characterization)

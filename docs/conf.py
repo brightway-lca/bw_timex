@@ -185,7 +185,7 @@ html_theme_options = {
     "icon_links": [
         {
             "name": "Launch interactive Demo on Binder",
-            "url": "https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb",
+            "url": "https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Ftutorials%2F1_getting_started.ipynb",
             "icon": "fa-solid fa-rocket",
         },
         {
