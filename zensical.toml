@@ -2,7 +2,7 @@
 site_name = "bw_timex"
 site_description = "Time-explicit Life Cycle Assessment"
 site_author = "Timo Diepers, Amelie Müller, Arthur Jakobs"
-site_url = "https://timodiepers.github.io/bw_timex/"
+site_url = "https://docs.brightway.dev/projects/bw-timex/en/latest/"
 
 repo_name = "brightway-lca/bw_timex"
 repo_url = "https://github.com/brightway-lca/bw_timex"
