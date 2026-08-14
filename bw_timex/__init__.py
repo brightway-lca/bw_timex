@@ -21,7 +21,7 @@ from .utils import (
     plot_characterized_inventory_as_waterfall,
 )
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 __all__ = [
     # forwarded from bw_temporalis for convenience
