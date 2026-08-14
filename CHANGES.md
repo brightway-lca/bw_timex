@@ -5,7 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [1.2.0] - 2026-08-14
+* Migrated the documentation from Sphinx to [Zensical](https://zensical.org), with the example pages generated from the notebooks ([#202](https://github.com/brightway-lca/bw_timex/pull/202))
 * Added name-based exchange lookup to `get_exchange`, `add_temporal_distribution_to_exchange` and `add_temporal_evolution_to_exchange`, via `input_name`/`output_name` (optionally narrowed down with `input_location`/`output_location` and `input_product`/`output_product`), which avoids having to know the machine-generated codes of e.g. ecoinvent nodes ([#202](https://github.com/brightway-lca/bw_timex/pull/202))
 * Added a flat top-level namespace: `TemporalDistribution`, `easy_timedelta_distribution` and `easy_datetime_distribution` are re-exported from `bw_temporalis`, and the user-facing helpers from `bw_timex.utils` (`add_temporal_distribution_to_exchange`, `add_temporal_evolution_to_exchange`, `add_flows_to_characterization_functions`, `get_exchange`, `get_temporal_evolution_factor`, `interactive_td_widget`, `plot_characterized_inventory_as_waterfall`) are now importable directly from `bw_timex` ([#206](https://github.com/brightway-lca/bw_timex/pull/206))
 * Fixed `lci()` raising `MultipleResults` when a temporalized process' code also exists in another database of the project, by resolving producers by node id instead of by code ([#203](https://github.com/brightway-lca/bw_timex/pull/203))
@@ -14,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added the pending-solve planning and technosphere factorization to `lci(expand_technosphere=False)`, which previously only ran for the expanded path ([#200](https://github.com/brightway-lca/bw_timex/pull/200))
 * Improved `TimexLCA` setup speed by making it independent of the background database size, via lazy node proxies and a base LCA restricted to the demand-relevant databases ([#204](https://github.com/brightway-lca/bw_timex/pull/204))
 * Added support for several background databases sharing the same point in time in `database_dates`, by resolving temporal market shares per producer instead of per date ([#205](https://github.com/brightway-lca/bw_timex/pull/205))
-* Fixed `dynamic_lcia()` input validation to accept the prospective metrics supported by `dynamic_characterization`: `pGWP`, `pGTP`, and `prospective_radiative_forcing`
+* Fixed `dynamic_lcia()` input validation to accept the prospective metrics supported by `dynamic_characterization`: `pGWP`, `pGTP`, and `prospective_radiative_forcing` ([855ba84](https://github.com/brightway-lca/bw_timex/commit/855ba845a00e08e3a3d10459c7d715b4602d71f9))
 * Fixed `MultipleTechnosphereExchanges` when several exchanges connect the same two nodes, by merging them into one edge ([#207](https://github.com/brightway-lca/bw_timex/pull/207))
 * Fixed processes consuming their own product losing that loop in the technosphere matrix, and `graph_traversal="bfs"` counting it twice ([#207](https://github.com/brightway-lca/bw_timex/pull/207))
 * Fixed `KeyError` in `build_timeline()` for node cohorts that receive no supply ([#207](https://github.com/brightway-lca/bw_timex/pull/207))
