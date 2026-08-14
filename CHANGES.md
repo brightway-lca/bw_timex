@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.2.1] - 2026-08-14
 * Fixed `ShapeMismatch` in `lci()` for processes with more than one biosphere exchange, by sizing the biosphere `flip_array` to the number of matrix entries (only raised with `bw_processing` >= 1.5; no numeric results change) ([#213](https://github.com/brightway-lca/bw_timex/pull/213))
+* Fixed the conda package declaring dependencies that had drifted from `pyproject.toml`, by generating the recipe's `run:` requirements from it ([#211](https://github.com/brightway-lca/bw_timex/pull/211))
 
 ## [1.2.0] - 2026-08-14
 * Migrated the documentation from Sphinx to [Zensical](https://zensical.org), with the example pages generated from the notebooks ([#202](https://github.com/brightway-lca/bw_timex/pull/202))
