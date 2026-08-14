@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+* Fixed `ShapeMismatch` in `lci()` for processes with more than one biosphere exchange, by sizing the biosphere `flip_array` to the number of matrix entries (only raised with `bw_processing` >= 1.5; no numeric results change) ([#213](https://github.com/brightway-lca/bw_timex/pull/213))
+
 ## [1.2.0] - 2026-08-14
 * Migrated the documentation from Sphinx to [Zensical](https://zensical.org), with the example pages generated from the notebooks ([#202](https://github.com/brightway-lca/bw_timex/pull/202))
 * Added name-based exchange lookup to `get_exchange`, `add_temporal_distribution_to_exchange` and `add_temporal_evolution_to_exchange`, via `input_name`/`output_name` (optionally narrowed down with `input_location`/`output_location` and `input_product`/`output_product`), which avoids having to know the machine-generated codes of e.g. ecoinvent nodes ([#202](https://github.com/brightway-lca/bw_timex/pull/202))
