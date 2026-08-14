@@ -28,6 +28,8 @@ PACKAGE_PATH="$(conda build "${SCRIPT_DIR}" "${CHANNELS[@]}" \
     --output-folder "${OUTPUT_DIR}" --output)"
 
 echo "==> Uploading ${PACKAGE_PATH} to the 'diepers' channel"
-anaconda upload --user diepers "${PACKAGE_PATH}"
+# -s pins the destination: recent anaconda-client versions otherwise prompt to
+# pick between anaconda.com and anaconda.org, which hangs a non-interactive run.
+anaconda -s anaconda.org upload --user diepers "${PACKAGE_PATH}"
 
 echo "==> Done"
