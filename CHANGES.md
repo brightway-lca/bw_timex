@@ -14,14 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Improved `TimexLCA` setup speed by making it independent of the background database size, via lazy node proxies and a base LCA restricted to the demand-relevant databases ([#204](https://github.com/brightway-lca/bw_timex/pull/204))
 * Added support for several background databases sharing the same point in time in `database_dates`, by resolving temporal market shares per producer instead of per date ([#205](https://github.com/brightway-lca/bw_timex/pull/205))
 * Fixed `dynamic_lcia()` input validation to accept the prospective metrics supported by `dynamic_characterization`: `pGWP`, `pGTP`, and `prospective_radiative_forcing`
-* Fixed `MultipleTechnosphereExchanges` when several exchanges connect the same two nodes, by merging them into one edge
-* Fixed processes consuming their own product losing that loop in the technosphere matrix, and `graph_traversal="bfs"` counting it twice
-* Fixed `KeyError` in `build_timeline()` for node cohorts that receive no supply
-* Fixed `traverse_background` losing everything upstream of a `cutoff` or `max_calc` truncation
-* Fixed `ValueError: Empty array` for all-zero cohorts in the background descent
-* Added `static_lcia()` for inventories built from the timeline (`lci(expand_technosphere=False)`)
-* Added `lci(keep_activity_dimension=False)`, which accumulates the dynamic inventory per biosphere flow and time instead of per activity, trading contribution analysis for much lower memory use
-* Reduced memory and runtime of `lci(expand_technosphere=False)` on large time-explicit systems
+* Fixed `MultipleTechnosphereExchanges` when several exchanges connect the same two nodes, by merging them into one edge ([#207](https://github.com/brightway-lca/bw_timex/pull/207))
+* Fixed processes consuming their own product losing that loop in the technosphere matrix, and `graph_traversal="bfs"` counting it twice ([#207](https://github.com/brightway-lca/bw_timex/pull/207))
+* Fixed `KeyError` in `build_timeline()` for node cohorts that receive no supply ([#207](https://github.com/brightway-lca/bw_timex/pull/207))
+* Fixed `traverse_background` losing everything upstream of a `cutoff` or `max_calc` truncation ([#207](https://github.com/brightway-lca/bw_timex/pull/207))
+* Fixed `ValueError: Empty array` for all-zero cohorts in the background descent ([#207](https://github.com/brightway-lca/bw_timex/pull/207))
+* Added `static_lcia()` for inventories built from the timeline (`lci(expand_technosphere=False)`) ([#207](https://github.com/brightway-lca/bw_timex/pull/207))
+* Added `lci(keep_activity_dimension=False)`, which accumulates the dynamic inventory per biosphere flow and time instead of per activity, trading contribution analysis for much lower memory use ([#207](https://github.com/brightway-lca/bw_timex/pull/207))
+* Reduced memory and runtime of `lci(expand_technosphere=False)` on large time-explicit systems ([#207](https://github.com/brightway-lca/bw_timex/pull/207))
 
 ## [1.1.2]
 * Fixed the option to calculate the lci from the timeline. This option is called with lci(expand_technosphere=False) which speeds up the calculation significantly for for large systems, but does not allow for detailed contribution analysis of background processes. https://github.com/brightway-lca/bw_timex/commit/12853dbd799764f6d2d2fa2335d6f6f19a97abed
