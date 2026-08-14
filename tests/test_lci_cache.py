@@ -137,8 +137,16 @@ class TestModuleLevelLCICache:
             starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d")
         )
         tlca_flat.lci(expand_technosphere=False, build_dynamic_biosphere=True)
-        with pytest.raises(ValueError, match="expanded matrix"):
-            tlca_flat.static_lcia()
+        # The flat build has its own (unexpanded) lca object: it must not have
+        # picked up the expanded run's cached solve, and its inventory - built
+        # from the timeline - must still give the same score.
+        assert tlca_flat.expanded_technosphere is False
+        assert tlca_flat._lci_used_cached_solve is False
+        tlca_flat.static_lcia()
+        tlca_expanded.static_lcia()
+        assert tlca_flat.static_score == pytest.approx(
+            tlca_expanded.static_score, rel=1e-9
+        )
 
     def test_warm_cache_skips_factorization(self):
         # First run populates the global cache.
