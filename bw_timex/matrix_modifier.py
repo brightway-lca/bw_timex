@@ -186,7 +186,10 @@ class MatrixModifier:
                     indices,
                     dtype=bwp.INDICES_DTYPE,
                 ),
-                flip_array=np.array([False], dtype=bool),
+                # Biosphere exchanges are never flipped: the sign of the flow
+                # is carried by the amount itself. One entry per index, since
+                # bw_processing requires matching shapes.
+                flip_array=np.zeros(len(indices), dtype=bool),
             )
         return datapackage_biosphere
 
