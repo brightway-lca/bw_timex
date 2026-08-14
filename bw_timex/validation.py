@@ -134,6 +134,7 @@ class LCIInputs(BaseModel):
 
     build_dynamic_biosphere: bool = True
     expand_technosphere: bool = True
+    keep_activity_dimension: bool = True
 
     @model_validator(mode="after")
     def validate_combination(self) -> "LCIInputs":
@@ -142,6 +143,11 @@ class LCIInputs(BaseModel):
                 "Currently, it is not possible to skip the construction of the dynamic "
                 "biosphere when building the inventories from the timeline. "
                 "Please either set build_dynamic_biosphere=True or expand_technosphere=True."
+            )
+        if not self.keep_activity_dimension and not self.build_dynamic_biosphere:
+            raise ValueError(
+                "keep_activity_dimension=False only applies to the dynamic biosphere, "
+                "which is not being built. Please set build_dynamic_biosphere=True."
             )
         return self
 

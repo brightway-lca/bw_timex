@@ -446,6 +446,7 @@ class TimexLCA:
         self,
         build_dynamic_biosphere: Optional[bool] = True,
         expand_technosphere: Optional[bool] = True,
+        keep_activity_dimension: Optional[bool] = True,
     ) -> None:
         """
         Calculates the time-explicit LCI.
@@ -474,6 +475,14 @@ class TimexLCA:
             if False, creates no new technosphere, but calculates the dynamic inventory directly
             from the timeline. Building from the timeline currently only works if
             `build_dynamic_biosphere` is also True.
+        keep_activity_dimension: bool
+            if True (default), the dynamic inventory keeps one column per emitting
+            activity, which is what a contribution analysis needs.
+            if False, emissions are accumulated per (biosphere flow, time) only, in a
+            single column. Scores - static and dynamic - are identical, and so is the
+            timing of the emissions, but they can no longer be attributed to the
+            activities that caused them. Use this for large time-explicit systems,
+            where the per-activity columns dominate memory.
 
         Returns
         -------
@@ -493,6 +502,7 @@ class TimexLCA:
         LCIInputs(
             build_dynamic_biosphere=build_dynamic_biosphere,
             expand_technosphere=expand_technosphere,
+            keep_activity_dimension=keep_activity_dimension,
         )
 
         if hasattr(self, "dynamic_inventory"):
@@ -532,7 +542,7 @@ class TimexLCA:
             data_obs = self.data_objs + self.datapackage
             self.expanded_technosphere = True  # set flag for later static lcia usage
         else:  # setup for timeline approach
-            logger.warning(
+            logger.info(
                 "Disaggregated lci is not yet implemented with this option.\n" \
                 "Please use expand_technosphere=True if you want to perform a contribution analysis on the background processes."
             )
@@ -604,7 +614,10 @@ class TimexLCA:
                         self.lca.inventory.copy(),
                     )
 
-                self.calculate_dynamic_inventory(expand_technosphere=True)
+                self.calculate_dynamic_inventory(
+                    expand_technosphere=True,
+                    keep_activity_dimension=keep_activity_dimension,
+                )
                 # Restore the fu inventory only if the build actually mutated
                 # `self.lca.inventory` via at least one `redo_lci` call
                 # (i.e. there was a cache miss). With everything cached, the
@@ -641,7 +654,10 @@ class TimexLCA:
                     self.lca.decompose_technosphere()
                     self._lci_did_factorize = True
 
-                self.calculate_dynamic_inventory(expand_technosphere=False)
+                self.calculate_dynamic_inventory(
+                    expand_technosphere=False,
+                    keep_activity_dimension=keep_activity_dimension,
+                )
 
     def disaggregate_background_lci(self) -> None:
         """
@@ -753,12 +769,33 @@ class TimexLCA:
         """
         if not hasattr(self, "lca"):
             raise AttributeError("LCI not yet calculated. Call TimexLCA.lci() first.")
-        if not self.expanded_technosphere:
-            raise ValueError(
-                "Currently the static lcia score can only be calculated if the expanded matrix has \
-                    been built. Please call TimexLCA.lci(expand_technosphere=True) first."
+        if self.expanded_technosphere:
+            self.lca.lcia()
+            self._static_score_from_timeline = None
+            return
+
+        # Without the expanded matrices there is no inventory on `self.lca` to
+        # characterize, but the dynamic inventory holds the same flows (just
+        # resolved in time), so characterize that with the static factors.
+        if not hasattr(self, "dynamic_inventory_df"):
+            raise AttributeError(
+                "Dynamic inventory not yet calculated. Call "
+                "TimexLCA.lci(expand_technosphere=False, build_dynamic_biosphere=True) first."
             )
-        self.lca.lcia()
+        self.lca.load_lcia_data()
+        diagonal = self.lca.characterization_matrix.diagonal()
+        characterization_factors = {
+            flow_id: diagonal[index]
+            for flow_id, index in self.lca.dicts.biosphere.items()
+        }
+        self._static_score_from_timeline = float(
+            (
+                self.dynamic_inventory_df["amount"]
+                * self.dynamic_inventory_df["flow"]
+                .map(characterization_factors)
+                .fillna(0.0)
+            ).sum()
+        )
 
     def dynamic_lcia(
         self,
@@ -929,6 +966,14 @@ class TimexLCA:
         """
         if not hasattr(self, "lca"):
             raise AttributeError("LCI not yet calculated. Call TimexLCA.lci() first.")
+        if not self.expanded_technosphere:
+            # Characterized from the dynamic inventory, not from `self.lca`,
+            # which has no expanded inventory to score.
+            if getattr(self, "_static_score_from_timeline", None) is None:
+                raise AttributeError(
+                    "Static score not yet calculated. Call TimexLCA.static_lcia() first."
+                )
+            return self._static_score_from_timeline
         return self.lca.score
 
     @property
@@ -1042,6 +1087,7 @@ class TimexLCA:
     def calculate_dynamic_inventory(
         self,
         expand_technosphere=True,
+        keep_activity_dimension=True,
     ) -> None:
         """
         Calculates the dynamic inventory, by first creating a dynamic biosphere matrix using the
@@ -1089,6 +1135,7 @@ class TimexLCA:
             expand_technosphere=expand_technosphere,
             background_unit_lci_cache=self._background_unit_lci_cache,
             nodes=self.nodes,
+            keep_activity_dimension=keep_activity_dimension,
         )
 
         # The pending-solve count + factorize decision is now made upfront
@@ -1104,16 +1151,21 @@ class TimexLCA:
         )
 
         # Build the dynamic inventory
-        count = len(self.dynamic_biosphere_builder.dynamic_supply_array)
-        # diagonalization of supply array keeps the dimension of the process, which we want to pass
-        # as additional information to the dynamic inventory dict
-        diagonal_supply_array = sparse.spdiags(
-            [self.dynamic_biosphere_builder.dynamic_supply_array], [0], count, count
-        )
-        self.dynamic_inventory = self.dynamic_biosphere_matrix @ diagonal_supply_array
+        if keep_activity_dimension:
+            count = len(self.dynamic_biosphere_builder.dynamic_supply_array)
+            # diagonalization of supply array keeps the dimension of the process, which we want to pass
+            # as additional information to the dynamic inventory dict
+            diagonal_supply_array = sparse.spdiags(
+                [self.dynamic_biosphere_builder.dynamic_supply_array], [0], count, count
+            )
+            self.dynamic_inventory = self.dynamic_biosphere_matrix @ diagonal_supply_array
+        else:
+            # There is no activity dimension left to scale: the builder already
+            # applied each activity's supply while accumulating.
+            self.dynamic_inventory = self.dynamic_biosphere_matrix
 
         self.dynamic_inventory_df = self.create_dynamic_inventory_dataframe(
-            expand_technosphere
+            expand_technosphere, keep_activity_dimension=keep_activity_dimension
         )
         self._dynamic_lcia_inventory_cache.clear()
 
@@ -1121,6 +1173,7 @@ class TimexLCA:
         self,
         expand_technosphere=True,
         use_disaggregated_lci=False,
+        keep_activity_dimension=True,
     ) -> pd.DataFrame:
         """
         Brings the dynamic inventory from its matrix form in `dynamic_inventory` into the
@@ -1161,7 +1214,11 @@ class TimexLCA:
         )
         dynamic_inventory = dynamic_inventory.tocoo()
 
-        if expand_technosphere:
+        if not keep_activity_dimension:
+            # Single aggregated column: the emissions are no longer attributable
+            # to an activity.
+            activities = [-1] * len(dynamic_inventory.col)
+        elif expand_technosphere:
             activities = [
                 self.lca.activity_dict.reversed[col] for col in dynamic_inventory.col
             ]
