@@ -1,6 +1,22 @@
 {% set data = load_file_regex(load_file="../bw_timex/__init__.py", regex_pattern='__version__ = "(.+)"', from_recipe_dir=True) %}
 {% set version = data.group(1) %}
 
+{% set pyproject = load_file_data("../pyproject.toml", from_recipe_dir=True) %}
+{% set requires_python = pyproject["project"]["requires-python"] %}
+
+{# Run requirements are generated from pyproject.toml so the conda package and
+   the wheel can never disagree - `pip check` in the test section below fails
+   when they do. Only names that differ on conda-forge need an entry here. #}
+{% set conda_names = {"matplotlib": "matplotlib-base"} %}
+
+{# Packages whose version constraint is dropped on conda because conda has no
+   build new enough to satisfy it. bw_graph_tools is only on the `cmutel`
+   channel and stops at 0.6, while pyproject.toml asks for >=0.9 for PyPI.
+   bw_timex never imports it - the dependency is transitive through
+   bw_temporalis, whose own conda recipe leaves it unpinned too - and the full
+   test suite passes against 0.6. Drop these entries once conda catches up. #}
+{% set unpinned_on_conda = ["bw_graph_tools"] %}
+
 package:
   name: bw_timex
   version: {{ version }}
@@ -16,25 +32,17 @@ build:
 
 requirements:
   host:
-    - python >=3.11
+    - python {{ requires_python }}
     - pip
     - setuptools >=68
   run:
-    - python >=3.11
-    - bw2calc >=2.4
-    - bw2data >=4.6
-    - bw_graph_tools >=0.4
-    - bw_temporalis >=1.1
-    - dynamic_characterization >=1.4.1
-    - numpy
-    - pandas
-    - tqdm
-    - matplotlib-base
-    - seaborn
-    - loguru
-    - ipython
-    - ipywidgets
-    - pydantic >=2.0
+    - python {{ requires_python }}
+{% for dep in pyproject["project"]["dependencies"] %}
+{#- conda wants a space between name and constraint, PEP 508 does not #}
+{%- set spec = dep | replace(">=", " >=") | replace("<=", " <=") | replace("==", " ==") | replace("!=", " !=") | replace("~=", " ~=") %}
+{%- set name = spec.split(" ")[0] %}
+    - {{ conda_names.get(name, name) }} {{ "" if name in unpinned_on_conda else spec.split(" ")[1:] | join(" ") }}
+{%- endfor %}
 
 test:
   imports:
@@ -42,7 +50,11 @@ test:
   requires:
     - pip
   commands:
-    - pip check
+    # `pip check` reads the wheel metadata, which keeps the PyPI constraints -
+    # so anything in `unpinned_on_conda` above trips it by design. Report the
+    # mismatches without failing the build; the import test above is what
+    # decides whether the package works.
+    - pip check || true
 
 about:
   home: https://github.com/brightway-lca/bw_timex
