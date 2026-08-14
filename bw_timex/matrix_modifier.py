@@ -68,10 +68,6 @@ class MatrixModifier:
         Creates a list of datapackages for the technosphere and biosphere matrices,
         by calling the respective functions.
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         list
@@ -95,10 +91,6 @@ class MatrixModifier:
         becomes a separate, time-explicit new node, by adding the new elements to the technosphere matrix.
         For processes at the intersection with background databases, the timing of the exchanges
         determines which background database to link to in so called "Temporal Markets".
-
-        Parameters
-        ----------
-        None
 
         Returns
         -------
@@ -146,10 +138,6 @@ class MatrixModifier:
 
         Temporal markets have no biosphere exchanges, as they only divide the amount of
         a technosphere exchange between the different databases.
-
-        Parameters
-        ----------
-        None
 
         Returns
         -------

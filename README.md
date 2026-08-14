@@ -12,7 +12,7 @@
 [![Conda Version](https://img.shields.io/conda/v/diepers/bw_timex?label=conda)](https://anaconda.org/diepers/bw_timex)
 [![Conda - License](https://img.shields.io/conda/l/diepers/bw_timex)](https://github.com/brightway-lca/bw_timex/blob/main/LICENSE)
 [![status](https://joss.theoj.org/papers/eb9021af0207b86e02439768a4841670/status.svg)](https://joss.theoj.org/papers/eb9021af0207b86e02439768a4841670)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Fgetting_started.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Ftutorials%2F1_getting_started.ipynb)
 
 **`bw_timex` makes your LCA use the right data for the right point in time.** It's a python package for [time-explicit Life Cycle Assessment](https://docs.brightway.dev/projects/bw-timex/en/latest/content/theory.html#terminology), built on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
 
@@ -33,9 +33,10 @@ You *can* work around this by hand: split each exchange into one copy per point 
 Most useful for long-lived products, strongly evolving production systems, and biogenic carbon. Still unsure whether you need time-explicit LCA? [Check out our decision tree](https://docs.brightway.dev/projects/bw-timex/en/latest/content/decisiontree.html) for some guidance.
 
 ## 👩‍💻 Getting Started
+- [Quick Start](https://docs.brightway.dev/projects/bw-timex/en/latest/content/getting_started/quickstart.html)
 - [Installation Guide](https://docs.brightway.dev/projects/bw-timex/en/latest/content/installation.html)
-- [Getting Started Tutorial](https://docs.brightway.dev/projects/bw-timex/en/latest/content/getting_started/index.html)
-- [Example Collection](https://docs.brightway.dev/projects/bw-timex/en/latest/content/examples/index.html)
+- [Walkthrough](https://docs.brightway.dev/projects/bw-timex/en/latest/content/getting_started/)
+- [Example Collection](https://docs.brightway.dev/projects/bw-timex/en/latest/content/examples/)
 
 ## 📚 Citation
 If `bw_timex` supports your scientific work, please consider citing our companion publications:

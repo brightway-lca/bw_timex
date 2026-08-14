@@ -136,8 +136,9 @@ class SetList:
     def __getitem__(self, key: any) -> set:
         """
         Returns all sets in the SetList instance containing the key
-        Inputs
-        ------
+
+        Parameters
+        ----------
         key: the key to look for in the sets of the SetList
 
         Returns

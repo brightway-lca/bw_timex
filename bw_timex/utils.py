@@ -498,6 +498,49 @@ def plot_characterized_inventory_as_waterfall(
     plt.show()
 
 
+def _resolve_node_by_name(direction: str, kwargs: dict) -> None:
+    """
+    Look up a node by its name and store its code and database in `kwargs`.
+
+    Nodes from databases like ecoinvent have machine-generated codes, so specifying
+    them by name (optionally narrowed down by database, location and reference
+    product) is often the only practical option.
+
+    Parameters
+    ----------
+    direction : {"input", "output"}
+        Which side of the exchange to resolve.
+    kwargs : dict
+        Arguments passed to `get_exchange`. The `<direction>_name`,
+        `<direction>_location` and `<direction>_product` entries are consumed here,
+        and `<direction>_code` and `<direction>_database` are set from the node found.
+
+    Returns
+    -------
+    None
+        `kwargs` is modified in place.
+    """
+    name = kwargs.pop(f"{direction}_name", None)
+    location = kwargs.pop(f"{direction}_location", None)
+    product = kwargs.pop(f"{direction}_product", None)
+
+    if name is None:
+        return
+
+    node_kwargs = {"name": name}
+    for key, value in [
+        ("database", kwargs.get(f"{direction}_database")),
+        ("location", location),
+        ("product", product),
+    ]:
+        if value is not None:
+            node_kwargs[key] = value
+
+    node = bd.get_node(**node_kwargs)
+    kwargs[f"{direction}_code"] = node["code"]
+    kwargs[f"{direction}_database"] = node["database"]
+
+
 def get_exchange(**kwargs) -> Exchange:
     """
     Get an exchange from the database.
@@ -509,9 +552,18 @@ def get_exchange(**kwargs) -> Exchange:
             - input_node: Input node object
             - input_code: Input node code
             - input_database: Input node database
+            - input_name: Input node name
+            - input_location: Input node location (only used together with input_name)
+            - input_product: Input node reference product (only used together with
+              input_name)
             - output_node: Output node object
             - output_code: Output node code
             - output_database: Output node database
+            - output_name: Output node name
+            - output_location: Output node location (only used together with
+              output_name)
+            - output_product: Output node reference product (only used together with
+              output_name)
 
     Returns
     -------
@@ -521,9 +573,10 @@ def get_exchange(**kwargs) -> Exchange:
     Raises
     ------
     MultipleResults
-        If multiple exchanges match the criteria.
+        If multiple exchanges (or, when searching by name, multiple nodes) match the
+        criteria.
     UnknownObject
-        If no exchange matches the criteria.
+        If no exchange (or, when searching by name, no node) matches the criteria.
     """
 
     # Process input_node if present
@@ -537,6 +590,10 @@ def get_exchange(**kwargs) -> Exchange:
     if output_node:
         kwargs["output_code"] = output_node["code"]
         kwargs["output_database"] = output_node["database"]
+
+    # Process names if present
+    _resolve_node_by_name("input", kwargs)
+    _resolve_node_by_name("output", kwargs)
 
     # Map kwargs to database fields
     mapping = {
@@ -580,15 +637,24 @@ def add_temporal_distribution_to_exchange(
     temporal_distribution : TemporalDistribution
         TemporalDistribution to be added to the exchange.
     **kwargs :
-        Arguments to specify an exchange.
+        Arguments to specify an exchange (same as `get_exchange`).
             - input_node: Input node object
             - input_id: Input node database ID
             - input_code: Input node code
             - input_database: Input node database
+            - input_name: Input node name
+            - input_location: Input node location (only used together with input_name)
+            - input_product: Input node reference product (only used together with
+              input_name)
             - output_node: Output node object
             - output_id: Output node database ID
             - output_code: Output node code
             - output_database: Output node database
+            - output_name: Output node name
+            - output_location: Output node location (only used together with
+              output_name)
+            - output_product: Output node reference product (only used together with
+              output_name)
 
     Returns
     -------

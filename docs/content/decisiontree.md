@@ -1,13 +1,20 @@
+---
+icon: lucide/git-branch
+tags:
+  - theory
+  - temporal evolution
+---
+
 # What LCA should I do?
 
 Not only are there many "types" of LCA already, `bw_timex` also adds lots of further options for time-explicit LCA alone. The following decision tree tries to give some guidance on what type of LCA is suitable in your case, and also navigate the options coming with `bw_timex`:
 
-```{mermaid}
+```mermaid
 flowchart TD
     %% Define node classes
-    classDef decision fill:#3fb1c5,color:black,stroke:none;
-    classDef lcaType fill:#9c5ffd,color:black,stroke:none;
-    classDef codeNode fill:#DBDBDB,text-align:left,color:black,stroke:none;
+    classDef decision color:#222832!important, fill:#3fb1c5, stroke:none;
+    classDef lcaType color:#222832, fill:#9c5ffd, stroke:none;
+    classDef codeNode text-align:left;
 
     TimingDecision{{"Do temporal aspects matter?"}}:::decision
     AspectDecision{{"Which aspects matter?"}}:::decision
@@ -44,16 +51,23 @@ flowchart TD
     BackgroundDecision -- "yes" --> CodeDisaggregatedLCIA
 ```
 
+/// figure-caption
+Decision tree for choosing the right type of LCA, and the right `bw_timex` options within it.
+///
+
 ## Modeling paradigm option: chimaera vs explicit process/product
 
 Brightway supports more than one way to represent inventory data. See the Brightway inventory
 overview on [processes, products, and something in between](https://docs.brightway.dev/en/latest/content/overview/inventory.html#processes-products-and-something-in-between)
 for the broader data-model discussion. In short:
 
-- **Explicit process/product** (`type="process"` + `type="product"`): products are separate
-  nouns, processes are separate verbs, and production edges connect processes to products.
-- **Chimaera** (`type="processwithreferenceproduct"`): one node acts as both process and
-  reference product. This is common in existing LCI databases and compact for many models.
+`Explicit process/product` (`type="process"` + `type="product"`)
+:   Products are separate nouns, processes are separate verbs, and production edges connect
+    processes to products.
+
+`Chimaera` (`type="processwithreferenceproduct"`)
+:   One node acts as both process and reference product. This is common in existing LCI
+    databases and compact for many models.
 
 Both paradigms are valid modelling choices. `bw_timex` aims to support both when building
 timelines and expanding matrices. The right choice depends on what you need to express and on the
@@ -61,11 +75,14 @@ data you start from.
 
 ### Terms used below
 
-A **production-time group** is a set of product units supplied or produced at the same time. In
-fleet and stock modelling, this is often called a **cohort**; for example, all vehicles produced in
-2030 are the 2030 cohort. A **process/product version date** is the date that fixes a foreground
-property of that group, such as vehicle efficiency or a material requirement. Some literature calls
-this a **vintage**.
+`production-time group`
+:   A set of product units supplied or produced at the same time. In fleet and stock modelling,
+    this is often called a **cohort**; for example, all vehicles produced in 2030 are the 2030
+    cohort.
+
+`process/product version date`
+:   The date that fixes a foreground property of a production-time group, such as vehicle
+    efficiency or a material requirement. Some literature calls this a **vintage**.
 
 ### When chimaera nodes are often pragmatic
 
@@ -77,9 +94,17 @@ style.
 For production-time group timing in a chimaera model, you usually add an intermediary foreground
 activity and put the temporal distribution on a normal technosphere edge, e.g.:
 
-```text
-fleet_service -- production-time group TD --> fleet_driving
-fleet_driving -- age TD --> electricity
+```mermaid
+flowchart LR
+    fleet_service("fleet_service"):::fg
+    fleet_driving("fleet_driving"):::fg
+    electricity("electricity"):::bg
+
+    fleet_service -- "production-time group TD" --> fleet_driving
+    fleet_driving -- "age TD" --> electricity
+
+    classDef fg color:#222832, fill:#3fb1c5, stroke:none;
+    classDef bg color:#222832, fill:#9c5ffd, stroke:none;
 ```
 
 This is a structural modelling pattern: `fleet_service` exists to give the production-time group
@@ -95,16 +120,27 @@ multi-output process modelling.
 For production-time group timing in an explicit model, put the temporal distribution directly on
 the production edge:
 
-```text
-fleet_process -- production-time group TD --> fleet_product
-fleet_process -- age TD --> electricity
+```mermaid
+flowchart LR
+    fleet_process("fleet_process"):::fg
+    fleet_product("fleet_product"):::fg
+    electricity("electricity"):::bg
+
+    fleet_process -- "production-time group TD" --> fleet_product
+    fleet_process -- "age TD" --> electricity
+
+    classDef fg color:#222832, fill:#3fb1c5, stroke:none;
+    classDef bg color:#222832, fill:#9c5ffd, stroke:none;
 ```
 
 This makes production timing part of the graph topology instead of introducing a wrapper activity.
 It also makes the two timeline dates easier to interpret:
 
-- `date_consumer`: the process/product version date or demand-side process instance date.
-- `date_producer`: the actual exchange event date.
+`date_consumer`
+:   The process/product version date or demand-side process instance date.
+
+`date_producer`
+:   The actual exchange event date.
 
 ### How this relates to temporal evolution
 
@@ -126,14 +162,18 @@ consumer and producer dates.
 
 Foreground temporal evolution can be keyed to either the consumer timestamp or the producer timestamp. The names are graph terms:
 
-- `temporal_evolution_reference="consumer"` means the factor is evaluated at `date_consumer`: the time of the foreground process instance using the exchange. In production-time group models, this is usually the **process/product version date**.
-- `temporal_evolution_reference="producer"` means the factor is evaluated at `date_producer`: the time when the exchanged input/output event actually happens. This is the **calendar event date**.
+`temporal_evolution_reference="consumer"`
+:   The factor is evaluated at `date_consumer`: the time of the foreground process instance using
+    the exchange. In production-time group models, this is usually the **process/product version
+    date**.
+
+`temporal_evolution_reference="producer"`
+:   The factor is evaluated at `date_producer`: the time when the exchanged input/output event
+    actually happens. This is the **calendar event date**.
 
 Use `consumer` for version-locked properties, e.g. a vehicle produced in 2025 keeps its 2025 kWh/km in 2035. Use `producer` for calendar-year properties, e.g. a repair operation becomes more efficient for all active vehicles in 2035.
 
-Rule of thumb:
+!!! tip "Rule of thumb"
 
-```text
-Property of the foreground process/product version date? -> consumer
-Property of the exchange event year?                -> producer
-```
+    - Property of the foreground process/product version date? → `consumer`
+    - Property of the exchange event year? → `producer`

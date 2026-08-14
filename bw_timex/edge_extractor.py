@@ -925,10 +925,6 @@ class EdgeExtractor(VariantBackgroundMixin, TemporalisLCA):
         node through time using convolution-operators. It stops in case the current edge
         is known to have no temporal distribution (=leaf) (e.g. part of background database).
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         list

@@ -1,3 +1,11 @@
+---
+icon: lucide/list-ordered
+tags:
+  - tutorial
+  - timeline
+  - background databases
+---
+
 # Step 2 - Building the process timeline
 
 With all the temporal information prepared, we can now instantiate our TimexLCA object. This is very similar to a normal Brightway LCA object, but with the additional argument of our `database_dates`:

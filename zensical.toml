@@ -1,0 +1,248 @@
+[project]
+site_name = "bw_timex"
+site_description = "Time-explicit Life Cycle Assessment"
+site_author = "Timo Diepers, Amelie Müller, Arthur Jakobs"
+site_url = "https://timodiepers.github.io/bw_timex/"
+
+repo_name = "brightway-lca/bw_timex"
+repo_url = "https://github.com/brightway-lca/bw_timex"
+edit_uri = "edit/main/docs/"
+
+copyright = "Copyright &copy; 2026 bw_timex developers"
+
+nav = [
+  { Home = [
+    { Overview = "index.md" },
+    { Changelog = "content/changelog.md" },
+    { License = "content/license.md" },
+    { Contributing = "content/contributing.md" },
+    { "Code of Conduct" = "content/codeofconduct.md" },
+    { Funding = "content/funding.md" },
+  ]},
+  { "User Guide" = [
+    { "Quick Start" = "content/getting_started/quickstart.md" },
+    { Installation = "content/installation.md" },
+    { Walkthrough = [
+      "content/getting_started/index.md",
+      { "Step 1 - Adding temporal information" = "content/getting_started/adding_temporal_information.md" },
+      { "Step 2 - Building the process timeline" = "content/getting_started/build_process_timeline.md" },
+      { "Step 3 - Calculating the time-explicit LCI" = "content/getting_started/time_explicit_lci.md" },
+      { "Step 4 - Impact assessment" = "content/getting_started/lcia.md" },
+    ]},
+    { "What LCA should I do?" = "content/decisiontree.md" },
+  ]},
+  { Theory = "content/theory.md" },
+  { Examples = [
+    "content/examples/index.md",
+    { Tutorials = [
+      { "Electric Car from Scratch" = "content/examples/tutorials/electric_vehicle_from_scratch.md" },
+      { "Dynamic Characterization" = "content/examples/tutorials/dynamic_characterization.md" },
+      { "Import from Excel" = "content/examples/tutorials/import_model_from_excel.md" },
+    ]},
+    { "Case Studies" = [
+      { "Electric Car with premise" = "content/examples/examples/electric_vehicle_premise.md" },
+      { "Electric Car with premise (in detail)" = "content/examples/examples/electric_vehicle_premise_detailed.md" },
+      { "EV Case Study for our Paper" = "content/examples/examples/paper_case_study.md" },
+    ]},
+    { Advanced = [
+      { "Temporal Distributions in the Background" = "content/examples/advanced/background_temporal_distributions.md" },
+      { "Background Temporalization with premise" = "content/examples/advanced/background_temporal_distributions_premise.md" },
+      { "Uncertainty with Datapackages" = "content/examples/advanced/uncertainty_with_datapackages.md" },
+    ]},
+  ]},
+  { "API Reference" = [
+    "api/index.md",
+    { TimexLCA = "api/timex_lca.md" },
+    { "Timeline Builder" = "api/timeline_builder.md" },
+    { "Matrix Modifier" = "api/matrix_modifier.md" },
+    { "Dynamic Biosphere Builder" = "api/dynamic_biosphere_builder.md" },
+    { "Edge Extractor" = "api/edge_extractor.md" },
+    { "Helper Classes" = "api/helper_classes.md" },
+    { Utils = "api/utils.md" },
+  ]},
+]
+
+extra_javascript = [
+  "https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.min.js",
+  "javascripts/source-overrides.js",
+]
+
+extra_css = [
+  "stylesheets/extra.css",
+]
+
+[project.theme]
+language = "en"
+logo = "_static/favicon.svg"
+favicon = "_static/favicon.svg"
+features = [
+  "announce.dismiss",
+  "content.action.edit",
+  "content.action.view",
+  "content.code.copy",
+  "content.code.annotate",
+  "content.tabs.link",
+  "content.tooltips",
+  "navigation.footer",
+  "navigation.instant",
+  "navigation.instant.prefetch",
+  "navigation.tabs",
+  "navigation.indexes",
+  "navigation.path",
+  "navigation.top",
+  "navigation.tracking",
+  "header.autohide",
+  "search.highlight",
+  "search.share",
+  "search.suggest",
+  "toc.follow",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "deep-purple"
+accent = "deep-purple"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "deep-purple"
+accent = "deep-purple"
+toggle.icon = "lucide/moon-star"
+toggle.name = "Switch to light mode"
+
+[project.theme.icon]
+repo = "fontawesome/brands/github"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/brightway-lca/bw_timex"
+name = "Open this Repo on GitHub"
+
+[[project.extra.social]]
+icon = "lucide/rocket"
+link = "https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Ftutorials%2F1_getting_started.ipynb"
+name = "Launch interactive Demo on Binder"
+
+[project.markdown_extensions.abbr]
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.def_list]
+[project.markdown_extensions.footnotes]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.toc]
+permalink = true
+[project.markdown_extensions.pymdownx.arithmatex]
+generic = true
+[project.markdown_extensions.pymdownx.betterem]
+smart_enable = "all"
+[project.markdown_extensions.pymdownx.blocks.caption]
+[project.markdown_extensions.pymdownx.caret]
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.emoji]
+emoji_index = "zensical.extensions.emoji.twemoji"
+emoji_generator = "zensical.extensions.emoji.to_svg"
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.keys]
+[project.markdown_extensions.pymdownx.mark]
+[project.markdown_extensions.pymdownx.smartsymbols]
+[project.markdown_extensions.pymdownx.snippets]
+auto_append = ["docs/includes/abbreviations.md"]
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+[project.markdown_extensions.pymdownx.tasklist]
+custom_checkbox = true
+[project.markdown_extensions.pymdownx.tilde]
+
+[project.plugins.mkdocstrings]
+enabled = true
+default_handler = "python"
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["."]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "numpy"
+docstring_section_style = "table"
+show_root_heading = true
+show_root_toc_entry = true
+show_root_full_path = false
+show_object_full_path = false
+show_category_heading = true
+show_symbol_type_heading = true
+show_symbol_type_toc = true
+members_order = "source"
+group_by_category = true
+show_if_no_docstring = false
+show_signature = true
+show_signature_annotations = true
+separate_signature = false
+signature_crossrefs = true
+merge_init_into_class = true
+show_source = true
+inherited_members = false
+filters = ["!^_", "!^__"]
+
+[project.plugins.tags]
+
+[project.markdown_extensions.zensical.extensions.preview]
+configurations = [
+  { targets.include = ["**"], targets.exclude = ["**/*.svg", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.gif", "**/*.webp"] },
+]
+
+[project.markdown_extensions.zensical.extensions.glightbox]
+
+[project.validation]
+invalid_links = true
+invalid_link_anchors = true
+
+[project.extra.tags]
+example = "example"
+premise = "premise"
+"dynamic characterization" = "dynchar"
+paper = "paper"
+excel = "excel"
+tutorial = "tutorial"
+advanced = "advanced"
+uncertainty = "uncertainty"
+datapackages = "datapackages"
+installation = "installation"
+"temporal distribution" = "temporal-distribution"
+"temporal evolution" = "temporal-evolution"
+"background databases" = "background-databases"
+timeline = "timeline"
+inventory = "inventory"
+"graph traversal" = "graph-traversal"
+theory = "theory"
+api = "api"
+
+[project.theme.icon.tag]
+example = "lucide/flask-conical"
+premise = "lucide/leaf"
+dynchar = "lucide/trending-up"
+paper = "lucide/scroll-text"
+excel = "lucide/table"
+tutorial = "lucide/footprints"
+advanced = "lucide/sliders-horizontal"
+uncertainty = "lucide/dices"
+datapackages = "lucide/package"
+installation = "lucide/download"
+"temporal-distribution" = "lucide/chart-column-increasing"
+"temporal-evolution" = "lucide/chart-spline"
+"background-databases" = "lucide/database"
+timeline = "lucide/list-ordered"
+inventory = "lucide/calculator"
+"graph-traversal" = "lucide/waypoints"
+theory = "lucide/book-open"
+api = "lucide/code"

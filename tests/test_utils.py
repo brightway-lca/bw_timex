@@ -290,6 +290,42 @@ class TestGetExchange:
                 output_database="foreground",
             )
 
+    def test_get_by_names(self):
+        exc = get_exchange(input_name="B", output_name="A")
+        assert exc["amount"] == 1
+
+    def test_name_disambiguated_by_database(self):
+        # "C" exists in both db_2022 and db_2024
+        exc = get_exchange(
+            input_name="C",
+            input_database="db_2024",
+            output_name="B",
+            output_database="foreground",
+        )
+        assert exc["type"] == "technosphere"
+
+    def test_name_disambiguated_by_location_and_product(self):
+        exc = get_exchange(
+            input_name="C",
+            input_database="db_2024",
+            input_location="somewhere",
+            input_product="C",
+            output_name="B",
+        )
+        assert exc["type"] == "technosphere"
+
+    def test_ambiguous_name_raises(self):
+        with pytest.raises(MultipleResults):
+            get_exchange(input_name="C", output_name="B")
+
+    def test_unknown_name_raises(self):
+        with pytest.raises(UnknownObject):
+            get_exchange(input_name="nonexistent", output_name="A")
+
+    def test_names_and_codes_can_be_mixed(self):
+        exc = get_exchange(input_name="B", output_code="A", output_database="foreground")
+        assert exc["amount"] == 1
+
 
 # --- add_temporal_distribution_to_exchange (DB-dependent) ---
 
@@ -316,6 +352,26 @@ class TestAddTemporalDistributionToExchange:
         )
         assert exc.get("temporal_distribution") is not None
         assert len(exc["temporal_distribution"].amount) == 3
+
+    def test_add_td_by_names(self):
+        td = TemporalDistribution(
+            np.array([0, 1], dtype="timedelta64[Y]"),
+            np.array([0.5, 0.5]),
+        )
+        add_temporal_distribution_to_exchange(
+            td,
+            input_name="carbon dioxide",
+            input_database="bio",
+            output_name="C",
+            output_database="db_2024",
+        )
+        exc = get_exchange(
+            input_code="CO2",
+            input_database="bio",
+            output_code="C",
+            output_database="db_2024",
+        )
+        assert len(exc["temporal_distribution"].amount) == 2
 
 
 # --- add_temporal_evolution_to_exchange (DB-dependent) ---

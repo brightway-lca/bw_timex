@@ -6,7 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-* Added a flat top-level namespace: `TemporalDistribution`, `easy_timedelta_distribution` and `easy_datetime_distribution` are re-exported from `bw_temporalis`, and the user-facing helpers from `bw_timex.utils` (`add_temporal_distribution_to_exchange`, `add_temporal_evolution_to_exchange`, `add_flows_to_characterization_functions`, `get_exchange`, `get_temporal_evolution_factor`, `interactive_td_widget`, `plot_characterized_inventory_as_waterfall`) are now importable directly from `bw_timex`
+* Added name-based exchange lookup to `get_exchange`, `add_temporal_distribution_to_exchange` and `add_temporal_evolution_to_exchange`, via `input_name`/`output_name` (optionally narrowed down with `input_location`/`output_location` and `input_product`/`output_product`), which avoids having to know the machine-generated codes of e.g. ecoinvent nodes ([#202](https://github.com/brightway-lca/bw_timex/pull/202))
+* Added a flat top-level namespace: `TemporalDistribution`, `easy_timedelta_distribution` and `easy_datetime_distribution` are re-exported from `bw_temporalis`, and the user-facing helpers from `bw_timex.utils` (`add_temporal_distribution_to_exchange`, `add_temporal_evolution_to_exchange`, `add_flows_to_characterization_functions`, `get_exchange`, `get_temporal_evolution_factor`, `interactive_td_widget`, `plot_characterized_inventory_as_waterfall`) are now importable directly from `bw_timex` ([#206](https://github.com/brightway-lca/bw_timex/pull/206))
 * Fixed `lci()` raising `MultipleResults` when a temporalized process' code also exists in another database of the project, by resolving producers by node id instead of by code ([#203](https://github.com/brightway-lca/bw_timex/pull/203))
 * Fixed supply scaling in `lci(expand_technosphere=False)` for processes with a production amount other than 1, whose supplies were mis-scaled and, for negative production amounts (waste treatment), sign-flipped ([#200](https://github.com/brightway-lca/bw_timex/pull/200))
 * Fixed `temporal_market_lcis` being corrupted when several timeline rows share a time-mapped temporal market ([#200](https://github.com/brightway-lca/bw_timex/pull/200))
@@ -93,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0] - 2024-09-13
 * Added utility function [`utils.add_temporal_distribution_to_exchange()`](https://github.com/brightway-lca/bw_timex/blob/a85349bdc43d98be559a7ce17d0b686098decec6/bw_timex/utils.py#L341) for easier temporalization of existing models
-* Added more clarifying docstrings, created a "Getting Started" section in the docs as well as a [`getting_started.ipynb`](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/getting_started.ipynb). Also overhauled existing example notebooks.
+* Added more clarifying docstrings, created a "Getting Started" section in the docs as well as a [`getting_started.ipynb`](https://github.com/brightway-lca/bw_timex/blob/main/notebooks/tutorials/1_getting_started.ipynb). Also overhauled existing example notebooks.
 * Changed naming of the different score attributes to be more clear and [turned them into a @property:](https://github.com/brightway-lca/bw_timex/blob/a85349bdc43d98be559a7ce17d0b686098decec6/bw_timex/timex_lca.py#L437)
     * `TimexLCA.base_score` := `TimexLCA.static_lca.score` (no time-explicit information)
     * `TimexLCA.static_score` := `TimexLCA.lca.score` (time-explicit LCI w/ static characterization)

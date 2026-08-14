@@ -1,0 +1,242 @@
+:root > * {
+  --md-code-fg-color: var(--md-default-fg-color);
+}
+
+.md-content .md-typeset .md-button {
+  background-color: transparent;
+  border-color: transparent;
+  border-radius: 0.4rem;
+  color: var(--md-default-fg-color);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.8rem;
+}
+
+.md-content .md-typeset .md-button:hover,
+.md-content .md-typeset .md-button:focus {
+  background-color: var(--md-default-fg-color--lightest);
+  border-color: transparent;
+  color: var(--md-default-fg-color);
+  opacity: 1;
+}
+
+.md-content .md-typeset .md-button--primary {
+  background-color: var(--md-primary-fg-color);
+  border-color: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color);
+}
+
+.md-content .md-typeset .md-button--primary:hover,
+.md-content .md-typeset .md-button--primary:focus {
+  background-color: var(--md-primary-fg-color--light);
+  border-color: var(--md-primary-fg-color--light);
+  color: var(--md-primary-bg-color);
+  opacity: 1;
+}
+
+/* Logo */
+.md-header__button.md-logo {
+    padding: 0 0.4rem !important;
+    margin: 0 !important;
+}
+
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+    height: 30px;
+    width: auto;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Title */
+.md-header__title {
+    margin-left: 10px !important;
+}
+
+.md-header__topic:first-child {
+    font-family: "Consolas", "Roboto Mono", monospace !important;
+    text-transform: lowercase;
+    font-weight: 700;
+}
+
+.md-header__topic:not(:first-child) {
+    font-family: var(--md-text-font-family, "Inter", sans-serif);
+    text-transform: none;
+    font-weight: normal;
+}
+
+.md-content .md-typeset img {
+  border-radius: 0.4rem;
+}
+
+/* Round the outer corners of the table, matching the code block radius. */
+.md-content .md-typeset .md-typeset__table table {
+  border-radius: 0.4rem;
+}
+
+/* The theme adds an extra margin-bottom on .md-typeset__table on top of its
+   .md-typeset__scrollwrap parent's own 1em, so tables get ~1.5em below but
+   only 1em above - drop that extra bit for a symmetric margin. */
+.md-content .md-typeset .md-typeset__table {
+  margin-bottom: 0;
+}
+
+/* Highlight code cells in the rendered example notebooks (and only those)
+   with a subtle primary-color inset border. Scoped via a JS-added class
+   (see docs/javascripts/source-overrides.js) rather than the Markdown
+   source. .md-content__inner and .md-typeset are the same element here,
+   not ancestor/descendant. */
+.md-content__inner.notebook-page.md-typeset .language-python.highlight {
+  box-shadow: none;
+}
+
+/* Target the <code> element itself rather than the theme's .md-code__content
+   class: that class is added at runtime by the theme's JS, so anything the
+   theme hasn't enhanced (e.g. a block inside a collapsed admonition) never
+   gets the highlight. */
+.md-content__inner.notebook-page.md-typeset .language-python.highlight > pre > code {
+  box-shadow: inset 0.2rem 0 0 var(--md-primary-fg-color);
+  border-radius: 0.4rem;
+}
+
+/* Cell outputs (nbconvert emits them as indented blocks, so they come out as
+   .language-text) keep the theme's own code background - they're set apart
+   from the cell above by the missing primary-color bar and by the log-line
+   colouring below, not by a different shade. */
+.md-content__inner.notebook-page.md-typeset .language-text.highlight {
+  box-shadow: none;
+}
+
+.md-content__inner.notebook-page.md-typeset .language-text.highlight > pre > code {
+  border-radius: 0.4rem;
+}
+
+/* Log-line tokens, applied at runtime by docs/javascripts/source-overrides.js.
+   Colours are set here (rather than reusing --md-code-hl-*) so the output
+   palette stays deliberately quieter than the Python token palette. */
+.md-content__inner.notebook-page.md-typeset .nb-log-time {
+  color: var(--md-default-fg-color--light);
+  opacity: 0.7;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-origin {
+  color: var(--md-default-fg-color--light);
+  opacity: 0.7;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-message {
+  color: var(--md-default-fg-color);
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-level {
+  font-weight: 700;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-level--info {
+  color: #3f6fd8;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-level--success {
+  color: #2e7d4f;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-level--warning {
+  color: #a86400;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-level--error {
+  color: #c0392b;
+}
+
+.md-content__inner.notebook-page.md-typeset .nb-log-level--debug {
+  color: var(--md-default-fg-color--light);
+}
+
+[data-md-color-scheme="slate"]
+  .md-content__inner.notebook-page.md-typeset
+  .nb-log-level--info {
+  color: #7fa8ff;
+}
+
+[data-md-color-scheme="slate"]
+  .md-content__inner.notebook-page.md-typeset
+  .nb-log-level--success {
+  color: #6fcf97;
+}
+
+[data-md-color-scheme="slate"]
+  .md-content__inner.notebook-page.md-typeset
+  .nb-log-level--warning {
+  color: #e0a03c;
+}
+
+[data-md-color-scheme="slate"]
+  .md-content__inner.notebook-page.md-typeset
+  .nb-log-level--error {
+  color: #ff8a80;
+}
+
+/* Below the theme's own mobile breakpoint, the code cell (like the table
+   and the code block itself) bleeds all the way to the true screen edge
+   rather than just to the edge of an inset content column - a rounded
+   corner sitting flush against the actual screen edge looks like a
+   rendering glitch, and it also clips the inset box-shadow above into a
+   rounded bar instead of a flat one flush with the screen. Squaring both
+   off here, since above this breakpoint the cell still has visible page
+   margin around it and the rounding reads as intentional. */
+@media screen and (max-width: 44.984375em) {
+  .md-content__inner.notebook-page.md-typeset .language-python.highlight > pre > code,
+  .md-content__inner.notebook-page.md-typeset .language-text.highlight > pre > code {
+    border-radius: 0;
+  }
+}
+
+/* "See Also" docstring sections. mkdocstrings turns every numpydoc section
+   it doesn't parse itself into an admonition whose class is the slugified
+   section title, so a `See Also` section arrives here as `details.see-also`.
+   That is not one of the theme's built-in admonition types, so it would
+   otherwise fall back to the unstyled default - give it the same treatment
+   the built-in types get. */
+:root {
+  --md-admonition-icon--see-also: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>');
+}
+
+.md-typeset .admonition.see-also,
+.md-typeset details.see-also {
+  border-color: #00b8d4;
+}
+
+.md-typeset .admonition.see-also:focus-within,
+.md-typeset details.see-also:focus-within {
+  box-shadow: 0 0 0 0.2rem #00b8d41a;
+}
+
+.md-typeset .see-also > .admonition-title,
+.md-typeset .see-also > summary {
+  background-color: #00b8d41a;
+}
+
+.md-typeset .see-also > .admonition-title::before,
+.md-typeset .see-also > summary::before {
+  background-color: #00b8d4;
+  -webkit-mask-image: var(--md-admonition-icon--see-also);
+  mask-image: var(--md-admonition-icon--see-also);
+}
+
+.md-typeset .see-also > .admonition-title::after,
+.md-typeset .see-also > summary::after {
+  color: #00b8d4;
+}
+
+/* The list of references in a "See Also" section is the whole body of the
+   admonition, so it doesn't need the bullets or the extra leading indent. */
+.md-typeset .see-also > ul {
+  list-style: none;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.md-typeset .see-also > ul > li {
+  margin-left: 0;
+}

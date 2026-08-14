@@ -79,29 +79,31 @@ class TimexLCA:
         user-defined.
 
 
-    Example
-    -------
-    >>> demand = {('my_foreground_database', 'my_process'): 1}
-    >>> method = ("some_method_family", "some_category", "some_method")
-    >>> database_dates = {
-            'my_background_database_one': datetime.strptime("2020", "%Y"),
-            'my_background_database_two': datetime.strptime("2030", "%Y"),
-            'my_background_database_three': datetime.strptime("2040", "%Y"),
-            # Several databases may share the same date, e.g. to keep your own
-            # modified copies of background processes in their own database:
-            'my_modified_background_2020': datetime.strptime("2020", "%Y"),
-            'my_foreground_database':'dynamic'
-        }
-    >>> tlca = TimexLCA(demand, method, database_dates)
-    >>> tlca.build_timeline() # has many optional arguments
-    >>> tlca.lci()
-    >>> tlca.static_lcia()
-    >>> print(tlca.static_score)
-    >>> tlca.dynamic_lcia(metric="radiative_forcing") # also available:
-    >>> # "GWP", "pGWP", "pGTP", "prospective_radiative_forcing"
-    >>> print(tlca.dynamic_score)
+    Examples
+    --------
+    ```python
+    demand = {("my_foreground_database", "my_process"): 1}
+    method = ("some_method_family", "some_category", "some_method")
+    database_dates = {
+        "my_background_database_one": datetime.strptime("2020", "%Y"),
+        "my_background_database_two": datetime.strptime("2030", "%Y"),
+        "my_background_database_three": datetime.strptime("2040", "%Y"),
+        # Several databases may share the same date, e.g. to keep your own
+        # modified copies of background processes in their own database:
+        "my_modified_background_2020": datetime.strptime("2020", "%Y"),
+        "my_foreground_database": "dynamic",
+    }
 
-    """ """"""
+    tlca = TimexLCA(demand, method, database_dates)
+    tlca.build_timeline()  # has many optional arguments
+    tlca.lci()
+    tlca.static_lcia()
+    print(tlca.static_score)
+    # also available: "GWP", "pGWP", "pGTP", "prospective_radiative_forcing"
+    tlca.dynamic_lcia(metric="radiative_forcing")
+    print(tlca.dynamic_score)
+    ```
+    """
 
     def __init__(
         self,
@@ -304,9 +306,10 @@ class TimexLCA:
         pandas.DataFrame:
             A DataFrame containing the timeline of technosphere exchanges
 
-        See also
+        See Also
         --------
-        bw_timex.timeline_builder.TimelineBuilder: Class that builds the timeline.
+        - [`TimelineBuilder`][bw_timex.timeline_builder.TimelineBuilder]: Class that builds the
+          timeline.
 
         """
         validated = BuildTimelineInputs(
@@ -490,13 +493,13 @@ class TimexLCA:
             calls LCI calculations from bw2calc and calculates the dynamic inventory, if
             `build_dynamic_biosphere` is True.
 
-        See also
+        See Also
         --------
-        build_datapackage:
-            Method to create the datapackages that contain the modifications
-            to the technosphere and biosphere matrix using the `MatrixModifier` class.
-        calculate_dynamic_inventory:
-            Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
+        - [`build_datapackage`][bw_timex.timex_lca.TimexLCA.build_datapackage]: Method to create
+          the datapackages that contain the modifications to the technosphere and biosphere matrix
+          using the [`MatrixModifier`][bw_timex.matrix_modifier.MatrixModifier] class.
+        - [`calculate_dynamic_inventory`][bw_timex.timex_lca.TimexLCA.calculate_dynamic_inventory]:
+          Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
 
         LCIInputs(
@@ -665,10 +668,6 @@ class TimexLCA:
         The disaggregated background LCI's allow a contribution analysis on the
         orginal inventory level as compared to the aggregated temporal market emissions.
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         None
@@ -757,10 +756,6 @@ class TimexLCA:
         """
         Calculates static LCIA using time-explicit LCIs with the standard static characterization
         factors of the selected LCIA method using `bw2calc.lcia()`.
-
-        Parameters
-        ----------
-        None
 
         Returns
         -------
@@ -860,9 +855,10 @@ class TimexLCA:
         pandas.DataFrame
             A DataFrame with the characterized inventory for the chosen metric and parameters.
 
-        See also
+        See Also
         --------
-        dynamic_characterization: Package handling the dynamic characterization: https://dynamic-characterization.readthedocs.io/en/latest/
+        - [`dynamic_characterization`](https://dynamic-characterization.readthedocs.io/en/latest/):
+          Package handling the dynamic characterization.
         """
 
         DynamicLCIAInputs(
@@ -996,19 +992,16 @@ class TimexLCA:
         Creates the datapackages that contain the modifications to the technosphere and biosphere
         matrix using the `MatrixModifier` class.
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         list
             List of datapackages that contain the modifications to the technosphere and biosphere
             matrix
 
-        See also
+        See Also
         --------
-        bw_timex.matrix_modifier.MatrixModifier: Class that handles the technosphere and biosphere matrix modifications.
+        - [`MatrixModifier`][bw_timex.matrix_modifier.MatrixModifier]: Class that handles the
+          technosphere and biosphere matrix modifications.
         """
         self.matrix_modifier = MatrixModifier(
             self.timeline,
@@ -1098,8 +1091,8 @@ class TimexLCA:
         Parameters
         ----------
         expand_technosphere: bool
-           A boolean indicating if the dynamic biosphere matrix is built directly from the expanded
-           matrices or from the timeline. Default is True (from expanded matrices).
+            A boolean indicating if the dynamic biosphere matrix is built directly from the
+            expanded matrices or from the timeline. Default is True (from expanded matrices).
 
         Returns
         -------
@@ -1109,9 +1102,10 @@ class TimexLCA:
             Also calculates and stores the lci of the temporal markets in the attribute
             self.temporal_market_lcis for use in contribution analysis of the background processes.
 
-        See also
+        See Also
         --------
-        bw_timex.dynamic_biosphere_builder.DynamicBiosphereBuilder: Class for creating the dynamic biosphere matrix and inventory.
+        - [`DynamicBiosphereBuilder`][bw_timex.dynamic_biosphere_builder.DynamicBiosphereBuilder]:
+          Class for creating the dynamic biosphere matrix and inventory.
         """
 
         if not hasattr(self, "lca"):
@@ -1257,10 +1251,6 @@ class TimexLCA:
         rebuild it. For large background databases that takes tens of seconds each, so
         the databases concerned are logged instead of the calculation appearing to hang.
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         None
@@ -1322,9 +1312,10 @@ class TimexLCA:
         tuple
             Indexed demand, data objects, and remapping dictionaries
 
-        See also
+        See Also
         --------
-        bw2data.compat.prepare_lca_inputs: Original code this function is adapted from (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
+        - [`bw2data.compat.prepare_lca_inputs`](https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py):
+          Original code this function is adapted from.
         """
         if not projects.dataset.data.get("25"):
             raise Brightway2Project(
@@ -1435,8 +1426,6 @@ class TimexLCA:
         method : tuple
             Tuple defining the LCIA method, such as `('foo', 'bar')`. Only needed if not passing
             `data_objs`.
-        demand_timing: dict
-            Dictionary mapping demand ids to their timing.
         weighting : tuple
             Tuple defining the LCIA weighting, such as `('foo', 'bar')`. Only needed if not passing
             `data_objs`.
@@ -1452,9 +1441,10 @@ class TimexLCA:
         tuple
             Indexed demand, data objects, and remapping dictionaries
 
-        See also
+        See Also
         --------
-        bw2data.compat.prepare_lca_inputs: Original code this function is adapted from (https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py).
+        - [`bw2data.compat.prepare_lca_inputs`](https://github.com/brightway-lca/brightway2-data/blob/main/bw2data/compat.py):
+          Original code this function is adapted from.
         """
 
         if not projects.dataset.data.get("25"):
@@ -1532,10 +1522,6 @@ class TimexLCA:
         - ``background``: set of node ids of all processes that depend on the demand processes and are in the background databases
         - ``foreground``: set of node ids of all processes that are not in the background databases
         - ``first_level_background_static``: set of node ids of all processes that are in the background databases and are directly linked to the demand processes
-
-        Parameters
-        ----------
-            None
 
         Returns
         -------
@@ -1638,10 +1624,6 @@ class TimexLCA:
         with only those activities and background databases that are actually mapped in the
         timeline.
 
-        Parameters
-        ----------
-        None
-
 
         Returns
         -------
@@ -1702,10 +1684,6 @@ class TimexLCA:
         """
         Prepares the input for the LCA from the timeline.
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         None
@@ -1747,10 +1725,6 @@ class TimexLCA:
         temporalized background databases) are added later on by the TimelineBuilder.
         Activities in the foreground database are mapped with
         (('database', 'code'), "dynamic"): time_mapping_id)" as their timing is not yet known.
-
-        Parameters
-        ----------
-        None
 
         Returns
         -------
@@ -1801,10 +1775,6 @@ class TimexLCA:
         timing of the producing process. For demands keyed by an explicit product node, the producer
         in the timeline is the process producing that product, so we resolve the product → process
         relationship via the production exchange.
-
-        Parameters
-        ----------
-        None
 
         Returns
         -------
@@ -1919,10 +1889,6 @@ class TimexLCA:
         """
         Returns the technosphere matrix as a dataframe with comprehensible labels instead of ids.
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         pd.DataFrame
@@ -1946,10 +1912,6 @@ class TimexLCA:
     def create_labelled_biosphere_dataframe(self) -> pd.DataFrame:
         """
         Returns the biosphere matrix as a pandas.DataFrame with comprehensible labels instead of ids.
-
-        Parameters
-        ----------
-        None
 
         Returns
         -------
@@ -1978,10 +1940,6 @@ class TimexLCA:
         """
         Returns the dynamic biosphere matrix as a dataframe with comprehensible labels instead of
         ids.
-
-        Parameters
-        ----------
-        None
 
         Returns
         -------
@@ -2030,10 +1988,6 @@ class TimexLCA:
         """
         Returns the dynamic_inventory_df with comprehensible labels for flows and activities instead
         of ids.
-
-        Parameters
-        ----------
-        None
 
         Returns
         -------

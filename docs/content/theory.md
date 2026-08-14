@@ -1,6 +1,13 @@
+---
+tags:
+  - theory
+  - graph traversal
+  - background databases
+---
+
 # Theory
 
-This section explains some of the theory behind time-explicit LCAs with `bw_timex`. In contrast to the [Getting Started section](getting_started/index.md), we explain a bit more of what`s going on in the background here. If this is still too vague for you, you can always check out our [API reference](api/index).
+This section explains some of the theory behind time-explicit LCAs with `bw_timex`. In contrast to the [Walkthrough](getting_started/index.md), we explain a bit more of what`s going on in the background here. If this is still too vague for you, you can always check out our [API reference](../api/index.md).
 
 ## Terminology
 LCA terminology can be confusing sometimes, also for experienced practitioners. Particularly, we found the terminology around temporal aspects of LCA confusing, where different terms have been used to describe the same temporal aspect or the same term has been used to describe different temporal aspects.
@@ -9,12 +16,12 @@ In an attempt for improved clarity, we use the term "time-explicit LCA". Essenti
 
 Below, you find a visualization of the time-explicit approach. Our [decision tree](decisiontree.md) might also help to understand the differences between the different types of LCA.
 
-```{image} data/timeexplicit_lca_dark.svg
-:class: only-dark
-```
-```{image} data/timeexplicit_lca_light.svg
-:class: only-light
-```
+![Time-explicit LCA overview](data/timeexplicit_lca_light.svg#only-light)
+![Time-explicit LCA overview](data/timeexplicit_lca_dark.svg#only-dark)
+
+/// figure-caption
+Time-explicit LCA jointly considers temporal distribution and temporal evolution.
+///
 
 
 ## Data requirements
@@ -28,76 +35,68 @@ For a time-explicit LCA, three inputs are required:
 3.  a set of time-specific background databases, which must have a reference in time.
 
 
-```{note}
--   The foreground system must have exchanges linked to one of the time-specific
-    background databases. These exchanges at the intersection between
-    foreground and background databases will be relinked by `bw_timex`.
--   Temporal distributions can occur at technosphere and biosphere
-    exchanges and can be given in various forms, see
-    [bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main),
-    including absolute (e.g. 2024-03-18) or relative (e.g. 3 years
-    before) types and can have different temporal resolution (down to
-    seconds but later aggregation supports resolutions down to hours).
--   Temporal distributions are optional. If none are provided, no delay
-    between producing and consuming process is assumed and the timing of
-    the consuming process is adopted also for the producing process.
-```
+!!! note
+
+    -   The foreground system must have exchanges linked to one of the time-specific
+        background databases. These exchanges at the intersection between
+        foreground and background databases will be relinked by `bw_timex`.
+    -   Temporal distributions can occur at technosphere and biosphere
+        exchanges and can be given in various forms, see
+        [bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main),
+        including absolute (e.g. 2024-03-18) or relative (e.g. 3 years
+        before) types and can have different temporal resolution (down to
+        seconds but later aggregation supports resolutions down to hours).
+    -   Temporal distributions are optional. If none are provided, no delay
+        between producing and consuming process is assumed and the timing of
+        the consuming process is adopted also for the producing process.
 
 
 ## Temporal distributions and graph traversal
 To determine the timing of the exchanges within the production system, we add the `temporal_distribution` attribute to the respective exchanges, using the [`TemporalDistribution`](https://docs.brightway.dev/projects/bw-temporalis/en/stable/content/api/bw_temporalis/temporal_distribution/index.html#bw_temporalis.temporal_distribution.TemporalDistribution) class from [`bw_temporalis`](https://github.com/brightway-lca/bw_temporalis). This class carries the information how the amount of the exchange is spread over time in two numpy arrays (`date`and `amount`). So, it tells you what share of an exchange happens at what point in time. If two consecutive edges in the supply chain graph carry a `TemporalDistribution`, they are [convolved](https://en.wikipedia.org/wiki/Convolution), combining the two temporal profiles.
 
-````{admonition} Example: Convolution
-:class: admonition-example
+!!! example "Example: Convolution"
 
-Let's say we have two temporal distributions. The first dates 30% of some exchange two years into the future, and 70% of that exchange four years into the future:
+    Let's say we have two temporal distributions. The first dates 30% of some exchange two years into the future, and 70% of that exchange four years into the future:
 
-```python
-import numpy as np
-from bw_timex import TemporalDistribution
+    ```python
+    import numpy as np
+    from bw_timex import TemporalDistribution
 
-two_and_four_years_ahead = TemporalDistribution(
-    date=np.array([2, 4], dtype="timedelta64[Y]"),
-    amount=np.array([0.3, 0.7])
-)
+    two_and_four_years_ahead = TemporalDistribution(
+        date=np.array([2, 4], dtype="timedelta64[Y]"),
+        amount=np.array([0.3, 0.7])
+    )
 
-two_and_four_years_ahead.graph(resolution="Y")
-```
-~~~{image} data/td_two_and_four_years_ahead.svg
-:align: center
-~~~
+    two_and_four_years_ahead.graph(resolution="Y")
+    ```
+    ![Temporal distribution: two and four years ahead](data/td_two_and_four_years_ahead.svg){ style="display:block;margin:0 auto" }
 
-</br>
+    </br>
 
-The other distribution spreads an amount over the following 4 months, with decreasing shares:
-```python
-spread_over_four_months = TemporalDistribution(
-    date=np.array([0, 1, 2, 3], dtype="timedelta64[M]"),
-    amount=np.array([0.4, 0.3, 0.2, 0.1])
-)
+    The other distribution spreads an amount over the following 4 months, with decreasing shares:
+    ```python
+    spread_over_four_months = TemporalDistribution(
+        date=np.array([0, 1, 2, 3], dtype="timedelta64[M]"),
+        amount=np.array([0.4, 0.3, 0.2, 0.1])
+    )
 
-spread_over_four_months.graph(resolution="M")
-```
-~~~{image} data/td_spread_over_four_months.svg
-:align: center
-~~~
+    spread_over_four_months.graph(resolution="M")
+    ```
+    ![Temporal distribution: spread over four months](data/td_spread_over_four_months.svg){ style="display:block;margin:0 auto" }
 
-</br>
+    </br>
 
-Now, let's see what happens when we convolute these temporal distributions:
-```python
-convolved_distribution = two_and_four_years_ahead * spread_over_four_months
+    Now, let's see what happens when we convolute these temporal distributions:
+    ```python
+    convolved_distribution = two_and_four_years_ahead * spread_over_four_months
 
-convolved_distribution.graph(resolution="M")
-```
-~~~{image} data/td_convolved.svg
-:align: center
-~~~
+    convolved_distribution.graph(resolution="M")
+    ```
+    ![Temporal distribution: convolved](data/td_convolved.svg){ style="display:block;margin:0 auto" }
 
-</br>
+    </br>
 
-Note how both the dates and the amounts of the output distribution get scaled.
-````
+    Note how both the dates and the amounts of the output distribution get scaled.
 
 To convolute all the temporal information from the supply chain graph, `bw_timex` uses the graph traversal from
 [bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main). An in-depth
@@ -151,26 +150,25 @@ You can specify temporal evolution attributes on exchanges using either time-dep
 
 This temporal evolution of exchanges is optional, and if no temporal evolution is given, the exchange amounts remain constant over time.
 
-````{admonition} Example: temporal evolution
-:class: admonition-example
-Foreground exchange amounts can be modified with a dictionary of either time-dependent scaling factors or absolute amounts:
+!!! example "Example: temporal evolution"
 
-```python
-from datetime import datetime
+    Foreground exchange amounts can be modified with a dictionary of either time-dependent scaling factors or absolute amounts:
 
-exchange["temporal_evolution_factors"] = {
-    datetime(2020, 1, 1): 1.0,   # 100% of base amount in 2020
-    datetime(2030, 1, 1): 0.75,  # 75% of base amount in 2030
-    datetime(2040, 1, 1): 0.6,   # 60% of base amount in 2040
-}
+    ```python
+    from datetime import datetime
 
-exchange["temporal_evolution_amounts"] = {
-    datetime(2020, 1, 1): 60,   # 60 MJ in 2020
-    datetime(2030, 1, 1): 45,   # 45 MJ in 2030
-    datetime(2040, 1, 1): 36,   # 36 MJ in 2040
-}
-```
-````
+    exchange["temporal_evolution_factors"] = {
+        datetime(2020, 1, 1): 1.0,   # 100% of base amount in 2020
+        datetime(2030, 1, 1): 0.75,  # 75% of base amount in 2030
+        datetime(2040, 1, 1): 0.6,   # 60% of base amount in 2040
+    }
+
+    exchange["temporal_evolution_amounts"] = {
+        datetime(2020, 1, 1): 60,   # 60 MJ in 2020
+        datetime(2030, 1, 1): 45,   # 45 MJ in 2030
+        datetime(2040, 1, 1): 36,   # 36 MJ in 2040
+    }
+    ```
 
 ## Building the process timeline
 
@@ -184,48 +182,51 @@ resolutions down to seconds while one may not have a similar temporal
 resolution for the databases. We recommend aligning `temporal_grouping`
 to the temporal resolution of the available databases.
 
-````{admonition} Example: Timeline
-:class: admonition-example
+!!! example "Example: Timeline"
 
-Let's consider the following system: a process A consumes an
-exchange b from a process B. Both A and B emit CO<sub>2</sub>. The emission of CO<sub>2</sub> from B decreases in the future. All exchanges occur at a certain point in time, relative to process A, which takes place "now" (2024). This example does not contain include temporal evolution of foregound exchanges.
-```{mermaid}
-flowchart LR
-subgraph background[" "]
-    B_2020(Process B \n 2020):::bg
-    B_2030(Process B \n 2030):::bg
-end
+    Let's consider the following system: a process A consumes an
+    exchange b from a process B. Both A and B emit CO~2~. The emission of CO~2~ from B decreases in the future. All exchanges occur at a certain point in time, relative to process A, which takes place "now" (2024). This example does not contain include temporal evolution of foregound exchanges.
+    ```mermaid
+    flowchart LR
+    subgraph background[" "]
+        B_2020(Process B \n 2020):::bg
+        B_2030(Process B \n 2030):::bg
+    end
 
-subgraph foreground[" "]
-    A(Process A):::fg
-end
+    subgraph foreground[" "]
+        A(Process A):::fg
+    end
 
-subgraph biosphere[" "]
-    CO2(CO<sub>2</sub>):::b
-end
+    subgraph biosphere[" "]
+        CO2(CO<sub>2</sub>):::b
+    end
 
-B_2020-->|"amounts: [30%,50%,20%] * 3 kg\n dates:[-2,0,+4]" years|A
-A-.->|"amounts: [60%, 40%] * 5 kg\n dates: [0,+1]" years|CO2
-B_2020-.->|"amounts: [100%] * <span style='color:#9c5ffd'><b>11 kg</b></span>\n dates:[0]" years|CO2
-B_2030-.->|"amounts: [100%] * <span style='color:#9c5ffd'><b>7 kg</b></span>\n dates:[0]" years|CO2
+    B_2020-->|"amounts: [30%,50%,20%] * 3 kg\n dates:[-2,0,+4]" years|A
+    A-.->|"amounts: [60%, 40%] * 5 kg\n dates: [0,+1]" years|CO2
+    B_2020-.->|"amounts: [100%] * <span style='color:#9c5ffd'><b>11 kg</b></span>\n dates:[0]" years|CO2
+    B_2030-.->|"amounts: [100%] * <span style='color:#9c5ffd'><b>7 kg</b></span>\n dates:[0]" years|CO2
 
-classDef bg color:#222832, fill:#3fb1c5, stroke:none;
-classDef fg color:#222832, fill:#3fb1c5, stroke:none;
-classDef b color:#222832, fill:#9c5ffd, stroke:none;
-style foreground fill:none, stroke:none;
-style background fill:none, stroke:none;
-style biosphere fill:none, stroke:none;
+    classDef bg color:#222832, fill:#3fb1c5, stroke:none;
+    classDef fg color:#222832, fill:#3fb1c5, stroke:none;
+    classDef b color:#222832, fill:#9c5ffd, stroke:none;
+    style foreground fill:none, stroke:none;
+    style background fill:none, stroke:none;
+    style biosphere fill:none, stroke:none;
 
-```
+    ```
 
-The resulting timeline looks like this:
-| date_producer | producer_name | date_consumer | consumer_name | amount | temporal_market_shares                          |
-|---------------|---------------|---------------|---------------|--------|------------------------------------------------|
-| 2022-01-01    | B             | 2024-01-01    | A             | 0.9    | {'background': 0.8, 'background_2030': 0.2}    |
-| 2024-01-01    | B             | 2024-01-01    | A             | 1.5    | {'background': 0.6, 'background_2030': 0.4}    |
-| 2024-01-01    | A             | 2024-01-01    | -1            | 1.0    | None                                           |
-| 2028-01-01    | B             | 2024-01-01    | A             | 0.6    | {'background': 0.2, 'background_2030': 0.8}    |
-````
+    The resulting timeline looks like this:
+
+    | date_producer | producer_name | date_consumer | consumer_name | amount | temporal_market_shares                          |
+    |---------------|---------------|---------------|---------------|--------|------------------------------------------------|
+    | 2022-01-01    | B             | 2024-01-01    | A             | 0.9    | {'background': 0.8, 'background_2030': 0.2}    |
+    | 2024-01-01    | B             | 2024-01-01    | A             | 1.5    | {'background': 0.6, 'background_2030': 0.4}    |
+    | 2024-01-01    | A             | 2024-01-01    | -1            | 1.0    | None                                           |
+    | 2028-01-01    | B             | 2024-01-01    | A             | 0.6    | {'background': 0.2, 'background_2030': 0.8}    |
+
+    /// table-caption
+    Timeline output for the process A / process B example above.
+    ///
 
 ## Time mapping
 
@@ -276,64 +277,31 @@ created:
     flows and is stored under `TimexLCA.lca.inventory`.
 
 
-````{admonition} Example: Matrix modifications
-:class: admonition-example
-:name: example-matrix-modifications
-For the simple system above, these are the modifications we apply to the matrices:
+!!! example "Example: Matrix modifications"
 
-:::{div} only-light
-```{carousel}
-:show_controls:
-:show_indicators:
-:show_dark:
-:show_fade:
-:data-bs-interval: false
+    For the simple system above, these are the modifications we apply to the matrices:
 
-~~~{image} data/matrix1_light.svg
-:align: center
-~~~
-~~~{image} data/matrix2_light.svg
-:align: center
-~~~
-~~~{image} data/matrix3_light.svg
-:align: center
-~~~
-~~~{image} data/matrix4_light.svg
-:align: center
-~~~
-```
-:::
+    === "1. Original matrices"
 
-:::{div} only-dark
-```{carousel}
-:show_controls:
-:show_indicators:
-:show_fade:
-:data-bs-interval: false
+        ![Matrix modification step 1: original matrices](data/matrix1_light.svg#only-light)
+        ![Matrix modification step 1: original matrices](data/matrix1_dark.svg#only-dark)
 
-~~~{image} data/matrix1_dark.svg
-:align: center
-:class: only-dark
-~~~
-~~~{image} data/matrix2_dark.svg
-:align: center
-:class: only-dark
-~~~
-~~~{image} data/matrix3_dark.svg
-:align: center
-:class: only-dark
-~~~
-~~~{image} data/matrix4_dark.svg
-:align: center
-:class: only-dark
-~~~
-```
-:::
+    === "2. Time-explicit rows and columns"
 
-</br>
+        ![Matrix modification step 2: time-explicit rows and columns](data/matrix2_light.svg#only-light)
+        ![Matrix modification step 2: time-explicit rows and columns](data/matrix2_dark.svg#only-dark)
 
-The timings from the timeline and the inventory information from the time-specific databases is inserted into the new time-explicit matrices. For each specific point in time that product b is demanded, temporal markets are created, distributing the demand for b between the time-specific background databases. The dynamic biosphere matrix is created, containing the timing of emissions. You can see that the CO<sub>2</sub> emission at process A occurs both in 2024 and 2025, based on the temporal distribution on this biosphere exchange.
-````
+    === "3. Temporal market shares from the timeline"
+
+        ![Matrix modification step 3: temporal market shares from the timeline](data/matrix3_light.svg#only-light)
+        ![Matrix modification step 3: temporal market shares from the timeline](data/matrix3_dark.svg#only-dark)
+
+    === "4. Dynamic biosphere"
+
+        ![Matrix modification step 4: dynamic biosphere](data/matrix4_light.svg#only-light)
+        ![Matrix modification step 4: dynamic biosphere](data/matrix4_dark.svg#only-dark)
+
+    The timings from the timeline and the inventory information from the time-specific databases is inserted into the new time-explicit matrices. For each specific point in time that product b is demanded, temporal markets are created, distributing the demand for b between the time-specific background databases. The dynamic biosphere matrix is created, containing the timing of emissions. You can see that the CO~2~ emission at process A occurs both in 2024 and 2025, based on the temporal distribution on this biosphere exchange.
 
 ## Static or dynamic impact assessment
 
@@ -345,8 +313,8 @@ level of `TimexLCA.dynamic_inventory`, dynamic LCIA can be applied, using `Timex
 Users can define or import their own dynamic LCIA functions. Out of the
 box, we provide dynamic LCIA functions for the climate change metrics
 \'radiative forcing\' and \'global warming potential (GWP)\' for all
-greenhouse gases in the [IPCC AR6 report Chapter 7 Table
-7.SM.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) from the brightway package [`dynamic_characterization`](https://github.com/brightway-lca/dynamic_characterization).
+greenhouse gases in the IPCC AR6, Chapter 7, Table 7.SM.7[^ipcc-ar6],
+from the brightway package [`dynamic_characterization`](https://github.com/brightway-lca/dynamic_characterization).
 
 The `time_horizon`, over which both metrics are evaluated,
 defaults to 100 years, but can be set flexibly in years. Additionally,
@@ -355,8 +323,7 @@ time horizon means that the all emissions are evaluated starting from
 the timing of the functional unit until the end of the time horizon,
 meaning that later emissions are counted for shorter, and flexible time
 horizon means that each emission is evaluated starting from its own
-timing until the end of the time horizon. The former is the approach of
-[Levasseur et al. 2010](https://pubs.acs.org/doi/10.1021/es9030003).
+timing until the end of the time horizon. The former is the approach of Levasseur et al.[^levasseur].
 This behavior is set with the boolean `fixed_time_horizon`.
 
 ## Contribution assessment of impacts
@@ -371,3 +338,6 @@ analysis and can be executed with `TimexLCA.dynamic_lcia(use_disaggregated_lci=T
  background processes, and uses these when calculating the dynamic LCIA results.
 
  Unsure about the different options? Check out the [decision tree](decisiontree.md) for guidance for your time-explicit LCA.
+
+[^ipcc-ar6]: IPCC, 2021: [Chapter 7: The Earth's Energy Budget, Climate Feedbacks and Climate Sensitivity](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/), in *Climate Change 2021: The Physical Science Basis*. Table 7.SM.7 provides the characterization factors used for the default dynamic LCIA functions.
+[^levasseur]: Levasseur, A., Lesage, P., Margni, M., Deschênes, L., Samson, R., 2010. [Considering Time in LCA: Dynamic LCA and Its Application to Global Warming Impact Assessments](https://pubs.acs.org/doi/10.1021/es9030003). *Environmental Science & Technology*, 44(8), 3169–3174.

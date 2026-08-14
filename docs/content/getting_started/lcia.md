@@ -1,4 +1,12 @@
+---
+icon: lucide/gauge
+tags:
+  - tutorial
+  - dynamic characterization
+---
+
 # Step 4 - Impact assessment
+
 To characterize the time-explicit inventory, we have two options: Static and dynamic life cycle impact assessment (LCIA).
 
 ## Static LCIA
@@ -28,6 +36,9 @@ characterization_functions = {
 }
 ```
 
+!!! tip "Using ecoinvent / biosphere3?"
+    Then you don't need to do this. `dynamic_characterization` automatically maps the biosphere flows to matching characterization functions, so you can just skip the `characterization_functions` argument.
+
 So, let's characterize our inventory. As a metric we choose radiative forcing, and a time horizon of 100 years:
 
 ```python
@@ -38,7 +49,7 @@ tlca.dynamic_lcia(
 )
 ```
 
-This returns the (dynamic) characterized inventory, which shows you the radiative forcing [W/m<sup>2</sup>] by the CO<sup>2</sup> emissions in the system over the next 100 years:
+This returns the (dynamic) characterized inventory, which shows you the radiative forcing [W/m^2^] by the CO~2~ emissions in the system over the next 100 years:
 
 | date       | amount         | flow | activity |
 |------------|----------------|------|----------|
@@ -58,10 +69,7 @@ To visualize what's going on, we can conveniently plot it with:
 ```python
 tlca.plot_dynamic_characterized_inventory()
 ```
-```{image} ../data/dynamic_characterized_inventory_radiative_forcing.svg
-:align: center
-:alt: Plot showing the radiative forcing over time
-```
+![Plot showing the radiative forcing over time](../data/dynamic_characterized_inventory_radiative_forcing.svg){ style="display:block;margin:0 auto" }
 <br />
 
 Of course we can also assess the "standard" climate change metric Global Warming Potential (GWP):
@@ -85,10 +93,7 @@ tlca.dynamic_lcia(
 ```python
 tlca.plot_dynamic_characterized_inventory()
 ```
-```{image} ../data/dynamic_characterized_inventory_gwp.svg
-:align: center
-:alt: Plot showing the radiative forcing over time
-```
+![Plot showing the radiative forcing over time](../data/dynamic_characterized_inventory_gwp.svg){ style="display:block;margin:0 auto" }
 <br />
 
-For most of the functions we used here, there are numerous optional arguments and settings you can tweak. We explore some of them in our other [Examples](../examples/index.md), but when in doubt check out our [docstrings](../api/index), which provide information also for the more advanced settings - so please browse through them as needed ☀️
+For most of the functions we used here, there are numerous optional arguments and settings you can tweak. We explore some of them in our other [Examples](../examples/index.md), but when in doubt check out our [docstrings](../../api/index.md), which provide information also for the more advanced settings - so please browse through them as needed ☀️
