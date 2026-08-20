@@ -848,7 +848,8 @@ for db in [db_2020, db_2030, db_2040]:
     if modified_name in bd.databases:
         del bd.databases[modified_name]
     modified_db = bd.Database(modified_name)
-    modified_db.register()
+    if modified_name not in bd.databases:
+        modified_db.register()
     modified_dbs[db.name] = modified_db
 
     for name, code_, eol_name in [
