@@ -195,6 +195,46 @@ class TestTimexLCAEdgeCases:
         )
         assert tlca.database_dates == {"foreground": "dynamic"}
 
+    def test_database_dates_from_representative_time_metadata(self):
+        fu = bd.get_node(database="foreground", code="A")
+        for year in (2022, 2024):
+            db = bd.Database(f"db_{year}")
+            db.metadata["representative_time"] = datetime(year, 1, 1).isoformat()
+            db.register()
+
+        tlca = TimexLCA(
+            demand={fu.key: 1},
+            method=("GWP", "example"),
+            database_dates=None,
+        )
+
+        assert tlca.database_dates["foreground"] == "dynamic"
+        assert tlca.database_dates["db_2022"] == datetime(2022, 1, 1)
+        assert tlca.database_dates["db_2024"] == datetime(2024, 1, 1)
+
+    def test_database_dates_argument_overwrites_representative_time_metadata(self):
+        fu = bd.get_node(database="foreground", code="A")
+
+        db_2022 = bd.Database("db_2022")
+        db_2022.metadata["representative_time"] = datetime(2012, 1, 1).isoformat()
+        db_2022.register()
+
+        db_2024 = bd.Database("db_2024")
+        db_2024.metadata["representative_time"] = datetime(2024, 1, 1).isoformat()
+        db_2024.register()
+
+        tlca = TimexLCA(
+            demand={fu.key: 1},
+            method=("GWP", "example"),
+            database_dates={
+                "foreground": "dynamic",
+                "db_2022": datetime(2022, 1, 1),
+            },
+        )
+
+        assert tlca.database_dates["db_2022"] == datetime(2022, 1, 1)
+        assert tlca.database_dates["db_2024"] == datetime(2024, 1, 1)
+
     def test_check_format_invalid_timestamp(self):
         fu = bd.get_node(database="foreground", code="A")
         with pytest.raises(ValueError, match="neither 'dynamic' nor a datetime"):

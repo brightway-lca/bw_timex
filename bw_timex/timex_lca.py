@@ -126,10 +126,13 @@ class TimexLCA:
                 Tuple defining the LCIA method, such as `('foo', 'bar')` or default methods, such as
                 `("EF v3.1", "climate change", "global warming potential (GWP100)")`
         database_dates : dict, optional
-                Dictionary mapping database names to dates. Several databases may
-                share the same date, e.g. to keep your own modified copies of
-                background processes in their own database instead of writing
-                them into the shared background database for that vintage.
+                Dictionary mapping database names to dates. If omitted, `TimexLCA`
+                reads database metadata attribute `representative_time` (ISO datetime
+                string or datetime object) and uses this mapping instead. Values
+                passed here overwrite metadata values per database. Several databases
+                may share the same date, e.g. to keep your own modified copies of
+                background processes in their own database instead of writing them
+                into the shared background database for that vintage.
         use_global_lci_cache : bool, optional
                 If True (default), background unit LCI matrices are cached at
                 module level and reused across `TimexLCA` objects within the
@@ -146,14 +149,9 @@ class TimexLCA:
 
         self.demand = demand
         self.method = method
-        self.database_dates = database_dates
-
-        if not self.database_dates:
-            logger.info(
-                "No database_dates provided. Treating the databases containing the functional \
-                unit as dynamic. No remapping of inventories to time explicit databases will be done."
-            )
-            self.database_dates = {key[0]: "dynamic" for key in demand.keys()}
+        self.database_dates = self._resolve_database_dates(
+            demand=demand, database_dates=database_dates
+        )
 
         TimexLCAInputs(
             demand=self.demand, method=self.method, database_dates=self.database_dates
@@ -230,6 +228,62 @@ class TimexLCA:
         self._lci_did_factorize = False
 
         logger.info("TimexLCA initialized.")
+
+    @staticmethod
+    def _normalize_database_date_value(
+        value: datetime | str, db_name: str, source: str
+    ) -> datetime | str:
+        if value == "dynamic" or isinstance(value, datetime):
+            return value
+
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Database '{db_name}' has invalid {source} value '{value}'. "
+                    "Expected ISO datetime string, datetime object, or 'dynamic'."
+                ) from exc
+
+        return value
+
+    def _resolve_database_dates(self, demand: dict, database_dates: dict | None) -> dict:
+        """Resolve database timing from metadata and optional user overrides."""
+
+        resolved_database_dates = {}
+        for db_name in bd.databases:
+            representative_time = bd.databases[db_name].get("representative_time")
+            if representative_time is None:
+                continue
+            resolved_database_dates[db_name] = self._normalize_database_date_value(
+                representative_time, db_name=db_name, source="representative_time"
+            )
+
+        if database_dates:
+            for db_name, value in database_dates.items():
+                resolved_database_dates[db_name] = (
+                    self._normalize_database_date_value(
+                        value, db_name=db_name, source="database_dates"
+                    )
+                )
+
+        demand_database_names = {
+            bd.get_activity(key)["database"] if not isinstance(key, bd.Node) else key["database"]
+            for key in demand
+        }
+
+        if not resolved_database_dates:
+            logger.info(
+                "No database_dates provided and no database representative_time metadata found. "
+                "Treating the databases containing the functional unit as dynamic. "
+                "No remapping of inventories to time explicit databases will be done."
+            )
+
+        for db_name in demand_database_names:
+            if db_name not in resolved_database_dates:
+                resolved_database_dates[db_name] = "dynamic"
+
+        return resolved_database_dates
 
     ########################################
     # Main functions to be called by users #
