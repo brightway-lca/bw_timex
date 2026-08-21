@@ -172,10 +172,18 @@ An unknown filter key — one that no candidate database declares — raises rat
 filtering everything away, listing the keys and values present in the project. That is
 what buys back the autocomplete a dict does not give.
 
+### Module layout
+
+Discovery, filtering and the setter live in a new module,
+`bw_timex/database_metadata.py`. `timex_lca.py` is already large and this is a
+self-contained responsibility with its own tests; `utils.py` holds exchange- and
+plot-level helpers. `TimexLCA` imports `resolve_database_dates_from_metadata` from it,
+and `set_database_metadata` is re-exported from the `bw_timex` top-level namespace.
+
 ### Setter helper
 
-`bw_timex.utils.set_database_metadata(database, **metadata)`, re-exported from
-`bw_timex`:
+`bw_timex.database_metadata.set_database_metadata(database, **metadata)`, re-exported
+from `bw_timex`:
 
 - `database` may be a name or a `bd.Database`; unregistered → `ValueError`.
 - `representative_time` accepts a `datetime` (serialized with `.isoformat()`), an ISO
@@ -195,8 +203,8 @@ are not both given. The metadata-side errors (unparseable value, ambiguity, unkn
 filter key) are raised in `_resolve_database_dates`, which owns the metadata, not in
 the pydantic model.
 
-`set_database_metadata` gets its own `DatabaseMetadataInputs` model, matching how the
-other user-facing helpers in `utils.py` validate.
+`set_database_metadata` gets its own `DatabaseMetadataInputs` model in
+`validation.py`, matching how the other user-facing helpers validate.
 
 ## Interactions and limits
 
@@ -224,8 +232,8 @@ other user-facing helpers in `utils.py` validate.
 - New section in `docs/content/getting_started/` on what a database represents:
   the metadata keys, `set_database_metadata`, scenario selection and its error, the
   premise-version caveat, and `database_dates` as the explicit override.
-- `docs/api/utils.md` picks up the new helper through the existing `::: bw_timex.utils`
-  block; no edit needed beyond the intro sentence.
+- New `docs/api/database_metadata.md` (`::: bw_timex.database_metadata`), added to the
+  API nav in `zensical.toml`.
 - `CHANGES.md`: entry under `[Unreleased]`.
 
 ## Notebooks
