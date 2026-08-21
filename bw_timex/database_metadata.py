@@ -7,7 +7,7 @@ prospective database:
 
 ```python
 {
-    "premise_version": "2.4.9.1",
+    "premise_version": "2.4.9.3",
     "iam_model": "remind",
     "pathway": "SSP2-PkBudg500",
     "representative_time": "2050-01-01T00:00:00",

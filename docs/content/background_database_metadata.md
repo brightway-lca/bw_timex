@@ -21,7 +21,7 @@ bd.databases["ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2050"]
     # written by brightway
     "format": "Ecoinvent XML", "backend": "sqlite", "number": 43648, ...,
     # written by premise
-    "premise_version": "2.4.9.1",
+    "premise_version": "2.4.9.3",
     "iam_model": "remind",
     "pathway": "SSP2-PkBudg500",
     "representative_time": "2050-01-01T00:00:00",
