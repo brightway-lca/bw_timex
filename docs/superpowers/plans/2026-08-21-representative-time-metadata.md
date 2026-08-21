@@ -18,7 +18,7 @@
 - Metadata keys, exactly as premise writes them: `representative_time`, `iam_model`, `pathway`, `system_model`, `ecoinvent_version`, `premise_version`, `external_scenarios`, `scenarios`.
 - Scenario identity keys (the ambiguity signature) are exactly: `("iam_model", "pathway", "system_model", "ecoinvent_version", "external_scenarios")`. `premise_version` is deliberately not one of them.
 - `notebooks/examples/paper_case_study.ipynb` must not be modified by any task.
-- No Claude/AI attribution in commit messages.
+- Commit messages carry no AI attribution and no `Co-Authored-By` trailer.
 
 ---
 
