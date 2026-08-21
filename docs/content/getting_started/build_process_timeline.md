@@ -8,7 +8,9 @@ tags:
 
 # Step 2 - Building the process timeline
 
-With all the temporal information prepared, we can now instantiate our TimexLCA object. This is very similar to a normal Brightway LCA object, but with the additional argument of our `database_dates`:
+With all the temporal information prepared, we can now instantiate our TimexLCA object.
+This is just like a normal Brightway LCA object - the timing of the background databases
+comes from their metadata:
 
 ```python
 from bw_timex import TimexLCA
@@ -16,9 +18,41 @@ from bw_timex import TimexLCA
 tlca = TimexLCA(
     demand={("foreground", "A"): 1},
     method=("our", "method"),
-    database_dates=database_dates,
 )
 ```
+
+The metadata is written by premise >= 2.4.9.2, or by you with
+`set_database_metadata` (see [Step 1](adding_temporal_information.md)).
+
+If your project holds several IAM scenarios, say which one you want - `bw_timex` lists
+what it found rather than guessing:
+
+```python
+tlca = TimexLCA(
+    demand={("foreground", "A"): 1},
+    method=("our", "method"),
+    scenario={"pathway": "SSP2-PkBudg500"},
+)
+```
+
+Any metadata key filters (`iam_model`, `pathway`, `system_model`, ...), and databases
+that don't carry it - your foreground, your own vintages - are kept. Comparing scenarios
+is the same script in a loop over filters.
+
+!!! tip "Mapping the databases by hand"
+
+    `database_dates` maps database names to dates yourself and replaces the metadata
+    entirely:
+
+    ```python
+    tlca = TimexLCA(demand, method, database_dates={
+        "background": datetime(2020, 1, 1),
+        "background_2030": datetime(2030, 1, 1),
+        "foreground": "dynamic",
+    })
+    ```
+
+    Handy to restrict a calculation to a subset of your project.
 
 Using our new `tlca` object, we can now build the timeline of processes that leads to our functional unit "A". If not specified otherwise, it's assumed that the demand occurs in the current year. In our case, we're specifying the time of demand to the year 2024, with the attribute 'starting_datetime`.. Building the timeline is very simple:
 ```python

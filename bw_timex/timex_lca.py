@@ -31,6 +31,7 @@ from scipy import sparse
 from ._lci_cache import BACKGROUND_UNIT_LCI_CACHE, LCI_SOLVE_CACHE, NODES_CACHE
 FACTORIZE_SOLVES_THRESHOLD = 8
 
+from .database_metadata import resolve_database_dates_from_metadata
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import InterDatabaseMapping, LazyActivity, TimeMappingDict
 from .matrix_modifier import MatrixModifier
@@ -82,19 +83,32 @@ class TimexLCA:
     Examples
     --------
     ```python
+    from bw_timex import TimexLCA, set_database_metadata
+
     demand = {("my_foreground_database", "my_process"): 1}
     method = ("some_method_family", "some_category", "some_method")
-    database_dates = {
-        "my_background_database_one": datetime.strptime("2020", "%Y"),
-        "my_background_database_two": datetime.strptime("2030", "%Y"),
-        "my_background_database_three": datetime.strptime("2040", "%Y"),
-        # Several databases may share the same date, e.g. to keep your own
-        # modified copies of background processes in their own database:
-        "my_modified_background_2020": datetime.strptime("2020", "%Y"),
-        "my_foreground_database": "dynamic",
-    }
 
-    tlca = TimexLCA(demand, method, database_dates)
+    # Databases exported by premise >= 2.4.9.2 already know the point in
+    # time they represent. For your own databases, say so once:
+    set_database_metadata("my_background_database_one", representative_time=datetime(2020, 1, 1))
+    set_database_metadata("my_background_database_two", representative_time=datetime(2030, 1, 1))
+
+    tlca = TimexLCA(demand, method)
+
+    # ... or map the databases explicitly, which then replaces the metadata:
+    tlca = TimexLCA(
+        demand,
+        method,
+        database_dates={
+            "my_background_database_one": datetime(2020, 1, 1),
+            "my_background_database_two": datetime(2030, 1, 1),
+            # Several databases may share the same date, e.g. to keep your own
+            # modified copies of background processes in their own database:
+            "my_modified_background_2020": datetime(2020, 1, 1),
+            "my_foreground_database": "dynamic",
+        },
+    )
+
     tlca.build_timeline()  # has many optional arguments
     tlca.lci()
     tlca.static_lcia()
@@ -110,6 +124,7 @@ class TimexLCA:
         demand: dict,
         method: tuple,
         database_dates: dict = None,
+        scenario: dict = None,
         use_global_lci_cache: bool = True,
     ) -> None:
         """
@@ -126,10 +141,31 @@ class TimexLCA:
                 Tuple defining the LCIA method, such as `('foo', 'bar')` or default methods, such as
                 `("EF v3.1", "climate change", "global warming potential (GWP100)")`
         database_dates : dict, optional
-                Dictionary mapping database names to dates. Several databases may
-                share the same date, e.g. to keep your own modified copies of
-                background processes in their own database instead of writing
-                them into the shared background database for that vintage.
+                Fallback for mapping the databases yourself instead of letting
+                `bw_timex` read their metadata - useful for databases written by
+                premise < 2.4.9.2, which carry no metadata, or when you want to
+                override what the metadata says. Dictionary mapping database names
+                to the point in time they represent, as a `datetime`, or to
+                `"dynamic"` for databases whose processes are distributed over
+                time (typically the foreground).
+                Several databases may share the same date, e.g. to keep your own
+                modified copies of background processes in their own database
+                instead of writing them into the shared background database for
+                that vintage. If not given, the mapping is read from the
+                databases' own `representative_time` metadata (which premise
+                >= 2.4.9.2 writes when exporting, and which you can set yourself
+                with `bw_timex.set_database_metadata`). Passing this argument replaces
+                the metadata entirely: only the databases listed here are used.
+        scenario : dict, optional
+                Metadata a background database must match to be used, e.g.
+                `{"iam_model": "remind", "pathway": "SSP2-PkBudg500"}`. Reads the
+                scenario metadata written by premise >= 2.4.9.2 (or by you, with
+                `bw_timex.set_database_metadata`), so it does nothing for
+                databases that carry none. Only needed when the project
+                holds several scenarios - `TimexLCA`
+                raises and lists them otherwise. Databases that don't declare the
+                filtered key (your foreground, a hand-built vintage) are always
+                kept. Cannot be combined with `database_dates`.
         use_global_lci_cache : bool, optional
                 If True (default), background unit LCI matrices are cached at
                 module level and reused across `TimexLCA` objects within the
@@ -146,17 +182,16 @@ class TimexLCA:
 
         self.demand = demand
         self.method = method
-        self.database_dates = database_dates
-
-        if not self.database_dates:
-            logger.info(
-                "No database_dates provided. Treating the databases containing the functional \
-                unit as dynamic. No remapping of inventories to time explicit databases will be done."
-            )
-            self.database_dates = {key[0]: "dynamic" for key in demand.keys()}
+        self.scenario = scenario
+        self.database_dates = self._resolve_database_dates(
+            demand=demand, database_dates=database_dates, scenario=scenario
+        )
 
         TimexLCAInputs(
-            demand=self.demand, method=self.method, database_dates=self.database_dates
+            demand=self.demand,
+            method=self.method,
+            database_dates=self.database_dates,
+            scenario=self.scenario,
         )
 
         # Filled in by `prepare_base_lca_inputs`: the databases the base LCA
@@ -230,6 +265,79 @@ class TimexLCA:
         self._lci_did_factorize = False
 
         logger.info("TimexLCA initialized.")
+
+    @staticmethod
+    def _resolve_database_dates(
+        demand: dict, database_dates: dict | None, scenario: dict | None
+    ) -> dict:
+        """Map databases to the points in time they represent.
+
+        Either from the explicit `database_dates` argument, which is then the
+        whole mapping, or from the databases' own `representative_time`
+        metadata. Databases holding the demand default to `"dynamic"`.
+
+        Raises
+        ------
+        ValueError
+            If both `database_dates` and `scenario` are given (`scenario`
+            only selects among databases resolved from metadata, so it makes
+            no sense once `database_dates` already gives the whole mapping),
+            or if `scenario` is given but no surviving database positively
+            declares one of its keys - almost always a typo in one of its
+            keys or values, since a filter that legitimately excludes
+            everything would leave nothing for `TimexLCA` to compute with.
+            A database that doesn't declare a filtered key at all is kept by
+            the filter (see `resolve_database_dates_from_metadata`), so
+            checking whether the *resolved mapping* is empty is not enough:
+            it stays non-empty whenever such a database happens to be
+            present, even though the filter matched none of the databases it
+            was meant to select among.
+        """
+        if database_dates is not None:
+            if scenario:
+                raise ValueError(
+                    "`scenario` selects background databases by their metadata and "
+                    "only applies when `database_dates` is not given. Pass one or "
+                    "the other."
+                )
+            return dict(database_dates)
+
+        resolved = resolve_database_dates_from_metadata(scenario)
+
+        filter_matched = scenario and any(
+            key in bd.databases[name] for name in resolved for key in scenario
+        )
+
+        if scenario and not filter_matched:
+            declared = {}
+            for name in bd.databases:
+                metadata = bd.databases[name]
+                for key in scenario:
+                    if key in metadata:
+                        declared.setdefault(key, set()).add(str(metadata[key]))
+            details = "; ".join(
+                f"'{key}': "
+                f"{sorted(declared[key]) if key in declared else 'not declared by any database'}"
+                for key in scenario
+            )
+            raise ValueError(
+                f"scenario={scenario!r} matched no database in this project. "
+                f"Values actually declared for its key(s) by this project's "
+                f"databases: {details}. Check for a typo in the filter."
+            )
+        elif not resolved:
+            logger.info(
+                "No database_dates provided, and no database in this project carries "
+                "`representative_time` metadata. Treating the databases containing the "
+                "functional unit as dynamic. No remapping of inventories to time "
+                "explicit databases will be done."
+            )
+
+        for key in demand:
+            database = bd.get_node(id=get_id(key))["database"]
+            resolved.setdefault(database, "dynamic")
+
+        return resolved
 
     ########################################
     # Main functions to be called by users #

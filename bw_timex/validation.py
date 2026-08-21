@@ -18,6 +18,7 @@ class TimexLCAInputs(BaseModel):
     demand: dict
     method: tuple
     database_dates: Optional[dict] = None
+    scenario: Optional[dict] = None
 
     @field_validator("demand")
     @classmethod
@@ -71,6 +72,26 @@ class TimexLCAInputs(BaseModel):
                 )
         return v
 
+    @field_validator("scenario")
+    @classmethod
+    def validate_scenario(cls, v: Optional[dict]) -> Optional[dict]:
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("scenario must be a non-empty dictionary if provided.")
+        for key, value in v.items():
+            if not isinstance(key, str):
+                raise ValueError(
+                    f"scenario keys must be strings (database metadata keys), got "
+                    f"{type(key).__name__}."
+                )
+            if not isinstance(value, (str, int, float, bool, list, tuple)):
+                raise ValueError(
+                    f"scenario values must be scalars or lists of scalars, got "
+                    f"{type(value).__name__} for key '{key}'."
+                )
+        return v
+
     @model_validator(mode="after")
     def validate_demand_in_dynamic_databases(self) -> "TimexLCAInputs":
         if self.database_dates is None:
@@ -84,7 +105,8 @@ class TimexLCAInputs(BaseModel):
             if act["database"] not in dynamic_database_names:
                 raise ValueError(
                     f"Demand activity {act} from database {act['database']}: "
-                    f"This database is not marked as 'dynamic' in database_dates. "
+                    f"This database is mapped to a date rather than 'dynamic' "
+                    f"(via `database_dates` or its `representative_time` metadata). "
                     f"Please check."
                 )
         return self
@@ -241,5 +263,29 @@ class PlotDynamicInventoryInputs(BaseModel):
             if not isinstance(item, int):
                 raise ValueError(
                     f"bio_flows must contain integer database IDs, got {type(item).__name__}: {item}."
+                )
+        return v
+
+
+class DatabaseMetadataInputs(BaseModel):
+    """Validates inputs to set_database_metadata"""
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    database: str
+    metadata: dict
+
+    @field_validator("metadata")
+    @classmethod
+    def validate_metadata(cls, v: dict) -> dict:
+        if not v:
+            raise ValueError(
+                "Provide at least one metadata field, e.g. "
+                "`representative_time=datetime(2030, 1, 1)`."
+            )
+        for key in v:
+            if not isinstance(key, str):
+                raise ValueError(
+                    f"Metadata keys must be strings, got {type(key).__name__}: {key}."
                 )
         return v
