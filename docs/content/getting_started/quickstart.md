@@ -38,6 +38,7 @@ from bw_timex import (
     TemporalDistribution,
     TimexLCA,
     add_temporal_distribution_to_exchange,
+    set_database_metadata,
 )
 
 # 1. Set up Brightway project
@@ -55,18 +56,15 @@ add_temporal_distribution_to_exchange(
     output_database="foreground",
 )
 
-# 3. Map your time-specific background databases to points in time
-database_dates = {
-    "background": datetime.strptime("2020", "%Y"),
-    "background_2030": datetime.strptime("2030", "%Y"),
-    "foreground": "dynamic",  # gets distributed over time
-}
+# 3. Say what your time-specific background databases represent
+#    (premise databases already know - skip this for them)
+set_database_metadata("background", representative_time=datetime(2020, 1, 1))
+set_database_metadata("background_2030", representative_time=datetime(2030, 1, 1))
 
 # 4. Create the TimexLCA object
 tlca = TimexLCA(
     demand={("foreground", "A"): 1},
     method=("our", "method"),
-    database_dates=database_dates,
 )
 
 # 5. Build the process timeline
@@ -93,7 +91,7 @@ tlca.plot_dynamic_characterized_inventory()
 | What you want to express | How | Where |
 |---|---|---|
 | *When* an exchange happens | `temporal_distribution` on the exchange | any foreground exchange (and background ones, if you traverse the background) |
-| *How the background changes* over time | one database per point in time + `database_dates` | background databases |
+| *How the background changes* over time | one database per point in time, each with `representative_time` metadata | background databases |
 | *How a foreground exchange changes* over time | `temporal_evolution_factors` / `temporal_evolution_amounts` on the exchange (`bw_timex>0.3.4`) | foreground exchanges |
 
 ```python
@@ -128,8 +126,10 @@ add_temporal_evolution_to_exchange(
 Absolute dates (`dtype="datetime64[s]"`) are also allowed in a `TemporalDistribution`,
 e.g. for the timing of the functional unit itself. Relative dates
 (`dtype="timedelta64[Y]"`) are relative to the consuming process. Several databases may
-share the same date in `database_dates`, e.g. if you keep modified copies of background
-processes in their own database instead of writing them into the shared vintage.
+represent the same point in time, e.g. if you keep modified copies of background
+processes in their own database instead of writing them into the shared vintage. See
+[What a database represents](../background_database_metadata.md) for scenario selection
+and for mapping databases explicitly with `database_dates`.
 
 ---
 
@@ -141,7 +141,8 @@ processes in their own database instead of writing them into the shared vintage.
 TimexLCA(
     demand={("foreground", "A"): 1},  # Node, (database, code) tuple, or int id
     method=("our", "method"),
-    database_dates=database_dates,    # optional, but usually what you want
+    scenario=None,                    # optional: pick one scenario among several
+    database_dates=None,              # optional: map databases explicitly instead of by metadata
 )
 ```
 

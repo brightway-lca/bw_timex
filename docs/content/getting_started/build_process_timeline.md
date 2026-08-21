@@ -8,7 +8,9 @@ tags:
 
 # Step 2 - Building the process timeline
 
-With all the temporal information prepared, we can now instantiate our TimexLCA object. This is very similar to a normal Brightway LCA object, but with the additional argument of our `database_dates`:
+With all the temporal information prepared, we can now instantiate our TimexLCA object.
+This is just like a normal Brightway LCA object - the timing of the background databases
+comes from their metadata:
 
 ```python
 from bw_timex import TimexLCA
@@ -16,9 +18,13 @@ from bw_timex import TimexLCA
 tlca = TimexLCA(
     demand={("foreground", "A"): 1},
     method=("our", "method"),
-    database_dates=database_dates,
 )
 ```
+
+If your project holds several scenarios, select one with
+`scenario={"pathway": "SSP2-PkBudg500"}`; to map the databases by hand instead, pass
+`database_dates`. Both are covered in
+[What a database represents](../background_database_metadata.md).
 
 Using our new `tlca` object, we can now build the timeline of processes that leads to our functional unit "A". If not specified otherwise, it's assumed that the demand occurs in the current year. In our case, we're specifying the time of demand to the year 2024, with the attribute 'starting_datetime`.. Building the timeline is very simple:
 ```python
