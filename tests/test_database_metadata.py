@@ -114,3 +114,81 @@ class TestResolveFromMetadata:
         bd.databases.flush()
         with pytest.raises(ValueError, match="db_2022"):
             resolve_database_dates_from_metadata()
+
+
+# ─── Tests for scenario selection ───
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestScenarioSelection:
+
+    @pytest.fixture(autouse=True)
+    def two_scenarios(self, temporal_grouping_db_monthly):
+        """db_2022 and db_2024 hold the same year in two different pathways."""
+        set_database_metadata(
+            "db_2022",
+            representative_time="2022-01-01",
+            iam_model="remind",
+            pathway="SSP2-PkBudg500",
+            premise_version="2.4.9.1",
+        )
+        set_database_metadata(
+            "db_2024",
+            representative_time="2024-01-01",
+            iam_model="remind",
+            pathway="SSP2-Base",
+            premise_version="2.4.9.1",
+        )
+
+    def test_two_scenario_sets_without_selection_raises(self):
+        with pytest.raises(ValueError, match="Several background scenarios"):
+            resolve_database_dates_from_metadata()
+
+    def test_error_names_the_differing_key_and_values(self):
+        with pytest.raises(ValueError) as excinfo:
+            resolve_database_dates_from_metadata()
+        message = str(excinfo.value)
+        assert "pathway" in message
+        assert "SSP2-PkBudg500" in message
+        assert "SSP2-Base" in message
+        # iam_model is identical in both sets, so it isn't part of the report
+        assert "iam_model" not in message
+
+    def test_scenario_selects_one_set(self):
+        resolved = resolve_database_dates_from_metadata(
+            scenario={"pathway": "SSP2-Base"}
+        )
+        assert resolved == {"db_2024": datetime(2024, 1, 1)}
+
+    def test_databases_without_scenario_metadata_survive_the_filter(self):
+        set_database_metadata("foreground", representative_time="dynamic")
+        resolved = resolve_database_dates_from_metadata(
+            scenario={"pathway": "SSP2-Base"}
+        )
+        assert resolved == {
+            "db_2024": datetime(2024, 1, 1),
+            "foreground": "dynamic",
+        }
+
+    def test_several_filter_keys_are_combined(self):
+        resolved = resolve_database_dates_from_metadata(
+            scenario={"iam_model": "remind", "pathway": "SSP2-Base"}
+        )
+        assert set(resolved) == {"db_2024"}
+
+    def test_filter_matching_nothing_resolves_to_nothing(self):
+        assert resolve_database_dates_from_metadata(
+            scenario={"pathway": "SSP2-PkBudg1150"}
+        ) == {}
+
+    def test_unknown_filter_key_raises_listing_available_keys(self):
+        with pytest.raises(ValueError) as excinfo:
+            resolve_database_dates_from_metadata(scenario={"pathwya": "SSP2-Base"})
+        message = str(excinfo.value)
+        assert "pathwya" in message
+        assert "pathway" in message
+
+    def test_same_scenario_from_two_premise_versions_is_not_ambiguous(self):
+        set_database_metadata("db_2024", pathway="SSP2-PkBudg500")
+        set_database_metadata("db_2024", premise_version="2.4.9.2")
+        assert set(resolve_database_dates_from_metadata()) == {"db_2022", "db_2024"}
