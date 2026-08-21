@@ -18,6 +18,7 @@ class TimexLCAInputs(BaseModel):
     demand: dict
     method: tuple
     database_dates: Optional[dict] = None
+    scenario: Optional[dict] = None
 
     @field_validator("demand")
     @classmethod
@@ -68,6 +69,26 @@ class TimexLCAInputs(BaseModel):
             if database not in bd.databases:
                 raise ValueError(
                     f"Database '{database}' not available in the Brightway2 project."
+                )
+        return v
+
+    @field_validator("scenario")
+    @classmethod
+    def validate_scenario(cls, v: Optional[dict]) -> Optional[dict]:
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("scenario must be a non-empty dictionary if provided.")
+        for key, value in v.items():
+            if not isinstance(key, str):
+                raise ValueError(
+                    f"scenario keys must be strings (database metadata keys), got "
+                    f"{type(key).__name__}."
+                )
+            if not isinstance(value, (str, int, float, bool, list, tuple)):
+                raise ValueError(
+                    f"scenario values must be scalars or lists of scalars, got "
+                    f"{type(value).__name__} for key '{key}'."
                 )
         return v
 

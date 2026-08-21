@@ -5,7 +5,7 @@ from datetime import datetime
 import bw2data as bd
 import pytest
 
-from bw_timex import set_database_metadata
+from bw_timex import TimexLCA, set_database_metadata
 from bw_timex.database_metadata import resolve_database_dates_from_metadata
 
 # ─── Tests for set_database_metadata ───
@@ -192,3 +192,99 @@ class TestScenarioSelection:
         set_database_metadata("db_2024", pathway="SSP2-PkBudg500")
         set_database_metadata("db_2024", premise_version="2.4.9.2")
         assert set(resolve_database_dates_from_metadata()) == {"db_2022", "db_2024"}
+
+
+# ─── Tests for TimexLCA using database metadata ───
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestTimexLCAFromMetadata:
+
+    @pytest.fixture
+    def fu(self):
+        return bd.get_node(database="foreground", code="A")
+
+    def test_no_arguments_uses_metadata(self, fu):
+        set_database_metadata("db_2022", representative_time="2022-01-01")
+        set_database_metadata("db_2024", representative_time="2024-01-01")
+        tlca = TimexLCA(demand={fu.key: 1}, method=("GWP", "example"))
+        assert tlca.database_dates == {
+            "db_2022": datetime(2022, 1, 1),
+            "db_2024": datetime(2024, 1, 1),
+            "foreground": "dynamic",
+        }
+
+    def test_demand_database_metadata_is_respected(self, fu):
+        set_database_metadata("db_2022", representative_time="2022-01-01")
+        set_database_metadata("foreground", representative_time="dynamic")
+        tlca = TimexLCA(demand={fu.key: 1}, method=("GWP", "example"))
+        assert tlca.database_dates["foreground"] == "dynamic"
+
+    def test_scenario_is_forwarded(self, fu):
+        set_database_metadata(
+            "db_2022", representative_time="2022-01-01", pathway="SSP2-Base"
+        )
+        set_database_metadata(
+            "db_2024", representative_time="2024-01-01", pathway="SSP2-PkBudg500"
+        )
+        tlca = TimexLCA(
+            demand={fu.key: 1},
+            method=("GWP", "example"),
+            scenario={"pathway": "SSP2-Base"},
+        )
+        assert tlca.database_dates == {
+            "db_2022": datetime(2022, 1, 1),
+            "foreground": "dynamic",
+        }
+
+    def test_database_dates_is_exclusive(self, fu):
+        set_database_metadata("db_2022", representative_time="2022-01-01")
+        set_database_metadata("db_2024", representative_time="2024-01-01")
+        tlca = TimexLCA(
+            demand={fu.key: 1},
+            method=("GWP", "example"),
+            database_dates={
+                "db_2024": datetime(2024, 1, 1),
+                "foreground": "dynamic",
+            },
+        )
+        assert tlca.database_dates == {
+            "db_2024": datetime(2024, 1, 1),
+            "foreground": "dynamic",
+        }
+
+    def test_database_dates_with_scenario_raises(self, fu):
+        with pytest.raises(ValueError, match="only applies when"):
+            TimexLCA(
+                demand={fu.key: 1},
+                method=("GWP", "example"),
+                database_dates={"foreground": "dynamic"},
+                scenario={"pathway": "SSP2-Base"},
+            )
+
+    def test_no_metadata_anywhere_falls_back_to_dynamic_demand(self, fu):
+        tlca = TimexLCA(demand={fu.key: 1}, method=("GWP", "example"))
+        assert tlca.database_dates == {"foreground": "dynamic"}
+
+    def test_metadata_and_database_dates_give_the_same_score(self, fu):
+        explicit = TimexLCA(
+            demand={fu.key: 1},
+            method=("GWP", "example"),
+            database_dates={
+                "db_2022": datetime(2022, 1, 1),
+                "db_2024": datetime(2024, 1, 1),
+                "foreground": "dynamic",
+            },
+        )
+        explicit.build_timeline(starting_datetime=datetime(2024, 1, 2))
+        explicit.lci()
+        explicit.static_lcia()
+
+        set_database_metadata("db_2022", representative_time="2022-01-01")
+        set_database_metadata("db_2024", representative_time="2024-01-01")
+        from_metadata = TimexLCA(demand={fu.key: 1}, method=("GWP", "example"))
+        from_metadata.build_timeline(starting_datetime=datetime(2024, 1, 2))
+        from_metadata.lci()
+        from_metadata.static_lcia()
+
+        assert from_metadata.static_score == pytest.approx(explicit.static_score)
