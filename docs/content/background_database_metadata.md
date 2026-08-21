@@ -151,8 +151,17 @@ tlca = TimexLCA(
 
 Use it when you want to restrict a calculation to a subset of the databases in your
 project, or when a database's metadata is wrong and you don't want to change it.
-It is also the fastest option on a large project: without it, `TimexLCA` reads
-metadata from and loads node data for *every* registered database that carries
-`representative_time`, including ones your demand does not actually depend on,
-which costs setup time at premise scale - narrow it down with `scenario`, or bypass
-metadata resolution entirely with an explicit `database_dates`.
+
+Without it, `TimexLCA` reads metadata from and loads node data for *every*
+registered database that carries `representative_time`, including ones your demand
+does not actually depend on. At premise scale, that is not just setup time: every
+database that ends up in `database_dates_static` becomes a candidate producer for
+temporal market interpolation, so an unrelated study's vintages sitting in the same
+project can change your results, not only how long setup takes. `bw_timex` guards
+against the case where this goes visibly wrong - the [ambiguous-scenario
+check](#choosing-a-scenario) and the same-date collision error raised when two
+databases hold the same producer at the same date - but it cannot catch a
+same-named, same-dated producer that is a legitimate, silent match. Narrow the
+selection down with `scenario`, or bypass metadata resolution entirely with an
+explicit `database_dates`, whenever your project holds background data you don't
+want considered.

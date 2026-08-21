@@ -141,8 +141,8 @@ and for mapping databases explicitly with `database_dates`.
 TimexLCA(
     demand={("foreground", "A"): 1},  # Node, (database, code) tuple, or int id
     method=("our", "method"),
-    scenario=None,                    # optional: pick one scenario among several
     database_dates=None,              # optional: map databases explicitly instead of by metadata
+    scenario=None,                    # optional: pick one scenario among several
 )
 ```
 
