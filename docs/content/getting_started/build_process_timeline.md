@@ -21,6 +21,8 @@ tlca = TimexLCA(
 )
 ```
 
+The metadata is written by premise >= 2.4.9.2, or by you with
+`set_database_metadata` (see [Step 1](adding_temporal_information.md)).
 If your project holds several scenarios, select one with
 `scenario={"pathway": "SSP2-PkBudg500"}`; to map the databases by hand instead, pass
 `database_dates`. Both are covered in

@@ -260,8 +260,9 @@ set_database_metadata("background_2030", representative_time=datetime(2030, 1, 1
 ```
 
 You only do this once per database - it is stored in your Brightway project. Databases
-exported by [premise](https://premise.readthedocs.io/en/latest/introduction.html) bring
-this metadata with them, so there is nothing to do for those. The foreground doesn't
+exported by [premise](https://premise.readthedocs.io/en/latest/introduction.html)
+**>= 2.4.9.2** bring this metadata with them, so there is nothing to do for those;
+for databases from an earlier premise, set it yourself as above. The foreground doesn't
 represent a specific point in time and is distributed over time instead; `bw_timex`
 treats the databases holding your functional unit that way automatically.
 

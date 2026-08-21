@@ -88,8 +88,8 @@ class TimexLCA:
     demand = {("my_foreground_database", "my_process"): 1}
     method = ("some_method_family", "some_category", "some_method")
 
-    # Databases exported by premise already know the point in time they
-    # represent. For your own databases, say so once:
+    # Databases exported by premise >= 2.4.9.2 already know the point in
+    # time they represent. For your own databases, say so once:
     set_database_metadata("my_background_database_one", representative_time=datetime(2020, 1, 1))
     set_database_metadata("my_background_database_two", representative_time=datetime(2030, 1, 1))
 
@@ -149,13 +149,14 @@ class TimexLCA:
                 instead of writing them into the shared background database for
                 that vintage. If not given, the mapping is read from the
                 databases' own `representative_time` metadata (which premise
-                writes when exporting, and which you can set yourself with
-                `bw_timex.set_database_metadata`). Passing this argument replaces
+                >= 2.4.9.2 writes when exporting, and which you can set yourself
+                with `bw_timex.set_database_metadata`). Passing this argument replaces
                 the metadata entirely: only the databases listed here are used.
         scenario : dict, optional
                 Metadata a background database must match to be used, e.g.
-                `{"iam_model": "remind", "pathway": "SSP2-PkBudg500"}`. Only
-                needed when the project holds several scenarios - `TimexLCA`
+                `{"iam_model": "remind", "pathway": "SSP2-PkBudg500"}`, as
+                written by premise >= 2.4.9.2. Only needed when the project
+                holds several scenarios - `TimexLCA`
                 raises and lists them otherwise. Databases that don't declare the
                 filtered key (your foreground, a hand-built vintage) are always
                 kept. Cannot be combined with `database_dates`.

@@ -21,7 +21,7 @@ bd.databases["ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2050"]
     # written by brightway
     "format": "Ecoinvent XML", "backend": "sqlite", "number": 43648, ...,
     # written by premise
-    "premise_version": "2.4.9.3",
+    "premise_version": "2.4.9.2",
     "iam_model": "remind",
     "pathway": "SSP2-PkBudg500",
     "representative_time": "2050-01-01T00:00:00",
@@ -39,9 +39,9 @@ tlca = TimexLCA(demand={("foreground", "A"): 1}, method=("our", "method"))
 
 !!! info "premise version"
 
-    premise writes this metadata from the version following 2.4.9.2 onwards. For
-    databases written by an earlier version, set it yourself as shown below - it is
-    a one-liner per database.
+    Only premise **>= 2.4.9.2** writes this metadata. Databases exported by an
+    earlier premise carry none of it - set it yourself as shown below, it is a
+    one-liner per database.
 
 ## Setting it yourself
 

@@ -7,7 +7,7 @@ prospective database:
 
 ```python
 {
-    "premise_version": "2.4.9.3",
+    "premise_version": "2.4.9.2",
     "iam_model": "remind",
     "pathway": "SSP2-PkBudg500",
     "representative_time": "2050-01-01T00:00:00",
@@ -15,6 +15,9 @@ prospective database:
     "system_model": "cutoff",
 }
 ```
+
+premise writes this metadata from version 2.4.9.2 onwards. Databases exported by
+an earlier premise carry none of it, and need `set_database_metadata`.
 
 Brightway stores this mapping as JSON, so dates are kept as ISO 8601 strings.
 """
@@ -102,8 +105,8 @@ def set_database_metadata(database: str | bd.Database, **metadata) -> dict:
     Store what a database represents in its Brightway metadata.
 
     Use this for databases that don't bring the metadata themselves, e.g.
-    databases you built yourself or that were exported by a premise version
-    older than the one writing scenario metadata. `TimexLCA` reads
+    databases you built yourself or that were exported by premise < 2.4.9.2,
+    which is the first version writing this metadata. `TimexLCA` reads
     `representative_time` from all databases of the project to map them to
     points in time, so this replaces passing `database_dates`.
 
@@ -115,9 +118,10 @@ def set_database_metadata(database: str | bd.Database, **metadata) -> dict:
         Metadata to store. `representative_time` accepts a `datetime`, an ISO
         8601 string, or `"dynamic"` and is always stored as a string, because
         Brightway serializes database metadata to JSON. Any other key is stored
-        as given and must be JSON-serializable. Keys that premise writes, and
-        that `TimexLCA(scenario=...)` can select on, are `iam_model`,
-        `pathway`, `system_model`, `ecoinvent_version` and `premise_version`.
+        as given and must be JSON-serializable. Keys that premise (>= 2.4.9.2)
+        writes, and that `TimexLCA(scenario=...)` can select on, are
+        `iam_model`, `pathway`, `system_model`, `ecoinvent_version` and
+        `premise_version`.
 
     Returns
     -------

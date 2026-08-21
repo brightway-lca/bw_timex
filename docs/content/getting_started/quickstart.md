@@ -57,7 +57,7 @@ add_temporal_distribution_to_exchange(
 )
 
 # 3. Say what your time-specific background databases represent
-#    (premise databases already know - skip this for them)
+#    (databases from premise >= 2.4.9.2 already know - skip this for them)
 set_database_metadata("background", representative_time=datetime(2020, 1, 1))
 set_database_metadata("background_2030", representative_time=datetime(2030, 1, 1))
 
