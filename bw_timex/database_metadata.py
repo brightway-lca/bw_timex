@@ -29,6 +29,8 @@ from typing import Any
 import bw2data as bd
 from loguru import logger
 
+from .validation import DatabaseMetadataInputs
+
 REPRESENTATIVE_TIME = "representative_time"
 SCENARIOS = "scenarios"
 DYNAMIC = "dynamic"
@@ -134,8 +136,6 @@ def set_database_metadata(database: str | bd.Database, **metadata) -> dict:
     )
     ```
     """
-    from .validation import DatabaseMetadataInputs
-
     name = _database_name(database)
     DatabaseMetadataInputs(database=name, metadata=metadata)
 

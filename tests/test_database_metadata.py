@@ -4,6 +4,7 @@ from datetime import datetime
 
 import bw2data as bd
 import pytest
+from loguru import logger
 
 from bw_timex import TimexLCA, set_database_metadata
 from bw_timex.database_metadata import resolve_database_dates_from_metadata
@@ -115,6 +116,60 @@ class TestResolveFromMetadata:
         bd.databases.flush()
         with pytest.raises(ValueError, match="db_2022"):
             resolve_database_dates_from_metadata()
+
+    def test_multi_scenario_database_is_named_in_the_log(self):
+        set_database_metadata("db_2022", representative_time="2022-01-01")
+        set_database_metadata(
+            "db_2024",
+            representative_time="2024-01-01",
+            scenarios=[
+                {"pathway": "SSP2-Base", "representative_time": "2024-01-01"},
+                {"pathway": "SSP2-PkBudg500", "representative_time": "2024-01-01"},
+            ],
+        )
+        messages = []
+        sink_id = logger.add(messages.append, level="INFO")
+        try:
+            resolve_database_dates_from_metadata()
+        finally:
+            logger.remove(sink_id)
+        assert any("db_2024" in message for message in messages)
+
+
+# ─── Tests for order-insensitive `external_scenarios` comparison ───
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestExternalScenariosOrderInsensitive:
+
+    def test_ambiguity_signature_is_order_insensitive(self):
+        """Same `external_scenarios`, listed in a different order, must not
+        look like two different scenarios."""
+        set_database_metadata(
+            "db_2022",
+            representative_time="2022-01-01",
+            external_scenarios=["scenario_a", "scenario_b"],
+        )
+        set_database_metadata(
+            "db_2024",
+            representative_time="2024-01-01",
+            external_scenarios=["scenario_b", "scenario_a"],
+        )
+        # Would raise "Several background scenarios found" if the signature
+        # depended on list order.
+        resolved = resolve_database_dates_from_metadata()
+        assert set(resolved) == {"db_2022", "db_2024"}
+
+    def test_filter_value_is_order_insensitive(self):
+        set_database_metadata(
+            "db_2022",
+            representative_time="2022-01-01",
+            external_scenarios=["scenario_a", "scenario_b"],
+        )
+        resolved = resolve_database_dates_from_metadata(
+            scenario={"external_scenarios": ["scenario_b", "scenario_a"]}
+        )
+        assert resolved == {"db_2022": datetime(2022, 1, 1)}
 
 
 # ─── Tests for scenario selection ───
@@ -257,6 +312,26 @@ class TestTimexLCAFromMetadata:
         assert "SSP2-Base" in message
         assert "SSP2-PkBudg500" in message
 
+    def test_typo_in_scenario_value_raises_even_with_a_non_scenario_survivor(self, fu):
+        """A database that declares no scenario keys survives every filter,
+        so the resolved mapping is non-empty even though the filter matched
+        none of the scenario databases it was meant to select among. The
+        error must still fire - checking whether `resolved` is empty is not
+        enough.
+        """
+        set_database_metadata("db_2022", representative_time="2022-01-01")
+        set_database_metadata(
+            "db_2024", representative_time="2024-01-01", pathway="SSP2-Base"
+        )
+        with pytest.raises(ValueError, match="SSP2-Basee") as excinfo:
+            TimexLCA(
+                demand={fu.key: 1},
+                method=("GWP", "example"),
+                scenario={"pathway": "SSP2-Basee"},
+            )
+        message = str(excinfo.value)
+        assert "SSP2-Base" in message
+
     def test_database_dates_is_exclusive(self, fu):
         set_database_metadata("db_2022", representative_time="2022-01-01")
         set_database_metadata("db_2024", representative_time="2024-01-01")
@@ -280,6 +355,19 @@ class TestTimexLCAFromMetadata:
                 method=("GWP", "example"),
                 database_dates={"foreground": "dynamic"},
                 scenario={"pathway": "SSP2-Base"},
+            )
+
+    def test_empty_database_dates_dict_raises(self, fu):
+        """An empty dict is falsy but not `None`: it must still be treated as
+        an explicit (if invalid) `database_dates`, not fall through to
+        metadata resolution.
+        """
+        set_database_metadata("db_2022", representative_time="2022-01-01")
+        with pytest.raises(ValueError, match="non-empty dictionary"):
+            TimexLCA(
+                demand={fu.key: 1},
+                method=("GWP", "example"),
+                database_dates={},
             )
 
     def test_no_metadata_anywhere_falls_back_to_dynamic_demand(self, fu):

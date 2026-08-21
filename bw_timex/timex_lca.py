@@ -275,12 +275,18 @@ class TimexLCA:
             If both `database_dates` and `scenario` are given (`scenario`
             only selects among databases resolved from metadata, so it makes
             no sense once `database_dates` already gives the whole mapping),
-            or if `scenario` is given but matches no database's metadata at
-            all - almost always a typo in one of its keys or values, since a
-            filter that legitimately excludes everything would leave nothing
-            for `TimexLCA` to compute with.
+            or if `scenario` is given but no surviving database positively
+            declares one of its keys - almost always a typo in one of its
+            keys or values, since a filter that legitimately excludes
+            everything would leave nothing for `TimexLCA` to compute with.
+            A database that doesn't declare a filtered key at all is kept by
+            the filter (see `resolve_database_dates_from_metadata`), so
+            checking whether the *resolved mapping* is empty is not enough:
+            it stays non-empty whenever such a database happens to be
+            present, even though the filter matched none of the databases it
+            was meant to select among.
         """
-        if database_dates:
+        if database_dates is not None:
             if scenario:
                 raise ValueError(
                     "`scenario` selects background databases by their metadata and "
@@ -291,24 +297,28 @@ class TimexLCA:
 
         resolved = resolve_database_dates_from_metadata(scenario)
 
-        if not resolved:
-            if scenario:
-                declared = {}
-                for name in bd.databases:
-                    metadata = bd.databases[name]
-                    for key in scenario:
-                        if key in metadata:
-                            declared.setdefault(key, set()).add(str(metadata[key]))
-                details = "; ".join(
-                    f"'{key}': "
-                    f"{sorted(declared[key]) if key in declared else 'not declared by any database'}"
-                    for key in scenario
-                )
-                raise ValueError(
-                    f"scenario={scenario!r} matched no database in this project. "
-                    f"Values actually declared for its key(s) by this project's "
-                    f"databases: {details}. Check for a typo in the filter."
-                )
+        filter_matched = scenario and any(
+            key in bd.databases[name] for name in resolved for key in scenario
+        )
+
+        if scenario and not filter_matched:
+            declared = {}
+            for name in bd.databases:
+                metadata = bd.databases[name]
+                for key in scenario:
+                    if key in metadata:
+                        declared.setdefault(key, set()).add(str(metadata[key]))
+            details = "; ".join(
+                f"'{key}': "
+                f"{sorted(declared[key]) if key in declared else 'not declared by any database'}"
+                for key in scenario
+            )
+            raise ValueError(
+                f"scenario={scenario!r} matched no database in this project. "
+                f"Values actually declared for its key(s) by this project's "
+                f"databases: {details}. Check for a typo in the filter."
+            )
+        elif not resolved:
             logger.info(
                 "No database_dates provided, and no database in this project carries "
                 "`representative_time` metadata. Treating the databases containing the "
