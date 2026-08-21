@@ -29,7 +29,6 @@ nav = [
       { "Step 3 - Calculating the time-explicit LCI" = "content/getting_started/time_explicit_lci.md" },
       { "Step 4 - Impact assessment" = "content/getting_started/lcia.md" },
     ]},
-    { "What a database represents" = "content/background_database_metadata.md" },
     { "What LCA should I do?" = "content/decisiontree.md" },
   ]},
   { Theory = "content/theory.md" },
@@ -61,6 +60,7 @@ nav = [
     { "Helper Classes" = "api/helper_classes.md" },
     { Utils = "api/utils.md" },
     { "Database metadata" = "api/database_metadata.md" },
+    { Errors = "api/errors.md" },
   ]},
 ]
 

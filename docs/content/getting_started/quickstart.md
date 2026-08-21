@@ -6,7 +6,7 @@ tags:
 
 # Quick Start
 
-A condensed reference for using `bw_timex`. For a step-by-step introduction, see the [Walkthrough](index.md). For the underlying framework, see the [Theory](../theory.md) page. For more, see the [Examples](../examples/index.md) or the [API Reference](../../api/index.md).
+Condensed reference for `bw_timex`. For a step-by-step introduction, see the [Walkthrough](index.md). For the underlying framework, see the [Theory](../theory.md) page. For more, see the [Examples](../examples/index.md) or the [API Reference](../../api/index.md).
 
 ---
 
@@ -128,8 +128,9 @@ e.g. for the timing of the functional unit itself. Relative dates
 (`dtype="timedelta64[Y]"`) are relative to the consuming process. Several databases may
 represent the same point in time, e.g. if you keep modified copies of background
 processes in their own database instead of writing them into the shared vintage. See
-[Time-specific background databases](../background_database_metadata.md) for scenario selection
-and for mapping databases explicitly with `database_dates`.
+[Step 1](adding_temporal_information.md) for the database metadata, and
+[Step 2](build_process_timeline.md) for scenario selection and for mapping databases
+explicitly with `database_dates`.
 
 ---
 

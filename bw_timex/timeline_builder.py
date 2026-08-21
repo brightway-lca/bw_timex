@@ -10,6 +10,7 @@ from bw2data.configuration import labels
 from loguru import logger
 
 from .edge_extractor import Edge, EdgeExtractor, EdgeExtractorBFS
+from .errors import UnmappedDatabaseError
 from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
@@ -306,6 +307,8 @@ class TimelineBuilder:
 
         grouped_edges = self._drop_edges_of_unsupplied_consumers(grouped_edges)
 
+        self._check_traversed_databases_are_mapped(grouped_edges)
+
         # add new processes to activity_time_mapping
         static_dbs = set(self.database_dates_static.keys()) if self.traverse_background else set()
         for row in grouped_edges.itertuples():
@@ -380,6 +383,70 @@ class TimelineBuilder:
     ###################################################
     # underlying functions called by build_timeline() #
     ###################################################
+
+    def _check_traversed_databases_are_mapped(self, grouped_edges: pd.DataFrame) -> None:
+        """
+        Check that every traversed process lives in a database that is mapped.
+
+        `bw_timex` places a process in time via the database it lives in, so
+        every database the traversal reaches must either represent a point in
+        time or be marked as `"dynamic"`. Only the databases holding the
+        functional unit are treated as dynamic automatically - a foreground
+        split across several databases has to mark the other ones itself. A
+        database that is mapped nowhere has no node metadata loaded for it,
+        which would otherwise surface as a bare `KeyError` on a node id.
+
+        Parameters
+        ----------
+        grouped_edges : pd.DataFrame
+            The timeline edges, with `producer` and `consumer` node ids.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        UnmappedDatabaseError
+            If any traversed process is in a database that is not mapped.
+        """
+        node_ids = set(grouped_edges["producer"]).union(grouped_edges["consumer"])
+        unmapped = sorted(
+            node_id
+            for node_id in node_ids
+            if node_id != -1 and node_id not in self.nodes
+        )
+        if not unmapped:
+            return
+
+        examples = {}
+        for node_id in unmapped:
+            node = bd.get_node(id=node_id)
+            examples.setdefault(node["database"], []).append(node["name"])
+
+        databases = ", ".join(
+            f"'{database}' (e.g. '{names[0]}'"
+            + (f", and {len(names) - 1} more" if len(names) > 1 else "")
+            + ")"
+            for database, names in examples.items()
+        )
+        first = next(iter(examples))
+        raise UnmappedDatabaseError(
+            f"The graph traversal reached processes in database(s) that are not "
+            f"mapped to a point in time: {databases}. `bw_timex` places every "
+            f"traversed process in time via its database, and only the "
+            f"database(s) holding the functional unit are treated as 'dynamic' "
+            f"automatically, so a foreground split across several databases has "
+            f"to mark the other ones itself.\n"
+            f"If '{first}' is part of your foreground, mark it as dynamic:\n"
+            f"    bw_timex.set_database_metadata('{first}', representative_time='dynamic')\n"
+            f"If it represents a point in time, give it that date instead:\n"
+            f"    bw_timex.set_database_metadata('{first}', "
+            f"representative_time=datetime(2030, 1, 1))\n"
+            f"Databases mapped for this calculation: "
+            f"{sorted(self.database_dates)}. When passing `database_dates` "
+            f"explicitly, it must list every database the traversal reaches."
+        )
 
     def check_database_names(self) -> None:
         """

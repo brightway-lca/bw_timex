@@ -266,9 +266,21 @@ for databases from an earlier premise, set it yourself as above. The foreground 
 represent a specific point in time and is distributed over time instead; `bw_timex`
 treats the databases holding your functional unit that way automatically.
 
+!!! tip "Foreground split across several databases"
+
+    Only the databases holding the functional unit become dynamic automatically. Mark
+    any other foreground database yourself:
+
+    ```python
+    set_database_metadata("my_intermediate_foreground", representative_time="dynamic")
+    ```
+
+    Otherwise `build_timeline()` raises an `UnmappedDatabaseError`, naming the database
+    it could not place in time.
+
 !!! tip "Data sources"
 
-    You can use whatever data source you want for the time-specific process data. A nice package from the Brightway cosmos that can help you is [premise](https://premise.readthedocs.io/en/latest/introduction.html).
+    You can use whatever data source you want for the time-specific process data. [premise](https://premise.readthedocs.io/en/latest/introduction.html) is a nice package from the Brightway cosmos, but you can also use any custom scenario.
 
 ### Several databases for the same point in time
 
