@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-* Added `representative_time` database metadata as the default timing source: `TimexLCA` now maps background databases to points in time by reading their Brightway metadata (as written by premise), making `database_dates` optional ([#217](https://github.com/brightway-lca/bw_timex/issues/217))
+* Added `representative_time` database metadata as the default timing source: `TimexLCA` now maps background databases to points in time by reading their Brightway metadata (as written by premise >= 2.4.9.2), making `database_dates` optional ([#217](https://github.com/brightway-lca/bw_timex/issues/217))
 * Added `set_database_metadata` to record what a database represents (`representative_time`, and scenario fields such as `iam_model` or `pathway`) for databases that don't bring the metadata themselves
 * Added `TimexLCA(scenario={...})` to select one background scenario when a project holds several; `TimexLCA` raises and lists the scenarios it found if the choice is ambiguous
 * Fixed `TimexLCA(scenario={...})` silently falling back to a plain (non-time-explicit) LCA when the filter matched no database at all, e.g. a typo in a key or value; it now raises a `ValueError` naming the filter and what each of its keys is actually declared as across the project's databases. Also reworded the `database_dates`-specific error messages in `validation.py`, `timeline_builder.py`, and `edge_extractor.py` to also credit `representative_time` metadata as a source of timing ([#217](https://github.com/brightway-lca/bw_timex/issues/217))
