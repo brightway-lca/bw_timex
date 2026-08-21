@@ -6,6 +6,7 @@ import bw2data as bd
 import pytest
 
 from bw_timex import set_database_metadata
+from bw_timex.database_metadata import resolve_database_dates_from_metadata
 
 # ─── Tests for set_database_metadata ───
 
@@ -66,3 +67,50 @@ class TestSetDatabaseMetadata:
     def test_no_metadata_raises(self):
         with pytest.raises(ValueError, match="at least one"):
             set_database_metadata("db_2022")
+
+
+# ─── Tests for resolving database dates from metadata ───
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestResolveFromMetadata:
+
+    def test_empty_project_metadata_resolves_to_nothing(self):
+        assert resolve_database_dates_from_metadata() == {}
+
+    def test_iso_strings_resolve_to_datetimes(self):
+        set_database_metadata("db_2022", representative_time="2022-01-01")
+        set_database_metadata("db_2024", representative_time="2024-01-01")
+        assert resolve_database_dates_from_metadata() == {
+            "db_2022": datetime(2022, 1, 1),
+            "db_2024": datetime(2024, 1, 1),
+        }
+
+    def test_dynamic_metadata_resolves_to_dynamic(self):
+        set_database_metadata("db_2022", representative_time="2022-01-01")
+        set_database_metadata("foreground", representative_time="dynamic")
+        resolved = resolve_database_dates_from_metadata()
+        assert resolved["foreground"] == "dynamic"
+        assert resolved["db_2022"] == datetime(2022, 1, 1)
+
+    def test_databases_without_metadata_are_ignored(self):
+        set_database_metadata("db_2022", representative_time="2022-01-01")
+        assert set(resolve_database_dates_from_metadata()) == {"db_2022"}
+
+    def test_multi_scenario_database_is_skipped(self):
+        set_database_metadata("db_2022", representative_time="2022-01-01")
+        set_database_metadata(
+            "db_2024",
+            representative_time="2024-01-01",
+            scenarios=[
+                {"pathway": "SSP2-Base", "representative_time": "2024-01-01"},
+                {"pathway": "SSP2-PkBudg500", "representative_time": "2024-01-01"},
+            ],
+        )
+        assert set(resolve_database_dates_from_metadata()) == {"db_2022"}
+
+    def test_invalid_metadata_value_raises_naming_the_database(self):
+        bd.databases["db_2022"]["representative_time"] = "whenever"
+        bd.databases.flush()
+        with pytest.raises(ValueError, match="db_2022"):
+            resolve_database_dates_from_metadata()

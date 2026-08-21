@@ -26,6 +26,7 @@ from datetime import datetime
 from typing import Any
 
 import bw2data as bd
+from loguru import logger
 
 REPRESENTATIVE_TIME = "representative_time"
 SCENARIOS = "scenarios"
@@ -165,3 +166,57 @@ def set_database_metadata(database: str | bd.Database, **metadata) -> dict:
     bd.databases[name].update(serialized)
     bd.databases.flush()
     return bd.databases[name]
+
+
+def _candidate_databases() -> dict[str, dict]:
+    """Registered databases that declare a `representative_time`.
+
+    Multi-scenario databases (superstructure and scenario-array exports, which
+    carry a `scenarios` list) are skipped: `bw_timex` needs one technosphere
+    per point in time and cannot pick a scenario out of such a database. They
+    can still be used by naming them in `database_dates`.
+    """
+    candidates = {}
+    for name in bd.databases:
+        metadata = bd.databases[name]
+        if REPRESENTATIVE_TIME not in metadata:
+            continue
+        if metadata.get(SCENARIOS):
+            logger.info(
+                f"Skipping database '{name}': it holds "
+                f"{len(metadata[SCENARIOS])} scenarios, so the point in time it "
+                f"represents is ambiguous. Map it explicitly with `database_dates` "
+                f"if you want to use it anyway."
+            )
+            continue
+        candidates[name] = metadata
+    return candidates
+
+
+def resolve_database_dates_from_metadata(
+    scenario: dict | None = None,
+) -> dict[str, datetime | str]:
+    """
+    Map the databases of the current project to the points in time they represent.
+
+    Reads the `representative_time` metadata of every registered database (see
+    [`set_database_metadata`][bw_timex.database_metadata.set_database_metadata]).
+
+    Parameters
+    ----------
+    scenario : dict, optional
+        Metadata a database must match to be included, e.g.
+        `{"iam_model": "remind", "pathway": "SSP2-PkBudg500"}`. Databases that
+        don't declare a filtered key at all are kept.
+
+    Returns
+    -------
+    dict
+        Mapping of database name to `datetime` or `"dynamic"`, ready to be used
+        as `TimexLCA.database_dates`.
+    """
+    candidates = _candidate_databases()
+    return {
+        name: _normalize_representative_time(metadata[REPRESENTATIVE_TIME], name)
+        for name, metadata in candidates.items()
+    }
