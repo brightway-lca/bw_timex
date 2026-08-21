@@ -141,10 +141,15 @@ and for mapping databases explicitly with `database_dates`.
 TimexLCA(
     demand={("foreground", "A"): 1},  # Node, (database, code) tuple, or int id
     method=("our", "method"),
-    database_dates=None,              # optional: map databases explicitly instead of by metadata
-    scenario=None,                    # optional: pick one scenario among several
+    database_dates=None,              # fallback: map the databases yourself, overriding metadata
+    scenario=None,                    # pick one scenario, when the project holds several
 )
 ```
+
+Both are optional. `scenario` narrows down what `bw_timex` reads from the database
+metadata (written by premise >= 2.4.9.2, or by you with `set_database_metadata`);
+`database_dates` is the fallback for when you'd rather write the mapping out yourself,
+and it overrides the metadata entirely.
 
 ### `build_timeline()`
 

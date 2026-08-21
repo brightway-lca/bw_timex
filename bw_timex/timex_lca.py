@@ -141,9 +141,13 @@ class TimexLCA:
                 Tuple defining the LCIA method, such as `('foo', 'bar')` or default methods, such as
                 `("EF v3.1", "climate change", "global warming potential (GWP100)")`
         database_dates : dict, optional
-                Dictionary mapping database names to the point in time they
-                represent, as a `datetime`, or to `"dynamic"` for databases whose
-                processes are distributed over time (typically the foreground).
+                Fallback for mapping the databases yourself instead of letting
+                `bw_timex` read their metadata - useful for databases written by
+                premise < 2.4.9.2, which carry no metadata, or when you want to
+                override what the metadata says. Dictionary mapping database names
+                to the point in time they represent, as a `datetime`, or to
+                `"dynamic"` for databases whose processes are distributed over
+                time (typically the foreground).
                 Several databases may share the same date, e.g. to keep your own
                 modified copies of background processes in their own database
                 instead of writing them into the shared background database for
@@ -154,8 +158,10 @@ class TimexLCA:
                 the metadata entirely: only the databases listed here are used.
         scenario : dict, optional
                 Metadata a background database must match to be used, e.g.
-                `{"iam_model": "remind", "pathway": "SSP2-PkBudg500"}`, as
-                written by premise >= 2.4.9.2. Only needed when the project
+                `{"iam_model": "remind", "pathway": "SSP2-PkBudg500"}`. Reads the
+                scenario metadata written by premise >= 2.4.9.2 (or by you, with
+                `bw_timex.set_database_metadata`), so it does nothing for
+                databases that carry none. Only needed when the project
                 holds several scenarios - `TimexLCA`
                 raises and lists them otherwise. Databases that don't declare the
                 filtered key (your foreground, a hand-built vintage) are always

@@ -68,6 +68,19 @@ over time. `TimexLCA` treats the databases holding your functional unit as
 set_database_metadata("foreground", representative_time="dynamic")
 ```
 
+Only the databases holding the functional unit get that treatment - nothing
+inspects exchanges for temporal distributions. So if your foreground is split
+across several databases, every one of them that does **not** hold the functional
+unit has to be marked itself:
+
+```python
+set_database_metadata("my_intermediate_foreground", representative_time="dynamic")
+```
+
+A foreground database that is neither marked nor holds the functional unit is
+missing from the mapping entirely, and `build_timeline()` fails with a `KeyError`
+on the first node it cannot place.
+
 ## Several databases for the same point in time
 
 More than one database may carry the same date. This is useful when you modify
