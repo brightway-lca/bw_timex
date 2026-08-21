@@ -1,0 +1,167 @@
+"""Read and write what a Brightway database represents.
+
+`bw_timex` needs to know which point in time each background database stands
+for. That information is stored in the database's own Brightway metadata
+(`bw2data.databases[name]`), where premise also writes it when it exports a
+prospective database:
+
+```python
+{
+    "premise_version": "2.4.9.1",
+    "iam_model": "remind",
+    "pathway": "SSP2-PkBudg500",
+    "representative_time": "2050-01-01T00:00:00",
+    "ecoinvent_version": "3.10.1",
+    "system_model": "cutoff",
+}
+```
+
+Brightway stores this mapping as JSON, so dates are kept as ISO 8601 strings.
+"""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime
+from typing import Any
+
+import bw2data as bd
+
+REPRESENTATIVE_TIME = "representative_time"
+SCENARIOS = "scenarios"
+DYNAMIC = "dynamic"
+
+#: Metadata keys that identify the scenario a database represents. Two
+#: databases differing in any of these represent different scenarios.
+#: `premise_version` is deliberately absent: re-running premise on the same
+#: pathway must not look like a second scenario.
+SCENARIO_SIGNATURE_KEYS = (
+    "iam_model",
+    "pathway",
+    "system_model",
+    "ecoinvent_version",
+    "external_scenarios",
+)
+
+#: Keys Brightway maintains itself, filtered out when reporting to the user
+#: which metadata a project's databases carry.
+BRIGHTWAY_METADATA_KEYS = frozenset(
+    {
+        "backend",
+        "depends",
+        "dirty",
+        "format",
+        "geocollections",
+        "modified",
+        "number",
+        "processed",
+        "searchable",
+    }
+)
+
+
+def _database_name(database: Any) -> str:
+    """The name of a database given either as a name or as a `bd.Database`."""
+    name = getattr(database, "name", database)
+    if not isinstance(name, str):
+        raise ValueError(
+            f"database must be a database name or a bw2data Database, got "
+            f"{type(database).__name__}."
+        )
+    return name
+
+
+def _normalize_representative_time(value: Any, database: str) -> datetime | str:
+    """Turn a stored `representative_time` into a datetime or `"dynamic"`."""
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        if value == DYNAMIC:
+            return DYNAMIC
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            raise ValueError(
+                f"Database '{database}' has an invalid `{REPRESENTATIVE_TIME}` "
+                f"metadata value: {value!r}. Expected an ISO 8601 datetime string "
+                f"(e.g. '2030-01-01'), a datetime, or '{DYNAMIC}'."
+            ) from None
+    raise ValueError(
+        f"Database '{database}' has an invalid `{REPRESENTATIVE_TIME}` metadata "
+        f"value of type {type(value).__name__}: {value!r}. Expected an ISO 8601 "
+        f"datetime string, a datetime, or '{DYNAMIC}'."
+    )
+
+
+def set_database_metadata(database: str | bd.Database, **metadata) -> dict:
+    """
+    Store what a database represents in its Brightway metadata.
+
+    Use this for databases that don't bring the metadata themselves, e.g.
+    databases you built yourself or that were exported by a premise version
+    older than the one writing scenario metadata. `TimexLCA` reads
+    `representative_time` from all databases of the project to map them to
+    points in time, so this replaces passing `database_dates`.
+
+    Parameters
+    ----------
+    database : str or bw2data.Database
+        Name of the database, or the database itself. Must be registered.
+    **metadata :
+        Metadata to store. `representative_time` accepts a `datetime`, an ISO
+        8601 string, or `"dynamic"` and is always stored as a string, because
+        Brightway serializes database metadata to JSON. Any other key is stored
+        as given and must be JSON-serializable. Keys that premise writes, and
+        that `TimexLCA(scenario=...)` can select on, are `iam_model`,
+        `pathway`, `system_model`, `ecoinvent_version` and `premise_version`.
+
+    Returns
+    -------
+    dict
+        The database's metadata after the update.
+
+    Examples
+    --------
+    ```python
+    set_database_metadata("db_2030", representative_time=datetime(2030, 1, 1))
+    set_database_metadata(
+        "my_2050_variant",
+        representative_time="2050-01-01",
+        iam_model="remind",
+        pathway="SSP2-PkBudg500",
+    )
+    ```
+    """
+    from .validation import DatabaseMetadataInputs
+
+    name = _database_name(database)
+    DatabaseMetadataInputs(database=name, metadata=metadata)
+
+    if name not in bd.databases:
+        raise ValueError(
+            f"Database '{name}' is not registered in this Brightway project. "
+            f"Available databases: {sorted(bd.databases)}."
+        )
+
+    serialized = {}
+    for key, value in metadata.items():
+        if key == REPRESENTATIVE_TIME:
+            normalized = _normalize_representative_time(value, name)
+            if isinstance(value, str):
+                # already a string (an ISO 8601 date or "dynamic"): store as given
+                serialized[key] = value
+            else:
+                serialized[key] = normalized.isoformat()
+            continue
+        try:
+            json.dumps(value)
+        except TypeError:
+            raise ValueError(
+                f"Metadata value for '{key}' is not JSON-serializable: {value!r}. "
+                f"Brightway stores database metadata as JSON."
+            ) from None
+        serialized[key] = value
+
+    bd.databases[name].update(serialized)
+    bd.databases.flush()
+    return bd.databases[name]

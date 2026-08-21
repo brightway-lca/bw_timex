@@ -5,6 +5,7 @@ from bw_temporalis import (
 )
 
 from ._lci_cache import clear_background_lci_cache
+from .database_metadata import set_database_metadata
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .edge_extractor import EdgeExtractor
 from .helper_classes import SetList
@@ -44,4 +45,5 @@ __all__ = [
     "get_temporal_evolution_factor",
     "interactive_td_widget",
     "plot_characterized_inventory_as_waterfall",
+    "set_database_metadata",
 ]

@@ -243,3 +243,27 @@ class PlotDynamicInventoryInputs(BaseModel):
                     f"bio_flows must contain integer database IDs, got {type(item).__name__}: {item}."
                 )
         return v
+
+
+class DatabaseMetadataInputs(BaseModel):
+    """Validates inputs to set_database_metadata"""
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    database: str
+    metadata: dict
+
+    @field_validator("metadata")
+    @classmethod
+    def validate_metadata(cls, v: dict) -> dict:
+        if not v:
+            raise ValueError(
+                "Provide at least one metadata field, e.g. "
+                "`representative_time=datetime(2030, 1, 1)`."
+            )
+        for key in v:
+            if not isinstance(key, str):
+                raise ValueError(
+                    f"Metadata keys must be strings, got {type(key).__name__}: {key}."
+                )
+        return v
