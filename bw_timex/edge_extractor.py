@@ -319,7 +319,8 @@ class VariantBackgroundMixin:
                     f"one database at {date:%Y-%m-%d}: '{candidates[date]}' and "
                     f"'{db_name}'. bw_timex cannot tell which one to use. Give "
                     "the copy a distinct name, reference product or location, "
-                    "or remove one of the two databases from `database_dates`."
+                    "or remove one of the two databases from `database_dates` or "
+                    "its `representative_time` metadata."
                 )
             candidates[date] = db_name
 

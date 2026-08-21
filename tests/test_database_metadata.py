@@ -7,6 +7,7 @@ import pytest
 
 from bw_timex import TimexLCA, set_database_metadata
 from bw_timex.database_metadata import resolve_database_dates_from_metadata
+from bw_timex.validation import TimexLCAInputs
 
 # ─── Tests for set_database_metadata ───
 
@@ -237,6 +238,25 @@ class TestTimexLCAFromMetadata:
             "foreground": "dynamic",
         }
 
+    def test_typo_in_scenario_value_raises(self, fu):
+        set_database_metadata(
+            "db_2022", representative_time="2022-01-01", pathway="SSP2-Base"
+        )
+        set_database_metadata(
+            "db_2024", representative_time="2024-01-01", pathway="SSP2-PkBudg500"
+        )
+        with pytest.raises(ValueError, match="SSP2-Basee") as excinfo:
+            TimexLCA(
+                demand={fu.key: 1},
+                method=("GWP", "example"),
+                scenario={"pathway": "SSP2-Basee"},
+            )
+        message = str(excinfo.value)
+        # The filter that matched nothing, and what's actually declared for
+        # that key, must both be in the error so a typo is obvious.
+        assert "SSP2-Base" in message
+        assert "SSP2-PkBudg500" in message
+
     def test_database_dates_is_exclusive(self, fu):
         set_database_metadata("db_2022", representative_time="2022-01-01")
         set_database_metadata("db_2024", representative_time="2024-01-01")
@@ -288,3 +308,30 @@ class TestTimexLCAFromMetadata:
         from_metadata.static_lcia()
 
         assert from_metadata.static_score == pytest.approx(explicit.static_score)
+
+
+# ─── Tests for TimexLCAInputs.validate_scenario ───
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestValidateScenario:
+
+    @pytest.fixture
+    def fu(self):
+        return bd.get_node(database="foreground", code="A")
+
+    def test_non_string_key_raises(self, fu):
+        with pytest.raises(ValueError, match="scenario keys must be strings"):
+            TimexLCAInputs(
+                demand={fu.key: 1},
+                method=("GWP", "example"),
+                scenario={123: "SSP2-Base"},
+            )
+
+    def test_non_scalar_value_raises(self, fu):
+        with pytest.raises(ValueError, match="scenario values must be scalars"):
+            TimexLCAInputs(
+                demand={fu.key: 1},
+                method=("GWP", "example"),
+                scenario={"pathway": {"nested": "dict"}},
+            )

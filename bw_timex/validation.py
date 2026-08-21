@@ -105,7 +105,8 @@ class TimexLCAInputs(BaseModel):
             if act["database"] not in dynamic_database_names:
                 raise ValueError(
                     f"Demand activity {act} from database {act['database']}: "
-                    f"This database is not marked as 'dynamic' in database_dates. "
+                    f"This database is mapped to a date rather than 'dynamic' "
+                    f"(via `database_dates` or its `representative_time` metadata). "
                     f"Please check."
                 )
         return self

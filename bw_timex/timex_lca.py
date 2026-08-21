@@ -268,6 +268,17 @@ class TimexLCA:
         Either from the explicit `database_dates` argument, which is then the
         whole mapping, or from the databases' own `representative_time`
         metadata. Databases holding the demand default to `"dynamic"`.
+
+        Raises
+        ------
+        ValueError
+            If both `database_dates` and `scenario` are given (`scenario`
+            only selects among databases resolved from metadata, so it makes
+            no sense once `database_dates` already gives the whole mapping),
+            or if `scenario` is given but matches no database's metadata at
+            all - almost always a typo in one of its keys or values, since a
+            filter that legitimately excludes everything would leave nothing
+            for `TimexLCA` to compute with.
         """
         if database_dates:
             if scenario:
@@ -281,6 +292,23 @@ class TimexLCA:
         resolved = resolve_database_dates_from_metadata(scenario)
 
         if not resolved:
+            if scenario:
+                declared = {}
+                for name in bd.databases:
+                    metadata = bd.databases[name]
+                    for key in scenario:
+                        if key in metadata:
+                            declared.setdefault(key, set()).add(str(metadata[key]))
+                details = "; ".join(
+                    f"'{key}': "
+                    f"{sorted(declared[key]) if key in declared else 'not declared by any database'}"
+                    for key in scenario
+                )
+                raise ValueError(
+                    f"scenario={scenario!r} matched no database in this project. "
+                    f"Values actually declared for its key(s) by this project's "
+                    f"databases: {details}. Check for a typo in the filter."
+                )
             logger.info(
                 "No database_dates provided, and no database in this project carries "
                 "`representative_time` metadata. Treating the databases containing the "

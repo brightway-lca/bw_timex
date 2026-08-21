@@ -578,7 +578,8 @@ class TimelineBuilder:
                         f"at {date:%Y-%m-%d}: '{already}' and '{node['database']}'. "
                         "bw_timex cannot tell which one its temporal market should use. "
                         "Give the copy a distinct name, reference product or location, "
-                        "or remove one of the two databases from `database_dates`."
+                        "or remove one of the two databases from `database_dates` or "
+                        "its `representative_time` metadata."
                     )
                 candidates[producer][date] = node["database"]
                 matches[producer][node["database"]] = node.id
