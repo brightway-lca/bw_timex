@@ -128,7 +128,7 @@ e.g. for the timing of the functional unit itself. Relative dates
 (`dtype="timedelta64[Y]"`) are relative to the consuming process. Several databases may
 represent the same point in time, e.g. if you keep modified copies of background
 processes in their own database instead of writing them into the shared vintage. See
-[What a database represents](../background_database_metadata.md) for scenario selection
+[Time-specific background databases](../background_database_metadata.md) for scenario selection
 and for mapping databases explicitly with `database_dates`.
 
 ---

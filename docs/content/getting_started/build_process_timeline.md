@@ -26,7 +26,7 @@ The metadata is written by premise >= 2.4.9.2, or by you with
 If your project holds several scenarios, select one with
 `scenario={"pathway": "SSP2-PkBudg500"}`; to map the databases by hand instead, pass
 `database_dates`. Both are covered in
-[What a database represents](../background_database_metadata.md).
+[Time-specific background databases](../background_database_metadata.md).
 
 Using our new `tlca` object, we can now build the timeline of processes that leads to our functional unit "A". If not specified otherwise, it's assumed that the demand occurs in the current year. In our case, we're specifying the time of demand to the year 2024, with the attribute 'starting_datetime`.. Building the timeline is very simple:
 ```python

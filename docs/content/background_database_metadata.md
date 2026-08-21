@@ -4,7 +4,7 @@ tags:
   - background databases
 ---
 
-# What a database represents
+# Time-specific background databases
 
 `bw_timex` needs to know which point in time each background database stands for.
 That information lives in the database's own Brightway metadata, so it only has to

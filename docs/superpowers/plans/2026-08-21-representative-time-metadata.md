@@ -1242,7 +1242,7 @@ e.g. for the timing of the functional unit itself. Relative dates
 (`dtype="timedelta64[Y]"`) are relative to the consuming process. Several databases may
 represent the same point in time, e.g. if you keep modified copies of background
 processes in their own database instead of writing them into the shared vintage. See
-[What a database represents](../background_database_metadata.md) for scenario selection
+[Time-specific background databases](../background_database_metadata.md) for scenario selection
 and for mapping databases explicitly with `database_dates`.
 ```
 
@@ -1301,7 +1301,7 @@ tlca = TimexLCA(
 If your project holds several scenarios, select one with
 `scenario={"pathway": "SSP2-PkBudg500"}`; to map the databases by hand instead, pass
 `database_dates`. Both are covered in
-[What a database represents](../background_database_metadata.md).
+[Time-specific background databases](../background_database_metadata.md).
 ````
 
 - [ ] **Step 6: Add the changelog entry**
@@ -1310,7 +1310,7 @@ Under `## [Unreleased]` in `CHANGES.md`:
 
 ```markdown
 * Added `representative_time` database metadata as the default timing source: `TimexLCA` now maps background databases to points in time by reading their Brightway metadata (as written by premise), making `database_dates` optional ([#217](https://github.com/brightway-lca/bw_timex/issues/217))
-* Added `set_database_metadata` to record what a database represents (`representative_time`, and scenario fields such as `iam_model` or `pathway`) for databases that don't bring the metadata themselves
+* Added `set_database_metadata` to record Time-specific background databases (`representative_time`, and scenario fields such as `iam_model` or `pathway`) for databases that don't bring the metadata themselves
 * Added `TimexLCA(scenario={...})` to select one background scenario when a project holds several; `TimexLCA` raises and lists the scenarios it found if the choice is ambiguous
 ```
 
