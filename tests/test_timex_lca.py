@@ -358,19 +358,22 @@ class TestTimexLCAEdgeCases:
         )
 
         tlca.lci(expand_technosphere=True, build_dynamic_biosphere=True)
-        cache_len_after_first_lci = len(tlca._background_unit_lci_cache)
+        cache_len_after_first_lci = len(tlca._background_supply_cache)
         assert cache_len_after_first_lci > 0
+        assert tlca._background_solver.n_solves > 0
         assert (
-            tlca.dynamic_biosphere_builder._background_unit_lci_cache
-            is tlca._background_unit_lci_cache
+            tlca._background_solver.shared_cache is tlca._background_supply_cache
         )
+        cached_payloads = dict(tlca._background_supply_cache)
 
         tlca.lci(expand_technosphere=True, build_dynamic_biosphere=True)
-        cache_len_after_second_lci = len(tlca._background_unit_lci_cache)
-        assert cache_len_after_second_lci == cache_len_after_first_lci
+        # Second call: same entries, same payload objects, no solve at all.
+        assert len(tlca._background_supply_cache) == cache_len_after_first_lci
+        for key, payload in cached_payloads.items():
+            assert tlca._background_supply_cache[key] is payload
+        assert tlca._background_solver.n_solves == 0
         assert (
-            tlca.dynamic_biosphere_builder._background_unit_lci_cache
-            is tlca._background_unit_lci_cache
+            tlca._background_solver.shared_cache is tlca._background_supply_cache
         )
 
     def test_dynamic_lcia(self):
