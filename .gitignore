@@ -205,3 +205,8 @@ pyrightconfig.json
 /docs/content/examples/tutorials/
 /docs/content/examples/examples/
 /docs/content/examples/advanced/
+
+.claude
+.superpowers
+ 
+.uv-cache
