@@ -318,16 +318,26 @@ class DatabaseMetadataInputs(BaseModel):
 
 
 class ScenarioBuildInputs(BaseModel):
-    """Validates the scenario mapping handed to ensure_scenario_databases"""
+    """Validates the arguments handed to ensure_scenario_databases"""
 
     model_config = {"arbitrary_types_allowed": True}
 
     scenario: dict
+    ecoinvent_credentials: Optional[tuple] = None
+
+    @field_validator("ecoinvent_credentials")
+    @classmethod
+    def validate_ecoinvent_credentials(cls, v: Optional[tuple]) -> Optional[tuple]:
+        if v is not None and len(v) != 2:
+            raise ValueError(
+                "`ecoinvent_credentials` must be a (username, password) tuple."
+            )
+        return v
 
     @field_validator("scenario")
     @classmethod
     def validate_scenario(cls, v: dict) -> dict:
-        from .database_metadata import SCENARIO_FILTER_KEYS
+        from .database_metadata import SCENARIO_BUILD_KEYS, SCENARIO_FILTER_KEYS
 
         if not v:
             raise ValueError(
@@ -353,5 +363,19 @@ class ScenarioBuildInputs(BaseModel):
             raise ValueError(
                 f"scenario is missing {missing}, which premise needs to build a "
                 f"database. Provide all of {list(SCENARIO_FILTER_KEYS)}."
+            )
+        allowed = SCENARIO_FILTER_KEYS + SCENARIO_BUILD_KEYS
+        unknown = [key for key in v if key not in allowed]
+        if unknown:
+            # Rejected here rather than after the build: an unknown key survives
+            # into the metadata filter, where it matches no database and raises
+            # only once premise has written gigabytes.
+            raise ValueError(
+                f"scenario contains the unknown key(s) {unknown}. When building "
+                f"databases, a scenario may only contain {list(allowed)}. "
+                f"`bw_timex` builds what premise's own IAM scenarios describe; to "
+                f"use a background that needs anything else, build it in premise "
+                f"directly, give it metadata with `bw_timex.set_database_metadata`, "
+                f"and let the `scenario` filter find it (without `create_missing`)."
             )
         return v

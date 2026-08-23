@@ -283,7 +283,7 @@ def ensure_scenario_databases(
         Database name to the point in time it represents, for the vintages
         found or built.
     """
-    ScenarioBuildInputs(scenario=scenario)
+    ScenarioBuildInputs(scenario=scenario, ecoinvent_credentials=ecoinvent_credentials)
     filters, build = split_scenario(scenario)
     # The same year twice would hand premise the same target name twice, and it
     # would build and write it twice.

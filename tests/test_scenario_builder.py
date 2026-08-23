@@ -209,6 +209,23 @@ class TestValidation:
         with pytest.raises(ValueError, match="scenario"):
             ensure_scenario_databases(None)
 
+    def test_unknown_scenario_key_is_rejected_before_building(self, fake_premise):
+        # Caught here or hours later by `resolve_database_dates_from_metadata`,
+        # after premise has written gigabytes.
+        with pytest.raises(ValueError) as error:
+            ensure_scenario_databases({**SCENARIO, "region": "EU", "years": [2030]})
+        message = str(error.value)
+        assert "region" in message
+        assert "iam_model" in message
+        assert fake_premise == []
+
+    def test_malformed_ecoinvent_credentials_are_rejected(self, fake_premise):
+        with pytest.raises(ValueError, match="username, password"):
+            ensure_scenario_databases(
+                {**SCENARIO, "years": [2030]}, ecoinvent_credentials=("user",)
+            )
+        assert fake_premise == []
+
 
 @pytest.mark.usefixtures("temporal_grouping_db_monthly")
 class TestCredentials:
@@ -548,6 +565,18 @@ class TestTimexLCAIntegration:
                 method=("GWP", "example"),
                 scenario={**SCENARIO, "years": [2030]},
             )
+
+    def test_unknown_scenario_key_raises_before_any_build(self, fake_premise):
+        from bw_timex import TimexLCA
+
+        with pytest.raises(ValueError, match="region"):
+            TimexLCA(
+                demand={("foreground", "A"): 1},
+                method=("GWP", "example"),
+                scenario={**SCENARIO, "region": "EU", "years": [2030]},
+                create_missing=True,
+            )
+        assert fake_premise == []
 
     def test_create_missing_with_database_dates_raises(self, fake_premise):
         from bw_timex import TimexLCA
