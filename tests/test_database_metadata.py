@@ -276,6 +276,18 @@ class TestTimexLCAFromMetadata:
         tlca = TimexLCA(demand={fu.key: 1}, method=("GWP", "example"))
         assert tlca.database_dates["foreground"] == "dynamic"
 
+    def test_demand_database_mapped_to_a_fixed_date_raises(self, fu):
+        """Regression: without an explicit `database_dates`, the demand's
+        database is resolved from its own `representative_time` metadata. If
+        that metadata maps it to a fixed date rather than "dynamic", this
+        must still raise - the same check that fires when `database_dates`
+        is given explicitly (see `test_demand_not_in_dynamic_db_raises` in
+        test_timex_lca.py) must also fire along the metadata-resolution path.
+        """
+        set_database_metadata("foreground", representative_time="2022-01-01")
+        with pytest.raises(ValueError, match="mapped to a date rather than 'dynamic'"):
+            TimexLCA(demand={fu.key: 1}, method=("GWP", "example"))
+
     def test_scenario_is_forwarded(self, fu):
         set_database_metadata(
             "db_2022", representative_time="2022-01-01", pathway="SSP2-Base"

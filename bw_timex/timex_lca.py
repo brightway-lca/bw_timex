@@ -226,6 +226,21 @@ class TimexLCA:
             demand=demand, database_dates=database_dates, scenario=scenario
         )
 
+        # Validate again against the *resolved* mapping: the earlier call
+        # above validated the raw `database_dates` argument (needed so a bad
+        # `create_missing` combination is rejected before any build starts),
+        # which is `None` on the metadata/scenario-resolution path - that
+        # call alone would never catch a demand database whose own
+        # `representative_time` metadata resolves it to a fixed date rather
+        # than "dynamic". `create_missing` is left at its default here since
+        # `self.database_dates` is never `None`.
+        TimexLCAInputs(
+            demand=demand,
+            method=method,
+            database_dates=self.database_dates,
+            scenario=self.scenario,
+        )
+
         # Filled in by `prepare_base_lca_inputs`: the databases the base LCA
         # covers, which is a subset of `database_dates` plus their dependents.
         self._base_lca_database_names = set()
