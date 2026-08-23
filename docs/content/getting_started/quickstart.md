@@ -173,10 +173,21 @@ tlca = TimexLCA(
 
 Only missing years are built, so running this again builds nothing. ecoinvent is
 imported first if the project has none. Each vintage is a full copy of ecoinvent:
-expect tens of minutes and roughly 2-4 GB per year. Two optional scenario keys tune
-the build: `sectors` narrows what premise updates (all sectors by default), and
-`source_database` names the ecoinvent to build from, if it is not the one
-`import_ecoinvent_release` writes.
+expect tens of minutes and roughly 2-4 GB per year. Building needs the optional
+`premise` extra, which belongs in [its own environment](../installation.md#building-background-databases-automatically).
+
+Two optional scenario keys tune the build. `sectors` narrows what premise updates
+(all sectors by default), and `source_database` names the ecoinvent to build from,
+if it is not the one `import_ecoinvent_release` writes. A vintage built with
+narrowed `sectors` only satisfies a later request for the same sectors, so it is
+recorded in the database metadata.
+
+The sector names are premise's own, and a name it does not know is only rejected
+once premise has extracted ecoinvent, so check them here first:
+
+`biomass`, `electricity`, `cement`, `steel`, `fuels`, `heat`, `renewable`,
+`metals`, `mining`, `battery`, `cdr`, `emissions`, `final energy`, `cars`,
+`two_wheelers`, `trucks`, `buses`, `trains`, `ships`, `external`.
 
 ### `build_timeline()`
 

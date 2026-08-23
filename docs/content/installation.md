@@ -225,7 +225,32 @@ tags:
 pip install "bw_timex[premise]"
 ```
 
-and credentials, which `bw_timex` reads from the environment unless you pass them:
+!!! warning "Install the extra in its own environment"
+
+    `premise` requires `numpy < 2`, so installing this extra into an environment
+    that already runs `bw_timex` **downgrades** `numpy` (and with it `scipy`) to
+    the 1.x series rather than just adding a package (resolving the extra today
+    gives `numpy 1.26.4` and `scipy 1.13.1`). `numpy 1.26.4` also ships wheels
+    only up to CPython 3.12, so on Python 3.13 the install falls back to
+    building `numpy` from source, which does not compile.
+
+    Give it a separate environment on **Python 3.11 or 3.12**:
+
+    ```bash
+    uv venv --python 3.12 .venv-premise
+    source .venv-premise/bin/activate
+    uv pip install "bw_timex[premise]"
+    ```
+
+    Brightway projects are shared between environments, so this costs you
+    nothing but a second environment: build the vintages there (with
+    `bw_timex.ensure_scenario_databases`, or a `TimexLCA(..., create_missing=True)`
+    call), then run your actual calculations from your normal `bw_timex`
+    environment against the same Brightway project - it will find the databases
+    premise wrote by their metadata.
+
+Building needs credentials, which `bw_timex` reads from the environment unless you
+pass them:
 
 | variable | needed for |
 |---|---|
