@@ -543,6 +543,14 @@ class TestBuilding:
         with pytest.raises(RuntimeError, match="2.4.9.2"):
             ensure_scenario_databases({**SCENARIO, "years": [2030]})
 
+    def test_empty_sectors_list_is_idempotent(self, fake_premise):
+        # `sectors=[]` must behave exactly like omitting `sectors`, or the
+        # second identical call collides with the database the first just built.
+        request = {**SCENARIO, "years": [2030], "sectors": []}
+        ensure_scenario_databases(request)
+        ensure_scenario_databases(request)
+        assert len(fake_premise) == 1
+
     def test_missing_representative_time_with_sectors_can_be_resumed(
         self, fake_premise, monkeypatch
     ):

@@ -336,7 +336,11 @@ def ensure_scenario_databases(
     # The same year twice would hand premise the same target name twice, and it
     # would build and write it twice.
     years = list(dict.fromkeys(build["years"]))
-    sectors = build.get("sectors")
+    # `[]` and absent both mean "all sectors" everywhere downstream
+    # (`database_matches_sectors`, the `sectors` metadata write below); without
+    # this, `sectors=[]` would look narrowed to the matcher but unnarrowed to
+    # the build, and the identical request would collide with itself.
+    sectors = build.get("sectors") or None
 
     existing = find_existing_vintages(filters, sectors)
     missing = [year for year in years if year not in existing]
