@@ -111,7 +111,7 @@ NOTEBOOK_META: dict[str, tuple[str, list[str]]] = {
     ),
     "advanced/scenario_comparison.ipynb": (
         "lucide/git-compare",
-        ["advanced", "scenario", "background databases"],
+        ["advanced", "scenario", "premise", "background databases"],
     ),
 }
 
