@@ -20,7 +20,6 @@ from .utils import (
     round_datetime,
 )
 
-
 class TimelineBuilder:
     """
     Class for building a process timeline based on the temporal distributions of their exchanges.
@@ -651,17 +650,11 @@ class TimelineBuilder:
                 candidates[producer][date] = node["database"]
                 matches[producer][node["database"]] = node.id
 
-        number_of_dates = len(set(self.database_dates_static.values()))
-        for producer, producer_candidates in candidates.items():
-            if len(producer_candidates) < number_of_dates:
-                logger.warning(
-                    "Producer '{}' was only found in {} of {} time-explicit database "
-                    "date(s): {}. Its temporal market can only draw on those.",
-                    self.nodes[producer]["name"],
-                    len(producer_candidates),
-                    number_of_dates,
-                    sorted(producer_candidates.values()),
-                )
+        # A producer missing from some vintages is not logged: it is normal (a
+        # hand-built family covering fewer years than the background, a process
+        # premise only introduces later), and warning per producer buried
+        # everything else. The resulting temporal market shares say the same
+        # thing and are inspectable on the timeline.
 
         self.market_producer_matches = matches
         return candidates

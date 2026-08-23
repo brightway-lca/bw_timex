@@ -2000,10 +2000,6 @@ class TimexLCA:
             del self.activity_time_mapping[key]
         # `reversed` is cached and only refreshed when this flag is set.
         self.activity_time_mapping._modified = True
-        logger.info(
-            f"Not loading {len(unused)} mapped database(s) that the timeline does "
-            f"not source from: {', '.join(sorted(unused))}."
-        )
 
     def databases_used_by_timeline(self) -> list:
         """
