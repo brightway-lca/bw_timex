@@ -50,6 +50,20 @@ SCENARIO_SIGNATURE_KEYS = (
     "external_scenarios",
 )
 
+#: Metadata keys premise writes that identify which scenario a database belongs
+#: to, and that `TimexLCA(scenario=...)` filters on.
+SCENARIO_FILTER_KEYS = (
+    "iam_model",
+    "pathway",
+    "system_model",
+    "ecoinvent_version",
+)
+
+#: Keys of a `scenario` mapping that describe how to *build* a missing vintage
+#: rather than what to match. They never reach the metadata filter: `years` is a
+#: list, and no database's metadata could ever equal it.
+SCENARIO_BUILD_KEYS = ("years", "sectors", "source_database")
+
 #: Keys Brightway maintains itself, filtered out when reporting to the user
 #: which metadata a project's databases carry.
 BRIGHTWAY_METADATA_KEYS = frozenset(
@@ -228,6 +242,30 @@ def _check_filter_keys(scenario: dict, candidates: dict[str, dict]) -> None:
     )
 
 
+def split_scenario(scenario: dict | None) -> tuple[dict, dict]:
+    """Separate a `scenario` mapping into its filter keys and its build keys."""
+    if not scenario:
+        return {}, {}
+    filters = {k: v for k, v in scenario.items() if k not in SCENARIO_BUILD_KEYS}
+    build = {k: v for k, v in scenario.items() if k in SCENARIO_BUILD_KEYS}
+    return filters, build
+
+
+def database_matches_scenario(metadata: dict, scenario: dict | None) -> bool:
+    """Whether a database's metadata survives a `scenario` filter.
+
+    A database is kept unless it *declares* a filtered key with a different
+    value: a hand-built vintage or a foreground carrying no scenario metadata
+    belongs to every scenario, not to none.
+    """
+    if not scenario:
+        return True
+    return all(
+        key not in metadata or _values_match(metadata[key], wanted)
+        for key, wanted in scenario.items()
+    )
+
+
 def _scenario_signature(metadata: dict) -> tuple:
     return tuple(
         (key, tuple(sorted(_as_set(metadata[key]))) if key in metadata else None)
@@ -298,15 +336,13 @@ def resolve_database_dates_from_metadata(
         as `TimexLCA.database_dates`.
     """
     candidates = _candidate_databases()
+    scenario, _ = split_scenario(scenario)
     if scenario:
         _check_filter_keys(scenario, candidates)
         candidates = {
             name: metadata
             for name, metadata in candidates.items()
-            if all(
-                key not in metadata or _values_match(metadata[key], wanted)
-                for key, wanted in scenario.items()
-            )
+            if database_matches_scenario(metadata, scenario)
         }
     _check_unambiguous(candidates)
     return {
