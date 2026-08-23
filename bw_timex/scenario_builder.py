@@ -56,9 +56,24 @@ def _run_premise(**kwargs) -> None:
     raise NotImplementedError
 
 
-def _import_ecoinvent(**kwargs) -> str:
-    """Filled in by Task 4. Every bw2io call happens here and nowhere else."""
-    raise NotImplementedError
+def _import_ecoinvent(version: str, system_model: str, credentials: tuple[str, str]) -> str:
+    """Import an ecoinvent release. The only place bw2io is called."""
+    try:
+        from bw2io import import_ecoinvent_release
+    except ImportError as error:
+        raise ImportError(
+            'bw2io is needed to import ecoinvent. Install it with: pip install '
+            '"bw_timex[premise]"'
+        ) from error
+
+    username, password = credentials
+    import_ecoinvent_release(
+        version=version,
+        system_model=system_model,
+        username=username,
+        password=password,
+    )
+    return f"ecoinvent-{version}-{system_model}"
 
 
 def _resolve_premise_key(premise_key: str | None) -> str:
@@ -96,6 +111,73 @@ def _resolve_ecoinvent_credentials(
             f"password)` or set {' and '.join(missing)}."
         )
     return username, password
+
+
+def vintage_name(filters: dict, year: int) -> str:
+    """The database name a built vintage gets."""
+    return (
+        f"ei_{filters['system_model']}_{filters['ecoinvent_version']}_"
+        f"{filters['iam_model']}_{filters['pathway']}_{year}"
+    )
+
+
+def _check_no_collisions(names: list[str], filters: dict) -> None:
+    """Refuse to build over a database that is not ours.
+
+    `write_db_to_brightway` deletes and rewrites a database of the same name
+    without asking. A name that exists here belongs to someone else: a name
+    that matched the scenario would have satisfied its year already, and its
+    year would not be in the build list.
+    """
+    colliding = [name for name in names if name in bd.databases]
+    if colliding:
+        raise ValueError(
+            f"Database(s) {colliding} already exists in this project but does "
+            f"not match scenario {filters!r}, and premise would overwrite them. "
+            f"Rename or delete them, or map them yourself with `database_dates`."
+        )
+
+
+def _resolve_source_database(
+    filters: dict, build: dict, ecoinvent_credentials
+) -> tuple[str, str]:
+    """The ecoinvent database premise builds from, and its biosphere.
+
+    Importing ecoinvent takes a while and needs a licence, so it happens only
+    when there is nothing to build from.
+    """
+    version = filters["ecoinvent_version"]
+    system_model = filters["system_model"]
+    default_biosphere = f"ecoinvent-{version}-biosphere"
+
+    source = build.get("source_database")
+    if source is not None:
+        if source not in bd.databases:
+            raise ValueError(
+                f"source_database '{source}' is not registered in this project. "
+                f"Available databases: {sorted(bd.databases)}."
+            )
+    else:
+        source = f"ecoinvent-{version}-{system_model}"
+        if source not in bd.databases:
+            logger.info(
+                f"No database '{source}' in this project. Importing ecoinvent "
+                f"{version} ({system_model}) first; this takes a while and needs "
+                f"an ecoinvent licence."
+            )
+            source = _import_ecoinvent(
+                version=version,
+                system_model=system_model,
+                credentials=_resolve_ecoinvent_credentials(ecoinvent_credentials),
+            )
+
+    for candidate in (default_biosphere, "biosphere3"):
+        if candidate in bd.databases:
+            return source, candidate
+    raise ValueError(
+        f"No biosphere database found: expected '{default_biosphere}' or "
+        f"'biosphere3'. premise needs one to link elementary flows."
+    )
 
 
 def ensure_scenario_databases(
@@ -137,4 +219,12 @@ def ensure_scenario_databases(
         )
         return {existing[year]: datetime(year, 1, 1) for year in years}
 
-    raise NotImplementedError  # building is added in Tasks 3-5
+    names = {year: vintage_name(filters, year) for year in missing}
+    _check_no_collisions(list(names.values()), filters)
+
+    key = _resolve_premise_key(premise_key)
+    source_database, biosphere = _resolve_source_database(
+        filters, build, ecoinvent_credentials
+    )
+
+    raise NotImplementedError  # the premise run is added in Task 5

@@ -145,9 +145,14 @@ class TestValidation:
 class TestCredentials:
 
     @pytest.fixture(autouse=True)
-    def _ecoinvent_present(self):
+    def _ecoinvent_present(self, temporal_grouping_db_monthly):
         # Without a source database the run would stop at the ecoinvent
-        # credentials before ever reaching the premise key.
+        # credentials before ever reaching the premise key. Depends
+        # explicitly on temporal_grouping_db_monthly (rather than relying on
+        # class-level usefixtures) so it runs after that fixture builds the
+        # project: autouse fixtures otherwise run before fixtures requested
+        # via usefixtures, and temporal_grouping_db_monthly's @bw2test starts
+        # a brand-new empty project that would silently erase these writes.
         write_minimal_database("ecoinvent-3.10.1-cutoff")
         write_minimal_database("ecoinvent-3.10.1-biosphere")
 
@@ -165,3 +170,95 @@ class TestCredentials:
         monkeypatch.delenv("PREMISE_KEY", raising=False)
         with pytest.raises(ValueError, match="PREMISE_KEY"):
             ensure_scenario_databases({**SCENARIO, "years": [2030]})
+
+
+@pytest.fixture
+def fake_ecoinvent_import(monkeypatch):
+    """Records ecoinvent imports and registers what bw2io would register."""
+    calls = []
+
+    def fake_import(version, system_model, credentials):
+        calls.append((version, system_model, credentials))
+        name = f"ecoinvent-{version}-{system_model}"
+        write_minimal_database(name)
+        write_minimal_database(f"ecoinvent-{version}-biosphere")
+        return name
+
+    monkeypatch.setattr(
+        "bw_timex.scenario_builder._import_ecoinvent", fake_import, raising=True
+    )
+    return calls
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestVintageName:
+
+    def test_name_is_deterministic(self):
+        from bw_timex.scenario_builder import vintage_name
+
+        assert (
+            vintage_name(SCENARIO, 2030)
+            == "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030"
+        )
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestSourceDatabase:
+
+    def test_existing_ecoinvent_is_used(self, fake_premise, fake_ecoinvent_import, monkeypatch):
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        write_minimal_database("ecoinvent-3.10.1-cutoff")
+        write_minimal_database("ecoinvent-3.10.1-biosphere")
+        ensure_scenario_databases({**SCENARIO, "years": [2030]})
+        assert fake_ecoinvent_import == []
+        assert fake_premise[0]["source_database"] == "ecoinvent-3.10.1-cutoff"
+        assert fake_premise[0]["biosphere"] == "ecoinvent-3.10.1-biosphere"
+
+    def test_missing_ecoinvent_is_imported(self, fake_premise, fake_ecoinvent_import, monkeypatch):
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        monkeypatch.setenv("ECOINVENT_USERNAME", "user")
+        monkeypatch.setenv("ECOINVENT_PASSWORD", "secret")
+        ensure_scenario_databases({**SCENARIO, "years": [2030]})
+        assert fake_ecoinvent_import == [("3.10.1", "cutoff", ("user", "secret"))]
+
+    def test_missing_ecoinvent_without_credentials_raises(self, fake_premise, monkeypatch):
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        monkeypatch.delenv("ECOINVENT_USERNAME", raising=False)
+        monkeypatch.delenv("ECOINVENT_PASSWORD", raising=False)
+        with pytest.raises(ValueError, match="ECOINVENT_USERNAME"):
+            ensure_scenario_databases({**SCENARIO, "years": [2030]})
+
+    def test_explicit_source_database_is_used(self, fake_premise, fake_ecoinvent_import, monkeypatch):
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        write_minimal_database("my_own_ecoinvent")
+        write_minimal_database("biosphere3")
+        ensure_scenario_databases(
+            {**SCENARIO, "years": [2030], "source_database": "my_own_ecoinvent"}
+        )
+        assert fake_ecoinvent_import == []
+        assert fake_premise[0]["source_database"] == "my_own_ecoinvent"
+        assert fake_premise[0]["biosphere"] == "biosphere3"
+
+    def test_unregistered_explicit_source_database_raises(self, fake_premise, monkeypatch):
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        with pytest.raises(ValueError, match="no_such_db"):
+            ensure_scenario_databases(
+                {**SCENARIO, "years": [2030], "source_database": "no_such_db"}
+            )
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestOverwriteGuard:
+
+    def test_foreign_database_under_target_name_raises(self, fake_premise, monkeypatch):
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        write_minimal_database("ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030")
+        with pytest.raises(ValueError, match="already exists"):
+            ensure_scenario_databases({**SCENARIO, "years": [2030]})
+
+    def test_nothing_is_built_when_a_name_collides(self, fake_premise, monkeypatch):
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        write_minimal_database("ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030")
+        with pytest.raises(ValueError):
+            ensure_scenario_databases({**SCENARIO, "years": [2030, 2040]})
+        assert fake_premise == []
