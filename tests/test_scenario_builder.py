@@ -321,9 +321,53 @@ class TestOverwriteGuard:
 
     def test_foreign_database_under_target_name_raises(self, fake_premise, monkeypatch):
         monkeypatch.setenv("PREMISE_KEY", "key")
-        write_minimal_database("ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030")
+        write_vintage(
+            "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030", 2030, pathway="SSP2-Base"
+        )
         with pytest.raises(ValueError, match="already exists"):
             ensure_scenario_databases({**SCENARIO, "years": [2030]})
+
+    def test_unfinished_earlier_build_is_recognised(self, fake_premise, monkeypatch):
+        # What a run that stopped at the metadata check leaves behind: premise
+        # wrote the database, but it carries no `representative_time`. Telling
+        # the user to delete it throws away hours of correct premise output.
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        write_minimal_database("ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030")
+        with pytest.raises(ValueError) as error:
+            ensure_scenario_databases({**SCENARIO, "years": [2030]})
+        message = str(error.value)
+        assert "did not finish" in message
+        assert "set_database_metadata" in message
+        assert "representative_time" in message
+
+    def test_the_documented_recovery_lets_the_build_be_resumed(
+        self, fake_premise, monkeypatch
+    ):
+        # The whole point of the message: adding the metadata by hand makes the
+        # next run reuse the stranded database instead of rebuilding it.
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        write_minimal_database("ecoinvent-3.10.1-cutoff")
+        write_minimal_database("ecoinvent-3.10.1-biosphere")
+
+        def premise_without_metadata(**kwargs):
+            for name in kwargs["names"]:
+                write_minimal_database(name)
+
+        monkeypatch.setattr(
+            "bw_timex.scenario_builder._run_premise",
+            premise_without_metadata,
+            raising=True,
+        )
+        with pytest.raises(RuntimeError, match="set_database_metadata"):
+            ensure_scenario_databases({**SCENARIO, "years": [2030]})
+
+        name = "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030"
+        set_database_metadata(name, representative_time=datetime(2030, 1, 1))
+        # Reuses the stranded database: the fake premise above is still in
+        # place, so a rebuild would raise the same RuntimeError again.
+        assert ensure_scenario_databases({**SCENARIO, "years": [2030]}) == {
+            name: datetime(2030, 1, 1)
+        }
 
     def test_nothing_is_built_when_a_name_collides(self, fake_premise, monkeypatch):
         monkeypatch.setenv("PREMISE_KEY", "key")

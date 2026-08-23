@@ -172,14 +172,41 @@ def vintage_name(filters: dict, year: int) -> str:
 def _check_no_collisions(
     names: dict[int, str], filters: dict, sectors: list[str] | None = None
 ) -> None:
-    """Refuse to build over a database that is not ours.
+    """Refuse to build over a database that this run did not write.
 
     `write_db_to_brightway` deletes and rewrites a database of the same name
-    without asking. A name that exists here belongs to someone else: a name
-    that matched the scenario would have satisfied its year already, and its
-    year would not be in the build list.
+    without asking. A name that exists here was not matched as a vintage: a
+    database that satisfied the scenario would have satisfied its year already,
+    and its year would not be in the build list.
+
+    Two kinds of collision, with opposite advice. A colliding database that
+    carries no `representative_time` is what an earlier run of this function
+    leaves behind when it stops at the metadata check below: premise wrote it,
+    so it is most likely a complete and correct database that is only missing
+    one metadata key, and deleting it throws away hours of premise. Anything
+    else declares a point in time and still did not match, so it belongs to
+    someone else.
     """
     wanted = {**filters, **({"sectors": sectors} if sectors else {})}
+    unfinished = {
+        year: name
+        for year, name in names.items()
+        if name in bd.databases and REPRESENTATIVE_TIME not in bd.databases[name]
+    }
+    if unfinished:
+        year, name = sorted(unfinished.items())[0]
+        raise ValueError(
+            f"Database(s) {sorted(unfinished.values())} already exist in this "
+            f"project under the name(s) this build would write, and carry no "
+            f"`{REPRESENTATIVE_TIME}` metadata. That is what an earlier build "
+            f"that did not finish leaves behind: premise wrote the database(s), "
+            f"but the run stopped before their metadata could be checked. "
+            f"Rather than rebuilding them (tens of minutes each), add the "
+            f"missing metadata, e.g. "
+            f"`bw_timex.set_database_metadata('{name}', "
+            f"representative_time=datetime({year}, 1, 1))`, and run this again. "
+            f"If they are not usable, delete them instead."
+        )
     colliding = [name for name in names.values() if name in bd.databases]
     if colliding:
         raise ValueError(
@@ -313,7 +340,11 @@ def ensure_scenario_databases(
                 f"premise wrote '{name}' without `{REPRESENTATIVE_TIME}` metadata, so "
                 f"`TimexLCA` cannot tell what point in time it represents. This "
                 f"metadata is written by premise >= 2.4.9.2; check your installed "
-                f"version, or set it yourself with `bw_timex.set_database_metadata`."
+                f"version. The database(s) premise just built are still in this "
+                f"project, so there is no need to build them again: add the missing "
+                f"metadata yourself with "
+                f"`bw_timex.set_database_metadata('{name}', "
+                f"representative_time=datetime({year}, 1, 1))` and run this again."
             )
         if sectors:
             # premise does not record which sectors were updated, and two runs of
