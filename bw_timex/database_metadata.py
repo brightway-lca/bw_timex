@@ -239,9 +239,10 @@ def _check_filter_keys(scenario: dict, candidates: dict[str, dict]) -> None:
         f"No database in this project declares the metadata key(s) "
         f"{unknown}. Keys declared by the databases of this project: {available}. "
         f"Add the metadata with `bw_timex.set_database_metadata`, check the "
-        f"spelling of your `scenario` filter, or pass `create_missing=True` "
-        f"(with a `years` list in the scenario) to build the databases with "
-        f"premise."
+        f"spelling of your `scenario` filter, or build the databases with "
+        f"premise - `bw_timex.ensure_scenario_databases(scenario)`, or "
+        f"`TimexLCA(..., create_missing=True)`, both with a `years` list in "
+        f"the scenario."
     )
 
 

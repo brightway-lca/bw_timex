@@ -31,7 +31,7 @@ from scipy import sparse
 from ._lci_cache import BACKGROUND_UNIT_LCI_CACHE, LCI_SOLVE_CACHE, NODES_CACHE
 FACTORIZE_SOLVES_THRESHOLD = 8
 
-from .database_metadata import resolve_database_dates_from_metadata
+from .database_metadata import resolve_database_dates_from_metadata, split_scenario
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import InterDatabaseMapping, LazyActivity, TimeMappingDict
 from .matrix_modifier import MatrixModifier
@@ -172,9 +172,11 @@ class TimexLCA:
         create_missing : bool, optional
                 If True, background databases the `scenario` names but that this
                 project does not hold yet are built with `premise`, and ecoinvent
-                is imported first if it is missing. The `scenario` then also needs
-                a `years` list (and may narrow `sectors` or name a
-                `source_database`). Needs the optional dependency:
+                is imported first if it is missing. The `scenario` then has to
+                describe the build completely: a `years` list plus all four of
+                `iam_model`, `pathway`, `system_model` and `ecoinvent_version`
+                (it may also narrow `sectors` or name a `source_database`).
+                Needs the optional dependency:
                 `pip install "bw_timex[premise]"`. Building takes tens of minutes
                 and roughly 2-4 GB per year. Default is False, which raises
                 instead of building. Cannot be combined with `database_dates`.
@@ -351,24 +353,30 @@ class TimexLCA:
 
         resolved = resolve_database_dates_from_metadata(scenario)
 
-        filter_matched = scenario and any(
-            key in bd.databases[name] for name in resolved for key in scenario
+        # Only the filter keys are matched against metadata; the build keys
+        # (`years`, `sectors`, ...) describe what to build and are never
+        # declared by any database, so reporting them as unmatched metadata
+        # would send the user looking for a key that cannot exist.
+        filters, _ = split_scenario(scenario)
+
+        filter_matched = filters and any(
+            key in bd.databases[name] for name in resolved for key in filters
         )
 
-        if scenario and not filter_matched:
+        if filters and not filter_matched:
             declared = {}
             for name in bd.databases:
                 metadata = bd.databases[name]
-                for key in scenario:
+                for key in filters:
                     if key in metadata:
                         declared.setdefault(key, set()).add(str(metadata[key]))
             details = "; ".join(
                 f"'{key}': "
                 f"{sorted(declared[key]) if key in declared else 'not declared by any database'}"
-                for key in scenario
+                for key in filters
             )
             raise ValueError(
-                f"scenario={scenario!r} matched no database in this project. "
+                f"scenario={filters!r} matched no database in this project. "
                 f"Values actually declared for its key(s) by this project's "
                 f"databases: {details}. Check for a typo in the filter, or pass "
                 f"`create_missing=True` (with a `years` list in the scenario) to "

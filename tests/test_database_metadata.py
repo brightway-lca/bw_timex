@@ -517,3 +517,28 @@ class TestResolverIgnoresBuildKeys:
             {"pathway": "SSP2-PkBudg500", "years": [2022], "sectors": ["electricity"]}
         )
         assert resolved == {"db_2022": datetime(2022, 1, 1)}
+
+    def test_build_keys_are_not_reported_as_undeclared(self):
+        # A scenario that keeps its `years` but is used without
+        # `create_missing` must not be told that `years` is missing metadata:
+        # no database ever declares it.
+        set_database_metadata("foreground", representative_time="dynamic")
+        set_database_metadata(
+            "db_2022",
+            representative_time=datetime(2022, 1, 1),
+            pathway="SSP2-Base",
+        )
+        fu = bd.get_node(database="foreground", code="A")
+        with pytest.raises(ValueError) as excinfo:
+            TimexLCA(
+                demand={fu.key: 1},
+                method=("GWP", "example"),
+                scenario={"pathway": "SSP2-PkBudg500", "years": [2022]},
+            )
+        message = str(excinfo.value)
+        assert "pathway" in message
+        assert "SSP2-Base" in message
+        # `years` is a build key, never a metadata key: it must not appear as
+        # one of the filter keys that matched nothing. (The message may still
+        # suggest `create_missing=True` with a `years` list.)
+        assert "'years'" not in message
