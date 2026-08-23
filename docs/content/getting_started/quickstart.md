@@ -84,6 +84,19 @@ print(tlca.dynamic_score)
 tlca.plot_dynamic_characterized_inventory()
 ```
 
+Steps 5-7 in one call, when you want to run the same calculation repeatedly
+(see [Repeated Runs & Scenario Comparison](scenarios.md)):
+
+```python
+from bw_timex import TimexLCASettings
+
+settings = TimexLCASettings(demand={("foreground", "A"): 1}, method=("our", "method"))
+tlca = TimexLCA.from_settings(settings).run()
+
+tlca.run(time_horizon=20)                       # re-run, one knob changed
+TimexLCA.compare([settings, other_settings])    # many runs into one table
+```
+
 ---
 
 ## Temporal Information Cheat Sheet
@@ -220,6 +233,22 @@ Result is stored in `tlca.timeline` (a DataFrame with `date_producer`, `producer
 | `fixed_time_horizon` | `False` | `True` = Levasseur approach (horizon from the functional unit), `False` = conventional (horizon from each emission) |
 | `time_horizon_start` | `None` | Start of the fixed time horizon, defaults to now |
 | `characterization_functions` | `None` | `{biosphere_flow_id: function}`. Not needed for ecoinvent / `biosphere3`, where flows are mapped automatically |
+
+### `run()` and `compare()`
+
+See [Repeated Runs & Scenario Comparison](scenarios.md).
+
+| Call | Description |
+|---|---|
+| `TimexLCA.from_settings(settings)` | Build the object from a `TimexLCASettings` |
+| `tlca.run()` | The four steps above, in order, with that object's settings |
+| `tlca.run(**overrides)` | The same, with settings overridden for this call only. Refuses a changed `scenario` / `database_dates` |
+| `TimexLCA.compare([settings, ...])` | Run several, into `ComparisonResult.summary` |
+
+`TimexLCASettings` takes every argument listed above - `demand`, `method`,
+`database_dates`, `scenario`, plus all of `build_timeline()`, `lci()` and
+`dynamic_lcia()` - and a `label` naming its row in a comparison. Enable or skip
+the LCIA steps with `static_lcia_enabled` / `dynamic_lcia_enabled`.
 
 ---
 

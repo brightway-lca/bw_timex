@@ -97,3 +97,5 @@ tlca.plot_dynamic_characterized_inventory()
 <br />
 
 For most of the functions we used here, there are numerous optional arguments and settings you can tweak. We explore some of them in our other [Examples](../examples/index.md), but when in doubt check out our [docstrings](../../api/index.md), which provide information also for the more advanced settings - so please browse through them as needed ☀️
+
+That's the whole calculation, one step at a time. If you now want to run it repeatedly - other years, other time horizons, other IAM scenarios - see [Repeated Runs & Scenario Comparison](scenarios.md), which wraps these same four steps in a single call.

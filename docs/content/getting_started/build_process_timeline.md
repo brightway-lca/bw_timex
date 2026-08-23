@@ -36,8 +36,10 @@ tlca = TimexLCA(
 ```
 
 Any metadata key filters (`iam_model`, `pathway`, `system_model`, ...), and databases
-that don't carry it - your foreground, your own vintages - are kept. Comparing scenarios
-is the same script in a loop over filters.
+that don't carry it - your foreground, your own vintages - are kept. To compare several
+scenarios, hand them all to
+[`TimexLCA.compare()`](scenarios.md#comparing-scenarios), which runs them into one
+table.
 
 !!! tip "Mapping the databases by hand"
 

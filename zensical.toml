@@ -29,6 +29,7 @@ nav = [
       { "Step 3 - Calculating the time-explicit LCI" = "content/getting_started/time_explicit_lci.md" },
       { "Step 4 - Impact assessment" = "content/getting_started/lcia.md" },
     ]},
+    { "Repeated Runs & Scenario Comparison" = "content/getting_started/scenarios.md" },
     { "What LCA should I do?" = "content/decisiontree.md" },
   ]},
   { Theory = "content/theory.md" },
