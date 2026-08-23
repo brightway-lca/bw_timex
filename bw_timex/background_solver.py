@@ -119,6 +119,28 @@ class BackgroundSolver:
         self._block_solvers: dict = {}
         self.factorized_blocks: set = set()
         self._block_submatrices: dict = {}
+        self._block_biosphere_submatrices: dict = {}
+
+        # Translated results, memoized per instance. The caches above hold
+        # node-id-keyed payloads so they can be shared between solvers; every
+        # read of one has to scatter it back into *this* solver's index space,
+        # which is a `searchsorted` plus a dense allocation. Building from the
+        # timeline asks for the same background activity once per row that
+        # consumes it, so that scatter ran far more often than the solve it
+        # was caching. These memos hold the scattered arrays, sized to this
+        # solver, and die with it.
+        #
+        # Aggregates are memoized on first sight - they are small (one value
+        # per biosphere flow) and the matrix build re-reads them constantly.
+        # Supply columns are not: they are an order of magnitude larger, and
+        # the build asks for each exactly once, through `unit_aggregate`'s
+        # miss path. Keeping those would be pure memory cost on the path that
+        # runs out of it first. `_seen_supply` defers the memo to the second
+        # request, which is where the re-reads actually live
+        # (`TimexLCA.temporal_market_lcis` and the disaggregation behind it).
+        self._translated_supply: dict = {}
+        self._translated_aggregate: dict = {}
+        self._seen_supply: set = set()
 
         # Lazily built, cached once per instance.
         self._column_node_ids_cache: Optional[np.ndarray] = None
@@ -222,28 +244,40 @@ class BackgroundSolver:
         return int(self._row_block_index[row])
 
     def unit_supply(self, activity_id) -> UnitSupply:
-        """Unit supply column for `activity_id`, from cache or a fresh solve."""
+        """Unit supply column for `activity_id`, from cache or a fresh solve.
+
+        `values` is a fresh array on every call - callers are free to write
+        into it without disturbing the memo behind it.
+        """
         cache_key = self.cache_key(activity_id)
-        cache = self._select_cache(cache_key, self.shared_cache, self._instance_supply_cache)
         block_index = self.block_index_for(activity_id)
+
+        memoized = self._translated_supply.get(cache_key)
+        if memoized is not None:
+            return UnitSupply(block_index=block_index, values=memoized.copy())
+
+        cache = self._select_cache(cache_key, self.shared_cache, self._instance_supply_cache)
         block = self.structure.blocks[block_index]
 
         if cache_key in cache:
             sorted_ids, order = self._sorted_column_ids(block_index)
             values = self._translate(cache[cache_key], sorted_ids, order, len(block.columns))
-            return UnitSupply(block_index=block_index, values=values)
+        else:
+            row = self.product_dict[activity_id]
+            local_row = np.searchsorted(block.rows, row)
+            rhs = np.zeros(len(block.rows))
+            rhs[local_row] = 1.0
+            values = self.solve_block(block_index, rhs)
 
-        row = self.product_dict[activity_id]
-        local_row = np.searchsorted(block.rows, row)
-        rhs = np.zeros(len(block.rows))
-        rhs[local_row] = 1.0
-        values = self.solve_block(block_index, rhs)
+            nonzero = np.flatnonzero(values)
+            column_ids = self._column_node_ids()[block.columns[nonzero]]
+            cache[cache_key] = (column_ids, values[nonzero].copy())
 
-        nonzero = np.flatnonzero(values)
-        column_ids = self._column_node_ids()[block.columns[nonzero]]
-        cache[cache_key] = (column_ids, values[nonzero].copy())
-
-        return UnitSupply(block_index=block_index, values=values)
+        if cache_key in self._seen_supply:
+            self._translated_supply[cache_key] = values
+        else:
+            self._seen_supply.add(cache_key)
+        return UnitSupply(block_index=block_index, values=values.copy())
 
     def unit_aggregate(self, activity_id) -> np.ndarray:
         """Unit LCI aggregated over biosphere rows: `B[:, cols] @ x`.
@@ -251,30 +285,35 @@ class BackgroundSolver:
         Dense, over *all* biosphere rows (not block-scoped, unlike
         `unit_supply`) - a background LCI touches a small fraction of a
         large biosphere, but which fraction depends on the activity, not
-        the block.
+        the block. A fresh array on every call, so callers may write into it.
         """
         cache_key = self.cache_key(activity_id)
+
+        memoized = self._translated_aggregate.get(cache_key)
+        if memoized is not None:
+            return memoized.copy()
+
         cache = self._select_cache(
             cache_key, self.shared_aggregate_cache, self._instance_aggregate_cache
         )
 
         if cache_key in cache:
             sorted_ids, order = self._sorted_biosphere_ids()
-            return self._translate(
+            aggregate = self._translate(
                 cache[cache_key], sorted_ids, order, self.biosphere_matrix.shape[0]
             )
+        else:
+            supply = self.unit_supply(activity_id)
+            aggregate = np.asarray(
+                self._biosphere_submatrix(supply.block_index) @ supply.values
+            ).ravel()
 
-        supply = self.unit_supply(activity_id)
-        block = self.structure.blocks[supply.block_index]
-        aggregate = np.asarray(
-            self.biosphere_matrix[:, block.columns] @ supply.values
-        ).ravel()
+            nonzero = np.flatnonzero(aggregate)
+            bio_ids = self._biosphere_node_ids()[nonzero]
+            cache[cache_key] = (bio_ids, aggregate[nonzero].copy())
 
-        nonzero = np.flatnonzero(aggregate)
-        bio_ids = self._biosphere_node_ids()[nonzero]
-        cache[cache_key] = (bio_ids, aggregate[nonzero].copy())
-
-        return aggregate
+        self._translated_aggregate[cache_key] = aggregate
+        return aggregate.copy()
 
     def solve_block(self, block_index: int, rhs: np.ndarray) -> np.ndarray:
         """Solve `A[block.rows][:, block.columns] x = rhs` for one block.
@@ -283,6 +322,13 @@ class BackgroundSolver:
         else a one-off `spsolve`. Every call is a real linear solve and
         increments `n_solves` - caching happens one level up, in
         `unit_supply`/`unit_aggregate`.
+
+        One right-hand side at a time, and not for want of trying: bundling
+        `k` of them into a single `(n_rows, k)` solve is not available here,
+        because with `scikit-umfpack` installed `scipy`'s `factorized`
+        returns a UMFPACK solver that rejects a 2-D right-hand side, and
+        falling back to SuperLU to get one costs more than the bundling
+        saves.
         """
         solve = self._block_solvers.get(block_index)
         if solve is not None:
@@ -340,6 +386,20 @@ class BackgroundSolver:
                 block.rows
             ][:, block.columns].tocsc()
         return self._block_submatrices[block_index]
+
+    def _biosphere_submatrix(self, block_index: int):
+        """`B[:, block.columns]`, memoized per block.
+
+        Rebuilding this slice per background activity is an O(nnz) walk of
+        the biosphere matrix on every unit LCI; a block is sliced once and
+        then reused by every activity that lands in it.
+        """
+        if block_index not in self._block_biosphere_submatrices:
+            block = self.structure.blocks[block_index]
+            self._block_biosphere_submatrices[block_index] = self.biosphere_matrix[
+                :, block.columns
+            ].tocsr()
+        return self._block_biosphere_submatrices[block_index]
 
     def _factorize_block(self, block_index: int) -> None:
         if block_index in self.factorized_blocks:

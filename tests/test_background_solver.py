@@ -297,3 +297,141 @@ class TestPrepareWithSeveralPendingSolvesInOneBlock:
         # Both solves went through the cached-LU branch of `solve_block`,
         # not a fresh ad-hoc `spsolve` - still one real solve each.
         assert solver.n_solves == 2
+
+
+@pytest.mark.usefixtures("dynamic_biosphere_matrix_db")
+class TestBiosphereSubmatrixIsMemoized:
+
+    def test_the_slice_is_taken_once_per_block(self):
+        # Regression guard: `B[:, block.columns]` used to be rebuilt inside
+        # every `unit_aggregate` call, an O(nnz) walk of the biosphere matrix
+        # per background activity.
+        _, _, solver = _setup()
+        background = bd.get_node(database="db_2020", code="C")
+        block_index = solver.block_index_for(background.id)
+
+        first = solver._biosphere_submatrix(block_index)
+        second = solver._biosphere_submatrix(block_index)
+
+        assert first is second
+
+
+@pytest.mark.usefixtures("dynamic_biosphere_matrix_db")
+class TestTranslatedResultsAreMemoized:
+    """A cache *hit* still had to scatter the node-id-keyed payload back into
+    this solver's index space - a `searchsorted` plus a dense allocation, on
+    every call. `lci(expand_technosphere=False)` asks for the same background
+    activity once per timeline row that consumes it, so that translation ran
+    far more often than the solve it was caching.
+    """
+
+    def test_repeated_aggregate_calls_translate_once(self, monkeypatch):
+        _, _, solver = _setup()
+        background = bd.get_node(database="db_2020", code="C")
+        solver.unit_aggregate(background.id)
+
+        translations = []
+        original = BackgroundSolver._translate
+
+        def counting_translate(*args):
+            translations.append(1)
+            return original(*args)
+
+        monkeypatch.setattr(
+            BackgroundSolver, "_translate", staticmethod(counting_translate)
+        )
+        first = solver.unit_aggregate(background.id)
+        second = solver.unit_aggregate(background.id)
+
+        assert translations == []
+        assert np.array_equal(first, second)
+
+    def test_supply_is_not_memoized_until_asked_for_twice(self):
+        # The matrix build asks for each supply column exactly once, through
+        # `unit_aggregate`'s miss path. Memoizing it there would be pure
+        # memory cost on a path that is already memory-bound at premise
+        # scale, so the dense column is only kept once something comes back
+        # for it - which is what `temporal_market_lcis` does.
+        _, _, solver = _setup()
+        background = bd.get_node(database="db_2020", code="C")
+
+        solver.unit_supply(background.id)
+        assert solver._translated_supply == {}
+
+        solver.unit_supply(background.id)
+        assert list(solver._translated_supply) == [solver.cache_key(background.id)]
+
+    def test_repeated_supply_calls_translate_once(self, monkeypatch):
+        _, _, solver = _setup()
+        background = bd.get_node(database="db_2020", code="C")
+        # Two calls: the first solves, the second is what installs the memo.
+        solver.unit_supply(background.id)
+        solver.unit_supply(background.id)
+
+        translations = []
+        original = BackgroundSolver._translate
+
+        def counting_translate(*args):
+            translations.append(1)
+            return original(*args)
+
+        monkeypatch.setattr(
+            BackgroundSolver, "_translate", staticmethod(counting_translate)
+        )
+        first = solver.unit_supply(background.id)
+        second = solver.unit_supply(background.id)
+
+        assert translations == []
+        assert np.array_equal(first.values, second.values)
+
+    def test_a_mutated_aggregate_does_not_corrupt_the_memo(self):
+        # Every call used to hand back a freshly scattered array, so callers
+        # were free to write into it. Memoizing must not quietly take that away.
+        _, _, solver = _setup()
+        background = bd.get_node(database="db_2020", code="C")
+
+        expected = solver.unit_aggregate(background.id).copy()
+        solver.unit_aggregate(background.id)[:] = 999.0
+
+        assert np.array_equal(solver.unit_aggregate(background.id), expected)
+
+    def test_a_mutated_supply_does_not_corrupt_the_memo(self):
+        _, _, solver = _setup()
+        background = bd.get_node(database="db_2020", code="C")
+
+        expected = solver.unit_supply(background.id).values.copy()
+        solver.unit_supply(background.id).values[:] = 999.0
+
+        assert np.array_equal(solver.unit_supply(background.id).values, expected)
+
+    def test_memoized_aggregate_still_matches_a_direct_solve(self):
+        lca, structure, solver = _setup()
+        background = bd.get_node(database="db_2020", code="C")
+
+        expected = lca.biosphere_matrix @ _full_supply(
+            structure, solver.unit_supply(background.id)
+        )
+        for _ in range(3):
+            assert np.allclose(solver.unit_aggregate(background.id), expected)
+
+    def test_a_second_solver_memoizes_independently(self):
+        # The memo is per instance and per index space; a solver sharing the
+        # payload cache must scatter it into its *own* columns, not reuse a
+        # translation made for another solver's index space.
+        shared_supply, shared_aggregate = {}, {}
+        _, structure, first = _setup()
+        first.shared_cache = shared_supply
+        first.shared_aggregate_cache = shared_aggregate
+        first.cache_key = lambda act: ("db_code", act)
+        background = bd.get_node(database="db_2020", code="C")
+        expected = _full_supply(structure, first.unit_supply(background.id))
+
+        _, second_structure, second = _setup()
+        second.shared_cache = shared_supply
+        second.shared_aggregate_cache = shared_aggregate
+        second.cache_key = lambda act: ("db_code", act)
+
+        assert second.n_solves == 0
+        assert np.allclose(
+            _full_supply(second_structure, second.unit_supply(background.id)), expected
+        )
