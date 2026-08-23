@@ -215,3 +215,19 @@ tags:
         ```bash
         conda install -c conda-forge jupyterlab
         ```
+
+## Building background databases automatically
+
+`TimexLCA` can build the prospective background databases a scenario names, using
+[premise](https://github.com/polca/premise). That needs the optional extra:
+
+```bash
+pip install "bw_timex[premise]"
+```
+
+and credentials, which `bw_timex` reads from the environment unless you pass them:
+
+| variable | needed for |
+|---|---|
+| `PREMISE_KEY` | decrypting premise's bundled IAM scenarios |
+| `ECOINVENT_USERNAME`, `ECOINVENT_PASSWORD` | importing ecoinvent, if the project has none yet |

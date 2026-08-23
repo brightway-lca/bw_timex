@@ -152,6 +152,32 @@ metadata (written by premise >= 2.4.9.2, or by you with `set_database_metadata`)
 `database_dates` is the fallback for when you'd rather write the mapping out yourself,
 and it overrides the metadata entirely.
 
+If the project does not hold the scenario's databases yet, `bw_timex` can build them
+with premise instead of raising. Add the years to the scenario and pass
+`create_missing=True`:
+
+```python
+tlca = TimexLCA(
+    demand={("foreground", "ev"): 1},
+    method=("EF v3.1", "climate change", "global warming potential (GWP100)"),
+    scenario={
+        "iam_model": "remind",
+        "pathway": "SSP2-PkBudg500",
+        "system_model": "cutoff",
+        "ecoinvent_version": "3.10.1",
+        "years": [2020, 2030, 2040],
+    },
+    create_missing=True,
+)
+```
+
+Only missing years are built, so running this again builds nothing. ecoinvent is
+imported first if the project has none. Each vintage is a full copy of ecoinvent:
+expect tens of minutes and roughly 2-4 GB per year. Two optional scenario keys tune
+the build: `sectors` narrows what premise updates (all sectors by default), and
+`source_database` names the ecoinvent to build from, if it is not the one
+`import_ecoinvent_release` writes.
+
 ### `build_timeline()`
 
 | Argument | Default | Description |
