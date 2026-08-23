@@ -125,6 +125,9 @@ class TimexLCA:
         method: tuple,
         database_dates: dict = None,
         scenario: dict = None,
+        create_missing: bool = False,
+        premise_key: str = None,
+        ecoinvent_credentials: tuple = None,
         use_global_lci_cache: bool = True,
     ) -> None:
         """
@@ -166,6 +169,22 @@ class TimexLCA:
                 raises and lists them otherwise. Databases that don't declare the
                 filtered key (your foreground, a hand-built vintage) are always
                 kept. Cannot be combined with `database_dates`.
+        create_missing : bool, optional
+                If True, background databases the `scenario` names but that this
+                project does not hold yet are built with `premise`, and ecoinvent
+                is imported first if it is missing. The `scenario` then also needs
+                a `years` list (and may narrow `sectors` or name a
+                `source_database`). Needs the optional dependency:
+                `pip install "bw_timex[premise]"`. Building takes tens of minutes
+                and roughly 2-4 GB per year. Default is False, which raises
+                instead of building. Cannot be combined with `database_dates`.
+        premise_key : str, optional
+                premise decryption key, used only when building. Falls back to the
+                environment variable `PREMISE_KEY`.
+        ecoinvent_credentials : tuple, optional
+                `(username, password)`, used only when ecoinvent itself has to be
+                imported. Falls back to the environment variables
+                `ECOINVENT_USERNAME` and `ECOINVENT_PASSWORD`.
         use_global_lci_cache : bool, optional
                 If True (default), background unit LCI matrices are cached at
                 module level and reused across `TimexLCA` objects within the
@@ -183,15 +202,28 @@ class TimexLCA:
         self.demand = demand
         self.method = method
         self.scenario = scenario
-        self.database_dates = self._resolve_database_dates(
-            demand=demand, database_dates=database_dates, scenario=scenario
-        )
 
         TimexLCAInputs(
-            demand=self.demand,
-            method=self.method,
-            database_dates=self.database_dates,
-            scenario=self.scenario,
+            demand=demand,
+            method=method,
+            database_dates=database_dates,
+            scenario=scenario,
+            create_missing=create_missing,
+            premise_key=premise_key,
+            ecoinvent_credentials=ecoinvent_credentials,
+        )
+
+        if create_missing:
+            from .scenario_builder import ensure_scenario_databases
+
+            ensure_scenario_databases(
+                scenario,
+                premise_key=premise_key,
+                ecoinvent_credentials=ecoinvent_credentials,
+            )
+
+        self.database_dates = self._resolve_database_dates(
+            demand=demand, database_dates=database_dates, scenario=scenario
         )
 
         # Filled in by `prepare_base_lca_inputs`: the databases the base LCA
@@ -323,7 +355,9 @@ class TimexLCA:
             raise ValueError(
                 f"scenario={scenario!r} matched no database in this project. "
                 f"Values actually declared for its key(s) by this project's "
-                f"databases: {details}. Check for a typo in the filter."
+                f"databases: {details}. Check for a typo in the filter, or pass "
+                f"`create_missing=True` (with a `years` list in the scenario) to "
+                f"build the databases with premise."
             )
         elif not resolved:
             logger.info(

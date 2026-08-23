@@ -19,6 +19,9 @@ class TimexLCAInputs(BaseModel):
     method: tuple
     database_dates: Optional[dict] = None
     scenario: Optional[dict] = None
+    create_missing: bool = False
+    premise_key: Optional[str] = None
+    ecoinvent_credentials: Optional[tuple] = None
 
     @field_validator("demand")
     @classmethod
@@ -109,6 +112,29 @@ class TimexLCAInputs(BaseModel):
                     f"(via `database_dates` or its `representative_time` metadata). "
                     f"Please check."
                 )
+        return self
+
+    @model_validator(mode="after")
+    def validate_create_missing(self) -> "TimexLCAInputs":
+        if not self.create_missing:
+            return self
+        if self.database_dates is not None:
+            raise ValueError(
+                "`create_missing` builds the background databases a `scenario` "
+                "describes, and only applies when `database_dates` is not given. "
+                "Pass one or the other."
+            )
+        if self.scenario is None:
+            raise ValueError(
+                "`create_missing=True` needs a `scenario` describing what to build, "
+                "e.g. scenario={'iam_model': 'remind', 'pathway': 'SSP2-PkBudg500', "
+                "'system_model': 'cutoff', 'ecoinvent_version': '3.10.1', "
+                "'years': [2030, 2040]}."
+            )
+        if self.ecoinvent_credentials is not None and len(self.ecoinvent_credentials) != 2:
+            raise ValueError(
+                "`ecoinvent_credentials` must be a (username, password) tuple."
+            )
         return self
 
 

@@ -355,3 +355,77 @@ class TestPremiseNotInstalled:
         monkeypatch.setitem(sys.modules, "premise", None)  # forces ImportError
         with pytest.raises(ImportError, match=r'bw_timex\[premise\]'):
             scenario_builder.ensure_scenario_databases({**SCENARIO, "years": [2030]})
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestTimexLCAIntegration:
+
+    @pytest.fixture(autouse=True)
+    def _ecoinvent_present(self, temporal_grouping_db_monthly, monkeypatch):
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        write_minimal_database("ecoinvent-3.10.1-cutoff")
+        write_minimal_database("ecoinvent-3.10.1-biosphere")
+
+    def test_public_export(self):
+        import bw_timex
+
+        assert bw_timex.ensure_scenario_databases is ensure_scenario_databases
+
+    def test_create_missing_builds_and_resolves(self, fake_premise):
+        from bw_timex import TimexLCA
+
+        tlca = TimexLCA(
+            demand={("foreground", "A"): 1},
+            method=("GWP", "example"),
+            scenario={**SCENARIO, "years": [2030]},
+            create_missing=True,
+        )
+        assert (
+            tlca.database_dates["ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030"]
+            == datetime(2030, 1, 1)
+        )
+        assert tlca.database_dates["foreground"] == "dynamic"
+
+    def test_default_does_not_build(self, fake_premise):
+        from bw_timex import TimexLCA
+
+        with pytest.raises(ValueError):
+            TimexLCA(
+                demand={("foreground", "A"): 1},
+                method=("GWP", "example"),
+                scenario={**SCENARIO, "years": [2030]},
+            )
+        assert fake_premise == []
+
+    def test_error_without_create_missing_mentions_it(self, fake_premise):
+        from bw_timex import TimexLCA
+
+        with pytest.raises(ValueError, match="create_missing"):
+            TimexLCA(
+                demand={("foreground", "A"): 1},
+                method=("GWP", "example"),
+                scenario={**SCENARIO, "years": [2030]},
+            )
+
+    def test_create_missing_with_database_dates_raises(self, fake_premise):
+        from bw_timex import TimexLCA
+
+        with pytest.raises(ValueError, match="database_dates"):
+            TimexLCA(
+                demand={("foreground", "A"): 1},
+                method=("GWP", "example"),
+                database_dates={"foreground": "dynamic"},
+                create_missing=True,
+            )
+        assert fake_premise == []
+
+    def test_create_missing_without_scenario_raises(self, fake_premise):
+        from bw_timex import TimexLCA
+
+        with pytest.raises(ValueError, match="scenario"):
+            TimexLCA(
+                demand={("foreground", "A"): 1},
+                method=("GWP", "example"),
+                create_missing=True,
+            )
+        assert fake_premise == []
