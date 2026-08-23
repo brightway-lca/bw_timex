@@ -274,10 +274,62 @@ class TimexLCA:
 
         logger.info("TimexLCA initialized.")
 
+    def _reset_run_state(self) -> None:
+        """Reset instance state for a fresh run, preserving base_lca.
+
+        Clears timeline, LCI results, and LCIA results to allow calling run()
+        multiple times with different settings on the same instance.
+        Reuses the expensive base_lca calculation across runs.
+        """
+        # Clear timeline and related state
+        if hasattr(self, "timeline"):
+            del self.timeline
+        self._last_timeline_build_key = None
+        self._cached_timeline = None
+
+        # Clear LCI results
+        if hasattr(self, "lca"):
+            del self.lca
+        if hasattr(self, "fu"):
+            del self.fu
+        if hasattr(self, "data_objs"):
+            del self.data_objs
+        if hasattr(self, "remapping"):
+            del self.remapping
+        if hasattr(self, "dynamic_inventory"):
+            del self.dynamic_inventory
+        if hasattr(self, "dynamic_inventory_df"):
+            del self.dynamic_inventory_df
+        if hasattr(self, "dynamic_inventory_disaggregated"):
+            del self.dynamic_inventory_disaggregated
+        if hasattr(self, "dynamic_inventory_disaggregated_df"):
+            del self.dynamic_inventory_disaggregated_df
+        if hasattr(self, "datapackage"):
+            del self.datapackage
+
+        # Clear LCIA results
+        self._dynamic_lcia_inventory_cache = {}
+        if hasattr(self, "characterized_inventory"):
+            del self.characterized_inventory
+        if hasattr(self, "current_metric"):
+            del self.current_metric
+        if hasattr(self, "current_time_horizon"):
+            del self.current_time_horizon
+        self._static_score_from_timeline = None
+
+        # Reset LCI computation flags
+        self._lci_used_cached_solve = False
+        self._lci_did_factorize = False
+        self._lci_pending_solves = 0
+
     def run(self, settings: TimexLCASettings) -> "TimexLCA":
         """Execute full TimexLCA pipeline using provided settings.
 
         Runs: build_timeline() → lci() → static_lcia() → dynamic_lcia() (optional).
+
+        Can be called multiple times with different settings on the same instance.
+        Each call resets timeline and LCIA results while preserving the base LCA
+        calculation, making parameter sweeps efficient.
 
         Parameters
         ----------
@@ -292,24 +344,30 @@ class TimexLCA:
         Examples
         --------
         ```python
+        # Single run
         settings = TimexLCASettings(
             demand=demand,
             method=method,
             database_dates=database_dates,
             starting_datetime="2024-01-01",
-            dynamic_lcia_enabled=True,
         )
         tlca = TimexLCA(
             demand=settings.demand,
             method=settings.method,
             database_dates=settings.database_dates,
-            use_global_lci_cache=settings.use_global_lci_cache,
         )
         tlca.run(settings)
-        print(tlca.static_score, tlca.dynamic_score)
+        print(f"2024 score: {tlca.static_score}")
+
+        # Multiple runs with different settings (reuses base_lca)
+        for year in [2024, 2025, 2026]:
+            settings.starting_datetime = f"{year}-01-01"
+            tlca.run(settings)
+            print(f"{year} score: {tlca.static_score}")
         ```
         """
         logger.info("Starting TimexLCA.run() pipeline...")
+        self._reset_run_state()
 
         # Build timeline
         logger.info("Step 1/4: Building timeline...")

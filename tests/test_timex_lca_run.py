@@ -131,3 +131,74 @@ class TestTimexLCASettings:
 
         assert tlca.expanded_technosphere is True
         assert hasattr(tlca, "datapackage")
+
+    def test_run_multiple_times_with_different_settings(self):
+        tlca = TimexLCA(
+            demand={self.fu.key: 1},
+            method=self.method,
+            database_dates=self.database_dates,
+        )
+
+        # First run
+        settings1 = TimexLCASettings(
+            demand={self.fu.key: 1},
+            method=self.method,
+            database_dates=self.database_dates,
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+            temporal_grouping="year",
+            dynamic_lcia_enabled=False,
+        )
+        tlca.run(settings1)
+        score1 = tlca.static_score
+        assert isinstance(score1, float)
+
+        # Second run with different starting_datetime
+        settings2 = TimexLCASettings(
+            demand={self.fu.key: 1},
+            method=self.method,
+            database_dates=self.database_dates,
+            starting_datetime=datetime.strptime("2023-01-02", "%Y-%m-%d"),
+            temporal_grouping="year",
+            dynamic_lcia_enabled=False,
+        )
+        tlca.run(settings2)
+        score2 = tlca.static_score
+        assert isinstance(score2, float)
+        # Different starting datetime should produce different results
+        assert score1 != score2
+
+        # Third run back to first settings
+        settings3 = TimexLCASettings(
+            demand={self.fu.key: 1},
+            method=self.method,
+            database_dates=self.database_dates,
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+            temporal_grouping="year",
+            dynamic_lcia_enabled=False,
+        )
+        tlca.run(settings3)
+        score3 = tlca.static_score
+        # Should match first run (same settings)
+        assert score3 == score1
+
+    def test_run_multiple_times_reuses_base_lca(self):
+        tlca = TimexLCA(
+            demand={self.fu.key: 1},
+            method=self.method,
+            database_dates=self.database_dates,
+        )
+        base_lca_id = id(tlca.base_lca)
+
+        settings = TimexLCASettings(
+            demand={self.fu.key: 1},
+            method=self.method,
+            database_dates=self.database_dates,
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+            dynamic_lcia_enabled=False,
+        )
+
+        # Run multiple times
+        for _ in range(3):
+            tlca.run(settings)
+            # base_lca should be the same object (not recreated)
+            assert id(tlca.base_lca) == base_lca_id
