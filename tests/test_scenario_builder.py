@@ -414,6 +414,13 @@ class TestBuilding:
             )
         assert len(fake_premise) == 1
 
+    def test_duplicate_years_are_built_once(self, fake_premise):
+        ensure_scenario_databases({**SCENARIO, "years": [2060, 2060]})
+        assert fake_premise[0]["names"] == [
+            "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2060"
+        ]
+        assert [s["year"] for s in fake_premise[0]["scenarios"]] == [2060]
+
     def test_built_and_existing_vintages_are_returned(self, fake_premise):
         write_vintage("ei_2030", 2030)
         result = ensure_scenario_databases({**SCENARIO, "years": [2030, 2040]})

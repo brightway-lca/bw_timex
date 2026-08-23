@@ -258,7 +258,9 @@ def ensure_scenario_databases(
     """
     ScenarioBuildInputs(scenario=scenario)
     filters, build = split_scenario(scenario)
-    years = build["years"]
+    # The same year twice would hand premise the same target name twice, and it
+    # would build and write it twice.
+    years = list(dict.fromkeys(build["years"]))
     sectors = build.get("sectors")
 
     existing = find_existing_vintages(filters, sectors)
