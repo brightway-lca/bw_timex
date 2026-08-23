@@ -12,7 +12,7 @@ from .errors import UnmappedDatabaseError
 from .helper_classes import SetList
 from .matrix_modifier import MatrixModifier
 from .timeline_builder import TimelineBuilder
-from .timex_lca import TimexLCA
+from .timex_lca import ComparisonResult, TimexLCA, TimexLCASettings
 from .utils import (
     add_flows_to_characterization_functions,
     add_temporal_distribution_to_exchange,
@@ -32,6 +32,8 @@ __all__ = [
     "easy_timedelta_distribution",
     # core classes
     "TimexLCA",
+    "TimexLCASettings",
+    "ComparisonResult",
     "TimelineBuilder",
     "MatrixModifier",
     "DynamicBiosphereBuilder",

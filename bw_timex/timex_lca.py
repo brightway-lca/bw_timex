@@ -1,6 +1,8 @@
 from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from functools import partial
+from time import perf_counter
 from typing import Callable, Optional
 
 import bw2data as bd
@@ -49,6 +51,98 @@ from .validation import (
     PlotDynamicInventoryInputs,
     TimexLCAInputs,
 )
+
+
+@dataclass
+class TimexLCASettings:
+    """Everything needed to run one time-explicit LCA calculation.
+
+    One `TimexLCASettings` fully describes a calculation, so it doubles as the
+    record of what was run - keep it, log it, or put a list of them into
+    [`TimexLCA.compare`][bw_timex.timex_lca.TimexLCA.compare].
+
+    The fields fall into two groups. `database_dates`, `scenario` and
+    `use_global_lci_cache` (`FIXED_FIELDS`) pick the background databases, which
+    fix the column space of the time-explicit matrices and the caches keyed on
+    them: they are set when the `TimexLCA` is built and cannot be changed per
+    run. Everything else - the demand, the method, and all the timeline, LCI and
+    LCIA knobs - may vary from run to run on the same object.
+    """
+
+    #: Fields that pick the background, and so cannot vary between runs of one
+    #: `TimexLCA`. Changing one means building a new object (which
+    #: `TimexLCA.compare` does for you).
+    FIXED_FIELDS = ("database_dates", "scenario", "use_global_lci_cache")
+
+    # Core parameters
+    demand: dict
+    method: tuple
+    database_dates: Optional[dict] = None
+    scenario: Optional[dict] = None
+    use_global_lci_cache: bool = True
+    #: Name for this calculation, used to label its row in a comparison.
+    label: Optional[str] = None
+
+    # Timeline parameters
+    starting_datetime: datetime | str = "now"
+    temporal_grouping: str = "year"
+    interpolation_type: str = "linear"
+    edge_filter_function: Optional[Callable] = None
+    cutoff: float = 1e-9
+    max_calc: int = 2000
+    graph_traversal: str = "priority"
+    traverse_background: bool = False
+    timeline_args: tuple = field(default_factory=tuple)
+    timeline_kwargs: dict = field(default_factory=dict)
+
+    # LCI parameters
+    build_dynamic_biosphere: bool = True
+    expand_technosphere: bool = True
+    keep_activity_dimension: bool = True
+
+    # LCIA parameters
+    static_lcia_enabled: bool = True
+    dynamic_lcia_enabled: bool = True
+    metric: str = "radiative_forcing"
+    time_horizon: int = 100
+    fixed_time_horizon: bool = False
+    time_horizon_start: Optional[datetime] = None
+    characterization_functions: Optional[dict] = None
+    characterization_function_co2: Optional[dict] = None
+    use_disaggregated_lci: bool = False
+
+
+@dataclass
+class ComparisonResult:
+    """What [`TimexLCA.compare`][bw_timex.timex_lca.TimexLCA.compare] found.
+
+    Attributes
+    ----------
+    summary : pandas.DataFrame
+        One row per calculation: its label, its scores, the settings it was run
+        with, how long it took, and the error it raised, if any. Scenario
+        metadata is spread over `scenario_*` columns, so scenarios can be
+        grouped and plotted directly.
+    settings : list[TimexLCASettings]
+        The settings of each row, in the same order - the full record of what
+        produced the comparison.
+    objects : dict[str, TimexLCA] or None
+        The `TimexLCA` objects by label, if `compare(keep_objects=True)`. Use
+        these to dig into a single result - its timeline, dynamic inventory, or
+        contributions. Calculations that share a background share one object,
+        so the same object can appear under several labels. `None` by default,
+        since holding every object of a large comparison is expensive.
+    """
+
+    summary: pd.DataFrame
+    settings: list
+    objects: Optional[dict] = None
+
+    def __len__(self) -> int:
+        return len(self.summary)
+
+    def _repr_html_(self) -> str:
+        return self.summary._repr_html_()
 
 
 class TimexLCA:
@@ -187,6 +281,16 @@ class TimexLCA:
             demand=demand, database_dates=database_dates, scenario=scenario
         )
 
+        # Settings this object was built from, if any, and the raw values of the
+        # fields that pick the background. Kept as passed (not as resolved), so
+        # `run` can tell whether a settings object asks for the same background.
+        self.settings = None
+        self._fixed_fields = {
+            "database_dates": database_dates,
+            "scenario": scenario,
+            "use_global_lci_cache": use_global_lci_cache,
+        }
+
         TimexLCAInputs(
             demand=self.demand,
             method=self.method,
@@ -265,6 +369,370 @@ class TimexLCA:
         self._lci_did_factorize = False
 
         logger.info("TimexLCA initialized.")
+
+    @classmethod
+    def from_settings(cls, settings: TimexLCASettings) -> "TimexLCA":
+        """Build a `TimexLCA` from a [`TimexLCASettings`][bw_timex.timex_lca.TimexLCASettings].
+
+        The settings' background fields (`TimexLCASettings.FIXED_FIELDS`) are
+        used to construct the object; the rest become the default arguments of
+        [`run`][bw_timex.timex_lca.TimexLCA.run].
+
+        Examples
+        --------
+        ```python
+        settings = TimexLCASettings(demand=demand, method=method, database_dates=dates)
+        tlca = TimexLCA.from_settings(settings).run()
+        print(tlca.static_score)
+        ```
+        """
+        tlca = cls(
+            demand=settings.demand,
+            method=settings.method,
+            database_dates=settings.database_dates,
+            scenario=settings.scenario,
+            use_global_lci_cache=settings.use_global_lci_cache,
+        )
+        tlca.settings = settings
+        return tlca
+
+    def _settings_for_run(
+        self, settings: TimexLCASettings | None, overrides: dict
+    ) -> TimexLCASettings:
+        """Resolve the settings one `run` call should use.
+
+        Starts from `settings` (or the object's own), applies `overrides`
+        without mutating either, and refuses overrides that would change the
+        background, since that would invalidate the matrices and caches this
+        object is built around.
+        """
+        base = settings if settings is not None else self.settings
+        if base is None:
+            base = TimexLCASettings(
+                demand=self.demand, method=self.method, **self._fixed_fields
+            )
+
+        known = set(TimexLCASettings.__dataclass_fields__)
+        unknown = set(overrides) - known
+        if unknown:
+            raise TypeError(
+                f"run() got unexpected setting(s) {sorted(unknown)}. "
+                f"Valid settings are: {sorted(known)}."
+            )
+
+        resolved = replace(base, **overrides) if overrides else base
+
+        for field_name in TimexLCASettings.FIXED_FIELDS:
+            if getattr(resolved, field_name) != self._fixed_fields[field_name]:
+                raise ValueError(
+                    f"`{field_name}` selects the background databases, which fix the "
+                    "columns of the time-explicit matrices, so it cannot change between "
+                    f"runs of one TimexLCA (this one was built with "
+                    f"{field_name}={self._fixed_fields[field_name]!r}). "
+                    "Build another TimexLCA for it, or pass both settings to "
+                    "TimexLCA.compare(), which does that for you."
+                )
+
+        return resolved
+
+    def _rebuild_base_lca(self, demand: dict, method: tuple) -> None:
+        """Recompute the base LCA for a new demand or method.
+
+        Everything keyed on the background - the node proxies, the node
+        collections, and both module-level caches - stays valid, since those
+        depend on `database_dates` rather than on the demand. The cached
+        timeline does not: the graph traversal starts from the demand and is
+        prioritised by the method's scores, so it is dropped here.
+        """
+        logger.info("Demand or method changed; recalculating base LCA...")
+        self.demand = demand
+        self.method = method
+        fu, data_objs, remapping = self.prepare_base_lca_inputs(
+            demand=demand, method=method
+        )
+        self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
+        self.base_lca.lci()
+        self.base_lca.lcia()
+        self._last_timeline_build_key = None
+        self._cached_timeline = None
+
+    def _clear_stale_results(self) -> None:
+        """Drop results of the previous run that this one may not overwrite.
+
+        Only derived *results* are cleared, never the caches: `build_timeline`,
+        `lci` and `dynamic_lcia` are all keyed on their own inputs, so they
+        recompute when they must and reuse when they can. Without this, a run
+        with dynamic LCIA disabled would still answer `dynamic_score` from the
+        previous run.
+        """
+        for attribute in (
+            "characterized_inventory",
+            "current_metric",
+            "current_time_horizon",
+            "dynamic_inventory",
+            "dynamic_inventory_df",
+            "dynamic_inventory_disaggregated",
+            "dynamic_inventory_disaggregated_df",
+            "datapackage",
+        ):
+            if hasattr(self, attribute):
+                delattr(self, attribute)
+        self._static_score_from_timeline = None
+
+    def run(
+        self, settings: TimexLCASettings | None = None, **overrides
+    ) -> "TimexLCA":
+        """Run the whole calculation: timeline, LCI, and LCIA.
+
+        Runs `build_timeline()`, `lci()`, `static_lcia()` and, unless disabled,
+        `dynamic_lcia()`.
+
+        Can be called repeatedly on one object to vary the demand, the method,
+        or any knob. The background caches and, where the timeline parameters
+        are unchanged, the timeline itself are reused between calls; only a
+        changed demand or method forces the base LCA to be recalculated.
+        Changing the background databases is refused - see
+        [`compare`][bw_timex.timex_lca.TimexLCA.compare] for that.
+
+        Parameters
+        ----------
+        settings : TimexLCASettings, optional
+            Settings for this run. Defaults to the ones the object was built
+            with by [`from_settings`][bw_timex.timex_lca.TimexLCA.from_settings].
+        **overrides
+            Individual settings to override for this run only, e.g.
+            `run(time_horizon=20)`. Neither `settings` nor the object's own
+            settings are modified.
+
+        Returns
+        -------
+        TimexLCA
+            The object itself, so calls can be chained.
+
+        Raises
+        ------
+        TypeError
+            If an override is not a field of `TimexLCASettings`.
+        ValueError
+            If an override would change the background databases.
+
+        Examples
+        --------
+        ```python
+        tlca = TimexLCA.from_settings(settings)
+        tlca.run()                            # the settings as given
+        tlca.run(time_horizon=20)             # one knob, settings untouched
+        tlca.run(demand={other_process: 1})   # new demand, background reused
+        ```
+        """
+        settings = self._settings_for_run(settings, overrides)
+        logger.info("Starting TimexLCA.run() pipeline...")
+
+        if settings.demand != self.demand or settings.method != self.method:
+            self._rebuild_base_lca(settings.demand, settings.method)
+        self._clear_stale_results()
+
+        # Build timeline
+        logger.info("Step 1/4: Building timeline...")
+        self.build_timeline(
+            starting_datetime=settings.starting_datetime,
+            temporal_grouping=settings.temporal_grouping,
+            interpolation_type=settings.interpolation_type,
+            edge_filter_function=settings.edge_filter_function,
+            cutoff=settings.cutoff,
+            max_calc=settings.max_calc,
+            graph_traversal=settings.graph_traversal,
+            traverse_background=settings.traverse_background,
+            *settings.timeline_args,
+            **settings.timeline_kwargs,
+        )
+
+        # Calculate LCI
+        logger.info("Step 2/4: Calculating LCI...")
+        self.lci(
+            build_dynamic_biosphere=settings.build_dynamic_biosphere,
+            expand_technosphere=settings.expand_technosphere,
+            keep_activity_dimension=settings.keep_activity_dimension,
+        )
+
+        # Calculate static LCIA
+        if settings.static_lcia_enabled:
+            logger.info("Step 3/4: Calculating static LCIA...")
+            self.static_lcia()
+        else:
+            logger.info("Step 3/4: Skipping static LCIA (disabled).")
+
+        # Calculate dynamic LCIA
+        if settings.dynamic_lcia_enabled:
+            logger.info("Step 4/4: Calculating dynamic LCIA...")
+            self.dynamic_lcia(
+                metric=settings.metric,
+                time_horizon=settings.time_horizon,
+                fixed_time_horizon=settings.fixed_time_horizon,
+                time_horizon_start=settings.time_horizon_start,
+                characterization_functions=settings.characterization_functions,
+                characterization_function_co2=settings.characterization_function_co2,
+                use_disaggregated_lci=settings.use_disaggregated_lci,
+            )
+        else:
+            logger.info("Step 4/4: Skipping dynamic LCIA (disabled).")
+
+        logger.info("TimexLCA.run() completed successfully.")
+        return self
+
+    @staticmethod
+    def _background_key(settings: TimexLCASettings) -> tuple:
+        """Hashable identity of the background a settings object asks for.
+
+        Two calculations can share one `TimexLCA` exactly when these match.
+        """
+        return (
+            tuple(sorted((k, str(v)) for k, v in (settings.database_dates or {}).items())),
+            tuple(sorted((k, str(v)) for k, v in (settings.scenario or {}).items())),
+            settings.use_global_lci_cache,
+        )
+
+    def _result_row(self, settings: TimexLCASettings) -> dict:
+        """Collect everything worth comparing about the run that just finished."""
+
+        def score(name):
+            try:
+                return float(getattr(self, name))
+            except (AttributeError, TypeError, ValueError):
+                return float("nan")
+
+        row = {
+            "base_score": score("base_score"),
+            "static_score": (
+                score("static_score") if settings.static_lcia_enabled else float("nan")
+            ),
+            "dynamic_score": (
+                score("dynamic_score") if settings.dynamic_lcia_enabled else float("nan")
+            ),
+        }
+        for key, value in (settings.scenario or {}).items():
+            row[f"scenario_{key}"] = value
+        row.update(
+            {
+                "demand": settings.demand,
+                "method": settings.method,
+                "database_dates": self.database_dates,
+                "n_databases": len(self.database_dates),
+                "starting_datetime": settings.starting_datetime,
+                "temporal_grouping": settings.temporal_grouping,
+                "interpolation_type": settings.interpolation_type,
+                "cutoff": settings.cutoff,
+                "max_calc": settings.max_calc,
+                "graph_traversal": settings.graph_traversal,
+                "traverse_background": settings.traverse_background,
+                "expand_technosphere": settings.expand_technosphere,
+                "build_dynamic_biosphere": settings.build_dynamic_biosphere,
+                "keep_activity_dimension": settings.keep_activity_dimension,
+                "metric": settings.metric if settings.dynamic_lcia_enabled else None,
+                "time_horizon": settings.time_horizon,
+                "fixed_time_horizon": settings.fixed_time_horizon,
+                "timeline_rows": len(self.timeline) if hasattr(self, "timeline") else 0,
+            }
+        )
+        return row
+
+    @classmethod
+    def compare(
+        cls,
+        settings: list,
+        keep_objects: bool = False,
+        on_error: str = "raise",
+    ) -> ComparisonResult:
+        """Run several calculations and collect them into one table.
+
+        This is the way to compare scenarios. Scenarios differ in their
+        background databases, and the background fixes the columns of the
+        time-explicit matrices and the caches keyed on them, so each one needs
+        its own `TimexLCA` - there is nothing shareable between them to begin
+        with. `compare` builds one object per distinct background and runs every
+        calculation that asks for that background on it, so a scenario × demand
+        grid only pays for a new object when the background actually changes.
+
+        Parameters
+        ----------
+        settings : list[TimexLCASettings]
+            The calculations to run, in the order they should appear.
+        keep_objects : bool, optional
+            If True, keep each `TimexLCA` in `ComparisonResult.objects` so the
+            timelines and inventories behind the scores stay available. Default
+            is False, since a large comparison holds a lot of memory this way.
+        on_error : str, optional
+            `"raise"` (default) propagates the first failure. `"record"` puts
+            the message in the row's `error` column, leaves its scores as NaN,
+            and carries on - useful for long unattended sweeps.
+
+        Returns
+        -------
+        ComparisonResult
+            Its `summary` is a `DataFrame` with one row per calculation.
+
+        Examples
+        --------
+        ```python
+        base = TimexLCASettings(demand=demand, method=method)
+        comparison = TimexLCA.compare(
+            [
+                replace(base, scenario={"pathway": "SSP2-Base"}, label="Base"),
+                replace(base, scenario={"pathway": "SSP2-PkBudg500"}, label="PkBudg500"),
+            ]
+        )
+        comparison.summary.plot.bar(x="label", y="static_score")
+        ```
+        """
+        if on_error not in ("raise", "record"):
+            raise ValueError(
+                f"`on_error` must be 'raise' or 'record', not {on_error!r}."
+            )
+
+        objects_by_background = {}
+        objects_by_label = {}
+        rows = []
+
+        for position, one in enumerate(settings):
+            label = one.label if one.label is not None else f"run {position}"
+            if label in objects_by_label:
+                label = f"{label} ({position})"
+
+            key = cls._background_key(one)
+            tlca = objects_by_background.get(key)
+            if tlca is None:
+                tlca = cls.from_settings(one)
+                objects_by_background[key] = tlca
+            objects_by_label[label] = tlca
+
+            logger.info(f"Comparison {position + 1}/{len(settings)}: {label}")
+            started = perf_counter()
+            try:
+                tlca.run(one)
+                row = tlca._result_row(one)
+                row["error"] = None
+            except Exception as error:  # noqa: BLE001 - reported in the table
+                if on_error == "raise":
+                    raise
+                logger.warning(f"Comparison run {label!r} failed: {error}")
+                row = {"error": f"{type(error).__name__}: {error}"}
+            row["label"] = label
+            row["runtime_s"] = perf_counter() - started
+            rows.append(row)
+
+        summary = pd.DataFrame(rows)
+        leading = [
+            column
+            for column in ("label", "base_score", "static_score", "dynamic_score")
+            if column in summary.columns
+        ]
+        summary = summary[leading + [c for c in summary.columns if c not in leading]]
+
+        return ComparisonResult(
+            summary=summary,
+            settings=list(settings),
+            objects=objects_by_label if keep_objects else None,
+        )
 
     @staticmethod
     def _resolve_database_dates(
@@ -538,6 +1006,7 @@ class TimexLCA:
             # producing the same final result but wasting work and creating a
             # fragile transient inconsistency. Skip it.
             self.add_interdatabase_activity_mapping_from_timeline()
+        self._drop_unused_vintages_from_activity_time_mapping()
         self._last_timeline_build_key = timeline_cache_key
         self._cached_timeline = self.timeline
         self._dynamic_lcia_inventory_cache.clear()
@@ -1507,6 +1976,78 @@ class TimexLCA:
 
         return indexed_demand, data_objs, remapping_dicts
 
+    def _drop_unused_vintages_from_activity_time_mapping(self) -> None:
+        """
+        Forget the static activities of vintages the timeline never sources from.
+
+        `lci()` loads only the databases
+        [`databases_used_by_timeline`][bw_timex.timex_lca.TimexLCA.databases_used_by_timeline]
+        returns, so the processes of the other ones get no technosphere column.
+        `activity_time_mapping` is pre-populated with every mapped database
+        before the timeline exists, and the dynamic biosphere matrix is sized
+        by its length, so the two have to be pruned together.
+
+        Returns
+        -------
+        None
+            Removes the pruned databases' entries from `activity_time_mapping`.
+        """
+        used = set(self.databases_used_by_timeline())
+        unused = set(self.database_dates) - used
+        if not unused:
+            return
+        for key in [key for key in self.activity_time_mapping if key[0][0] in unused]:
+            del self.activity_time_mapping[key]
+        # `reversed` is cached and only refreshed when this flag is set.
+        self.activity_time_mapping._modified = True
+        logger.info(
+            f"Not loading {len(unused)} mapped database(s) that the timeline does "
+            f"not source from: {', '.join(sorted(unused))}."
+        )
+
+    def databases_used_by_timeline(self) -> list:
+        """
+        The mapped databases the time-explicit matrices actually reference.
+
+        A project can hold vintages a given study never sources from - e.g. a
+        2050 vintage for a system that ends in 2042, or the vintages of an
+        unrelated study. They get no temporal market share, and the expanded
+        technosphere only ever references a background database that a row's
+        `temporal_market_shares` names, so their processes would only add
+        columns to the matrix that has to be solved.
+
+        Kept are the dynamic databases, the databases holding the demand, every
+        database a temporal market draws on, and the databases of the traversed
+        processes themselves (which is what `traverse_background` adds). Their
+        graph dependents are added by the caller.
+
+        Returns
+        -------
+        list
+            Names of the databases to load, in `database_dates` order. All of
+            them, if no timeline has been built yet.
+        """
+        timeline = getattr(self, "timeline", None)
+        if timeline is None:
+            return list(self.database_dates)
+
+        used = {
+            database
+            for database, date in self.database_dates.items()
+            if not isinstance(date, datetime)
+        }
+        used.update(
+            bd.get_node(id=get_id(key))["database"] for key in (self.demand or {})
+        )
+        for shares in timeline["temporal_market_shares"]:
+            if shares:
+                used.update(shares)
+        for node_id in set(timeline["producer"]).union(timeline["consumer"]):
+            if node_id != -1:
+                used.add(self.nodes[node_id]["database"])
+
+        return [database for database in self.database_dates if database in used]
+
     def prepare_bw_timex_inputs(
         self,
         demand=None,
@@ -1564,7 +2105,7 @@ class TimexLCA:
         data_objs = []
         remapping_dicts = None
 
-        demand_database_names = list(self.database_dates.keys())
+        demand_database_names = self.databases_used_by_timeline()
 
         if demand_database_names:
             database_names = set.union(
