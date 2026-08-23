@@ -33,7 +33,7 @@ from scipy import sparse
 from ._lci_cache import BACKGROUND_UNIT_LCI_CACHE, LCI_SOLVE_CACHE, NODES_CACHE
 FACTORIZE_SOLVES_THRESHOLD = 8
 
-from .database_metadata import resolve_database_dates_from_metadata
+from .database_metadata import resolve_database_dates_from_metadata, split_scenario
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import InterDatabaseMapping, LazyActivity, TimeMappingDict
 from .matrix_modifier import MatrixModifier
@@ -219,6 +219,9 @@ class TimexLCA:
         method: tuple,
         database_dates: dict = None,
         scenario: dict = None,
+        create_missing: bool = False,
+        premise_key: str = None,
+        ecoinvent_credentials: tuple = None,
         use_global_lci_cache: bool = True,
     ) -> None:
         """
@@ -260,6 +263,24 @@ class TimexLCA:
                 raises and lists them otherwise. Databases that don't declare the
                 filtered key (your foreground, a hand-built vintage) are always
                 kept. Cannot be combined with `database_dates`.
+        create_missing : bool, optional
+                If True, background databases the `scenario` names but that this
+                project does not hold yet are built with `premise`, and ecoinvent
+                is imported first if it is missing. The `scenario` then has to
+                describe the build completely: a `years` list plus all four of
+                `iam_model`, `pathway`, `system_model` and `ecoinvent_version`
+                (it may also narrow `sectors` or name a `source_database`).
+                Needs the optional dependency:
+                `pip install "bw_timex[premise]"`. Building takes tens of minutes
+                and roughly 2-4 GB per year. Default is False, which raises
+                instead of building. Cannot be combined with `database_dates`.
+        premise_key : str, optional
+                premise decryption key, used only when building. Falls back to the
+                environment variable `PREMISE_KEY`.
+        ecoinvent_credentials : tuple, optional
+                `(username, password)`, used only when ecoinvent itself has to be
+                imported. Falls back to the environment variables
+                `ECOINVENT_USERNAME` and `ECOINVENT_PASSWORD`.
         use_global_lci_cache : bool, optional
                 If True (default), background unit LCI matrices are cached at
                 module level and reused across `TimexLCA` objects within the
@@ -277,6 +298,26 @@ class TimexLCA:
         self.demand = demand
         self.method = method
         self.scenario = scenario
+
+        TimexLCAInputs(
+            demand=demand,
+            method=method,
+            database_dates=database_dates,
+            scenario=scenario,
+            create_missing=create_missing,
+            premise_key=premise_key,
+            ecoinvent_credentials=ecoinvent_credentials,
+        )
+
+        if create_missing:
+            from .scenario_builder import ensure_scenario_databases
+
+            ensure_scenario_databases(
+                scenario,
+                premise_key=premise_key,
+                ecoinvent_credentials=ecoinvent_credentials,
+            )
+
         self.database_dates = self._resolve_database_dates(
             demand=demand, database_dates=database_dates, scenario=scenario
         )
@@ -291,9 +332,17 @@ class TimexLCA:
             "use_global_lci_cache": use_global_lci_cache,
         }
 
+        # Validate again against the *resolved* mapping: the earlier call
+        # above validated the raw `database_dates` argument (needed so a bad
+        # `create_missing` combination is rejected before any build starts),
+        # which is `None` on the metadata/scenario-resolution path - that
+        # call alone would never catch a demand database whose own
+        # `representative_time` metadata resolves it to a fixed date rather
+        # than "dynamic". `create_missing` is left at its default here since
+        # `self.database_dates` is never `None`.
         TimexLCAInputs(
-            demand=self.demand,
-            method=self.method,
+            demand=demand,
+            method=method,
             database_dates=self.database_dates,
             scenario=self.scenario,
         )
@@ -772,26 +821,34 @@ class TimexLCA:
 
         resolved = resolve_database_dates_from_metadata(scenario)
 
-        filter_matched = scenario and any(
-            key in bd.databases[name] for name in resolved for key in scenario
+        # Only the filter keys are matched against metadata; the build keys
+        # (`years`, `sectors`, ...) describe what to build and are never
+        # declared by any database, so reporting them as unmatched metadata
+        # would send the user looking for a key that cannot exist.
+        filters, _ = split_scenario(scenario)
+
+        filter_matched = filters and any(
+            key in bd.databases[name] for name in resolved for key in filters
         )
 
-        if scenario and not filter_matched:
+        if filters and not filter_matched:
             declared = {}
             for name in bd.databases:
                 metadata = bd.databases[name]
-                for key in scenario:
+                for key in filters:
                     if key in metadata:
                         declared.setdefault(key, set()).add(str(metadata[key]))
             details = "; ".join(
                 f"'{key}': "
                 f"{sorted(declared[key]) if key in declared else 'not declared by any database'}"
-                for key in scenario
+                for key in filters
             )
             raise ValueError(
-                f"scenario={scenario!r} matched no database in this project. "
+                f"scenario={filters!r} matched no database in this project. "
                 f"Values actually declared for its key(s) by this project's "
-                f"databases: {details}. Check for a typo in the filter."
+                f"databases: {details}. Check for a typo in the filter, or pass "
+                f"`create_missing=True` (with a `years` list in the scenario) to "
+                f"build the databases with premise."
             )
         elif not resolved:
             logger.info(

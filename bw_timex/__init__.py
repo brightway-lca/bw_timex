@@ -11,6 +11,7 @@ from .edge_extractor import EdgeExtractor
 from .errors import UnmappedDatabaseError
 from .helper_classes import SetList
 from .matrix_modifier import MatrixModifier
+from .scenario_builder import ensure_scenario_databases
 from .timeline_builder import TimelineBuilder
 from .timex_lca import ComparisonResult, TimexLCA, TimexLCASettings
 from .utils import (
@@ -46,6 +47,7 @@ __all__ = [
     "add_temporal_distribution_to_exchange",
     "add_temporal_evolution_to_exchange",
     "clear_background_lci_cache",
+    "ensure_scenario_databases",
     "get_exchange",
     "get_temporal_evolution_factor",
     "interactive_td_widget",

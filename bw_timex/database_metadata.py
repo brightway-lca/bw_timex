@@ -36,6 +36,7 @@ from .validation import DatabaseMetadataInputs
 
 REPRESENTATIVE_TIME = "representative_time"
 SCENARIOS = "scenarios"
+SECTORS = "sectors"
 DYNAMIC = "dynamic"
 
 #: Metadata keys that identify the scenario a database represents. Two
@@ -49,6 +50,20 @@ SCENARIO_SIGNATURE_KEYS = (
     "ecoinvent_version",
     "external_scenarios",
 )
+
+#: Metadata keys premise writes that identify which scenario a database belongs
+#: to, and that `TimexLCA(scenario=...)` filters on.
+SCENARIO_FILTER_KEYS = (
+    "iam_model",
+    "pathway",
+    "system_model",
+    "ecoinvent_version",
+)
+
+#: Keys of a `scenario` mapping that describe how to *build* a missing vintage
+#: rather than what to match. They never reach the metadata filter: `years` is a
+#: list, and no database's metadata could ever equal it.
+SCENARIO_BUILD_KEYS = ("years", "sectors", "source_database")
 
 #: Keys Brightway maintains itself, filtered out when reporting to the user
 #: which metadata a project's databases carry.
@@ -223,9 +238,52 @@ def _check_filter_keys(scenario: dict, candidates: dict[str, dict]) -> None:
     raise ValueError(
         f"No database in this project declares the metadata key(s) "
         f"{unknown}. Keys declared by the databases of this project: {available}. "
-        f"Add the metadata with `bw_timex.set_database_metadata`, or check the "
-        f"spelling of your `scenario` filter."
+        f"Add the metadata with `bw_timex.set_database_metadata`, check the "
+        f"spelling of your `scenario` filter, or build the databases with "
+        f"premise - `bw_timex.ensure_scenario_databases(scenario)`, or "
+        f"`TimexLCA(..., create_missing=True)`, both with a `years` list in "
+        f"the scenario."
     )
+
+
+def split_scenario(scenario: dict | None) -> tuple[dict, dict]:
+    """Separate a `scenario` mapping into its filter keys and its build keys."""
+    if not scenario:
+        return {}, {}
+    filters = {k: v for k, v in scenario.items() if k not in SCENARIO_BUILD_KEYS}
+    build = {k: v for k, v in scenario.items() if k in SCENARIO_BUILD_KEYS}
+    return filters, build
+
+
+def database_matches_scenario(metadata: dict, scenario: dict | None) -> bool:
+    """Whether a database's metadata survives a `scenario` filter.
+
+    A database is kept unless it *declares* a filtered key with a different
+    value: a hand-built vintage or a foreground carrying no scenario metadata
+    belongs to every scenario, not to none.
+    """
+    if not scenario:
+        return True
+    return all(
+        key not in metadata or _values_match(metadata[key], wanted)
+        for key, wanted in scenario.items()
+    )
+
+
+def database_matches_sectors(metadata: dict, sectors: list | None) -> bool:
+    """Whether a database covers exactly the sectors a build asked for.
+
+    premise does not record which sectors it updated, so `sectors` metadata is
+    written by `ensure_scenario_databases`. A database without it covers all
+    sectors, which is what a request without `sectors` asks for. This is an
+    equality, not a superset test: a database updated for other sectors than
+    the ones asked for is a different database, and an all-sector one is not
+    what a narrowed request asked to build.
+    """
+    declared = metadata.get(SECTORS)
+    if declared is None or sectors is None:
+        return declared is None and sectors is None
+    return _values_match(declared, sectors)
 
 
 def _scenario_signature(metadata: dict) -> tuple:
@@ -298,15 +356,13 @@ def resolve_database_dates_from_metadata(
         as `TimexLCA.database_dates`.
     """
     candidates = _candidate_databases()
+    scenario, _ = split_scenario(scenario)
     if scenario:
         _check_filter_keys(scenario, candidates)
         candidates = {
             name: metadata
             for name, metadata in candidates.items()
-            if all(
-                key not in metadata or _values_match(metadata[key], wanted)
-                for key, wanted in scenario.items()
-            )
+            if database_matches_scenario(metadata, scenario)
         }
     _check_unambiguous(candidates)
     return {
