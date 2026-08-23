@@ -109,6 +109,10 @@ NOTEBOOK_META: dict[str, tuple[str, list[str]]] = {
         "lucide/dices",
         ["advanced", "uncertainty", "datapackages"],
     ),
+    "advanced/scenario_comparison.ipynb": (
+        "lucide/git-compare",
+        ["advanced", "scenario", "background databases"],
+    ),
 }
 
 # A tutorial's leading "N_" orders the notebooks in the file listing; the docs
