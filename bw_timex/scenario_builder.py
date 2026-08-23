@@ -18,18 +18,20 @@ import bw2data as bd
 from loguru import logger
 
 from .database_metadata import (
-    DYNAMIC,
     REPRESENTATIVE_TIME,
     SCENARIOS,
     _normalize_representative_time,
     database_matches_scenario,
+    database_matches_sectors,
     set_database_metadata,
     split_scenario,
 )
 from .validation import ScenarioBuildInputs
 
 
-def find_existing_vintages(filters: dict) -> dict[int, str]:
+def find_existing_vintages(
+    filters: dict, sectors: list[str] | None = None
+) -> dict[int, tuple[str, datetime]]:
     """Map each year the project already covers to the database covering it.
 
     A year is covered by a registered database whose `representative_time`
@@ -37,6 +39,14 @@ def find_existing_vintages(filters: dict) -> dict[int, str]:
     own rule (`database_matches_scenario`): a database is dropped only if it
     declares a filtered key with a different value. Any stricter rule would
     build a second database for a year `TimexLCA` already resolves.
+
+    `sectors` is not part of that filter - it never reaches
+    `TimexLCA(scenario=...)` - but a vintage built for other sectors is not the
+    vintage this build asked for, so it is compared separately
+    (`database_matches_sectors`).
+
+    Returns the database's own `representative_time`, not a date derived from
+    the year: a hand-built vintage need not sit on 1 January.
     """
     found = {}
     for name in bd.databases:
@@ -44,11 +54,13 @@ def find_existing_vintages(filters: dict) -> dict[int, str]:
         if REPRESENTATIVE_TIME not in metadata or metadata.get(SCENARIOS):
             continue
         value = _normalize_representative_time(metadata[REPRESENTATIVE_TIME], name)
-        if value == DYNAMIC or not isinstance(value, datetime):
+        if not isinstance(value, datetime):  # "dynamic"
             continue
         if not database_matches_scenario(metadata, filters):
             continue
-        found.setdefault(value.year, name)
+        if not database_matches_sectors(metadata, sectors):
+            continue
+        found.setdefault(value.year, (name, value))
     return found
 
 
@@ -157,7 +169,9 @@ def vintage_name(filters: dict, year: int) -> str:
     )
 
 
-def _check_no_collisions(names: list[str], filters: dict) -> None:
+def _check_no_collisions(
+    names: dict[int, str], filters: dict, sectors: list[str] | None = None
+) -> None:
     """Refuse to build over a database that is not ours.
 
     `write_db_to_brightway` deletes and rewrites a database of the same name
@@ -165,11 +179,12 @@ def _check_no_collisions(names: list[str], filters: dict) -> None:
     that matched the scenario would have satisfied its year already, and its
     year would not be in the build list.
     """
-    colliding = [name for name in names if name in bd.databases]
+    wanted = {**filters, **({"sectors": sectors} if sectors else {})}
+    colliding = [name for name in names.values() if name in bd.databases]
     if colliding:
         raise ValueError(
             f"Database(s) {colliding} already exists in this project but does "
-            f"not match scenario {filters!r}, and premise would overwrite them. "
+            f"not match scenario {wanted!r}, and premise would overwrite them. "
             f"Rename or delete them, or map them yourself with `database_dates`."
         )
 
@@ -244,8 +259,9 @@ def ensure_scenario_databases(
     ScenarioBuildInputs(scenario=scenario)
     filters, build = split_scenario(scenario)
     years = build["years"]
+    sectors = build.get("sectors")
 
-    existing = find_existing_vintages(filters)
+    existing = find_existing_vintages(filters, sectors)
     missing = [year for year in years if year not in existing]
 
     if not missing:
@@ -253,17 +269,16 @@ def ensure_scenario_databases(
             f"All {len(years)} requested background vintage(s) already exist in "
             f"this project. Nothing to build."
         )
-        return {existing[year]: datetime(year, 1, 1) for year in years}
+        return dict(existing[year] for year in years)
 
     names = {year: vintage_name(filters, year) for year in missing}
-    _check_no_collisions(list(names.values()), filters)
+    _check_no_collisions(names, filters, sectors)
 
     key = _resolve_premise_key(premise_key)
     source_database, biosphere = _resolve_source_database(
         filters, build, ecoinvent_credentials
     )
 
-    sectors = build.get("sectors")
     logger.info(
         f"Building {len(missing)} background database(s) for year(s) {missing} with "
         f"premise ({filters['iam_model']}, {filters['pathway']}, "
@@ -306,6 +321,7 @@ def ensure_scenario_databases(
 
     logger.info(f"Built {len(missing)} background database(s).")
 
-    resolved = {existing[year]: datetime(year, 1, 1) for year in years if year in existing}
+    resolved = dict(existing[year] for year in years if year in existing)
+    # premise writes 1 January of the scenario year.
     resolved.update({names[year]: datetime(year, 1, 1) for year in missing})
     return resolved

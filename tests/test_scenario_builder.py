@@ -71,7 +71,9 @@ class TestFindExistingVintages:
 
     def test_matching_vintage_is_found_by_year(self):
         write_vintage("ei_2030", 2030)
-        assert find_existing_vintages(SCENARIO) == {2030: "ei_2030"}
+        assert find_existing_vintages(SCENARIO) == {
+            2030: ("ei_2030", datetime(2030, 1, 1))
+        }
 
     def test_other_scenario_is_not_found(self):
         write_vintage("ei_2030", 2030, pathway="SSP2-Base")
@@ -80,7 +82,18 @@ class TestFindExistingVintages:
     def test_database_without_scenario_metadata_satisfies_its_year(self):
         write_minimal_database("hand_built_2020")
         set_database_metadata("hand_built_2020", representative_time=datetime(2020, 1, 1))
-        assert find_existing_vintages(SCENARIO) == {2020: "hand_built_2020"}
+        assert find_existing_vintages(SCENARIO) == {
+            2020: ("hand_built_2020", datetime(2020, 1, 1))
+        }
+
+    def test_the_real_representative_time_is_returned(self):
+        write_minimal_database("hand_built_mid_2030")
+        set_database_metadata(
+            "hand_built_mid_2030", representative_time=datetime(2030, 6, 15)
+        )
+        assert find_existing_vintages(SCENARIO) == {
+            2030: ("hand_built_mid_2030", datetime(2030, 6, 15))
+        }
 
     def test_dynamic_databases_are_ignored(self):
         set_database_metadata("foreground", representative_time="dynamic")
@@ -91,6 +104,52 @@ class TestFindExistingVintages:
         bd.databases["superstructure"]["scenarios"] = [{"year": 2030}, {"year": 2040}]
         bd.databases.flush()
         assert find_existing_vintages(SCENARIO) == {}
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestSectorMatching:
+    """A vintage only satisfies a year if it covers the sectors that were asked for.
+
+    premise does not record which sectors it updated, so `sectors` metadata is
+    written by `ensure_scenario_databases` itself; a database without it was
+    built with all sectors (or by hand, which the scenario filter treats the
+    same way).
+    """
+
+    def test_same_sectors_are_reused(self):
+        write_vintage("ei_2030", 2030, sectors=["electricity"])
+        assert find_existing_vintages(SCENARIO, sectors=["electricity"]) == {
+            2030: ("ei_2030", datetime(2030, 1, 1))
+        }
+
+    def test_sector_order_does_not_matter(self):
+        write_vintage("ei_2030", 2030, sectors=["electricity", "steel"])
+        assert find_existing_vintages(SCENARIO, sectors=["steel", "electricity"]) == {
+            2030: ("ei_2030", datetime(2030, 1, 1))
+        }
+
+    def test_other_sectors_are_not_reused(self):
+        write_vintage("ei_2030", 2030, sectors=["electricity"])
+        assert find_existing_vintages(SCENARIO, sectors=["steel"]) == {}
+
+    def test_narrowed_vintage_does_not_satisfy_an_all_sector_request(self):
+        write_vintage("ei_2030", 2030, sectors=["electricity"])
+        assert find_existing_vintages(SCENARIO) == {}
+
+    def test_all_sector_vintage_does_not_satisfy_a_narrowed_request(self):
+        write_vintage("ei_2030", 2030)
+        assert find_existing_vintages(SCENARIO, sectors=["electricity"]) == {}
+
+    def test_a_differently_narrowed_vintage_is_rebuilt(self, fake_premise, monkeypatch):
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        write_minimal_database("ecoinvent-3.10.1-cutoff")
+        write_minimal_database("ecoinvent-3.10.1-biosphere")
+        write_vintage("ei_electricity_2040", 2040, sectors=["electricity"])
+        ensure_scenario_databases(
+            {**SCENARIO, "years": [2040], "sectors": ["steel"]}
+        )
+        assert len(fake_premise) == 1
+        assert fake_premise[0]["sectors"] == ["steel"]
 
 
 @pytest.mark.usefixtures("temporal_grouping_db_monthly")
@@ -106,6 +165,16 @@ class TestNothingToBuild:
         write_vintage("ei_2030", 2030)
         result = ensure_scenario_databases({**SCENARIO, "years": [2030]})
         assert result == {"ei_2030": datetime(2030, 1, 1)}
+
+    def test_found_database_keeps_its_real_representative_time(self, fake_premise):
+        # A hand-built vintage need not sit on 1 January, and the returned
+        # mapping documents what the database represents, not what was asked for.
+        write_minimal_database("hand_built_mid_2030")
+        set_database_metadata(
+            "hand_built_mid_2030", representative_time=datetime(2030, 6, 15)
+        )
+        result = ensure_scenario_databases({**SCENARIO, "years": [2030]})
+        assert result == {"hand_built_mid_2030": datetime(2030, 6, 15)}
 
     def test_premise_is_not_imported(self, fake_premise, monkeypatch):
         monkeypatch.delitem(sys.modules, "premise", raising=False)
@@ -322,6 +391,28 @@ class TestBuilding:
         ensure_scenario_databases({**SCENARIO, "years": [2030]})
         name = "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030"
         assert "sectors" not in bd.databases[name]
+
+    def test_a_vintage_built_with_sectors_is_reused_on_the_same_request(
+        self, fake_premise
+    ):
+        # The `sectors` metadata written after the build must be readable by
+        # the next run, or every narrowed build is repeated forever.
+        request = {**SCENARIO, "years": [2030], "sectors": ["electricity"]}
+        ensure_scenario_databases(request)
+        ensure_scenario_databases(request)
+        assert len(fake_premise) == 1
+
+    def test_a_vintage_built_with_sectors_is_not_reused_for_other_sectors(
+        self, fake_premise
+    ):
+        ensure_scenario_databases(
+            {**SCENARIO, "years": [2030], "sectors": ["electricity"]}
+        )
+        with pytest.raises(ValueError, match="already exists"):
+            ensure_scenario_databases(
+                {**SCENARIO, "years": [2030], "sectors": ["steel"]}
+            )
+        assert len(fake_premise) == 1
 
     def test_built_and_existing_vintages_are_returned(self, fake_premise):
         write_vintage("ei_2030", 2030)

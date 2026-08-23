@@ -36,6 +36,7 @@ from .validation import DatabaseMetadataInputs
 
 REPRESENTATIVE_TIME = "representative_time"
 SCENARIOS = "scenarios"
+SECTORS = "sectors"
 DYNAMIC = "dynamic"
 
 #: Metadata keys that identify the scenario a database represents. Two
@@ -266,6 +267,22 @@ def database_matches_scenario(metadata: dict, scenario: dict | None) -> bool:
         key not in metadata or _values_match(metadata[key], wanted)
         for key, wanted in scenario.items()
     )
+
+
+def database_matches_sectors(metadata: dict, sectors: list | None) -> bool:
+    """Whether a database covers exactly the sectors a build asked for.
+
+    premise does not record which sectors it updated, so `sectors` metadata is
+    written by `ensure_scenario_databases`. A database without it covers all
+    sectors, which is what a request without `sectors` asks for. This is an
+    equality, not a superset test: a database updated for other sectors than
+    the ones asked for is a different database, and an all-sector one is not
+    what a narrowed request asked to build.
+    """
+    declared = metadata.get(SECTORS)
+    if declared is None or sectors is None:
+        return declared is None and sectors is None
+    return _values_match(declared, sectors)
 
 
 def _scenario_signature(metadata: dict) -> tuple:
