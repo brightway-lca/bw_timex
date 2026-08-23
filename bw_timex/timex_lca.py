@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
 from typing import Callable, Optional
@@ -48,6 +49,48 @@ from .validation import (
     PlotDynamicInventoryInputs,
     TimexLCAInputs,
 )
+
+
+@dataclass
+class TimexLCASettings:
+    """Configuration settings for a complete TimexLCA run.
+
+    Encapsulates all parameters for building timeline, calculating LCI, and performing LCIA.
+    """
+
+    # Core parameters
+    demand: dict
+    method: tuple
+    database_dates: Optional[dict] = None
+    use_global_lci_cache: bool = True
+
+    # Timeline parameters
+    starting_datetime: datetime | str = "now"
+    temporal_grouping: str = "year"
+    interpolation_type: str = "linear"
+    edge_filter_function: Optional[Callable] = None
+    cutoff: float = 1e-9
+    max_calc: int = 2000
+    graph_traversal: str = "priority"
+    traverse_background: bool = False
+    timeline_args: tuple = field(default_factory=tuple)
+    timeline_kwargs: dict = field(default_factory=dict)
+
+    # LCI parameters
+    build_dynamic_biosphere: bool = True
+    expand_technosphere: bool = True
+    keep_activity_dimension: bool = True
+
+    # LCIA parameters
+    static_lcia_enabled: bool = True
+    dynamic_lcia_enabled: bool = True
+    metric: str = "radiative_forcing"
+    time_horizon: int = 100
+    fixed_time_horizon: bool = False
+    time_horizon_start: Optional[datetime] = None
+    characterization_functions: Optional[dict] = None
+    characterization_function_co2: Optional[dict] = None
+    use_disaggregated_lci: bool = False
 
 
 class TimexLCA:
@@ -230,6 +273,91 @@ class TimexLCA:
         self._lci_did_factorize = False
 
         logger.info("TimexLCA initialized.")
+
+    def run(self, settings: TimexLCASettings) -> "TimexLCA":
+        """Execute full TimexLCA pipeline using provided settings.
+
+        Runs: build_timeline() → lci() → static_lcia() → dynamic_lcia() (optional).
+
+        Parameters
+        ----------
+        settings : TimexLCASettings
+            Configuration object containing all parameters for the run.
+
+        Returns
+        -------
+        TimexLCA
+            Returns self for method chaining.
+
+        Examples
+        --------
+        ```python
+        settings = TimexLCASettings(
+            demand=demand,
+            method=method,
+            database_dates=database_dates,
+            starting_datetime="2024-01-01",
+            dynamic_lcia_enabled=True,
+        )
+        tlca = TimexLCA(
+            demand=settings.demand,
+            method=settings.method,
+            database_dates=settings.database_dates,
+            use_global_lci_cache=settings.use_global_lci_cache,
+        )
+        tlca.run(settings)
+        print(tlca.static_score, tlca.dynamic_score)
+        ```
+        """
+        logger.info("Starting TimexLCA.run() pipeline...")
+
+        # Build timeline
+        logger.info("Step 1/4: Building timeline...")
+        self.build_timeline(
+            starting_datetime=settings.starting_datetime,
+            temporal_grouping=settings.temporal_grouping,
+            interpolation_type=settings.interpolation_type,
+            edge_filter_function=settings.edge_filter_function,
+            cutoff=settings.cutoff,
+            max_calc=settings.max_calc,
+            graph_traversal=settings.graph_traversal,
+            traverse_background=settings.traverse_background,
+            *settings.timeline_args,
+            **settings.timeline_kwargs,
+        )
+
+        # Calculate LCI
+        logger.info("Step 2/4: Calculating LCI...")
+        self.lci(
+            build_dynamic_biosphere=settings.build_dynamic_biosphere,
+            expand_technosphere=settings.expand_technosphere,
+            keep_activity_dimension=settings.keep_activity_dimension,
+        )
+
+        # Calculate static LCIA
+        if settings.static_lcia_enabled:
+            logger.info("Step 3/4: Calculating static LCIA...")
+            self.static_lcia()
+        else:
+            logger.info("Step 3/4: Skipping static LCIA (disabled).")
+
+        # Calculate dynamic LCIA
+        if settings.dynamic_lcia_enabled:
+            logger.info("Step 4/4: Calculating dynamic LCIA...")
+            self.dynamic_lcia(
+                metric=settings.metric,
+                time_horizon=settings.time_horizon,
+                fixed_time_horizon=settings.fixed_time_horizon,
+                time_horizon_start=settings.time_horizon_start,
+                characterization_functions=settings.characterization_functions,
+                characterization_function_co2=settings.characterization_function_co2,
+                use_disaggregated_lci=settings.use_disaggregated_lci,
+            )
+        else:
+            logger.info("Step 4/4: Skipping dynamic LCIA (disabled).")
+
+        logger.info("TimexLCA.run() completed successfully.")
+        return self
 
     ########################################
     # Main functions to be called by users #

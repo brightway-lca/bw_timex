@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* Added `TimexLCASettings` configuration class and `TimexLCA.run()` method for streamlined full-pipeline execution: encapsulates all options for timeline building, LCI, and LCIA calculations in a single dataclass, with `run()` executing the complete workflow in sequence
 
 ## [1.2.1] - 2026-08-14
 * Fixed `ShapeMismatch` in `lci()` for processes with more than one biosphere exchange, by sizing the biosphere `flip_array` to the number of matrix entries (only raised with `bw_processing` >= 1.5; no numeric results change) ([#213](https://github.com/brightway-lca/bw_timex/pull/213))
