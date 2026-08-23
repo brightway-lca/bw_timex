@@ -289,3 +289,43 @@ class DatabaseMetadataInputs(BaseModel):
                     f"Metadata keys must be strings, got {type(key).__name__}: {key}."
                 )
         return v
+
+
+class ScenarioBuildInputs(BaseModel):
+    """Validates the scenario mapping handed to ensure_scenario_databases"""
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    scenario: dict
+
+    @field_validator("scenario")
+    @classmethod
+    def validate_scenario(cls, v: dict) -> dict:
+        from .database_metadata import SCENARIO_FILTER_KEYS
+
+        if not v:
+            raise ValueError(
+                "scenario must be a non-empty dictionary describing the background "
+                "to build, e.g. {'iam_model': 'remind', 'pathway': 'SSP2-PkBudg500', "
+                "'system_model': 'cutoff', 'ecoinvent_version': '3.10.1', "
+                "'years': [2030, 2040]}."
+            )
+        years = v.get("years")
+        if not years or not isinstance(years, (list, tuple)):
+            raise ValueError(
+                "scenario must contain a non-empty `years` list to build background "
+                "databases, e.g. scenario={..., 'years': [2030, 2040]}. premise "
+                "builds one database per year."
+            )
+        if not all(isinstance(year, int) and not isinstance(year, bool) for year in years):
+            raise ValueError(
+                f"scenario `years` must be integer years, e.g. [2030, 2040], got "
+                f"{list(years)}."
+            )
+        missing = [key for key in SCENARIO_FILTER_KEYS if key not in v]
+        if missing:
+            raise ValueError(
+                f"scenario is missing {missing}, which premise needs to build a "
+                f"database. Provide all of {list(SCENARIO_FILTER_KEYS)}."
+            )
+        return v

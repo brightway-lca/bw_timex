@@ -11,6 +11,7 @@ everything it needs never touches either.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 
 import bw2data as bd
@@ -24,6 +25,7 @@ from .database_metadata import (
     database_matches_scenario,
     split_scenario,
 )
+from .validation import ScenarioBuildInputs
 
 
 def find_existing_vintages(filters: dict) -> dict[int, str]:
@@ -59,6 +61,43 @@ def _import_ecoinvent(**kwargs) -> str:
     raise NotImplementedError
 
 
+def _resolve_premise_key(premise_key: str | None) -> str:
+    key = premise_key or os.environ.get("PREMISE_KEY")
+    if not key:
+        raise ValueError(
+            "No premise decryption key. Pass `premise_key=...` or set the "
+            "environment variable PREMISE_KEY. The key is needed to read "
+            "premise's bundled IAM scenarios; see "
+            "https://premise.readthedocs.io for how to request one."
+        )
+    return key
+
+
+def _resolve_ecoinvent_credentials(
+    credentials: tuple[str, str] | None,
+) -> tuple[str, str]:
+    if credentials:
+        username, password = credentials
+    else:
+        username = os.environ.get("ECOINVENT_USERNAME")
+        password = os.environ.get("ECOINVENT_PASSWORD")
+    missing = [
+        name
+        for name, value in (
+            ("ECOINVENT_USERNAME", username),
+            ("ECOINVENT_PASSWORD", password),
+        )
+        if not value
+    ]
+    if missing:
+        raise ValueError(
+            f"No ecoinvent credentials, needed to import the source database "
+            f"premise builds from. Pass `ecoinvent_credentials=(username, "
+            f"password)` or set {' and '.join(missing)}."
+        )
+    return username, password
+
+
 def ensure_scenario_databases(
     scenario: dict,
     premise_key: str | None = None,
@@ -84,6 +123,7 @@ def ensure_scenario_databases(
         Database name to the point in time it represents, for the vintages
         found or built.
     """
+    ScenarioBuildInputs(scenario=scenario)
     filters, build = split_scenario(scenario)
     years = build["years"]
 

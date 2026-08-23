@@ -112,3 +112,56 @@ class TestNothingToBuild:
         write_vintage("ei_2030", 2030)
         ensure_scenario_databases({**SCENARIO, "years": [2030]})
         assert "premise" not in sys.modules
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestValidation:
+
+    def test_missing_years_raises(self, fake_premise):
+        with pytest.raises(ValueError, match="years"):
+            ensure_scenario_databases(SCENARIO)
+
+    def test_empty_years_raises(self, fake_premise):
+        with pytest.raises(ValueError, match="years"):
+            ensure_scenario_databases({**SCENARIO, "years": []})
+
+    def test_non_integer_year_raises(self, fake_premise):
+        with pytest.raises(ValueError, match="years"):
+            ensure_scenario_databases({**SCENARIO, "years": ["2030"]})
+
+    def test_missing_filter_keys_are_named(self, fake_premise):
+        with pytest.raises(ValueError, match="ecoinvent_version"):
+            ensure_scenario_databases(
+                {"iam_model": "remind", "pathway": "SSP2-PkBudg500", "system_model": "cutoff",
+                 "years": [2030]}
+            )
+
+    def test_no_scenario_raises(self, fake_premise):
+        with pytest.raises(ValueError, match="scenario"):
+            ensure_scenario_databases(None)
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestCredentials:
+
+    @pytest.fixture(autouse=True)
+    def _ecoinvent_present(self):
+        # Without a source database the run would stop at the ecoinvent
+        # credentials before ever reaching the premise key.
+        write_minimal_database("ecoinvent-3.10.1-cutoff")
+        write_minimal_database("ecoinvent-3.10.1-biosphere")
+
+    def test_premise_key_argument_wins_over_environment(self, fake_premise, monkeypatch):
+        monkeypatch.setenv("PREMISE_KEY", "from-environment")
+        ensure_scenario_databases({**SCENARIO, "years": [2030]}, premise_key="explicit")
+        assert fake_premise[0]["key"] == "explicit"
+
+    def test_premise_key_falls_back_to_environment(self, fake_premise, monkeypatch):
+        monkeypatch.setenv("PREMISE_KEY", "from-environment")
+        ensure_scenario_databases({**SCENARIO, "years": [2030]})
+        assert fake_premise[0]["key"] == "from-environment"
+
+    def test_missing_premise_key_names_the_variable(self, fake_premise, monkeypatch):
+        monkeypatch.delenv("PREMISE_KEY", raising=False)
+        with pytest.raises(ValueError, match="PREMISE_KEY"):
+            ensure_scenario_databases({**SCENARIO, "years": [2030]})
