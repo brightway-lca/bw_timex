@@ -23,6 +23,7 @@ from .database_metadata import (
     SCENARIOS,
     _normalize_representative_time,
     database_matches_scenario,
+    set_database_metadata,
     split_scenario,
 )
 from .validation import ScenarioBuildInputs
@@ -51,9 +52,44 @@ def find_existing_vintages(filters: dict) -> dict[int, str]:
     return found
 
 
-def _run_premise(**kwargs) -> None:
-    """Filled in by Task 5. Every premise call happens here and nowhere else."""
-    raise NotImplementedError
+def _run_premise(
+    *,
+    scenarios: list[dict],
+    source_database: str,
+    source_version: str,
+    system_model: str,
+    biosphere: str,
+    sectors: list[str] | None,
+    names: list[str],
+    key: str,
+) -> None:
+    """Build and write one prospective database per scenario.
+
+    The only place premise is called. One `NewDatabase` for all scenarios, not
+    one per year: premise caches the extracted source database, so separate
+    runs would re-extract ecoinvent every time.
+    """
+    try:
+        from premise import NewDatabase
+    except ImportError as error:
+        raise ImportError(
+            'premise is needed to build background databases. Install it with: '
+            'pip install "bw_timex[premise]"'
+        ) from error
+
+    ndb = NewDatabase(
+        scenarios=scenarios,
+        source_db=source_database,
+        source_version=source_version,
+        system_model=system_model,
+        biosphere_name=biosphere,
+        key=key,
+    )
+    if sectors:
+        ndb.update(sectors)
+    else:
+        ndb.update()
+    ndb.write_db_to_brightway(name=names)
 
 
 def _import_ecoinvent(version: str, system_model: str, credentials: tuple[str, str]) -> str:
@@ -227,4 +263,49 @@ def ensure_scenario_databases(
         filters, build, ecoinvent_credentials
     )
 
-    raise NotImplementedError  # the premise run is added in Task 5
+    sectors = build.get("sectors")
+    logger.info(
+        f"Building {len(missing)} background database(s) for year(s) {missing} with "
+        f"premise ({filters['iam_model']}, {filters['pathway']}, "
+        f"{'all sectors' if not sectors else ', '.join(sectors)}). Each is a full "
+        f"copy of ecoinvent, so expect tens of minutes and roughly 2-4 GB per year."
+    )
+
+    _run_premise(
+        scenarios=[
+            {
+                "model": filters["iam_model"],
+                "pathway": filters["pathway"],
+                "year": year,
+            }
+            for year in missing
+        ],
+        source_database=source_database,
+        source_version=filters["ecoinvent_version"],
+        system_model=filters["system_model"],
+        biosphere=biosphere,
+        sectors=sectors,
+        names=[names[year] for year in missing],
+        key=key,
+    )
+
+    for year in missing:
+        name = names[year]
+        if REPRESENTATIVE_TIME not in bd.databases.get(name, {}):
+            raise RuntimeError(
+                f"premise wrote '{name}' without `{REPRESENTATIVE_TIME}` metadata, so "
+                f"`TimexLCA` cannot tell what point in time it represents. This "
+                f"metadata is written by premise >= 2.4.9.2; check your installed "
+                f"version, or set it yourself with `bw_timex.set_database_metadata`."
+            )
+        if sectors:
+            # premise does not record which sectors were updated, and two runs of
+            # the same pathway with different sectors would otherwise look identical
+            # to the scenario filter.
+            set_database_metadata(name, sectors=list(sectors))
+
+    logger.info(f"Built {len(missing)} background database(s).")
+
+    resolved = {existing[year]: datetime(year, 1, 1) for year in years if year in existing}
+    resolved.update({names[year]: datetime(year, 1, 1) for year in missing})
+    return resolved

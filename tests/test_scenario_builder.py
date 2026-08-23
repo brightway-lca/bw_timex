@@ -262,3 +262,96 @@ class TestOverwriteGuard:
         with pytest.raises(ValueError):
             ensure_scenario_databases({**SCENARIO, "years": [2030, 2040]})
         assert fake_premise == []
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestBuilding:
+
+    @pytest.fixture(autouse=True)
+    def _ecoinvent_present(self, temporal_grouping_db_monthly, monkeypatch):
+        # See TestCredentials._ecoinvent_present: this must depend explicitly
+        # on temporal_grouping_db_monthly, or the autouse fixture runs first
+        # and temporal_grouping_db_monthly's @bw2test then wipes it out by
+        # switching to a fresh temp project.
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        write_minimal_database("ecoinvent-3.10.1-cutoff")
+        write_minimal_database("ecoinvent-3.10.1-biosphere")
+
+    def test_only_missing_years_are_built(self, fake_premise):
+        write_vintage("ei_2030", 2030)
+        ensure_scenario_databases({**SCENARIO, "years": [2020, 2030, 2040]})
+        assert len(fake_premise) == 1
+        assert [s["year"] for s in fake_premise[0]["scenarios"]] == [2020, 2040]
+
+    def test_premise_scenarios_carry_model_and_pathway(self, fake_premise):
+        ensure_scenario_databases({**SCENARIO, "years": [2030]})
+        assert fake_premise[0]["scenarios"] == [
+            {"model": "remind", "pathway": "SSP2-PkBudg500", "year": 2030}
+        ]
+
+    def test_source_version_and_system_model_are_passed(self, fake_premise):
+        ensure_scenario_databases({**SCENARIO, "years": [2030]})
+        assert fake_premise[0]["source_version"] == "3.10.1"
+        assert fake_premise[0]["system_model"] == "cutoff"
+
+    def test_names_line_up_with_scenarios(self, fake_premise):
+        ensure_scenario_databases({**SCENARIO, "years": [2030, 2040]})
+        assert fake_premise[0]["names"] == [
+            "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030",
+            "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2040",
+        ]
+
+    def test_all_sectors_by_default(self, fake_premise):
+        ensure_scenario_databases({**SCENARIO, "years": [2030]})
+        assert fake_premise[0]["sectors"] is None
+
+    def test_narrowed_sectors_are_passed_through(self, fake_premise):
+        ensure_scenario_databases(
+            {**SCENARIO, "years": [2030], "sectors": ["electricity", "steel"]}
+        )
+        assert fake_premise[0]["sectors"] == ["electricity", "steel"]
+
+    def test_narrowed_sectors_are_recorded_in_metadata(self, fake_premise):
+        ensure_scenario_databases(
+            {**SCENARIO, "years": [2030], "sectors": ["electricity"]}
+        )
+        name = "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030"
+        assert bd.databases[name]["sectors"] == ["electricity"]
+
+    def test_no_sectors_metadata_when_all_sectors(self, fake_premise):
+        ensure_scenario_databases({**SCENARIO, "years": [2030]})
+        name = "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030"
+        assert "sectors" not in bd.databases[name]
+
+    def test_built_and_existing_vintages_are_returned(self, fake_premise):
+        write_vintage("ei_2030", 2030)
+        result = ensure_scenario_databases({**SCENARIO, "years": [2030, 2040]})
+        assert result == {
+            "ei_2030": datetime(2030, 1, 1),
+            "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2040": datetime(2040, 1, 1),
+        }
+
+    def test_missing_representative_time_after_write_raises(self, monkeypatch):
+        def fake_run_premise(**kwargs):
+            for name in kwargs["names"]:
+                write_minimal_database(name)  # no metadata: an old premise
+
+        monkeypatch.setattr(
+            "bw_timex.scenario_builder._run_premise", fake_run_premise, raising=True
+        )
+        with pytest.raises(RuntimeError, match="2.4.9.2"):
+            ensure_scenario_databases({**SCENARIO, "years": [2030]})
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestPremiseNotInstalled:
+
+    def test_import_error_names_the_extra(self, monkeypatch):
+        from bw_timex import scenario_builder
+
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        write_minimal_database("ecoinvent-3.10.1-cutoff")
+        write_minimal_database("ecoinvent-3.10.1-biosphere")
+        monkeypatch.setitem(sys.modules, "premise", None)  # forces ImportError
+        with pytest.raises(ImportError, match=r'bw_timex\[premise\]'):
+            scenario_builder.ensure_scenario_databases({**SCENARIO, "years": [2030]})
