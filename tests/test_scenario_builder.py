@@ -393,6 +393,31 @@ class TestOverwriteGuard:
             ensure_scenario_databases({**SCENARIO, "years": [2030, 2040]})
         assert fake_premise == []
 
+    def test_unfinished_earlier_build_with_sectors_can_be_resumed(
+        self, fake_premise, monkeypatch
+    ):
+        # `sectors` metadata is only written after the representative_time
+        # check passes, so a stranded narrowed build has neither key. The
+        # advice must restore both, or re-running the same request lands
+        # right back in this same collision.
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        write_minimal_database("ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030")
+        request = {**SCENARIO, "years": [2030], "sectors": ["electricity"]}
+        with pytest.raises(ValueError) as error:
+            ensure_scenario_databases(request)
+        message = str(error.value)
+        assert "did not finish" in message
+        assert "set_database_metadata" in message
+        assert "sectors" in message
+        assert "electricity" in message
+
+        name = "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030"
+        set_database_metadata(
+            name, representative_time=datetime(2030, 1, 1), sectors=["electricity"]
+        )
+        # Following the advice literally must resume, not collide again.
+        assert ensure_scenario_databases(request) == {name: datetime(2030, 1, 1)}
+
 
 @pytest.mark.usefixtures("temporal_grouping_db_monthly")
 class TestBuilding:
@@ -500,6 +525,35 @@ class TestBuilding:
         )
         with pytest.raises(RuntimeError, match="2.4.9.2"):
             ensure_scenario_databases({**SCENARIO, "years": [2030]})
+
+    def test_missing_representative_time_with_sectors_can_be_resumed(
+        self, fake_premise, monkeypatch
+    ):
+        # Same trap as the collision-guard message: `sectors` is written
+        # after this check, so the recovery snippet must include it too, or
+        # following it literally re-triggers the sector-mismatch collision.
+        def premise_without_metadata(**kwargs):
+            for name in kwargs["names"]:
+                write_minimal_database(name)
+
+        monkeypatch.setattr(
+            "bw_timex.scenario_builder._run_premise",
+            premise_without_metadata,
+            raising=True,
+        )
+        request = {**SCENARIO, "years": [2030], "sectors": ["electricity"]}
+        with pytest.raises(RuntimeError) as error:
+            ensure_scenario_databases(request)
+        message = str(error.value)
+        assert "set_database_metadata" in message
+        assert "sectors" in message
+        assert "electricity" in message
+
+        name = "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030"
+        set_database_metadata(
+            name, representative_time=datetime(2030, 1, 1), sectors=["electricity"]
+        )
+        assert ensure_scenario_databases(request) == {name: datetime(2030, 1, 1)}
 
 
 @pytest.mark.usefixtures("temporal_grouping_db_monthly")

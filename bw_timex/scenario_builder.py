@@ -169,6 +169,22 @@ def vintage_name(filters: dict, year: int) -> str:
     )
 
 
+def _metadata_recovery_call(name: str, year: int, sectors: list[str] | None) -> str:
+    """The `set_database_metadata` call that resumes a stranded build.
+
+    `sectors` metadata is written only after the `representative_time` check
+    passes (see `ensure_scenario_databases`), so a build stranded before that
+    point has neither key. The recovery snippet must restore both when
+    `sectors` was requested, or following it literally re-triggers the very
+    collision it is meant to resolve - now because `sectors` is missing.
+    """
+    sectors_arg = f", sectors={list(sectors)!r}" if sectors else ""
+    return (
+        f"bw_timex.set_database_metadata('{name}', "
+        f"representative_time=datetime({year}, 1, 1){sectors_arg})"
+    )
+
+
 def _check_no_collisions(
     names: dict[int, str], filters: dict, sectors: list[str] | None = None
 ) -> None:
@@ -203,9 +219,8 @@ def _check_no_collisions(
             f"but the run stopped before their metadata could be checked. "
             f"Rather than rebuilding them (tens of minutes each), add the "
             f"missing metadata, e.g. "
-            f"`bw_timex.set_database_metadata('{name}', "
-            f"representative_time=datetime({year}, 1, 1))`, and run this again. "
-            f"If they are not usable, delete them instead."
+            f"`{_metadata_recovery_call(name, year, sectors)}`, and run this "
+            f"again. If they are not usable, delete them instead."
         )
     colliding = [name for name in names.values() if name in bd.databases]
     if colliding:
@@ -343,8 +358,8 @@ def ensure_scenario_databases(
                 f"version. The database(s) premise just built are still in this "
                 f"project, so there is no need to build them again: add the missing "
                 f"metadata yourself with "
-                f"`bw_timex.set_database_metadata('{name}', "
-                f"representative_time=datetime({year}, 1, 1))` and run this again."
+                f"`{_metadata_recovery_call(name, year, sectors)}` and run this "
+                f"again."
             )
         if sectors:
             # premise does not record which sectors were updated, and two runs of
