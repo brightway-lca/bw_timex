@@ -20,6 +20,7 @@ from loguru import logger
 from .database_metadata import (
     REPRESENTATIVE_TIME,
     SCENARIOS,
+    SECTORS,
     _normalize_representative_time,
     database_matches_scenario,
     database_matches_sectors,
@@ -195,13 +196,22 @@ def _check_no_collisions(
     database that satisfied the scenario would have satisfied its year already,
     and its year would not be in the build list.
 
-    Two kinds of collision, with opposite advice. A colliding database that
-    carries no `representative_time` is what an earlier run of this function
-    leaves behind when it stops at the metadata check below: premise wrote it,
-    so it is most likely a complete and correct database that is only missing
-    one metadata key, and deleting it throws away hours of premise. Anything
-    else declares a point in time and still did not match, so it belongs to
-    someone else.
+    Three kinds of collision, with different advice each:
+
+    - A colliding database that carries no `representative_time` is what an
+      earlier run of this function leaves behind when it stops at the
+      metadata check below: premise wrote it, so it is most likely a complete
+      and correct database that is only missing metadata, and deleting it
+      throws away hours of premise.
+    - A colliding database that matches every filter key but declares
+      different `sectors` is not foreign either: it is the same scenario,
+      built for a different sector selection. Its year was not counted as
+      satisfied (`database_matches_sectors` excluded it, since that is an
+      equality test, not a superset test), so a build was attempted under the
+      same name - but deleting or renaming it away by default would throw
+      away a database that may already cover what was asked for.
+    - Anything else declares a point in time and still did not match, so it
+      belongs to someone else.
     """
     wanted = {**filters, **({"sectors": sectors} if sectors else {})}
     unfinished = {
@@ -222,7 +232,30 @@ def _check_no_collisions(
             f"`{_metadata_recovery_call(name, year, sectors)}`, and run this "
             f"again. If they are not usable, delete them instead."
         )
-    colliding = [name for name in names.values() if name in bd.databases]
+    remaining = [name for name in names.values() if name in bd.databases]
+    sector_mismatch = {
+        name: bd.databases[name]
+        for name in remaining
+        if database_matches_scenario(bd.databases[name], filters)
+    }
+    if sector_mismatch:
+        name = sorted(sector_mismatch)[0]
+        existing_sectors = sector_mismatch[name].get(SECTORS)
+        existing_desc = (
+            f"sectors {sorted(existing_sectors)}" if existing_sectors else "all sectors"
+        )
+        wanted_desc = f"sectors {sorted(sectors)}" if sectors else "all sectors"
+        raise ValueError(
+            f"Database '{name}' already exists in this project and matches "
+            f"scenario {filters!r}, but it was built for {existing_desc} while "
+            f"this build asked for {wanted_desc} - only `sectors` differs, so "
+            f"it is not a foreign database. If {existing_desc} already covers "
+            f"what you need, drop `sectors` from the scenario and reuse it "
+            f"as-is. Otherwise rename it, e.g. "
+            f"`bw2data.Database('{name}').rename('{name}_renamed')`, so this "
+            f"narrowed build can be written alongside it."
+        )
+    colliding = remaining
     if colliding:
         raise ValueError(
             f"Database(s) {colliding} already exists in this project but does "

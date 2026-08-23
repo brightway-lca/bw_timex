@@ -418,6 +418,23 @@ class TestOverwriteGuard:
         # Following the advice literally must resume, not collide again.
         assert ensure_scenario_databases(request) == {name: datetime(2030, 1, 1)}
 
+    def test_all_sector_vintage_colliding_with_a_narrowed_build_is_not_foreign(
+        self, fake_premise, monkeypatch
+    ):
+        # An all-sectors vintage satisfies every filter key of a narrowed
+        # request; only `sectors` differs. That is not a foreign database and
+        # must not be offered "delete" as the fix.
+        monkeypatch.setenv("PREMISE_KEY", "key")
+        write_vintage("ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030", 2030)
+        with pytest.raises(ValueError) as error:
+            ensure_scenario_databases(
+                {**SCENARIO, "years": [2030], "sectors": ["electricity"]}
+            )
+        message = str(error.value)
+        assert "delete" not in message.lower()
+        assert "sectors" in message
+        assert fake_premise == []
+
 
 @pytest.mark.usefixtures("temporal_grouping_db_monthly")
 class TestBuilding:
