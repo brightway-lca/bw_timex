@@ -34,6 +34,7 @@ class DynamicBiosphereBuilder:
         background_solver=None,
         nodes: dict | None = None,
         keep_activity_dimension: bool = True,
+        group_background_by_time: bool = False,
     ) -> None:
         """
         Initializes the DynamicBiosphereBuilder object.
@@ -99,6 +100,18 @@ class DynamicBiosphereBuilder:
         # static or dynamic - needs, and it keeps the entry count proportional to
         # the number of (flow, time) pairs instead of (flow, time, activity).
         self.keep_activity_dimension = bool(keep_activity_dimension)
+        # Sum the background demands of every temporal-market row landing at
+        # the same point in time, and solve those sums instead of one unit LCI
+        # per background process. Only lossless when the rows in question end
+        # up in the same column anyway, which is exactly what dropping the
+        # activity dimension does - and only wired for the timeline build,
+        # where a row *is* a column. `TimexLCA` decides whether it is also
+        # cheaper; see `_plan_background_solves`.
+        self.group_background_by_time = bool(
+            group_background_by_time
+            and not keep_activity_dimension
+            and not expand_technosphere
+        )
 
         if expand_technosphere:
             self.technosphere_matrix = (
@@ -153,6 +166,9 @@ class DynamicBiosphereBuilder:
         self.temporal_market_recipes = {}
         self.temporal_market_scales = {}
         self.temporal_market_cols = []  # To keep track of temporal market columns
+        # Time step -> {background activity: demand, supply already folded in}.
+        # Only filled when `group_background_by_time` is on.
+        self._grouped_background_demands: dict = {}
 
     @staticmethod
     def _supply_array_from_timeline(
@@ -348,6 +364,17 @@ class DynamicBiosphereBuilder:
                 else:
                     demand = self.demand_from_timeline(row)
 
+                if demand and self.group_background_by_time:
+                    # Defer to the grouped pass after the loop: fold this
+                    # row's supply into its demand now (there is no column
+                    # left to scale by afterwards) and sum it into the time
+                    # step the emissions land at.
+                    scale = float(self.dynamic_supply_array[process_col_index])
+                    target = self._grouped_background_demands.setdefault(time, {})
+                    for act, amount in demand.items():
+                        target[act] = target.get(act, 0.0) + amount * scale
+                    continue
+
                 if demand:
                     # Emissions of all background activities of the temporal
                     # market, per unit of market output, already summed over
@@ -401,6 +428,9 @@ class DynamicBiosphereBuilder:
                             seen_rows=seen_rows,
                         )
 
+        if self.group_background_by_time:
+            self._add_grouped_background_entries()
+
         # now build the dynamic biosphere matrix
         if not self.keep_activity_dimension:
             ncols = 1
@@ -431,6 +461,85 @@ class DynamicBiosphereBuilder:
         dynamic_biosphere_matrix = dynamic_biosphere_matrix.tocsr()
 
         return dynamic_biosphere_matrix
+
+    def _add_grouped_background_entries(self):
+        """Emit one solved background aggregate per time step.
+
+        `sum_r B A^-1 d_r` and `B A^-1 sum_r d_r` are the same number, and with
+        no activity dimension every `r` at a given time step writes into the
+        same column - so the sum can be taken before the solve. Supply was
+        already folded into each `d_r` when it was collected, which is why
+        these entries bypass `_add_entry`'s scaling.
+
+        Emitted after the timeline loop, so `biosphere_time_mapping` hands out
+        its row ids in a different order than an ungrouped build would. The
+        rows carry the same `(flow, time)` pairs with the same amounts - only
+        their position in the matrix differs, and everything user-facing
+        (`dynamic_inventory_df`, the scores) goes through the mapping.
+        """
+        for time, demand in self._grouped_background_demands.items():
+            aggregate = self.background_solver.aggregate_for_demand(demand)
+
+            time_in_datetime = convert_date_string_to_datetime(
+                self.temporal_grouping, str(time)
+            )
+            date = TemporalDistribution(
+                date=np.array([str(time_in_datetime)], dtype=self.time_res),
+                amount=np.array([1]),
+            ).date[0]
+
+            for row_idx in np.flatnonzero(aggregate):
+                bioflow = self.lca_obj.dicts.biosphere.reversed[row_idx]
+                key = (self.biosphere_time_mapping.add((bioflow, date)), 0)
+                self._matrix_entries[key] = (
+                    self._matrix_entries.get(key, 0.0) + aggregate[row_idx]
+                )
+
+    def collect_background_demands_by_time(self):
+        """Plan the grouped background solves: time step -> summed demand.
+
+        The counterpart of `collect_background_demands`, which groups the same
+        walk by temporal market instead. Supply is folded in here exactly as
+        the build does it, so the number of distinct `(time, block)` pairs in
+        the result is the number of solves grouping would actually cost.
+        """
+        return self.collect_background_demand_plan()[1]
+
+    def collect_background_demand_plan(self):
+        """Both groupings of the background demands, from a single walk.
+
+        `TimexLCA` compares the two solve strategies before building, which
+        needs the demands grouped per temporal market *and* per time step.
+        Collecting them separately walks the timeline twice and re-derives
+        every row's demand twice - on a premise-sized model that costs more
+        than the grouping it is trying to choose.
+
+        Returns
+        -------
+        tuple of dict
+            `(by_market, by_time)`. `by_market` matches
+            `collect_background_demands`; `by_time` carries each row's supply
+            folded into its amounts, as the grouped build applies it.
+        """
+        by_market, by_time = {}, {}
+        for row in self.timeline.itertuples():
+            idx = row.time_mapped_producer
+            if idx not in self.node_collections["temporal_markets"]:
+                continue
+            if row.Index in self.collapsed_market_rows:
+                continue
+            demand = self.demand_from_timeline(row)
+            if not demand:
+                continue
+
+            market = by_market.setdefault(idx, {})
+            _, time = self.activity_time_mapping.reversed[idx]
+            scale = float(self.dynamic_supply_array[row.Index])
+            grouped = by_time.setdefault(time, {})
+            for act, amount in demand.items():
+                market[act] = market.get(act, 0.0) + amount
+                grouped[act] = grouped.get(act, 0.0) + amount * scale
+        return by_market, by_time
 
     def demand_from_timeline(self, row):
         """

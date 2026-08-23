@@ -571,6 +571,7 @@ class TimexLCA:
         build_dynamic_biosphere: Optional[bool] = True,
         expand_technosphere: Optional[bool] = True,
         keep_activity_dimension: Optional[bool] = True,
+        group_background_by_time: Optional[bool] = None,
     ) -> None:
         """
         Calculates the time-explicit LCI.
@@ -607,6 +608,24 @@ class TimexLCA:
             timing of the emissions, but they can no longer be attributed to the
             activities that caused them. Use this for large time-explicit systems,
             where the per-activity columns dominate memory.
+        group_background_by_time: bool, optional
+            How the background unit LCIs are solved. `None` (default) picks
+            whichever of the two strategies needs fewer solves for this call;
+            `True` forces per-time-step solving and `False` forces per-process
+            solving.
+
+            Per-time-step solving sums the background demands of every temporal
+            market landing at the same point in time and solves those sums,
+            costing one solve per `(time, block)` pair rather than one per
+            distinct background process. It only applies with
+            `expand_technosphere=False` and `keep_activity_dimension=False`,
+            where the rows it sums share a column anyway - asking for it
+            elsewhere logs a warning and is ignored.
+
+            Worth pinning to `False` when re-running `lci()` several times in
+            one session: grouped right-hand sides are sums specific to a run,
+            so they are never cached, while per-process unit LCIs are - which
+            makes every run after the first free.
 
         Returns
         -------
@@ -627,6 +646,7 @@ class TimexLCA:
             build_dynamic_biosphere=build_dynamic_biosphere,
             expand_technosphere=expand_technosphere,
             keep_activity_dimension=keep_activity_dimension,
+            group_background_by_time=group_background_by_time,
         )
 
         if hasattr(self, "dynamic_inventory"):
@@ -705,6 +725,11 @@ class TimexLCA:
                     nodes=self.nodes,
                 )
                 self._prepare_background_solves(shadow)
+                self._warn_if_grouping_unavailable(
+                    group_background_by_time,
+                    expand_technosphere=True,
+                    keep_activity_dimension=keep_activity_dimension,
+                )
 
                 solve_key = self._solve_cache_key(expand_technosphere=True)
                 if solve_key in LCI_SOLVE_CACHE:
@@ -749,11 +774,17 @@ class TimexLCA:
                     background_solver=self._background_solver,
                     nodes=self.nodes,
                 )
-                self._prepare_background_solves(shadow)
+                group_by_time = self._plan_background_solves(
+                    shadow,
+                    expand_technosphere=False,
+                    keep_activity_dimension=keep_activity_dimension,
+                    group_background_by_time=group_background_by_time,
+                )
 
                 self.calculate_dynamic_inventory(
                     expand_technosphere=False,
                     keep_activity_dimension=keep_activity_dimension,
+                    group_background_by_time=group_by_time,
                 )
 
     def _technosphere_database_labels(self) -> tuple[np.ndarray, np.ndarray]:
@@ -865,6 +896,136 @@ class TimexLCA:
         self._background_solver.prepare(
             [activity_id for demand in demands.values() for activity_id in demand]
         )
+
+    def _prepare_grouped_blocks(self, grouped: dict) -> None:
+        """Factorize the blocks the grouped solves will revisit.
+
+        Every time step solves the same few background blocks again, so
+        without this each grouped solve is a fresh `spsolve` on a full block -
+        far more expensive than the per-process solves grouping replaces.
+        """
+        solver = self._background_solver
+        solver.prepare_blocks(
+            block_index
+            for demand in grouped.values()
+            for block_index in {
+                solver.block_index_for(activity_id) for activity_id in demand
+            }
+        )
+
+    @staticmethod
+    def _warn_if_grouping_unavailable(
+        requested, expand_technosphere: bool, keep_activity_dimension: bool
+    ) -> None:
+        """Say so when an explicit `group_background_by_time=True` cannot apply.
+
+        Summing the market rows of a time step is only lossless when those rows
+        share a column anyway, so the request is dropped rather than honoured -
+        and dropping it silently would leave the caller thinking they got it.
+        """
+        if not requested:
+            return
+        reasons = []
+        if expand_technosphere:
+            reasons.append("expand_technosphere=True")
+        if keep_activity_dimension:
+            reasons.append("keep_activity_dimension=True")
+        logger.warning(
+            f"group_background_by_time=True ignored: it needs "
+            f"expand_technosphere=False and keep_activity_dimension=False, but "
+            f"{' and '.join(reasons)} was given. Solving per background "
+            f"process instead."
+        )
+
+    def _plan_background_solves(
+        self,
+        builder: DynamicBiosphereBuilder,
+        expand_technosphere: bool,
+        keep_activity_dimension: bool,
+        group_background_by_time: Optional[bool] = None,
+    ) -> bool:
+        """Choose how the background gets solved, and prepare for that choice.
+
+        Two strategies produce the same numbers:
+
+        - *per background process* - one unit LCI per distinct background
+          activity, linearly combined per temporal market. Costs one solve per
+          uncached activity, and the results are cached across `TimexLCA`
+          objects in a session, so a warm run costs nothing at all.
+        - *per time step* - sum the background demands of every market row
+          landing at the same time, and solve those sums. Costs one solve per
+          `(time, block)` pair, caches nothing, but is independent of how many
+          background processes the foreground reaches.
+
+        Which is cheaper is a property of the model: a small foreground over
+        many time steps favours the first, a wide foreground over few time
+        steps the second. Both counts are known here, so when
+        `group_background_by_time` is `None` the smaller one is taken; a
+        `True`/`False` from the caller overrides that.
+
+        Returns
+        -------
+        bool
+            Whether the dynamic biosphere build should group by time step.
+        """
+        # Grouping sums rows that share a time step, which is only lossless
+        # when they share a column anyway - i.e. with no activity dimension -
+        # and is only wired for the timeline build, where a row is a column.
+        can_group = not expand_technosphere and not keep_activity_dimension
+        if not can_group:
+            self._warn_if_grouping_unavailable(
+                group_background_by_time,
+                expand_technosphere=expand_technosphere,
+                keep_activity_dimension=keep_activity_dimension,
+            )
+            demands = builder.collect_background_demands()
+            self._background_solver.prepare(
+                [
+                    activity_id
+                    for demand in demands.values()
+                    for activity_id in demand
+                ]
+            )
+            return False
+
+        # One walk, both groupings: walking twice to choose between them can
+        # cost more than the choice saves.
+        demands, grouped = builder.collect_background_demand_plan()
+        activity_ids = [
+            activity_id for demand in demands.values() for activity_id in demand
+        ]
+
+        # An explicit request wins; `None` means decide by cost.
+        if group_background_by_time is not None:
+            if group_background_by_time:
+                self._prepare_grouped_blocks(grouped)
+            else:
+                self._background_solver.prepare(activity_ids)
+            return bool(group_background_by_time)
+
+        solver = self._background_solver
+        pending = {
+            solver.cache_key(activity_id) for activity_id in activity_ids
+        } - set(solver.shared_cache) - set(solver._instance_supply_cache)
+
+        grouped_solves = len(
+            {
+                (time, solver.block_index_for(activity_id))
+                for time, demand in grouped.items()
+                for activity_id in demand
+            }
+        )
+
+        if grouped_solves < len(pending):
+            logger.info(
+                f"Solving the background per time step ({grouped_solves} solves) "
+                f"instead of per process ({len(pending)})."
+            )
+            self._prepare_grouped_blocks(grouped)
+            return True
+
+        self._background_solver.prepare(activity_ids)
+        return False
 
     @property
     def temporal_market_lcis(self) -> dict:
@@ -1335,6 +1496,7 @@ class TimexLCA:
         self,
         expand_technosphere=True,
         keep_activity_dimension=True,
+        group_background_by_time=False,
     ) -> None:
         """
         Calculates the dynamic inventory, by first creating a dynamic biosphere matrix using the
@@ -1390,6 +1552,7 @@ class TimexLCA:
             background_solver=self._background_solver,
             nodes=self.nodes,
             keep_activity_dimension=keep_activity_dimension,
+            group_background_by_time=group_background_by_time,
         )
 
         # Which blocks are worth pre-factorizing is planned upfront by `lci()`.

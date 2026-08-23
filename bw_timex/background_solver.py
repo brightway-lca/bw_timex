@@ -263,10 +263,8 @@ class BackgroundSolver:
             sorted_ids, order = self._sorted_column_ids(block_index)
             values = self._translate(cache[cache_key], sorted_ids, order, len(block.columns))
         else:
-            row = self.product_dict[activity_id]
-            local_row = np.searchsorted(block.rows, row)
             rhs = np.zeros(len(block.rows))
-            rhs[local_row] = 1.0
+            rhs[self._local_row(block, activity_id)] = 1.0
             values = self.solve_block(block_index, rhs)
 
             nonzero = np.flatnonzero(values)
@@ -314,6 +312,45 @@ class BackgroundSolver:
 
         self._translated_aggregate[cache_key] = aggregate
         return aggregate.copy()
+
+    def aggregate_for_demand(self, demand: dict) -> np.ndarray:
+        """Biosphere aggregate of a *combined* demand `{activity_id: amount}`.
+
+        Equal to `sum(unit_aggregate(act) * amount)` by linearity, but reached
+        with one solve per block the demand touches instead of one per
+        activity. That is the whole point: a caller that has already summed
+        many timeline rows into one demand pays for the blocks, not the rows.
+
+        A temporal market interpolates between vintages living in different
+        background databases - different diagonal blocks - so a demand
+        routinely spans more than one, and each block is solved separately and
+        the aggregates summed.
+
+        Nothing is cached here. The demand is a sum specific to one caller's
+        grouping, so it has no stable identity to key on, unlike the per
+        activity unit LCIs of `unit_supply` / `unit_aggregate`.
+        """
+        by_block: dict = {}
+        for activity_id, amount in demand.items():
+            block_index = self.block_index_for(activity_id)
+            part = by_block.setdefault(block_index, {})
+            part[activity_id] = part.get(activity_id, 0.0) + amount
+
+        result = np.zeros(self.biosphere_matrix.shape[0])
+        for block_index, part in by_block.items():
+            block = self.structure.blocks[block_index]
+            rhs = np.zeros(len(block.rows))
+            for activity_id, amount in part.items():
+                rhs[self._local_row(block, activity_id)] += amount
+            supply = self.solve_block(block_index, rhs)
+            result += np.asarray(
+                self._biosphere_submatrix(block_index) @ supply
+            ).ravel()
+        return result
+
+    def _local_row(self, block, activity_id) -> int:
+        """Position of `activity_id`'s product row within `block.rows`."""
+        return int(np.searchsorted(block.rows, self.product_dict[activity_id]))
 
     def solve_block(self, block_index: int, rhs: np.ndarray) -> np.ndarray:
         """Solve `A[block.rows][:, block.columns] x = rhs` for one block.
@@ -374,6 +411,22 @@ class BackgroundSolver:
             pending_counts[block_index] = pending_counts.get(block_index, 0) + 1
 
         for block_index, count in pending_counts.items():
+            if count > 1:
+                self._factorize_block(block_index)
+
+    def prepare_blocks(self, block_indices) -> None:
+        """Pre-factorize every block that will be solved more than once.
+
+        The counterpart of `prepare` for callers that solve combined demands
+        (`aggregate_for_demand`) rather than per-activity unit LCIs: they know
+        which blocks they will hit and how often, but not which activities.
+        Same trade as `prepare` - an LU of an ecoinvent-sized block costs
+        roughly a hundred solves, so a block solved once must not buy one.
+        """
+        counts: dict = {}
+        for block_index in block_indices:
+            counts[block_index] = counts.get(block_index, 0) + 1
+        for block_index, count in counts.items():
             if count > 1:
                 self._factorize_block(block_index)
 
