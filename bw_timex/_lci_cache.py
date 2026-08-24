@@ -1,20 +1,29 @@
-"""Module-level cache for background unit LCI matrices.
+"""Module-level caches for background LCI results.
 
-This cache persists across :class:`~bw_timex.TimexLCA` objects within a single
+These caches persist across :class:`~bw_timex.TimexLCA` objects within a single
 Python session / ``bw_timex`` import (e.g. one Jupyter notebook kernel).
 
 Only *stable* background process identities are stored here: keys of the form
-``("db_code", db, code, modified)``, where ``modified`` is the background
-database's ``modified`` token. Editing a background database bumps that token,
-so stale entries are automatically missed instead of silently reused.
+``("db_code", project, db, code, modified)``, where ``modified`` is the
+background database's ``modified`` token. Editing a background database bumps
+that token, so stale entries are automatically missed instead of silently
+reused.
 
 Unstable keys (the time-mapped ``activity_id`` and the per-run
 ``temporalized`` database) are deliberately kept per-object by the
-:class:`~bw_timex.dynamic_biosphere_builder.DynamicBiosphereBuilder` and never
-reach this module-level cache.
+:class:`~bw_timex.background_solver.BackgroundSolver` and never reach these
+module-level caches.
 """
 
-BACKGROUND_UNIT_LCI_CACHE = {}
+# Cached supply columns and biosphere aggregates for background unit LCIs.
+# Payloads are pairs of 1-D numpy arrays `(node_ids, values)` holding only the
+# nonzero entries, in stable node-id space rather than any one lca_obj's
+# row/column index space (see `bw_timex.background_solver`). Caching a dense
+# `B @ diag(x)` matrix per background activity is what made large runs run out
+# of memory; supply columns (0.35 MB) and aggregates are orders of magnitude
+# smaller than the inventory matrices (5.5 MB) they replace.
+BACKGROUND_SUPPLY_CACHE = {}
+BACKGROUND_AGGREGATE_CACHE = {}
 
 # Cached biosphere exchanges per (project, db, code, modified). Keyed by the
 # source database's `modified` token so foreground/background edits
@@ -34,8 +43,10 @@ NODES_CACHE = {}
 
 
 def clear_background_lci_cache() -> None:
-    """Clear all module-level bw_timex caches (unit LCI, biosphere exchanges, solve, nodes)."""
-    BACKGROUND_UNIT_LCI_CACHE.clear()
+    """Clear all module-level bw_timex caches (supply/aggregate, biosphere
+    exchanges, solve, nodes)."""
+    BACKGROUND_SUPPLY_CACHE.clear()
+    BACKGROUND_AGGREGATE_CACHE.clear()
     BIOSPHERE_EXCHANGES_CACHE.clear()
     LCI_SOLVE_CACHE.clear()
     NODES_CACHE.clear()

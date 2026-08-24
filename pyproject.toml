@@ -76,6 +76,22 @@ solvers = [
     "pypardiso; sys_platform != 'darwin' or platform_machine != 'arm64'",
 ]
 
+premise = ["premise[bw25]>=2.4.9.2"]
+
+[tool.uv]
+# premise pins numpy < 2, which every other dependency here is happy to accept -
+# so without this, one lockfile resolution covering all extras drags the whole
+# project down to numpy 1.x, and CI on Python 3.13 (where numpy 1.26 has no
+# wheels) falls back to building numpy and scipy from source. Declaring the
+# extras as conflicting makes uv resolve them separately: `--extra testing` keeps
+# numpy 2.x, and `--extra premise` gets the numpy 1.x stack premise needs.
+conflicts = [
+    [
+        { extra = "premise" },
+        { extra = "testing" },
+    ],
+]
+
 [tool.setuptools]
 license-files = ["LICENSE"]
 package-data = {bw_timex = ["*.md", "*.txt", "data/*.json"]}
