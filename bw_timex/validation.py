@@ -73,11 +73,20 @@ class TimexLCAInputs(BaseModel):
                 raise ValueError(
                     f"The value {value} for database '{database}' is neither 'dynamic' nor a datetime object. Check the format of the database_dates."
                 )
+        return v
+
+    @model_validator(mode="after")
+    def validate_database_dates_exist(self) -> "TimexLCAInputs":
+        if self.create_missing:
+            return self
+        if self.database_dates is None:
+            return self
+        for database in self.database_dates:
             if database not in bd.databases:
                 raise ValueError(
                     f"Database '{database}' not available in the Brightway2 project."
                 )
-        return v
+        return self
 
     @field_validator("scenario")
     @classmethod
