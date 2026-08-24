@@ -44,6 +44,7 @@ it expects.
 | [`background_temporal_distributions.ipynb`](advanced/background_temporal_distributions.ipynb) | Temporal distributions *inside* background databases, via `traverse_background` | no |
 | [`background_temporal_distributions_premise.ipynb`](advanced/background_temporal_distributions_premise.ipynb) | The same feature on ecoinvent + premise data | yes |
 | [`uncertainty_with_datapackages.ipynb`](advanced/uncertainty_with_datapackages.ipynb) | Scenarios, sensitivity and Monte Carlo on a solved `TimexLCA` via extra `bw_processing` datapackages | no |
+| [`scenario_comparison.ipynb`](advanced/scenario_comparison.ipynb) | `TimexLCASettings`, repeated `TimexLCA.run()`, and `TimexLCA.compare()` on ecoinvent + premise data | yes |
 
 ## Teaching
 

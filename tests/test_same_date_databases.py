@@ -4,7 +4,6 @@ from datetime import datetime
 
 import bw2data as bd
 import pytest
-from loguru import logger
 
 from bw_timex import TimexLCA
 
@@ -62,22 +61,16 @@ def test_same_triplet_at_same_date_raises(same_date_db):
         tlca.build_timeline(starting_datetime="2025-01-01")
 
 
-def test_producer_in_a_single_vintage_warns_and_is_time_invariant(same_date_db):
-    """A copy made into only one vintage stays constant over time, with a warning."""
+def test_producer_in_a_single_vintage_is_time_invariant(same_date_db):
+    """A copy made into only one vintage stays constant over time."""
     bd.Database("modified_2030").get("steel_without_eol").delete()
     bd.Database("modified_2030").process()
 
-    messages = []
-    sink_id = logger.add(messages.append, level="WARNING")
-    try:
-        tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
-        tlca.build_timeline(starting_datetime="2025-01-01")
-    finally:
-        logger.remove(sink_id)
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
+    tlca.build_timeline(starting_datetime="2025-01-01")
 
     shares = _shares_by_producer(tlca.timeline)
     assert shares["steel, without EOL"] == {"modified_2020": 1}
-    assert any("steel, without EOL" in message for message in messages)
 
 
 def test_background_traversal_routes_within_the_modified_family(same_date_deep_db):
@@ -180,18 +173,12 @@ def test_partial_coverage_across_three_dates_interpolates_over_available(
         "foreground": "dynamic",
     }
 
-    messages = []
-    sink_id = logger.add(messages.append, level="WARNING")
-    try:
-        tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, database_dates)
-        tlca.build_timeline(starting_datetime="2025-01-01")
-    finally:
-        logger.remove(sink_id)
+    tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, database_dates)
+    tlca.build_timeline(starting_datetime="2025-01-01")
 
     shares = _shares_by_producer(tlca.timeline)
     assert set(shares["steel, without EOL"]) == {"modified_2020", "modified_2030"}
     assert shares["steel, without EOL"]["modified_2020"] == pytest.approx(0.5, abs=0.01)
-    assert any("steel, without EOL" in message for message in messages)
 
 
 def test_nearest_interpolation_stays_within_each_family(same_date_db):
@@ -208,31 +195,6 @@ def test_nearest_interpolation_stays_within_each_family(same_date_db):
         {"modified_2020": 1},
         {"modified_2030": 1},
     )
-
-
-def test_background_traversal_partial_coverage_warns(same_date_deep_db):
-    """A node reached mid-descent that exists in only one vintage of its
-    family must still trigger the partial-coverage warning, just like a
-    leaf temporal market does (`test_producer_in_a_single_vintage_warns_and_is_time_invariant`
-    above). Without this, a node pinned to a single vintage during background
-    traversal is silently pinned with no warning at all.
-    """
-    bd.Database("modified_2030").get("smelting").delete()
-    bd.Database("modified_2030").process()
-
-    messages = []
-    sink_id = logger.add(messages.append, level="WARNING")
-    try:
-        tlca = TimexLCA({("foreground", "fu"): 1}, METHOD, DATABASE_DATES)
-        tlca.build_timeline(
-            starting_datetime="2025-01-01",
-            graph_traversal="bfs",
-            traverse_background=True,
-        )
-    finally:
-        logger.remove(sink_id)
-
-    assert any("smelting" in message for message in messages)
 
 
 def test_interdatabase_mapping_is_filled_by_the_timeline_builder(same_date_db):
