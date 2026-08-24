@@ -42,9 +42,9 @@ nav = [
       { "Import from Excel" = "content/examples/tutorials/import_model_from_excel.md" },
     ]},
     { "Case Studies" = [
-      { "Electric Car with premise" = "content/examples/electric_vehicle_premise.md" },
-      { "Electric Car with premise (in detail)" = "content/examples/electric_vehicle_premise_detailed.md" },
-      { "EV Case Study for our Paper" = "content/examples/paper_case_study.md" },
+      { "Electric Car with premise" = "content/examples/examples/electric_vehicle_premise.md" },
+      { "Electric Car with premise (in detail)" = "content/examples/examples/electric_vehicle_premise_detailed.md" },
+      { "EV Case Study for our Paper" = "content/examples/examples/paper_case_study.md" },
     ]},
     { Advanced = [
       { "Temporal Distributions in the Background" = "content/examples/advanced/background_temporal_distributions.md" },
@@ -143,8 +143,8 @@ permalink = true
 generic = true
 [project.markdown_extensions.pymdownx.betterem]
 smart_enable = "all"
-[project.markdown_extensions.pymdownx.caret]
 [project.markdown_extensions.pymdownx.blocks.caption]
+[project.markdown_extensions.pymdownx.caret]
 [project.markdown_extensions.pymdownx.details]
 [project.markdown_extensions.pymdownx.emoji]
 emoji_index = "zensical.extensions.emoji.twemoji"
@@ -197,3 +197,57 @@ merge_init_into_class = true
 show_source = true
 inherited_members = false
 filters = ["!^_", "!^__"]
+
+[project.plugins.tags]
+
+[project.markdown_extensions.zensical.extensions.preview]
+configurations = [
+  { targets.include = ["**"], targets.exclude = ["**/*.svg", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.gif", "**/*.webp"] },
+]
+
+[project.markdown_extensions.zensical.extensions.glightbox]
+
+[project.validation]
+invalid_links = true
+invalid_link_anchors = true
+
+[project.extra.tags]
+example = "example"
+premise = "premise"
+"dynamic characterization" = "dynchar"
+paper = "paper"
+excel = "excel"
+tutorial = "tutorial"
+advanced = "advanced"
+uncertainty = "uncertainty"
+datapackages = "datapackages"
+installation = "installation"
+"temporal distribution" = "temporal-distribution"
+"temporal evolution" = "temporal-evolution"
+"background databases" = "background-databases"
+timeline = "timeline"
+inventory = "inventory"
+"graph traversal" = "graph-traversal"
+theory = "theory"
+api = "api"
+
+[project.theme.icon.tag]
+example = "lucide/flask-conical"
+premise = "lucide/leaf"
+dynchar = "lucide/trending-up"
+paper = "lucide/scroll-text"
+excel = "lucide/table"
+tutorial = "lucide/footprints"
+advanced = "lucide/sliders-horizontal"
+uncertainty = "lucide/dices"
+scenario = "lucide/git-compare"
+datapackages = "lucide/package"
+installation = "lucide/download"
+"temporal-distribution" = "lucide/chart-column-increasing"
+"temporal-evolution" = "lucide/chart-spline"
+"background-databases" = "lucide/database"
+timeline = "lucide/list-ordered"
+inventory = "lucide/calculator"
+"graph-traversal" = "lucide/waypoints"
+theory = "lucide/book-open"
+api = "lucide/code"
