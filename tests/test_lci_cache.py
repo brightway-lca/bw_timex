@@ -1,19 +1,22 @@
 from datetime import datetime
 
+import bw2calc
 import bw2data as bd
 import pytest
 
 import bw_timex
 from bw_timex import TimexLCA
 from bw_timex._lci_cache import (
-    BACKGROUND_UNIT_LCI_CACHE,
+    BACKGROUND_AGGREGATE_CACHE,
+    BACKGROUND_SUPPLY_CACHE,
     BIOSPHERE_EXCHANGES_CACHE,
     LCI_SOLVE_CACHE,
     NODES_CACHE,
 )
 
 
-def _build_tlca(expand_technosphere=True, **kwargs):
+def _make_tlca(**kwargs):
+    """A TimexLCA with its timeline built, but no `lci()` call yet."""
     node_a = bd.get_node(database="foreground", code="A")
     database_dates = {
         "db_2020": datetime.strptime("2020", "%Y"),
@@ -26,6 +29,11 @@ def _build_tlca(expand_technosphere=True, **kwargs):
         **kwargs,
     )
     tlca.build_timeline(starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"))
+    return tlca
+
+
+def _build_tlca(expand_technosphere=True, **kwargs):
+    tlca = _make_tlca(**kwargs)
     tlca.lci(
         expand_technosphere=expand_technosphere, build_dynamic_biosphere=True
     )
@@ -47,7 +55,7 @@ class TestModuleLevelLCICache:
         project = bd.projects.current
         return [
             k
-            for k in BACKGROUND_UNIT_LCI_CACHE
+            for k in BACKGROUND_SUPPLY_CACHE
             if k[0] == "db_code"
             and k[1] == project
             and k[2] == "db_2020"
@@ -62,7 +70,7 @@ class TestModuleLevelLCICache:
     def test_cache_reused_across_different_lci_structures(self):
         # Build with expand_technosphere=True populates the cache.
         _build_tlca()
-        n_before = len([k for k in BACKGROUND_UNIT_LCI_CACHE if k[0] == "db_code"])
+        n_before = len([k for k in BACKGROUND_SUPPLY_CACHE if k[0] == "db_code"])
         assert n_before > 0
 
         # Build with expand_technosphere=False — different lca_obj structure
@@ -84,7 +92,7 @@ class TestModuleLevelLCICache:
         tlca2.lci(expand_technosphere=False, build_dynamic_biosphere=True)
 
         # Same db_code entries — no new misses logged.
-        n_after = len([k for k in BACKGROUND_UNIT_LCI_CACHE if k[0] == "db_code"])
+        n_after = len([k for k in BACKGROUND_SUPPLY_CACHE if k[0] == "db_code"])
         assert n_after == n_before
 
     def test_cache_persists_and_is_reused_across_objects(self):
@@ -92,23 +100,28 @@ class TestModuleLevelLCICache:
         keys = self._db_2020_c_keys()
         assert len(keys) == 1
         key = keys[0]
-        cached_matrix = BACKGROUND_UNIT_LCI_CACHE[key]
+        cached_payload = BACKGROUND_SUPPLY_CACHE[key]
 
-        _build_tlca()
-        # Identical scenario re-run: same key, same object reused (not recomputed),
-        # and no extra entry created.
+        tlca_warm = _build_tlca()
+        # Identical scenario re-run: same key, same payload reused (not
+        # recomputed), no extra entry created, and no solve performed.
         assert self._db_2020_c_keys() == [key]
-        assert BACKGROUND_UNIT_LCI_CACHE[key] is cached_matrix
+        assert BACKGROUND_SUPPLY_CACHE[key] is cached_payload
+        assert tlca_warm._background_solver.n_solves == 0
 
     def test_opt_out_does_not_use_global_cache(self):
-        _build_tlca(use_global_lci_cache=False)
-        assert len(BACKGROUND_UNIT_LCI_CACHE) == 0
+        tlca = _build_tlca(use_global_lci_cache=False)
+        assert len(BACKGROUND_SUPPLY_CACHE) == 0
+        assert len(BACKGROUND_AGGREGATE_CACHE) == 0
+        # The background LCIs went into the object's private caches instead.
+        assert len(tlca._background_supply_cache) > 0
+        assert tlca._background_solver.shared_cache is tlca._background_supply_cache
 
     def test_clear_background_lci_cache_empties_it(self):
         _build_tlca()
-        assert len(BACKGROUND_UNIT_LCI_CACHE) > 0
+        assert len(BACKGROUND_SUPPLY_CACHE) > 0
         bw_timex.clear_background_lci_cache()
-        assert len(BACKGROUND_UNIT_LCI_CACHE) == 0
+        assert len(BACKGROUND_SUPPLY_CACHE) == 0
 
     def test_global_cache_does_not_leak_across_structures(self):
         # expand_technosphere=True then a second object with expand=False must
@@ -148,44 +161,42 @@ class TestModuleLevelLCICache:
             tlca_expanded.static_score, rel=1e-9
         )
 
-    def test_warm_cache_skips_factorization(self):
-        # First run populates the global cache.
+    def test_cold_cache_solves_background_lcis_off_the_main_matrix(self):
+        # Background unit LCIs are solved per block by `BackgroundSolver`, so
+        # a cold run performs them without ever touching `self.lca`.
+        tlca = _build_tlca()
+        assert tlca._background_solver.n_solves > 0
+
+    def test_warm_cache_performs_no_background_solves(self):
         _build_tlca()
-        # Second run with identical scenario should have 0 cache misses and
-        # therefore skip the expensive technosphere LU factorization.
-        tlca2 = _build_tlca()
-        assert tlca2._lci_did_factorize is False
+        tlca_warm = _build_tlca()
+        assert tlca_warm._background_solver.n_solves == 0
 
-    def test_cold_cache_factorizes_when_above_threshold(self, monkeypatch):
-        # Force the threshold down so the tiny test scenario triggers factorize.
-        import bw_timex.timex_lca as tlca_mod
+    def test_expanded_lci_solves_the_main_matrix_exactly_once(self, monkeypatch):
+        # Since background unit LCIs never run through `self.lca` any more, the
+        # expanded matrix needs one solve and no `redo_lci` reset afterwards.
+        tlca = _make_tlca()
+        calls = {"lci_calculation": 0, "redo_lci": 0}
+        original_lci_calculation = bw2calc.LCA.lci_calculation
+        original_redo_lci = bw2calc.LCA.redo_lci
 
-        monkeypatch.setattr(tlca_mod, "FACTORIZE_SOLVES_THRESHOLD", 1)
-        tlca = _build_tlca()
-        assert tlca._lci_did_factorize is True
+        def counting_lci_calculation(lca_obj, *args, **kwargs):
+            calls["lci_calculation"] += 1
+            return original_lci_calculation(lca_obj, *args, **kwargs)
 
-    def test_cold_cache_skips_factorization_when_below_threshold(self, monkeypatch):
-        # With the threshold high, the few cache misses should not justify
-        # factorizing — single sparse solves are cheaper.
-        import bw_timex.timex_lca as tlca_mod
+        def counting_redo_lci(lca_obj, *args, **kwargs):
+            calls["redo_lci"] += 1
+            return original_redo_lci(lca_obj, *args, **kwargs)
 
-        monkeypatch.setattr(tlca_mod, "FACTORIZE_SOLVES_THRESHOLD", 1000)
-        tlca = _build_tlca()
-        assert tlca._lci_did_factorize is False
+        monkeypatch.setattr(bw2calc.LCA, "lci_calculation", counting_lci_calculation)
+        monkeypatch.setattr(bw2calc.LCA, "redo_lci", counting_redo_lci)
+        tlca.lci(expand_technosphere=True, build_dynamic_biosphere=True)
 
-    def test_warm_cache_skips_trailing_redo_lci_reset(self):
-        # First run populates global cache.
-        _build_tlca()
-        # Second run has zero background unit-LCI solves during the build,
-        # so the trailing redo_lci(self.fu) reset is unnecessary.
-        tlca2 = _build_tlca()
-        assert tlca2._lci_did_reset is False
-
-    def test_cold_cache_does_trailing_redo_lci_reset(self):
-        # Cold cache: build will call redo_lci on at least one background act,
-        # so the trailing reset back to the functional unit is required.
-        tlca = _build_tlca()
-        assert tlca._lci_did_reset is True
+        assert calls == {"lci_calculation": 1, "redo_lci": 0}
+        # And the surviving fu inventory really is the functional unit's.
+        assert tlca._background_solver.n_solves > 0
+        tlca.static_lcia()
+        assert tlca.static_score == pytest.approx(tlca.dynamic_inventory.sum())
 
     def test_biosphere_exchanges_cache_persists_across_objects(self):
         _build_tlca()
@@ -203,37 +214,13 @@ class TestModuleLevelLCICache:
         bw_timex.clear_background_lci_cache()
         assert len(BIOSPHERE_EXCHANGES_CACHE) == 0
 
-    def test_from_timeline_counts_pending_background_solves(self):
+    def test_from_timeline_reuses_cached_background_lcis(self):
         # Building from the timeline needs the same background unit LCIs as the
-        # expanded path, so it has to plan its solves the same way.
+        # expanded path, and reuses the same cache entries.
         tlca = _build_tlca(expand_technosphere=False)
-        assert tlca._lci_pending_solves > 0
+        assert tlca._background_solver.n_solves > 0
         tlca_warm = _build_tlca(expand_technosphere=False)
-        assert tlca_warm._lci_pending_solves == 0
-
-    def test_from_timeline_factorizes_when_above_threshold(self, monkeypatch):
-        import bw_timex.timex_lca as tlca_mod
-
-        monkeypatch.setattr(tlca_mod, "FACTORIZE_SOLVES_THRESHOLD", 1)
-        tlca = _build_tlca(expand_technosphere=False)
-        assert tlca._lci_did_factorize is True
-
-    def test_from_timeline_skips_factorization_when_below_threshold(self, monkeypatch):
-        import bw_timex.timex_lca as tlca_mod
-
-        monkeypatch.setattr(tlca_mod, "FACTORIZE_SOLVES_THRESHOLD", 1000)
-        tlca = _build_tlca(expand_technosphere=False)
-        assert tlca._lci_did_factorize is False
-
-    def test_from_timeline_warm_cache_skips_factorization(self, monkeypatch):
-        import bw_timex.timex_lca as tlca_mod
-
-        monkeypatch.setattr(tlca_mod, "FACTORIZE_SOLVES_THRESHOLD", 1)
-        _build_tlca(expand_technosphere=False)
-        # Everything the second run needs is cached, so there is nothing left
-        # to factorize for.
-        tlca_warm = _build_tlca(expand_technosphere=False)
-        assert tlca_warm._lci_did_factorize is False
+        assert tlca_warm._background_solver.n_solves == 0
 
     def test_from_timeline_matches_expanded_score(self):
         tlca_expanded = _build_tlca(expand_technosphere=True)
