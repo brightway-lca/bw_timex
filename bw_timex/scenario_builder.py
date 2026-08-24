@@ -1,0 +1,412 @@
+"""Find the background vintages a scenario names, or build them with premise.
+
+`TimexLCA(scenario=...)` selects background databases by their metadata. When
+the project does not hold them yet, `ensure_scenario_databases` builds the
+missing ones with premise instead of leaving the user at a dead end.
+
+premise and bw2io are imported inside `_run_premise` and `_import_ecoinvent`
+only, so `bw_timex` keeps working without them installed and a run that finds
+everything it needs never touches either.
+"""
+
+from __future__ import annotations
+
+import os
+from datetime import datetime
+
+import bw2data as bd
+from loguru import logger
+
+from .database_metadata import (
+    REPRESENTATIVE_TIME,
+    SCENARIOS,
+    SECTORS,
+    _normalize_representative_time,
+    database_matches_scenario,
+    database_matches_sectors,
+    set_database_metadata,
+    split_scenario,
+)
+from .validation import ScenarioBuildInputs
+
+
+def find_existing_vintages(
+    filters: dict, sectors: list[str] | None = None
+) -> dict[int, tuple[str, datetime]]:
+    """Map each year the project already covers to the database covering it.
+
+    A year is covered by a registered database whose `representative_time`
+    falls in it and that the scenario filter keeps. "Keeps" is the resolver's
+    own rule (`database_matches_scenario`): a database is dropped only if it
+    declares a filtered key with a different value. Any stricter rule would
+    build a second database for a year `TimexLCA` already resolves.
+
+    `sectors` is not part of that filter - it never reaches
+    `TimexLCA(scenario=...)` - but a vintage built for other sectors is not the
+    vintage this build asked for, so it is compared separately
+    (`database_matches_sectors`).
+
+    Returns the database's own `representative_time`, not a date derived from
+    the year: a hand-built vintage need not sit on 1 January.
+    """
+    found = {}
+    for name in bd.databases:
+        metadata = bd.databases[name]
+        if REPRESENTATIVE_TIME not in metadata or metadata.get(SCENARIOS):
+            continue
+        value = _normalize_representative_time(metadata[REPRESENTATIVE_TIME], name)
+        if not isinstance(value, datetime):  # "dynamic"
+            continue
+        if not database_matches_scenario(metadata, filters):
+            continue
+        if not database_matches_sectors(metadata, sectors):
+            continue
+        found.setdefault(value.year, (name, value))
+    return found
+
+
+def _run_premise(
+    *,
+    scenarios: list[dict],
+    source_database: str,
+    source_version: str,
+    system_model: str,
+    biosphere: str,
+    sectors: list[str] | None,
+    names: list[str],
+    key: str,
+) -> None:
+    """Build and write one prospective database per scenario.
+
+    The only place premise is called. One `NewDatabase` for all scenarios, not
+    one per year: premise caches the extracted source database, so separate
+    runs would re-extract ecoinvent every time.
+    """
+    try:
+        from premise import NewDatabase
+    except ImportError as error:
+        raise ImportError(
+            'premise is needed to build background databases. Install it with: '
+            'pip install "bw_timex[premise]"'
+        ) from error
+
+    ndb = NewDatabase(
+        scenarios=scenarios,
+        source_db=source_database,
+        source_version=source_version,
+        system_model=system_model,
+        biosphere_name=biosphere,
+        key=key,
+    )
+    if sectors:
+        ndb.update(sectors)
+    else:
+        ndb.update()
+    ndb.write_db_to_brightway(name=names)
+
+
+def _import_ecoinvent(version: str, system_model: str, credentials: tuple[str, str]) -> str:
+    """Import an ecoinvent release. The only place bw2io is called."""
+    try:
+        from bw2io import import_ecoinvent_release
+    except ImportError as error:
+        raise ImportError(
+            'bw2io is needed to import ecoinvent. Install it with: pip install '
+            '"bw_timex[premise]"'
+        ) from error
+
+    username, password = credentials
+    import_ecoinvent_release(
+        version=version,
+        system_model=system_model,
+        username=username,
+        password=password,
+    )
+    return f"ecoinvent-{version}-{system_model}"
+
+
+def _resolve_premise_key(premise_key: str | None) -> str:
+    key = premise_key or os.environ.get("PREMISE_KEY")
+    if not key:
+        raise ValueError(
+            "No premise decryption key. Pass `premise_key=...` or set the "
+            "environment variable PREMISE_KEY. The key is needed to read "
+            "premise's bundled IAM scenarios; see "
+            "https://premise.readthedocs.io for how to request one."
+        )
+    return key
+
+
+def _resolve_ecoinvent_credentials(
+    credentials: tuple[str, str] | None,
+) -> tuple[str, str]:
+    if credentials:
+        username, password = credentials
+    else:
+        username = os.environ.get("ECOINVENT_USERNAME")
+        password = os.environ.get("ECOINVENT_PASSWORD")
+    missing = [
+        name
+        for name, value in (
+            ("ECOINVENT_USERNAME", username),
+            ("ECOINVENT_PASSWORD", password),
+        )
+        if not value
+    ]
+    if missing:
+        raise ValueError(
+            f"No ecoinvent credentials, needed to import the source database "
+            f"premise builds from. Pass `ecoinvent_credentials=(username, "
+            f"password)` or set {' and '.join(missing)}."
+        )
+    return username, password
+
+
+def vintage_name(filters: dict, year: int) -> str:
+    """The database name a built vintage gets."""
+    return (
+        f"ei_{filters['system_model']}_{filters['ecoinvent_version']}_"
+        f"{filters['iam_model']}_{filters['pathway']}_{year}"
+    )
+
+
+def _metadata_recovery_call(name: str, year: int, sectors: list[str] | None) -> str:
+    """The `set_database_metadata` call that resumes a stranded build.
+
+    `sectors` metadata is written only after the `representative_time` check
+    passes (see `ensure_scenario_databases`), so a build stranded before that
+    point has neither key. The recovery snippet must restore both when
+    `sectors` was requested, or following it literally re-triggers the very
+    collision it is meant to resolve - now because `sectors` is missing.
+    """
+    sectors_arg = f", sectors={list(sectors)!r}" if sectors else ""
+    return (
+        f"bw_timex.set_database_metadata('{name}', "
+        f"representative_time=datetime({year}, 1, 1){sectors_arg})"
+    )
+
+
+def _check_no_collisions(
+    names: dict[int, str], filters: dict, sectors: list[str] | None = None
+) -> None:
+    """Refuse to build over a database that this run did not write.
+
+    `write_db_to_brightway` deletes and rewrites a database of the same name
+    without asking. A name that exists here was not matched as a vintage: a
+    database that satisfied the scenario would have satisfied its year already,
+    and its year would not be in the build list.
+
+    Three kinds of collision, with different advice each:
+
+    - A colliding database that carries no `representative_time` is what an
+      earlier run of this function leaves behind when it stops at the
+      metadata check below: premise wrote it, so it is most likely a complete
+      and correct database that is only missing metadata, and deleting it
+      throws away hours of premise.
+    - A colliding database that matches every filter key but declares
+      different `sectors` is not foreign either: it is the same scenario,
+      built for a different sector selection. Its year was not counted as
+      satisfied (`database_matches_sectors` excluded it, since that is an
+      equality test, not a superset test), so a build was attempted under the
+      same name - but deleting or renaming it away by default would throw
+      away a database that may already cover what was asked for.
+    - Anything else declares a point in time and still did not match, so it
+      belongs to someone else.
+    """
+    wanted = {**filters, **({"sectors": sectors} if sectors else {})}
+    unfinished = {
+        year: name
+        for year, name in names.items()
+        if name in bd.databases and REPRESENTATIVE_TIME not in bd.databases[name]
+    }
+    if unfinished:
+        year, name = sorted(unfinished.items())[0]
+        raise ValueError(
+            f"Database(s) {sorted(unfinished.values())} already exist in this "
+            f"project under the name(s) this build would write, and carry no "
+            f"`{REPRESENTATIVE_TIME}` metadata. That is what an earlier build "
+            f"that did not finish leaves behind: premise wrote the database(s), "
+            f"but the run stopped before their metadata could be checked. "
+            f"Rather than rebuilding them (tens of minutes each), add the "
+            f"missing metadata, e.g. "
+            f"`{_metadata_recovery_call(name, year, sectors)}`, and run this "
+            f"again. If they are not usable, delete them instead."
+        )
+    remaining = [name for name in names.values() if name in bd.databases]
+    sector_mismatch = {
+        name: bd.databases[name]
+        for name in remaining
+        if database_matches_scenario(bd.databases[name], filters)
+    }
+    if sector_mismatch:
+        name = sorted(sector_mismatch)[0]
+        existing_sectors = sector_mismatch[name].get(SECTORS)
+        existing_desc = (
+            f"sectors {sorted(existing_sectors)}" if existing_sectors else "all sectors"
+        )
+        wanted_desc = f"sectors {sorted(sectors)}" if sectors else "all sectors"
+        raise ValueError(
+            f"Database '{name}' already exists in this project and matches "
+            f"scenario {filters!r}, but it was built for {existing_desc} while "
+            f"this build asked for {wanted_desc} - only `sectors` differs, so "
+            f"it is not a foreign database. If {existing_desc} already covers "
+            f"what you need, drop `sectors` from the scenario and reuse it "
+            f"as-is. Otherwise rename it, e.g. "
+            f"`bw2data.Database('{name}').rename('{name}_renamed')`, so this "
+            f"narrowed build can be written alongside it."
+        )
+    colliding = remaining
+    if colliding:
+        raise ValueError(
+            f"Database(s) {colliding} already exists in this project but does "
+            f"not match scenario {wanted!r}, and premise would overwrite them. "
+            f"Rename or delete them, or map them yourself with `database_dates`."
+        )
+
+
+def _resolve_source_database(
+    filters: dict, build: dict, ecoinvent_credentials
+) -> tuple[str, str]:
+    """The ecoinvent database premise builds from, and its biosphere.
+
+    Importing ecoinvent takes a while and needs a licence, so it happens only
+    when there is nothing to build from.
+    """
+    version = filters["ecoinvent_version"]
+    system_model = filters["system_model"]
+    default_biosphere = f"ecoinvent-{version}-biosphere"
+
+    source = build.get("source_database")
+    if source is not None:
+        if source not in bd.databases:
+            raise ValueError(
+                f"source_database '{source}' is not registered in this project. "
+                f"Available databases: {sorted(bd.databases)}."
+            )
+    else:
+        source = f"ecoinvent-{version}-{system_model}"
+        if source not in bd.databases:
+            logger.info(
+                f"No database '{source}' in this project. Importing ecoinvent "
+                f"{version} ({system_model}) first; this takes a while and needs "
+                f"an ecoinvent licence."
+            )
+            source = _import_ecoinvent(
+                version=version,
+                system_model=system_model,
+                credentials=_resolve_ecoinvent_credentials(ecoinvent_credentials),
+            )
+
+    for candidate in (default_biosphere, "biosphere3"):
+        if candidate in bd.databases:
+            return source, candidate
+    raise ValueError(
+        f"No biosphere database found: expected '{default_biosphere}' or "
+        f"'biosphere3'. premise needs one to link elementary flows."
+    )
+
+
+def ensure_scenario_databases(
+    scenario: dict,
+    premise_key: str | None = None,
+    ecoinvent_credentials: tuple[str, str] | None = None,
+) -> dict[str, datetime]:
+    """
+    Make sure every year of `scenario` has a background database, building what is missing.
+
+    Parameters
+    ----------
+    scenario : dict
+        The same mapping `TimexLCA` takes, plus the build keys `years`
+        (required), `sectors` and `source_database`.
+    premise_key : str, optional
+        premise decryption key. Falls back to `$PREMISE_KEY`.
+    ecoinvent_credentials : tuple, optional
+        `(username, password)`, used only if ecoinvent has to be imported.
+        Falls back to `$ECOINVENT_USERNAME` / `$ECOINVENT_PASSWORD`.
+
+    Returns
+    -------
+    dict
+        Database name to the point in time it represents, for the vintages
+        found or built.
+    """
+    ScenarioBuildInputs(scenario=scenario, ecoinvent_credentials=ecoinvent_credentials)
+    filters, build = split_scenario(scenario)
+    # The same year twice would hand premise the same target name twice, and it
+    # would build and write it twice.
+    years = list(dict.fromkeys(build["years"]))
+    # `[]` and absent both mean "all sectors" everywhere downstream
+    # (`database_matches_sectors`, the `sectors` metadata write below); without
+    # this, `sectors=[]` would look narrowed to the matcher but unnarrowed to
+    # the build, and the identical request would collide with itself.
+    sectors = build.get("sectors") or None
+
+    existing = find_existing_vintages(filters, sectors)
+    missing = [year for year in years if year not in existing]
+
+    if not missing:
+        logger.info(
+            f"All {len(years)} requested background vintage(s) already exist in "
+            f"this project. Nothing to build."
+        )
+        return dict(existing[year] for year in years)
+
+    names = {year: vintage_name(filters, year) for year in missing}
+    _check_no_collisions(names, filters, sectors)
+
+    key = _resolve_premise_key(premise_key)
+    source_database, biosphere = _resolve_source_database(
+        filters, build, ecoinvent_credentials
+    )
+
+    logger.info(
+        f"Building {len(missing)} background database(s) for year(s) {missing} with "
+        f"premise ({filters['iam_model']}, {filters['pathway']}, "
+        f"{'all sectors' if not sectors else ', '.join(sectors)}). Each is a full "
+        f"copy of ecoinvent, so expect tens of minutes and roughly 2-4 GB per year."
+    )
+
+    _run_premise(
+        scenarios=[
+            {
+                "model": filters["iam_model"],
+                "pathway": filters["pathway"],
+                "year": year,
+            }
+            for year in missing
+        ],
+        source_database=source_database,
+        source_version=filters["ecoinvent_version"],
+        system_model=filters["system_model"],
+        biosphere=biosphere,
+        sectors=sectors,
+        names=[names[year] for year in missing],
+        key=key,
+    )
+
+    for year in missing:
+        name = names[year]
+        if REPRESENTATIVE_TIME not in bd.databases.get(name, {}):
+            raise RuntimeError(
+                f"premise wrote '{name}' without `{REPRESENTATIVE_TIME}` metadata, so "
+                f"`TimexLCA` cannot tell what point in time it represents. This "
+                f"metadata is written by premise >= 2.4.9.2; check your installed "
+                f"version. The database(s) premise just built are still in this "
+                f"project, so there is no need to build them again: add the missing "
+                f"metadata yourself with "
+                f"`{_metadata_recovery_call(name, year, sectors)}` and run this "
+                f"again."
+            )
+        if sectors:
+            # premise does not record which sectors were updated, and two runs of
+            # the same pathway with different sectors would otherwise look identical
+            # to the scenario filter.
+            set_database_metadata(name, sectors=list(sectors))
+
+    logger.info(f"Built {len(missing)} background database(s).")
+
+    resolved = dict(existing[year] for year in years if year in existing)
+    # premise writes 1 January of the scenario year.
+    resolved.update({names[year]: datetime(year, 1, 1) for year in missing})
+    return resolved

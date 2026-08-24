@@ -276,6 +276,18 @@ class TestTimexLCAFromMetadata:
         tlca = TimexLCA(demand={fu.key: 1}, method=("GWP", "example"))
         assert tlca.database_dates["foreground"] == "dynamic"
 
+    def test_demand_database_mapped_to_a_fixed_date_raises(self, fu):
+        """Regression: without an explicit `database_dates`, the demand's
+        database is resolved from its own `representative_time` metadata. If
+        that metadata maps it to a fixed date rather than "dynamic", this
+        must still raise - the same check that fires when `database_dates`
+        is given explicitly (see `test_demand_not_in_dynamic_db_raises` in
+        test_timex_lca.py) must also fire along the metadata-resolution path.
+        """
+        set_database_metadata("foreground", representative_time="2022-01-01")
+        with pytest.raises(ValueError, match="mapped to a date rather than 'dynamic'"):
+            TimexLCA(demand={fu.key: 1}, method=("GWP", "example"))
+
     def test_scenario_is_forwarded(self, fu):
         set_database_metadata(
             "db_2022", representative_time="2022-01-01", pathway="SSP2-Base"
@@ -423,3 +435,110 @@ class TestValidateScenario:
                 method=("GWP", "example"),
                 scenario={"pathway": {"nested": "dict"}},
             )
+
+
+# ─── Tests for the scenario key vocabulary ───
+
+
+class TestSplitScenario:
+
+    def test_build_keys_are_separated(self):
+        from bw_timex.database_metadata import split_scenario
+
+        filters, build = split_scenario(
+            {
+                "iam_model": "remind",
+                "pathway": "SSP2-PkBudg500",
+                "years": [2020, 2030],
+                "sectors": ["electricity"],
+                "source_database": "my_ecoinvent",
+            }
+        )
+        assert filters == {"iam_model": "remind", "pathway": "SSP2-PkBudg500"}
+        assert build == {
+            "years": [2020, 2030],
+            "sectors": ["electricity"],
+            "source_database": "my_ecoinvent",
+        }
+
+    def test_unknown_keys_are_treated_as_filters(self):
+        from bw_timex.database_metadata import split_scenario
+
+        filters, build = split_scenario({"my_own_key": "value"})
+        assert filters == {"my_own_key": "value"}
+        assert build == {}
+
+    def test_none_scenario_gives_empty_dicts(self):
+        from bw_timex.database_metadata import split_scenario
+
+        assert split_scenario(None) == ({}, {})
+
+
+class TestDatabaseMatchesScenario:
+
+    def test_declared_and_equal_matches(self):
+        from bw_timex.database_metadata import database_matches_scenario
+
+        assert database_matches_scenario({"pathway": "SSP2-PkBudg500"}, {"pathway": "SSP2-PkBudg500"})
+
+    def test_declared_and_different_does_not_match(self):
+        from bw_timex.database_metadata import database_matches_scenario
+
+        assert not database_matches_scenario({"pathway": "SSP2-Base"}, {"pathway": "SSP2-PkBudg500"})
+
+    def test_undeclared_key_still_matches(self):
+        from bw_timex.database_metadata import database_matches_scenario
+
+        assert database_matches_scenario({"representative_time": "2020-01-01"}, {"pathway": "SSP2-PkBudg500"})
+
+    def test_list_values_compare_order_insensitively(self):
+        from bw_timex.database_metadata import database_matches_scenario
+
+        assert database_matches_scenario(
+            {"external_scenarios": ["b", "a"]}, {"external_scenarios": ["a", "b"]}
+        )
+
+    def test_empty_scenario_matches_everything(self):
+        from bw_timex.database_metadata import database_matches_scenario
+
+        assert database_matches_scenario({"pathway": "SSP2-Base"}, None)
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestResolverIgnoresBuildKeys:
+
+    def test_build_keys_do_not_reach_the_filter(self):
+        set_database_metadata(
+            "db_2022",
+            representative_time=datetime(2022, 1, 1),
+            pathway="SSP2-PkBudg500",
+        )
+        resolved = resolve_database_dates_from_metadata(
+            {"pathway": "SSP2-PkBudg500", "years": [2022], "sectors": ["electricity"]}
+        )
+        assert resolved == {"db_2022": datetime(2022, 1, 1)}
+
+    def test_build_keys_are_not_reported_as_undeclared(self):
+        # A scenario that keeps its `years` but is used without
+        # `create_missing` must not be told that `years` is missing metadata:
+        # no database ever declares it.
+        set_database_metadata("foreground", representative_time="dynamic")
+        set_database_metadata(
+            "db_2022",
+            representative_time=datetime(2022, 1, 1),
+            pathway="SSP2-Base",
+        )
+        fu = bd.get_node(database="foreground", code="A")
+        with pytest.raises(ValueError) as excinfo:
+            TimexLCA(
+                demand={fu.key: 1},
+                method=("GWP", "example"),
+                scenario={"pathway": "SSP2-PkBudg500", "years": [2022]},
+            )
+        message = str(excinfo.value)
+        assert "pathway" in message
+        assert "SSP2-Base" in message
+        # `years` is a build key, never a metadata key: it must not appear as
+        # one of the filter keys that matched nothing. (The message may still
+        # suggest `create_missing=True` with a `years` list.)
+        assert "'years'" not in message
