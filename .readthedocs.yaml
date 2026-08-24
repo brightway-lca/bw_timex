@@ -18,5 +18,6 @@ build:
       - python docs/convert_notebooks.py
       - python docs/fix_example_paths.py
       - zensical build
+      - python docs/add_example_url_aliases.py
       - mkdir -p $READTHEDOCS_OUTPUT/html
       - cp -r site/* $READTHEDOCS_OUTPUT/html/
