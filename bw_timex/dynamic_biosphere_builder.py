@@ -31,9 +31,10 @@ class DynamicBiosphereBuilder:
         timeline: pd.DataFrame,
         interdatabase_activity_mapping: SetList,
         expand_technosphere: bool = True,
-        background_unit_lci_cache: dict | None = None,
+        background_solver=None,
         nodes: dict | None = None,
         keep_activity_dimension: bool = True,
+        group_background_by_time: bool = False,
     ) -> None:
         """
         Initializes the DynamicBiosphereBuilder object.
@@ -68,6 +69,11 @@ class DynamicBiosphereBuilder:
         expand_technosphere : bool, optional
             A boolean indicating if the dynamic biosphere matrix is built via expanded matrices or directly from the timeline.
             Default is True.
+        background_solver : BackgroundSolver, optional
+            Solver supplying the unit background LCIs the temporal markets are
+            made of. Required whenever the timeline contains temporal markets;
+            `TimexLCA` builds one per `lci()` call and hands the same instance
+            to every builder, so its supply/aggregate caches are shared.
         nodes : dict, optional
             A dictionary mapping node ids to their bw2data node proxies, as collected by
             `TimexLCA`. Used to resolve producers by id instead of by code, which is only
@@ -88,16 +94,24 @@ class DynamicBiosphereBuilder:
 
         self.lca_obj = lca_obj
 
-        # Cached background unit LCIs are stored as structure-independent
-        # triplets (bioflow_id, bg_activity_id, amount); when consumed the
-        # matrix is rebuilt to *this* lca_obj's biosphere/technosphere
-        # index space (see `_rebuild_unit_lci`).
         self._expand_technosphere = bool(expand_technosphere)
         # With the activity dimension dropped, every emission goes into a single
         # column, already scaled by its activity's supply. That is all a score -
         # static or dynamic - needs, and it keeps the entry count proportional to
         # the number of (flow, time) pairs instead of (flow, time, activity).
         self.keep_activity_dimension = bool(keep_activity_dimension)
+        # Sum the background demands of every temporal-market row landing at
+        # the same point in time, and solve those sums instead of one unit LCI
+        # per background process. Only lossless when the rows in question end
+        # up in the same column anyway, which is exactly what dropping the
+        # activity dimension does - and only wired for the timeline build,
+        # where a row *is* a column. `TimexLCA` decides whether it is also
+        # cheaper; see `_plan_background_solves`.
+        self.group_background_by_time = bool(
+            group_background_by_time
+            and not keep_activity_dimension
+            and not expand_technosphere
+        )
 
         if expand_technosphere:
             self.technosphere_matrix = (
@@ -137,22 +151,24 @@ class DynamicBiosphereBuilder:
         # from the bw2data SQL store; share results across TimexLCA objects.
         from ._lci_cache import BIOSPHERE_EXCHANGES_CACHE
         self._activity_biosphere_exchange_cache = BIOSPHERE_EXCHANGES_CACHE
-        # Shared/global cache: only stable ("db_code", ...) keys go here so it
-        # can safely persist across TimexLCA objects. Stored as
-        # structure-independent triplets (bioflow_id, bg_activity_id, amount)
-        # so the same entry can be reused across lca_objs with different
-        # column/row spaces (different timelines, expand modes, etc.).
-        self._background_unit_lci_cache = (
-            background_unit_lci_cache if background_unit_lci_cache is not None else {}
-        )
-        # Per-object cache for keys that are NOT stable across TimexLCA objects
-        # (time-mapped activity ids and the per-run "temporalized" database).
-        self._instance_unit_lci_cache = {}
-        # Within-build cache of rebuilt unit-LCI matrices (sized to *this*
-        # lca_obj). Avoids re-materializing the same CSR for repeated calls
-        # within one build_dynamic_biosphere_matrix run.
-        self._rebuilt_unit_lci_cache = {}
+        self.background_solver = background_solver
+        if background_solver is not None:
+            # A `BackgroundSolver` has no notion of a time mapping, so it
+            # cannot tell a stable background-process identity from a
+            # time-mapped or temporalized one - the builder can, and that
+            # split is what keeps unstable keys out of the module-level cache.
+            background_solver.cache_key = self.get_background_lci_cache_key
+        # Per temporal market: which background activities it demands, in what
+        # amount per unit of market output, and the market's own supply. Two
+        # small dicts of floats instead of one `B @ diag(x)` matrix per market
+        # - see `TimexLCA.temporal_market_lcis`, which materializes those
+        # matrices from these recipes only when something asks for them.
+        self.temporal_market_recipes = {}
+        self.temporal_market_scales = {}
         self.temporal_market_cols = []  # To keep track of temporal market columns
+        # Time step -> {background activity: demand, supply already folded in}.
+        # Only filled when `group_background_by_time` is on.
+        self._grouped_background_demands: dict = {}
 
     @staticmethod
     def _supply_array_from_timeline(
@@ -233,12 +249,9 @@ class DynamicBiosphereBuilder:
         -------
         dynamic_biosphere_matrix : scipy.sparse.csr_matrix
             A sparse matrix with the dimensions (bio_flows at a specific time step) x (processes).
-        temporal_market_lcis : dict
-            A dictionary containing the disaggregated LCI's of the temporal markets,
-            with the time-mapped-activity id as key.
+            The temporal markets' background recipes are left on
+            `temporal_market_recipes` / `temporal_market_scales`.
         """
-
-        temporal_market_lcis = {}
 
         for row in self.timeline.itertuples():
             idx = row.time_mapped_producer
@@ -331,7 +344,7 @@ class DynamicBiosphereBuilder:
                         )
 
             elif idx in self.node_collections["temporal_markets"]:
-                if expand_technosphere and idx in temporal_market_lcis:
+                if expand_technosphere and idx in self.temporal_market_recipes:
                     # Several timeline rows (one per consumer) can share a
                     # time-mapped market, but with expanded matrices they all
                     # map to the same column, whose supply already sums them up.
@@ -351,38 +364,44 @@ class DynamicBiosphereBuilder:
                 else:
                     demand = self.demand_from_timeline(row)
 
-                if demand:
-                    # lci of all background activities of the temporal market,
-                    # per unit of market output. Built per timeline row: the
-                    # same time-mapped market can occur in several rows (one per
-                    # consumer), and when building from the timeline each of
-                    # those rows is its own column with its own supply.
-                    unit_lci_total = None
+                if demand and self.group_background_by_time:
+                    # Defer to the grouped pass after the loop: fold this
+                    # row's supply into its demand now (there is no column
+                    # left to scale by afterwards) and sum it into the time
+                    # step the emissions land at.
+                    scale = float(self.dynamic_supply_array[process_col_index])
+                    target = self._grouped_background_demands.setdefault(time, {})
                     for act, amount in demand.items():
-                        unit_lci = self.get_background_unit_lci(act) * amount
-                        unit_lci_total = (
-                            unit_lci
-                            if unit_lci_total is None
-                            else unit_lci_total + unit_lci
-                        )
+                        target[act] = target.get(act, 0.0) + amount * scale
+                    continue
 
-                    aggregated_inventory = np.asarray(
-                        unit_lci_total.sum(axis=1)
-                    ).ravel()
+                if demand:
+                    # Emissions of all background activities of the temporal
+                    # market, per unit of market output, already summed over
+                    # the background processes that caused them. Only this
+                    # aggregate feeds the dynamic biosphere matrix; the
+                    # per-process breakdown is kept as a recipe below.
+                    aggregated_inventory = None
+                    for act, amount in demand.items():
+                        contribution = self.get_background_unit_aggregate(act) * amount
+                        aggregated_inventory = (
+                            contribution
+                            if aggregated_inventory is None
+                            else aggregated_inventory + contribution
+                        )
 
                     if expand_technosphere:
-                        # Only used to disaggregate the background of temporal
-                        # markets, which needs the expanded technosphere. Keeping
-                        # one scaled LCI per market row otherwise just burns
-                        # memory (real background systems have hundreds of
-                        # thousands of market rows).
-                        scaled_lci = (
-                            unit_lci_total * self.dynamic_supply_array[process_col_index]
+                        # Recorded only for `disaggregate_background_lci()`,
+                        # which needs the expanded technosphere. A recipe is a
+                        # handful of floats; the matrices it stands for are
+                        # megabytes each, and real background systems have
+                        # hundreds of thousands of market rows.
+                        recipe = self.temporal_market_recipes.setdefault(idx, {})
+                        for act, amount in demand.items():
+                            recipe[act] = recipe.get(act, 0.0) + amount
+                        self.temporal_market_scales[idx] = float(
+                            self.dynamic_supply_array[process_col_index]
                         )
-                        if idx not in temporal_market_lcis:
-                            temporal_market_lcis[idx] = scaled_lci
-                        else:
-                            temporal_market_lcis[idx] += scaled_lci
 
                     time_in_datetime = convert_date_string_to_datetime(
                         self.temporal_grouping, str(time)
@@ -409,6 +428,9 @@ class DynamicBiosphereBuilder:
                             seen_rows=seen_rows,
                         )
 
+        if self.group_background_by_time:
+            self._add_grouped_background_entries()
+
         # now build the dynamic biosphere matrix
         if not self.keep_activity_dimension:
             ncols = 1
@@ -418,7 +440,7 @@ class DynamicBiosphereBuilder:
             ncols = len(self.timeline)
 
         if not self._matrix_entries:
-            return sp.csr_matrix((0, ncols)), temporal_market_lcis
+            return sp.csr_matrix((0, ncols))
 
         # Filled element-wise into pre-sized arrays rather than via Python
         # lists: real background systems reach tens of millions of entries,
@@ -438,7 +460,86 @@ class DynamicBiosphereBuilder:
         )
         dynamic_biosphere_matrix = dynamic_biosphere_matrix.tocsr()
 
-        return dynamic_biosphere_matrix, temporal_market_lcis
+        return dynamic_biosphere_matrix
+
+    def _add_grouped_background_entries(self):
+        """Emit one solved background aggregate per time step.
+
+        `sum_r B A^-1 d_r` and `B A^-1 sum_r d_r` are the same number, and with
+        no activity dimension every `r` at a given time step writes into the
+        same column - so the sum can be taken before the solve. Supply was
+        already folded into each `d_r` when it was collected, which is why
+        these entries bypass `_add_entry`'s scaling.
+
+        Emitted after the timeline loop, so `biosphere_time_mapping` hands out
+        its row ids in a different order than an ungrouped build would. The
+        rows carry the same `(flow, time)` pairs with the same amounts - only
+        their position in the matrix differs, and everything user-facing
+        (`dynamic_inventory_df`, the scores) goes through the mapping.
+        """
+        for time, demand in self._grouped_background_demands.items():
+            aggregate = self.background_solver.aggregate_for_demand(demand)
+
+            time_in_datetime = convert_date_string_to_datetime(
+                self.temporal_grouping, str(time)
+            )
+            date = TemporalDistribution(
+                date=np.array([str(time_in_datetime)], dtype=self.time_res),
+                amount=np.array([1]),
+            ).date[0]
+
+            for row_idx in np.flatnonzero(aggregate):
+                bioflow = self.lca_obj.dicts.biosphere.reversed[row_idx]
+                key = (self.biosphere_time_mapping.add((bioflow, date)), 0)
+                self._matrix_entries[key] = (
+                    self._matrix_entries.get(key, 0.0) + aggregate[row_idx]
+                )
+
+    def collect_background_demands_by_time(self):
+        """Plan the grouped background solves: time step -> summed demand.
+
+        The counterpart of `collect_background_demands`, which groups the same
+        walk by temporal market instead. Supply is folded in here exactly as
+        the build does it, so the number of distinct `(time, block)` pairs in
+        the result is the number of solves grouping would actually cost.
+        """
+        return self.collect_background_demand_plan()[1]
+
+    def collect_background_demand_plan(self):
+        """Both groupings of the background demands, from a single walk.
+
+        `TimexLCA` compares the two solve strategies before building, which
+        needs the demands grouped per temporal market *and* per time step.
+        Collecting them separately walks the timeline twice and re-derives
+        every row's demand twice - on a premise-sized model that costs more
+        than the grouping it is trying to choose.
+
+        Returns
+        -------
+        tuple of dict
+            `(by_market, by_time)`. `by_market` matches
+            `collect_background_demands`; `by_time` carries each row's supply
+            folded into its amounts, as the grouped build applies it.
+        """
+        by_market, by_time = {}, {}
+        for row in self.timeline.itertuples():
+            idx = row.time_mapped_producer
+            if idx not in self.node_collections["temporal_markets"]:
+                continue
+            if row.Index in self.collapsed_market_rows:
+                continue
+            demand = self.demand_from_timeline(row)
+            if not demand:
+                continue
+
+            market = by_market.setdefault(idx, {})
+            _, time = self.activity_time_mapping.reversed[idx]
+            scale = float(self.dynamic_supply_array[row.Index])
+            grouped = by_time.setdefault(time, {})
+            for act, amount in demand.items():
+                market[act] = market.get(act, 0.0) + amount
+                grouped[act] = grouped.get(act, 0.0) + amount * scale
+        return by_market, by_time
 
     def demand_from_timeline(self, row):
         """
@@ -582,137 +683,74 @@ class DynamicBiosphereBuilder:
             ]
         return self._activity_biosphere_exchange_cache[cache_key]
 
-    def get_background_unit_lci(self, act):
+    def get_background_unit_aggregate(self, act):
+        """Unit background LCI of an activity, aggregated over its processes.
+
+        Parameters
+        ----------
+        act : int
+            Node id of the background activity.
+
+        Returns
+        -------
+        numpy.ndarray
+            Emissions per unit of `act`, dense over the biosphere rows of
+            `lca_obj`, summed over the background processes that emit them.
+
+        Notes
+        -----
+        Only the aggregate reaches the dynamic biosphere matrix: a temporal
+        market contributes one column, so the per-process breakdown would be
+        summed away immediately. `BackgroundSolver` caches the aggregate (and
+        the supply column behind it) per background process identity, so
+        repeated occurrences of the same process cost nothing.
         """
-        Return unit background LCI matrix for an activity, cached by process identity.
+        if self.background_solver is None:
+            raise ValueError(
+                "Temporal markets need a BackgroundSolver; none was passed to "
+                "DynamicBiosphereBuilder. TimexLCA.lci() builds one."
+            )
+        return self.background_solver.unit_aggregate(act)
 
-        Background activities can occur repeatedly with different exchange amounts.
-        Reusing the unit LCI avoids repeated `redo_lci` solves for equivalent processes.
-        """
-        cache_key = self.get_background_lci_cache_key(act)
-        # Within this build the rebuilt matrix is stable; reuse it.
-        if cache_key in self._rebuilt_unit_lci_cache:
-            return self._rebuilt_unit_lci_cache[cache_key]
-
-        # Only stable background-process identities may be reused across
-        # TimexLCA objects; everything else stays in the per-object cache.
-        cache = (
-            self._background_unit_lci_cache
-            if cache_key[0] == "db_code"
-            else self._instance_unit_lci_cache
-        )
-        if cache_key not in cache:
-            self.lca_obj.redo_lci({act: 1})
-            matrix = self.lca_obj.inventory
-            # Snapshot triplets for cross-structure reuse, but keep the
-            # freshly-solved matrix directly — it's already sized to *this*
-            # lca_obj so no rebuild is needed on the miss path.
-            cache[cache_key] = self._inventory_to_triplets(matrix)
-        else:
-            matrix = self._rebuild_unit_lci(cache[cache_key])
-        self._rebuilt_unit_lci_cache[cache_key] = matrix
-        return matrix
-
-    def _inventory_to_triplets(self, inv):
-        """Convert a CSR inventory matrix to structure-independent triplets.
-
-        Translates row/col indices into stable bioflow / activity ids via
-        the producing lca_obj's dicts, so the cache entry can be reused by
-        lca_objs with different index spaces. Returns a tuple of three
-        numpy arrays ``(bioflow_ids, activity_ids, values)`` — vectorized
-        for speed (Python-tuple lists cost ~1.3 s on premise/ecoinvent).
-        """
-        coo = inv.tocoo()
-        bio_arr, act_arr = self._lca_obj_id_arrays()
-        return (
-            bio_arr[coo.row].copy(),
-            act_arr[coo.col].copy(),
-            coo.data.copy(),
-        )
-
-    def _lca_obj_id_arrays(self):
-        """row/col index → bioflow_id / activity_id, cached per builder."""
-        if not hasattr(self, "_cached_lca_id_arrays"):
-            n_bio = self.lca_obj.biosphere_matrix.shape[0]
-            n_act = self.lca_obj.technosphere_matrix.shape[0]
-            bio_arr = np.full(n_bio, -1, dtype=np.int64)
-            for k, v in self.lca_obj.dicts.biosphere.reversed.items():
-                bio_arr[k] = v
-            act_arr = np.full(n_act, -1, dtype=np.int64)
-            for k, v in self.lca_obj.dicts.activity.reversed.items():
-                act_arr[k] = v
-            self._cached_lca_id_arrays = (bio_arr, act_arr)
-        return self._cached_lca_id_arrays
-
-    def _rebuild_unit_lci(self, triplets):
-        """Rebuild a unit-LCI CSR sized to *this* lca_obj from cached triplets.
-
-        Entries referring to bioflows or activities not present in the
-        current lca_obj are silently skipped. For consumers using the same
-        set of databases this never drops anything; for legitimately
-        narrower scenarios it correctly excludes out-of-scope entries.
-        """
-        # On a pure cache hit (no preceding redo_lci on this lca_obj) the
-        # technosphere/biosphere matrices and dicts may not have been built
-        # yet. Materialize them now.
-        if not hasattr(self.lca_obj, "technosphere_matrix"):
-            self.lca_obj.load_lci_data()
-        bio_ids, act_ids, data = triplets
-        bio_dict = self.lca_obj.dicts.biosphere
-        act_dict = self.lca_obj.dicts.activity
-        # Per-cache-entry list lookups are unavoidable (bw2calc dicts aren't
-        # numpy-friendly), but the tight loop is still cheap relative to a
-        # redo_lci solve. -1 sentinel marks missing keys; mask filters them.
-        bio_rows = np.fromiter(
-            (bio_dict.get(int(b), -1) for b in bio_ids), count=len(bio_ids), dtype=np.int64
-        )
-        act_cols = np.fromiter(
-            (act_dict.get(int(a), -1) for a in act_ids), count=len(act_ids), dtype=np.int64
-        )
-        mask = (bio_rows >= 0) & (act_cols >= 0)
-        rows = bio_rows[mask]
-        cols = act_cols[mask]
-        vals = data[mask]
-        n_bio = self.lca_obj.biosphere_matrix.shape[0]
-        n_act = self.lca_obj.technosphere_matrix.shape[0]
-        return sp.csr_matrix((vals, (rows, cols)), shape=(n_bio, n_act))
-
-    def count_pending_background_solves(self):
-        """Count uncached background unit-LCI solves that the matrix build will need.
+    def collect_background_demands(self):
+        """Plan the background unit LCIs the matrix build will ask for.
 
         Walks the temporal-markets branch of `build_dynamic_biosphere_matrix`
-        without performing any `redo_lci` solves — just consults the existing
-        cache. TimexLCA uses this to decide whether LU-factorizing the
-        technosphere upfront is worth it; factorization only pays off once
-        the number of pending solves exceeds the break-even point.
+        with the same row guards, but without solving anything. `TimexLCA`
+        uses the activity ids to pre-factorize (via `BackgroundSolver.prepare`)
+        those blocks that several pending solves would otherwise factorize -
+        or `spsolve` - one at a time.
+
+        Returns
+        -------
+        dict
+            Time-mapped temporal market id -> `{background activity id:
+            coefficient}`. When building from the timeline, several rows can
+            share a market and each get their own column; their coefficients
+            are summed here, which is all planning needs - only the activity
+            ids matter, and they are the same either way.
         """
-        pending_keys = set()
+        demands = {}
         for row in self.timeline.itertuples():
             idx = row.time_mapped_producer
-            # Deduplicates repeated (flow, time) entries within one activity,
-            # which the per-activity columns do implicitly.
-            seen_rows = set()
             if idx not in self.node_collections["temporal_markets"]:
                 continue
             if self._expand_technosphere:
+                if idx in demands:
+                    # All rows of one market share a column, so they share a
+                    # demand; the build looks at the first row only.
+                    continue
                 demand = self.demand_from_technosphere(idx, self.activity_dict[idx])
             else:
-                # Timeline path: the demands come from the row's temporal
-                # market shares, which is a plain mapping lookup — no solve.
+                if row.Index in self.collapsed_market_rows:
+                    continue
                 demand = self.demand_from_timeline(row)
             if not demand:
                 continue
-            for act in demand:
-                key = self.get_background_lci_cache_key(act)
-                cache = (
-                    self._background_unit_lci_cache
-                    if key[0] == "db_code"
-                    else self._instance_unit_lci_cache
-                )
-                if key in cache or key in pending_keys:
-                    continue
-                pending_keys.add(key)
-        return len(pending_keys)
+            target = demands.setdefault(idx, {})
+            for act, amount in demand.items():
+                target[act] = target.get(act, 0.0) + amount
+        return demands
 
     def get_background_lci_cache_key(self, act):
         """Build a stable cache key for background unit LCI reuse."""
@@ -725,6 +763,16 @@ class DynamicBiosphereBuilder:
             db, code = process_key
             if db == "temporalized":
                 return ("temporalized", code)
+            if (
+                act in self.node_collections["temporalized_processes"]
+                or act in self.node_collections["temporal_markets"]
+            ):
+                # A time-explicit copy of a background process, or a market
+                # standing in for one, carries the *original* process key - so
+                # a `("db_code", ...)` key would name the original node, whose
+                # unit LCI is a different column of a different matrix. Those
+                # copies are per-run, so they stay instance-local.
+                return ("activity_id", act)
             # Include the background database's `modified` token so edits to
             # that database invalidate stale globally-cached unit LCIs.
             modified = bd.databases[db].get("modified") if db in bd.databases else None

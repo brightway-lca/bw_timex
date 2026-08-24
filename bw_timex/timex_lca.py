@@ -28,9 +28,14 @@ from loguru import logger
 from peewee import fn
 from scipy import sparse
 
-from ._lci_cache import BACKGROUND_UNIT_LCI_CACHE, LCI_SOLVE_CACHE, NODES_CACHE
-FACTORIZE_SOLVES_THRESHOLD = 8
-
+from ._lci_cache import (
+    BACKGROUND_AGGREGATE_CACHE,
+    BACKGROUND_SUPPLY_CACHE,
+    LCI_SOLVE_CACHE,
+    NODES_CACHE,
+)
+from .background_solver import BackgroundSolver
+from .block_structure import BlockStructure
 from .database_metadata import resolve_database_dates_from_metadata
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import InterDatabaseMapping, LazyActivity, TimeMappingDict
@@ -255,14 +260,22 @@ class TimexLCA:
         self._cached_timeline = None
         self._default_edge_filter_function = None
         self._dynamic_lcia_inventory_cache = {}
-        self._background_unit_lci_cache = (
-            BACKGROUND_UNIT_LCI_CACHE if use_global_lci_cache else {}
+        # Handed to every `BackgroundSolver` this object builds, so background
+        # unit LCIs are shared across `lci()` calls - and, unless opted out,
+        # across `TimexLCA` objects in the session.
+        self._background_supply_cache = (
+            BACKGROUND_SUPPLY_CACHE if use_global_lci_cache else {}
         )
+        self._background_aggregate_cache = (
+            BACKGROUND_AGGREGATE_CACHE if use_global_lci_cache else {}
+        )
+        self._background_solver = None
+        # Materialized on demand from the builder's recipes; see
+        # `temporal_market_lcis`.
+        self._temporal_market_lcis = None
         # Whether the last lci() call restored its supply_array / inventory
         # from `LCI_SOLVE_CACHE` instead of running a fresh `spsolve`.
         self._lci_used_cached_solve = False
-        # Whether the last lci() call LU-factorized the expanded technosphere.
-        self._lci_did_factorize = False
 
         logger.info("TimexLCA initialized.")
 
@@ -558,6 +571,7 @@ class TimexLCA:
         build_dynamic_biosphere: Optional[bool] = True,
         expand_technosphere: Optional[bool] = True,
         keep_activity_dimension: Optional[bool] = True,
+        group_background_by_time: Optional[bool] = None,
     ) -> None:
         """
         Calculates the time-explicit LCI.
@@ -594,6 +608,24 @@ class TimexLCA:
             timing of the emissions, but they can no longer be attributed to the
             activities that caused them. Use this for large time-explicit systems,
             where the per-activity columns dominate memory.
+        group_background_by_time: bool, optional
+            How the background unit LCIs are solved. `None` (default) picks
+            whichever of the two strategies needs fewer solves for this call;
+            `True` forces per-time-step solving and `False` forces per-process
+            solving.
+
+            Per-time-step solving sums the background demands of every temporal
+            market landing at the same point in time and solves those sums,
+            costing one solve per `(time, block)` pair rather than one per
+            distinct background process. It only applies with
+            `expand_technosphere=False` and `keep_activity_dimension=False`,
+            where the rows it sums share a column anyway - asking for it
+            elsewhere logs a warning and is ignored.
+
+            Worth pinning to `False` when re-running `lci()` several times in
+            one session: grouped right-hand sides are sums specific to a run,
+            so they are never cached, while per-process unit LCIs are - which
+            makes every run after the first free.
 
         Returns
         -------
@@ -614,25 +646,19 @@ class TimexLCA:
             build_dynamic_biosphere=build_dynamic_biosphere,
             expand_technosphere=expand_technosphere,
             keep_activity_dimension=keep_activity_dimension,
+            group_background_by_time=group_background_by_time,
         )
 
         if hasattr(self, "dynamic_inventory"):
             del self.dynamic_inventory
 
-        # Reset per-call; decided downstream based on cache state and the
-        # pending-solve count.
-        self._lci_did_factorize = False
         # Whether the initial fu solve was restored from `LCI_SOLVE_CACHE`
         # instead of running `lci_calculation`.
         self._lci_used_cached_solve = False
-        # Whether `redo_lci(self.fu)` was called at the end to restore the
-        # fu inventory. Only needed when the build actually ran any
-        # `redo_lci` during background unit-LCI solves.
-        self._lci_did_reset = False
-        # Number of background unit-LCI solves the most recent
-        # build_dynamic_biosphere_matrix had to perform (cache misses).
-        # Set by calculate_dynamic_inventory.
-        self._lci_pending_solves = 0
+        # Both belong to the `self.lca` built below, so neither survives a
+        # second `lci()` call.
+        self._background_solver = None
+        self._temporal_market_lcis = None
 
         if not hasattr(self, "timeline"):
             raise AttributeError(
@@ -672,9 +698,8 @@ class TimexLCA:
             self.lca.lci()
         else:  # building dynamic biosphere
             if expand_technosphere:
-                # Build matrices and dicts without solving; the fu solve
-                # is decided next based on actual pending background solves
-                # and the module-level solve cache.
+                # Build matrices and dicts without solving; whether the fu
+                # solve is needed at all is decided from the solve cache below.
                 self.lca.load_lci_data()
                 self.lca.build_demand_array()
                 # Placeholder so the shadow builder's __init__ can read
@@ -683,6 +708,7 @@ class TimexLCA:
                 self.lca.supply_array = np.zeros(
                     self.lca.technosphere_matrix.shape[0]
                 )
+                self._background_solver = self._build_background_solver()
                 shadow = DynamicBiosphereBuilder(
                     self.lca,
                     self.activity_time_mapping,
@@ -695,30 +721,28 @@ class TimexLCA:
                     self.timeline,
                     self.interdatabase_activity_mapping,
                     expand_technosphere=True,
-                    background_unit_lci_cache=self._background_unit_lci_cache,
+                    background_solver=self._background_solver,
                     nodes=self.nodes,
                 )
-                pending = shadow.count_pending_background_solves()
-                self._lci_pending_solves = pending
+                self._prepare_background_solves(shadow)
+                self._warn_if_grouping_unavailable(
+                    group_background_by_time,
+                    expand_technosphere=True,
+                    keep_activity_dimension=keep_activity_dimension,
+                )
 
                 solve_key = self._solve_cache_key(expand_technosphere=True)
-                if pending == 0 and solve_key in LCI_SOLVE_CACHE:
-                    # Fully warm: skip the ~1.4 s fu solve and the trailing
-                    # reset; the cached supply_array & inventory cover both.
+                if solve_key in LCI_SOLVE_CACHE:
+                    # Skip the ~1.4 s fu solve; the cached supply_array and
+                    # inventory are exactly what it would produce.
                     supply, inventory = LCI_SOLVE_CACHE[solve_key]
                     self.lca.supply_array = supply
                     self.lca.inventory = inventory
                     self._lci_used_cached_solve = True
-                elif pending + 1 >= FACTORIZE_SOLVES_THRESHOLD:
-                    # Many redo_lci's coming; pay the factorize once.
-                    self.lca.lci(factorize=True)
-                    LCI_SOLVE_CACHE[solve_key] = (
-                        self.lca.supply_array.copy(),
-                        self.lca.inventory.copy(),
-                    )
-                    self._lci_did_factorize = True
                 else:
-                    # Few or no redo_lci's; single solve, no factorize.
+                    # Background unit LCIs are solved by `BackgroundSolver`,
+                    # never through `self.lca`, so the main matrix is solved
+                    # exactly once and there is nothing to factorize for.
                     self.lca.lci_calculation()
                     LCI_SOLVE_CACHE[solve_key] = (
                         self.lca.supply_array.copy(),
@@ -729,18 +753,12 @@ class TimexLCA:
                     expand_technosphere=True,
                     keep_activity_dimension=keep_activity_dimension,
                 )
-                # Restore the fu inventory only if the build actually mutated
-                # `self.lca.inventory` via at least one `redo_lci` call
-                # (i.e. there was a cache miss). With everything cached, the
-                # inventory is still the fu solve from above.
-                if self._lci_pending_solves > 0:
-                    self.lca.redo_lci(self.fu)
-                    self._lci_did_reset = True
             else:
                 # Same planning as above, minus the functional-unit solve: the
                 # supply comes from the timeline, so only the background
-                # unit-LCI solves during the build matter here.
+                # unit LCIs matter here.
                 self.lca.load_lci_data()
+                self._background_solver = self._build_background_solver()
                 shadow = DynamicBiosphereBuilder(
                     self.lca,
                     self.activity_time_mapping,
@@ -753,22 +771,338 @@ class TimexLCA:
                     self.timeline,
                     self.interdatabase_activity_mapping,
                     expand_technosphere=False,
-                    background_unit_lci_cache=self._background_unit_lci_cache,
+                    background_solver=self._background_solver,
                     nodes=self.nodes,
                 )
-                pending = shadow.count_pending_background_solves()
-                self._lci_pending_solves = pending
-
-                if pending >= FACTORIZE_SOLVES_THRESHOLD:
-                    # Many `redo_lci`s coming; pay the LU factorization once.
-                    # No solve needed, just the factorized technosphere.
-                    self.lca.decompose_technosphere()
-                    self._lci_did_factorize = True
+                group_by_time = self._plan_background_solves(
+                    shadow,
+                    expand_technosphere=False,
+                    keep_activity_dimension=keep_activity_dimension,
+                    group_background_by_time=group_background_by_time,
+                )
 
                 self.calculate_dynamic_inventory(
                     expand_technosphere=False,
                     keep_activity_dimension=keep_activity_dimension,
+                    group_background_by_time=group_by_time,
                 )
+
+    def _technosphere_database_labels(self) -> tuple[np.ndarray, np.ndarray]:
+        """Source database of every technosphere column and row of `self.lca`.
+
+        Returns
+        -------
+        tuple of numpy.ndarray
+            `(column_labels, row_labels)`, one label per technosphere column
+            and row. `BlockStructure.detect` groups by these: background
+            vintages never consume from each other or from the foreground, so
+            one label per database is exactly the block structure.
+
+        Notes
+        -----
+        Resolved from the two mappings `TimexLCA` already holds - the activity
+        time mapping for time-mapped ids, `self.nodes` for everything else -
+        so labelling 262k premise columns costs dictionary lookups, not one
+        database query per column. If any node resists both, every column and
+        row gets the same label instead, which makes `detect` fall back to a
+        single block: a structure we cannot fully explain is one we must not
+        split. That fallback logs a warning - it is a performance cliff, not a
+        wrong answer, and otherwise leaves no trace.
+        """
+        time_mapping = self.activity_time_mapping.reversed
+        nodes = self.nodes
+        # Distinct ids, not positions: the same node is usually both a
+        # process column and a product row, and reporting it twice would
+        # overstate how broken the labelling is.
+        unresolved_ids = set()
+
+        def label_of(node_id):
+            mapped = time_mapping.get(node_id)
+            if mapped is not None:
+                process_key = mapped[0]
+                if isinstance(process_key, tuple):
+                    return process_key[0]
+            node = nodes.get(node_id)
+            if node is not None:
+                return node["database"]
+            # Reachable: `get_background_lci_cache_key` keeps an
+            # `("activity_id", act)` branch for ids whose process key is not a
+            # `(db, code)` tuple, and such an id lands here.
+            unresolved_ids.add(node_id)
+            return ""
+
+        n_rows, n_columns = self.lca.technosphere_matrix.shape
+        column_labels = np.empty(n_columns, dtype=object)
+        n_labelled_columns = 0
+        for index, node_id in self.lca.dicts.activity.reversed.items():
+            column_labels[index] = label_of(node_id)
+            n_labelled_columns += 1
+        row_labels = np.empty(n_rows, dtype=object)
+        n_labelled_rows = 0
+        for index, node_id in self.lca.dicts.product.reversed.items():
+            row_labels[index] = label_of(node_id)
+            n_labelled_rows += 1
+
+        n_unmapped = (n_columns - n_labelled_columns) + (n_rows - n_labelled_rows)
+        if unresolved_ids or n_unmapped:
+            # All-or-nothing by design - one unexplained node makes the whole
+            # split untrustworthy - but the cost is the difference between
+            # per-vintage and whole-matrix solving, so say so rather than
+            # leave a premise-sized run silently slow.
+            example = (
+                f" (e.g. node id {min(unresolved_ids)})" if unresolved_ids else ""
+            )
+            logger.warning(
+                f"Could not determine the source database of "
+                f"{len(unresolved_ids)} technosphere node(s){example}, and "
+                f"{n_unmapped} matrix position(s) map to no node. Solving the "
+                "technosphere as a single block instead of per database, "
+                "which is markedly slower on large time-explicit systems."
+            )
+            return np.zeros(n_columns, dtype=np.int8), np.zeros(n_rows, dtype=np.int8)
+        return column_labels.astype(str), row_labels.astype(str)
+
+    def _build_background_solver(self) -> BackgroundSolver:
+        """A `BackgroundSolver` over the current `self.lca`'s matrices.
+
+        Its supply and aggregate caches are this object's, so background unit
+        LCIs are reused across `lci()` calls - and, unless the object opted out
+        with `use_global_lci_cache=False`, across `TimexLCA` objects in the
+        session.
+        """
+        column_labels, row_labels = self._technosphere_database_labels()
+        solver = BackgroundSolver(
+            technosphere_matrix=self.lca.technosphere_matrix,
+            biosphere_matrix=self.lca.biosphere_matrix,
+            activity_dict=self.lca.dicts.activity,
+            product_dict=self.lca.dicts.product,
+            biosphere_dict=self.lca.dicts.biosphere,
+            structure=BlockStructure.detect(
+                self.lca.technosphere_matrix, column_labels, row_labels
+            ),
+        )
+        solver.shared_cache = self._background_supply_cache
+        solver.shared_aggregate_cache = self._background_aggregate_cache
+        return solver
+
+    def _prepare_background_solves(self, builder: DynamicBiosphereBuilder) -> None:
+        """Let the solver pre-factorize for the solves `builder` implies.
+
+        `builder` here is a shadow builder: it walks the timeline to find out
+        which background activities the real build will ask for, without
+        solving any of them.
+        """
+        demands = builder.collect_background_demands()
+        self._background_solver.prepare(
+            [activity_id for demand in demands.values() for activity_id in demand]
+        )
+
+    def _prepare_grouped_blocks(self, grouped: dict) -> None:
+        """Factorize the blocks the grouped solves will revisit.
+
+        Every time step solves the same few background blocks again, so
+        without this each grouped solve is a fresh `spsolve` on a full block -
+        far more expensive than the per-process solves grouping replaces.
+        """
+        solver = self._background_solver
+        solver.prepare_blocks(
+            block_index
+            for demand in grouped.values()
+            for block_index in {
+                solver.block_index_for(activity_id) for activity_id in demand
+            }
+        )
+
+    @staticmethod
+    def _warn_if_grouping_unavailable(
+        requested, expand_technosphere: bool, keep_activity_dimension: bool
+    ) -> None:
+        """Say so when an explicit `group_background_by_time=True` cannot apply.
+
+        Summing the market rows of a time step is only lossless when those rows
+        share a column anyway, so the request is dropped rather than honoured -
+        and dropping it silently would leave the caller thinking they got it.
+        """
+        if not requested:
+            return
+        reasons = []
+        if expand_technosphere:
+            reasons.append("expand_technosphere=True")
+        if keep_activity_dimension:
+            reasons.append("keep_activity_dimension=True")
+        logger.warning(
+            f"group_background_by_time=True ignored: it needs "
+            f"expand_technosphere=False and keep_activity_dimension=False, but "
+            f"{' and '.join(reasons)} was given. Solving per background "
+            f"process instead."
+        )
+
+    def _plan_background_solves(
+        self,
+        builder: DynamicBiosphereBuilder,
+        expand_technosphere: bool,
+        keep_activity_dimension: bool,
+        group_background_by_time: Optional[bool] = None,
+    ) -> bool:
+        """Choose how the background gets solved, and prepare for that choice.
+
+        Two strategies produce the same numbers:
+
+        - *per background process* - one unit LCI per distinct background
+          activity, linearly combined per temporal market. Costs one solve per
+          uncached activity, and the results are cached across `TimexLCA`
+          objects in a session, so a warm run costs nothing at all.
+        - *per time step* - sum the background demands of every market row
+          landing at the same time, and solve those sums. Costs one solve per
+          `(time, block)` pair, caches nothing, but is independent of how many
+          background processes the foreground reaches.
+
+        Which is cheaper is a property of the model: a small foreground over
+        many time steps favours the first, a wide foreground over few time
+        steps the second. Both counts are known here, so when
+        `group_background_by_time` is `None` the smaller one is taken; a
+        `True`/`False` from the caller overrides that.
+
+        Returns
+        -------
+        bool
+            Whether the dynamic biosphere build should group by time step.
+        """
+        # Grouping sums rows that share a time step, which is only lossless
+        # when they share a column anyway - i.e. with no activity dimension -
+        # and is only wired for the timeline build, where a row is a column.
+        can_group = not expand_technosphere and not keep_activity_dimension
+        if not can_group:
+            self._warn_if_grouping_unavailable(
+                group_background_by_time,
+                expand_technosphere=expand_technosphere,
+                keep_activity_dimension=keep_activity_dimension,
+            )
+            demands = builder.collect_background_demands()
+            self._background_solver.prepare(
+                [
+                    activity_id
+                    for demand in demands.values()
+                    for activity_id in demand
+                ]
+            )
+            return False
+
+        # One walk, both groupings: walking twice to choose between them can
+        # cost more than the choice saves.
+        demands, grouped = builder.collect_background_demand_plan()
+        activity_ids = [
+            activity_id for demand in demands.values() for activity_id in demand
+        ]
+
+        # An explicit request wins; `None` means decide by cost.
+        if group_background_by_time is not None:
+            if group_background_by_time:
+                self._prepare_grouped_blocks(grouped)
+            else:
+                self._background_solver.prepare(activity_ids)
+            return bool(group_background_by_time)
+
+        solver = self._background_solver
+        pending = {
+            solver.cache_key(activity_id) for activity_id in activity_ids
+        } - set(solver.shared_cache) - set(solver._instance_supply_cache)
+
+        grouped_solves = len(
+            {
+                (time, solver.block_index_for(activity_id))
+                for time, demand in grouped.items()
+                for activity_id in demand
+            }
+        )
+
+        if grouped_solves < len(pending):
+            logger.info(
+                f"Solving the background per time step ({grouped_solves} solves) "
+                f"instead of per process ({len(pending)})."
+            )
+            self._prepare_grouped_blocks(grouped)
+            return True
+
+        self._background_solver.prepare(activity_ids)
+        return False
+
+    @property
+    def temporal_market_lcis(self) -> dict:
+        """Background LCI matrix per temporal market, keyed by time-mapped id.
+
+        Materialized on first access from the recipes recorded during the
+        matrix build: `sum(coefficient * unit supply)` over the market's
+        background activities, scaled by the market's own supply, spread back
+        over the biosphere as `B @ diag(x)`. Keeping the recipes instead of
+        the matrices is what lets a premise-sized run finish `lci()`; anything
+        that actually wants the matrices - `disaggregate_background_lci()`,
+        contribution analyses - still gets them here.
+
+        Empty unless the inventory was built with `expand_technosphere=True`,
+        which is the only mode that can disaggregate a background.
+        """
+        if self._temporal_market_lcis is None:
+            self._temporal_market_lcis = self._materialize_temporal_market_lcis()
+        return self._temporal_market_lcis
+
+    def _materialize_temporal_market_lcis(self) -> dict:
+        if not hasattr(self, "dynamic_biosphere_builder") or (
+            self._background_solver is None
+        ):
+            raise AttributeError(
+                "Dynamic biosphere not yet built. "
+                "Call TimexLCA.lci(build_dynamic_biosphere=True) first."
+            )
+        builder = self.dynamic_biosphere_builder
+        solver = self._background_solver
+        biosphere_matrix = solver.biosphere_matrix
+        n_columns = solver.technosphere_matrix.shape[1]
+
+        market_lcis = {}
+        for market_id, recipe in builder.temporal_market_recipes.items():
+            scale = builder.temporal_market_scales[market_id]
+            # A market's background activities are the same process in
+            # different vintages, so they sit in *different* blocks, whose
+            # supply columns cover disjoint parts of the technosphere.
+            # Accumulate per block and stitch the triplets together.
+            supply_per_block = {}
+            for activity_id, coefficient in recipe.items():
+                supply = solver.unit_supply(activity_id)
+                scaled = supply.values * (coefficient * scale)
+                if supply.block_index in supply_per_block:
+                    supply_per_block[supply.block_index] += scaled
+                else:
+                    supply_per_block[supply.block_index] = scaled
+
+            rows, columns, data = [], [], []
+            for block_index, values in supply_per_block.items():
+                block_columns = solver.structure.blocks[block_index].columns
+                # A background LCI supplies a fraction of even its own block;
+                # slicing the columns it actually reaches keeps the product -
+                # and the resulting matrix - to that fraction. Only exact
+                # zeros are dropped, never small values.
+                nonzero = np.flatnonzero(values)
+                supplied = block_columns[nonzero]
+                block_lci = (
+                    biosphere_matrix[:, supplied].multiply(values[nonzero]).tocoo()
+                )
+                rows.append(block_lci.row)
+                columns.append(supplied[block_lci.col])
+                data.append(block_lci.data)
+
+            market_lci = sparse.csr_matrix(
+                (
+                    np.concatenate(data),
+                    (np.concatenate(rows), np.concatenate(columns)),
+                ),
+                shape=(biosphere_matrix.shape[0], n_columns),
+            )
+            # `multiply` keeps every stored entry of the biosphere slice, so a
+            # biosphere matrix carrying explicit zeros would leak them in.
+            market_lci.eliminate_zeros()
+            market_lcis[market_id] = market_lci
+        return market_lcis
 
     def disaggregate_background_lci(self) -> None:
         """
@@ -1158,37 +1492,11 @@ class TimexLCA:
             demand_hash,
         )
 
-    def _has_matching_cached_unit_lcis(self, expand_technosphere: bool) -> bool:
-        """Whether the cache contains entries for any of this scenario's databases.
-
-        Cache keys are ``("db_code", db, code, modified)`` (structure-
-        independent triplet form); a hit on any background database in
-        ``self.database_dates`` with a matching ``modified`` token means
-        the build will likely reuse cached unit LCIs.
-        """
-        project = bd.projects.current
-        db_versions = {
-            db: bd.databases[db].get("modified") if db in bd.databases else None
-            for db in self.database_dates
-        }
-        for key in self._background_unit_lci_cache:
-            if not (
-                isinstance(key, tuple) and len(key) >= 5 and key[0] == "db_code"
-            ):
-                continue
-            key_project, db, _code, modified = key[1], key[2], key[3], key[4]
-            if (
-                key_project == project
-                and db in db_versions
-                and db_versions[db] == modified
-            ):
-                return True
-        return False
-
     def calculate_dynamic_inventory(
         self,
         expand_technosphere=True,
         keep_activity_dimension=True,
+        group_background_by_time=False,
     ) -> None:
         """
         Calculates the dynamic inventory, by first creating a dynamic biosphere matrix using the
@@ -1222,6 +1530,12 @@ class TimexLCA:
             )
 
         self.biosphere_time_mapping = TimeMappingDict(start_id=0)
+        # Recipes recorded below replace whatever a previous build left behind.
+        self._temporal_market_lcis = None
+        if self._background_solver is None:
+            # Called directly rather than through `lci()`, which normally
+            # builds the solver as part of planning the background solves.
+            self._background_solver = self._build_background_solver()
 
         self.dynamic_biosphere_builder = DynamicBiosphereBuilder(
             self.lca,
@@ -1235,18 +1549,16 @@ class TimexLCA:
             self.timeline,
             self.interdatabase_activity_mapping,
             expand_technosphere=expand_technosphere,
-            background_unit_lci_cache=self._background_unit_lci_cache,
+            background_solver=self._background_solver,
             nodes=self.nodes,
             keep_activity_dimension=keep_activity_dimension,
+            group_background_by_time=group_background_by_time,
         )
 
-        # The pending-solve count + factorize decision is now made upfront
-        # by `lci()`. We trust `self._lci_pending_solves` / `_lci_did_factorize`
-        # set there. Calling `calculate_dynamic_inventory` directly without
-        # going through `lci()` will skip those optimizations but still
-        # produce correct results.
-
-        self.dynamic_biosphere_matrix, self.temporal_market_lcis = (
+        # Which blocks are worth pre-factorizing is planned upfront by `lci()`.
+        # Calling `calculate_dynamic_inventory` directly skips that planning
+        # but still produces correct results.
+        self.dynamic_biosphere_matrix = (
             self.dynamic_biosphere_builder.build_dynamic_biosphere_matrix(
                 expand_technosphere=expand_technosphere,
             )

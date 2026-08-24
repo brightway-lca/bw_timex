@@ -157,6 +157,7 @@ class LCIInputs(BaseModel):
     build_dynamic_biosphere: bool = True
     expand_technosphere: bool = True
     keep_activity_dimension: bool = True
+    group_background_by_time: Optional[bool] = None
 
     @model_validator(mode="after")
     def validate_combination(self) -> "LCIInputs":
