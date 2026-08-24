@@ -44,12 +44,16 @@ class TimexLCAInputs(BaseModel):
             raise ValueError(
                 f"method must be a tuple of strings, got types: {[type(item).__name__ for item in v]}."
             )
-        if v not in bd.methods:
+        return v
+
+    @model_validator(mode="after")
+    def validate_method_exists(self) -> "TimexLCAInputs":
+        if not self.create_missing and self.method not in bd.methods:
             raise ValueError(
-                f"Method {v} not found in the current Brightway project. "
+                f"Method {self.method} not found in the current Brightway project. "
                 f"Available methods can be listed with `bw2data.methods`."
             )
-        return v
+        return self
 
     @field_validator("database_dates")
     @classmethod
@@ -160,7 +164,6 @@ class BuildTimelineInputs(BaseModel):
         if isinstance(v, str):
             if v == "now":
                 return v
-            # Try to parse the string as a date
             try:
                 datetime.fromisoformat(v)
             except ValueError:
@@ -368,9 +371,6 @@ class ScenarioBuildInputs(BaseModel):
         allowed = SCENARIO_FILTER_KEYS + SCENARIO_BUILD_KEYS
         unknown = [key for key in v if key not in allowed]
         if unknown:
-            # Rejected here rather than after the build: an unknown key survives
-            # into the metadata filter, where it matches no database and raises
-            # only once premise has written gigabytes.
             raise ValueError(
                 f"scenario contains the unknown key(s) {unknown}. When building "
                 f"databases, a scenario may only contain {list(allowed)}. "
