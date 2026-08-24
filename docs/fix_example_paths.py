@@ -46,8 +46,15 @@ def main() -> None:
             body = body.replace("../advanced/", "advanced/")
             destination.write_text(body, encoding="utf-8")
 
-    if generated.exists() and not any(generated.iterdir()):
-        generated.rmdir()
+        # Keep the old navigation targets as explicit pages. The post-build
+        # alias step turns these into redirects to the corrected locations.
+        generated.mkdir(parents=True, exist_ok=True)
+        old_page = generated / f"{stem}.md"
+        old_page.write_text(
+            f"---\ntitle: {stem.replace('_', ' ').title()}\n---\n\n"
+            f"This page has moved to [the current case study](../{stem}.md).\n",
+            encoding="utf-8",
+        )
 
 
 if __name__ == "__main__":
