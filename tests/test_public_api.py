@@ -1,10 +1,28 @@
 """Tests for what `bw_timex` exposes at the top level."""
 
+import importlib
+import pkgutil
+
 import bw_temporalis
 import pytest
 
 import bw_timex
 from bw_timex import utils
+
+MODULES = sorted(
+    module.name for module in pkgutil.iter_modules(bw_timex.__path__)
+)
+
+
+@pytest.mark.parametrize("name", MODULES)
+def test_every_module_imports(name):
+    """Every module imports, so a rename can't leave a stale importer behind.
+
+    Renaming something in one module and missing an importer in another makes
+    `import bw_timex` itself fail, which takes the whole test suite down with a
+    collection error rather than a test failure - so it is worth its own test.
+    """
+    importlib.import_module(f"bw_timex.{name}")
 
 FORWARDED_FROM_TEMPORALIS = [
     "TemporalDistribution",
