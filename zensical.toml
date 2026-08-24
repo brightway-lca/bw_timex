@@ -185,7 +185,6 @@ show_root_full_path = false
 show_object_full_path = false
 show_category_heading = true
 show_symbol_type_heading = true
-show_symbol_type_heading = true
 show_symbol_type_toc = true
 members_order = "source"
 group_by_category = true
