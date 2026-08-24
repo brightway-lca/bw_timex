@@ -59,6 +59,8 @@ nav = [
     { "Edge Extractor" = "api/edge_extractor.md" },
     { "Helper Classes" = "api/helper_classes.md" },
     { Utils = "api/utils.md" },
+    { "Database metadata" = "api/database_metadata.md" },
+    { Errors = "api/errors.md" },
   ]},
 ]
 

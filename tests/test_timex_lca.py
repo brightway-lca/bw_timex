@@ -535,7 +535,7 @@ class TestTimexLCAEdgeCases:
     def test_demand_not_in_dynamic_db_raises(self):
         """Test error when demand activity's db is not marked dynamic (line 988)."""
         fu = bd.get_node(database="foreground", code="A")
-        with pytest.raises(ValueError, match="not marked as 'dynamic'"):
+        with pytest.raises(ValueError, match="mapped to a date rather than 'dynamic'"):
             TimexLCA(
                 demand={fu.key: 1},
                 method=("GWP", "example"),

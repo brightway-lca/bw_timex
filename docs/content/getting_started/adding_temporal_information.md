@@ -247,23 +247,40 @@ end
     )
     ```
 
-So, as you can see, the processes at specific time steps reside within a separate normal Brightway database. To hand them to `bw_timex`, we just need to define a dictionary that maps the names of time-specific databases to the point in time that they represent:
+So, as you can see, the processes at specific time steps reside within a separate normal
+Brightway database. `bw_timex` picks these up automatically, as long as each database
+says which point in time it represents:
 
 ```python
 from datetime import datetime
+from bw_timex import set_database_metadata
 
-# Note: The foreground does not represent a specific point in time, but should
-# later be dynamically distributed over time
-database_dates = {
-    "background": datetime.strptime("2020", "%Y"),
-    "background_2030": datetime.strptime("2030", "%Y"),
-    "foreground": "dynamic",
-}
+set_database_metadata("background", representative_time=datetime(2020, 1, 1))
+set_database_metadata("background_2030", representative_time=datetime(2030, 1, 1))
 ```
+
+You only do this once per database - it is stored in your Brightway project. Databases
+exported by [premise](https://premise.readthedocs.io/en/latest/introduction.html)
+**>= 2.4.9.2** bring this metadata with them, so there is nothing to do for those;
+for databases from an earlier premise, set it yourself as above. The foreground doesn't
+represent a specific point in time and is distributed over time instead; `bw_timex`
+treats the databases holding your functional unit that way automatically.
+
+!!! tip "Foreground split across several databases"
+
+    Only the databases holding the functional unit become dynamic automatically. Mark
+    any other foreground database yourself:
+
+    ```python
+    set_database_metadata("my_intermediate_foreground", representative_time="dynamic")
+    ```
+
+    Otherwise `build_timeline()` raises an `UnmappedDatabaseError`, naming the database
+    it could not place in time.
 
 !!! tip "Data sources"
 
-    You can use whatever data source you want for the time-specific process data. A nice package from the Brightway cosmos that can help you is [premise](https://premise.readthedocs.io/en/latest/introduction.html).
+    You can use whatever data source you want for the time-specific process data. [premise](https://premise.readthedocs.io/en/latest/introduction.html) is a nice package from the Brightway cosmos, but you can also use any custom scenario.
 
 ### Several databases for the same point in time
 
@@ -272,13 +289,10 @@ background processes: keep the modified copies in your own database per point in
 time, instead of writing them into ecoinvent or premise.
 
 ```python
-database_dates = {
-    "ecoinvent_2020": datetime.strptime("2020", "%Y"),
-    "ecoinvent_2030": datetime.strptime("2030", "%Y"),
-    "my_background_2020": datetime.strptime("2020", "%Y"),  # your modified copies
-    "my_background_2030": datetime.strptime("2030", "%Y"),
-    "foreground": "dynamic",
-}
+set_database_metadata("ecoinvent_2020", representative_time=datetime(2020, 1, 1))
+set_database_metadata("ecoinvent_2030", representative_time=datetime(2030, 1, 1))
+set_database_metadata("my_background_2020", representative_time=datetime(2020, 1, 1))
+set_database_metadata("my_background_2030", representative_time=datetime(2030, 1, 1))
 ```
 
 For each process, `bw_timex` interpolates only between the databases that actually

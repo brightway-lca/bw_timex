@@ -47,3 +47,4 @@ from .fixtures.zero_weight_background_td_db_fixture import (
     zero_weight_first_background_td_db,
 )
 from .fixtures.vehicle_explicit_db_fixture import vehicle_explicit_db
+from .fixtures.split_foreground_db_fixture import split_foreground_db
