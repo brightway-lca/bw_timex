@@ -16,6 +16,7 @@ build:
       - pip install -r docs/requirements.txt
       - pip install -e .
       - python docs/convert_notebooks.py
+      - python docs/fix_example_paths.py
       - zensical build
       - mkdir -p $READTHEDOCS_OUTPUT/html
       - cp -r site/* $READTHEDOCS_OUTPUT/html/
