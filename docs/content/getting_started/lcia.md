@@ -96,6 +96,6 @@ tlca.plot_dynamic_characterized_inventory()
 ![Plot showing the radiative forcing over time](../data/dynamic_characterized_inventory_gwp.svg){ style="display:block;margin:0 auto" }
 <br />
 
-For most of the functions we used here, there are numerous optional arguments and settings you can tweak. We explore some of them in our other [Examples](../examples/index.md), but when in doubt check out our [docstrings](../../api/index.md), which provide information also for the more advanced settings - so please browse through them as needed ☀️
+For most of the functions we used here, there are numerous optional arguments and settings you can tweak. We explore some of them in our other [Examples](../examples/index.md), but when in doubt check out our [docstrings](../../api/index.md), which provide information also for the more advanced settings - so please browse through them as needed ☀️ 
 
-That's the whole calculation, one step at a time. If you now want to run it repeatedly - other years, other time horizons, other IAM scenarios - see [Repeated Runs & Scenario Comparison](scenarios.md), which wraps these same four steps in a single call.
+Instead of running the whole `build_timeline()`, `lci()`, `static_lcia()` and `dynamic_lcia()` pipeline yourself, you can also take the short route through a simple `.run`-call, as described under [Configured Runs & Scenario Comparisons](configured_runs.md).
