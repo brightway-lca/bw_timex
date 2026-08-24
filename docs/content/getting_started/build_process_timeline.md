@@ -9,8 +9,7 @@ tags:
 # Step 2 - Building the process timeline
 
 With all the temporal information prepared, we can now instantiate our TimexLCA object.
-This is just like a normal Brightway LCA object - the timing of the background databases
-comes from their metadata:
+This is just like a normal Brightway LCA object:
 
 ```python
 from bw_timex import TimexLCA
@@ -21,11 +20,8 @@ tlca = TimexLCA(
 )
 ```
 
-The metadata is written by premise >= 2.4.9.2, or by you with
-`set_database_metadata` (see [Step 1](adding_temporal_information.md)).
-
-If your project holds several IAM scenarios, say which one you want - `bw_timex` lists
-what it found rather than guessing:
+If you have multiple background databases representing different scenarios in your Brightway-project, 
+you additionally need to specify which scenario you wish to assess. 
 
 ```python
 tlca = TimexLCA(
@@ -36,13 +32,14 @@ tlca = TimexLCA(
 ```
 
 Any metadata key filters (`iam_model`, `pathway`, `system_model`, ...), and databases
-that don't carry it - your foreground, your own vintages - are kept. Comparing scenarios
-is the same script in a loop over filters.
+that don't carry it - your foreground, your own vintages - are kept. To compare several
+scenarios, hand them all to
+[`TimexLCA.compare()`](configured_runs.md#comparing-scenarios), which runs them into one
+table.
 
 !!! tip "Mapping the databases by hand"
 
-    `database_dates` maps database names to dates yourself and replaces the metadata
-    entirely:
+    You can also explicitly pass `database_dates` to `TimexLCA`, not requiring any database metadata:
 
     ```python
     tlca = TimexLCA(demand, method, database_dates={

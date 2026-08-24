@@ -84,6 +84,33 @@ print(tlca.dynamic_score)
 tlca.plot_dynamic_characterized_inventory()
 ```
 
+As an alternative to running `.build_timeline()`, `.lci()`and `.static_lcia()`/`.dynamic_lcia()`, you can also do:
+
+```python
+from bw_timex import TimexLCA, TimexLCASettings
+
+settings = TimexLCASettings(
+    demand={("foreground", "A"): 1}, 
+    method=("our", "method"), 
+    time_horizon=100,
+    )
+tlca = TimexLCA(settings).run()
+print(tlca.dynamic_score)
+
+tlca.run(time_horizon=20) # re-run, but with different time horizon
+print(tlca.dynamic_score)
+
+```
+
+For comparing different settings conveniently, you can simply run:
+
+```python
+comparison = tlca.compare([settings, other_settings])
+print(comparison.summary)
+```
+
+
+
 ---
 
 ## Temporal Information Cheat Sheet
@@ -154,7 +181,7 @@ and it overrides the metadata entirely.
 
 If the project does not hold the scenario's databases yet, `bw_timex` can build them
 with premise instead of raising. Add the years to the scenario and pass
-`create_missing=True`:
+`create_missing=True`, alongside the premise key and ecoinvent credentials:
 
 ```python
 tlca = TimexLCA(
@@ -168,26 +195,10 @@ tlca = TimexLCA(
         "years": [2020, 2030, 2040],
     },
     create_missing=True,
+    premise_key="dummy_premise_decryption_key",              # or $PREMISE_KEY
+    ecoinvent_credentials=("dummy_user", "dummy_password"),  # or $ECOINVENT_USERNAME / _PASSWORD
 )
 ```
-
-Only missing years are built, so running this again builds nothing. ecoinvent is
-imported first if the project has none. Each vintage is a full copy of ecoinvent:
-expect tens of minutes and roughly 2-4 GB per year. Building needs the optional
-`premise` extra, which belongs in [its own environment](../installation.md#building-background-databases-automatically).
-
-Two optional scenario keys tune the build. `sectors` narrows what premise updates
-(all sectors by default), and `source_database` names the ecoinvent to build from,
-if it is not the one `import_ecoinvent_release` writes. A vintage built with
-narrowed `sectors` only satisfies a later request for the same sectors, so it is
-recorded in the database metadata.
-
-The sector names are premise's own, and a name it does not know is only rejected
-once premise has extracted ecoinvent, so check them here first:
-
-`biomass`, `electricity`, `cement`, `steel`, `fuels`, `heat`, `renewable`,
-`metals`, `mining`, `battery`, `cdr`, `emissions`, `final energy`, `cars`,
-`two_wheelers`, `trucks`, `buses`, `trains`, `ships`, `external`.
 
 ### `build_timeline()`
 
@@ -220,6 +231,22 @@ Result is stored in `tlca.timeline` (a DataFrame with `date_producer`, `producer
 | `fixed_time_horizon` | `False` | `True` = Levasseur approach (horizon from the functional unit), `False` = conventional (horizon from each emission) |
 | `time_horizon_start` | `None` | Start of the fixed time horizon, defaults to now |
 | `characterization_functions` | `None` | `{biosphere_flow_id: function}`. Not needed for ecoinvent / `biosphere3`, where flows are mapped automatically |
+
+### `run()` and `compare()`
+
+See [Repeated Runs & Scenario Comparison](configured_runs.md).
+
+| Call | Description |
+|---|---|
+| `TimexLCA(settings)` | Build the object from a `TimexLCASettings` |
+| `tlca.run()` | The four steps above, in order, with that object's settings |
+| `tlca.run(**overrides)` | The same, with settings overridden for this call only. Refuses a changed `scenario` / `database_dates` |
+| `TimexLCA.compare([settings, ...])` | Run several, into `ComparisonResult.summary` |
+
+`TimexLCASettings` takes every argument listed above - `demand`, `method`,
+`database_dates`, `scenario`, plus all of `build_timeline()`, `lci()` and
+`dynamic_lcia()` - and a `label` naming its row in a comparison. Enable or skip
+the LCIA steps with `static_lcia_enabled` / `dynamic_lcia_enabled`.
 
 ---
 

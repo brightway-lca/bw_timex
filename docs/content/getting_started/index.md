@@ -14,14 +14,10 @@ This section will help you quickly getting started with your time-explicit LCA p
 
 In the following sections, we'll walk through the steps 1-4, considering a very simple dummy system. If you directly want to look at a more complex example, take a look at our [example collection](../examples/index.md). If you're interested in the full details on how `bw_timex` works, you can also skip to our [Theory Section](../theory.md). For some general guidance on what kind of LCA is suitable for what kind of case, check out our [decision tree](../decisiontree.md).
 
-!!! tip "In a hurry?"
+!!! tip "Run an entire `TimexLCA` with a single function call"
 
-    Our [Quick Start](quickstart.md) page condenses all of this into one page of code and reference tables.
+    Instead of following steps 2-4 in sequence, you can configure everything in a single object and just call a simple `.run()` function, see [Configured Runs & Scenario Comparisons](configured_runs.md).
 
 !!! tip "You want more interaction?"
 
     [Launch this tutorial on Binder!](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Ftutorials%2F1_getting_started.ipynb) In this interactive environment, you can directly run the bw_timex code yourself whilst following along.
-
-!!! tip "Using an AI coding agent?"
-
-    Install our [Brightway agent skills](https://github.com/TimoDiepers/brightway-skills) — they teach Claude Code (or any other [agentskills.io](https://agentskills.io)-compatible agent) this workflow, including the parts that are easy to get wrong.

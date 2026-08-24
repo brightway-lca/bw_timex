@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import MISSING, InitVar, dataclass, field, fields, replace
 from datetime import datetime
 from functools import partial
 from time import perf_counter
@@ -30,7 +30,6 @@ from loguru import logger
 from peewee import fn
 from scipy import sparse
 
-from ._lci_cache import BACKGROUND_UNIT_LCI_CACHE, LCI_SOLVE_CACHE, NODES_CACHE
 FACTORIZE_SOLVES_THRESHOLD = 8
 
 from .database_metadata import resolve_database_dates_from_metadata, split_scenario
@@ -76,12 +75,62 @@ class TimexLCASettings:
     them: they are set when the `TimexLCA` is built and cannot be changed per
     run. Everything else - the demand, the method, and all the timeline, LCI and
     LCIA knobs - may vary from run to run on the same object.
+
+    Every knob can also be written grouped by the stage it belongs to, which
+    keeps a long settings block readable:
+
+    ```python
+    TimexLCASettings(
+        demand=demand,
+        method=method,
+        timeline={"starting_datetime": datetime(2024, 1, 1), "temporal_grouping": "month"},
+        lci={"build_dynamic_biosphere": False},
+        lcia={"metric": "GWP", "time_horizon": 20},
+    )
+    ```
+
+    The groups are only a way of writing the call: they are unpacked into the
+    same flat fields, so the two spellings produce equal objects, and
+    `dataclasses.replace` and `run(**overrides)` stay flat either way.
     """
 
     #: Fields that pick the background, and so cannot vary between runs of one
     #: `TimexLCA`. Changing one means building a new object (which
     #: `TimexLCA.compare` does for you).
     FIXED_FIELDS = ("database_dates", "scenario", "use_global_lci_cache")
+
+    #: The stage each knob belongs to, for the grouped spelling above. Also
+    #: what the reference documentation is organised by.
+    STAGE_GROUPS = {
+        "timeline": (
+            "starting_datetime",
+            "temporal_grouping",
+            "interpolation_type",
+            "edge_filter_function",
+            "cutoff",
+            "max_calc",
+            "graph_traversal",
+            "traverse_background",
+            "timeline_args",
+            "timeline_kwargs",
+        ),
+        "lci": (
+            "build_dynamic_biosphere",
+            "expand_technosphere",
+            "keep_activity_dimension",
+        ),
+        "lcia": (
+            "static_lcia_enabled",
+            "dynamic_lcia_enabled",
+            "metric",
+            "time_horizon",
+            "fixed_time_horizon",
+            "time_horizon_start",
+            "characterization_functions",
+            "characterization_function_co2",
+            "use_disaggregated_lci",
+        ),
+    }
 
     # Core parameters
     demand: dict
@@ -111,7 +160,14 @@ class TimexLCASettings:
 
     # LCIA parameters
     static_lcia_enabled: bool = True
-    dynamic_lcia_enabled: bool = True
+    #: Whether [`run`][bw_timex.timex_lca.TimexLCA.run] characterizes the
+    #: inventory dynamically. `None` (the default) means "if it can": dynamic
+    #: characterization needs a characterization function per biosphere flow,
+    #: and those are only found automatically for ecoinvent / `biosphere3`
+    #: flows, so a model on its own biosphere database is characterized
+    #: statically only, unless `characterization_functions` says how. `True`
+    #: asks for it explicitly, and raises if the flows cannot be matched.
+    dynamic_lcia_enabled: Optional[bool] = None
     metric: str = "radiative_forcing"
     time_horizon: int = 100
     fixed_time_horizon: bool = False
@@ -119,6 +175,63 @@ class TimexLCASettings:
     characterization_functions: Optional[dict] = None
     characterization_function_co2: Optional[dict] = None
     use_disaggregated_lci: bool = False
+
+    # The grouped spelling. These are init-only: they are unpacked into the
+    # flat fields above and never stored, so the object has one shape no matter
+    # how it was written. `dataclasses.replace` rebuilds from the flat fields
+    # and leaves these at None, which is why an empty group must be a no-op.
+    timeline: InitVar[Optional[dict]] = None
+    lci: InitVar[Optional[dict]] = None
+    lcia: InitVar[Optional[dict]] = None
+
+    def __post_init__(self, timeline, lci, lcia) -> None:
+        for group, given in (("timeline", timeline), ("lci", lci), ("lcia", lcia)):
+            if not given:
+                continue
+            for name, value in given.items():
+                self._check_group_key(group, name)
+                # A knob given both flat and in a group is a conflict - unless
+                # the flat one still holds its default, which is
+                # indistinguishable from not having been passed at all.
+                current = getattr(self, name)
+                if current != _field_default(name) and current != value:
+                    raise TypeError(
+                        f"`{name}` was given both directly (={current!r}) and in "
+                        f"{group}={{{name!r}: {value!r}}}. Pass it once."
+                    )
+                setattr(self, name, value)
+
+    @classmethod
+    def _check_group_key(cls, group: str, name: str) -> None:
+        """Reject a key that does not belong in the stage group it was put in."""
+        if name in cls.STAGE_GROUPS[group]:
+            return
+
+        for other, names in cls.STAGE_GROUPS.items():
+            if name in names:
+                raise TypeError(
+                    f"`{name}` is a {other} setting, but was passed in {group}={{...}}. "
+                    f"Move it to {other}={{{name!r}: ...}}."
+                )
+
+        if name in {f.name for f in fields(cls)}:
+            raise TypeError(
+                f"`{name}` is not a stage setting - pass it directly, as "
+                f"TimexLCASettings({name}=...), not in {group}={{...}}."
+            )
+
+        raise TypeError(
+            f"{group}={{{name!r}: ...}} is not a setting. Valid {group} settings "
+            f"are: {sorted(cls.STAGE_GROUPS[group])}."
+        )
+
+
+def _field_default(name: str):
+    """The value a `TimexLCASettings` field has when it isn't passed."""
+    for f in fields(TimexLCASettings):
+        if f.name == name:
+            return f.default_factory() if f.default_factory is not MISSING else f.default
+    raise KeyError(name)
 
 
 @dataclass
@@ -212,20 +325,26 @@ class TimexLCA:
         },
     )
 
+    # Run the whole calculation. `run` takes every argument of the four stages
+    # it calls, e.g. metric="GWP" - also available: "pGWP", "pGTP",
+    # "prospective_radiative_forcing".
+    tlca.run()
+    print(tlca.static_score)
+    print(tlca.dynamic_score)
+
+    # The stages can also be called one at a time, to inspect an intermediate
+    # result or to re-run only part of the calculation:
     tlca.build_timeline()  # has many optional arguments
     tlca.lci()
     tlca.static_lcia()
-    print(tlca.static_score)
-    # also available: "GWP", "pGWP", "pGTP", "prospective_radiative_forcing"
     tlca.dynamic_lcia(metric="radiative_forcing")
-    print(tlca.dynamic_score)
     ```
     """
 
     def __init__(
         self,
-        demand: dict,
-        method: tuple,
+        demand: "dict | TimexLCASettings",
+        method: tuple = None,
         database_dates: dict = None,
         scenario: dict = None,
         create_missing: bool = False,
@@ -240,12 +359,17 @@ class TimexLCA:
 
         Parameters
         ----------
-        demand : dict[object: float]
+        demand : dict[object: float] or TimexLCASettings
                 The demand for which the LCA will be calculated. The keys can be Brightway `Node`
                 instances, `(database, code)` tuples, or integer ids.
+                A [`TimexLCASettings`][bw_timex.timex_lca.TimexLCASettings] can be
+                passed instead of the demand, in which case it supplies the demand,
+                the method and the background selection, and becomes the default
+                settings of [`run`][bw_timex.timex_lca.TimexLCA.run].
         method : tuple
                 Tuple defining the LCIA method, such as `('foo', 'bar')` or default methods, such as
-                `("EF v3.1", "climate change", "global warming potential (GWP100)")`
+                `("EF v3.1", "climate change", "global warming potential (GWP100)")`.
+                Required unless a `TimexLCASettings` is given as the first argument.
         database_dates : dict, optional
                 Fallback for mapping the databases yourself instead of letting
                 `bw_timex` read their metadata - useful for databases written by
@@ -304,6 +428,35 @@ class TimexLCA:
 
         logger.info("Initializing TimexLCA object...")
 
+        settings = None
+        if isinstance(demand, TimexLCASettings):
+            settings = demand
+            also_given = sorted(
+                name
+                for name, value in (
+                    ("method", method),
+                    ("database_dates", database_dates),
+                    ("scenario", scenario),
+                )
+                if value is not None
+            )
+            if also_given:
+                raise TypeError(
+                    f"A TimexLCASettings already carries {also_given}, so passing "
+                    "it separately is ambiguous. Put everything into the settings "
+                    "(dataclasses.replace makes a modified copy)."
+                )
+            demand = settings.demand
+            method = settings.method
+            database_dates = settings.database_dates
+            scenario = settings.scenario
+            use_global_lci_cache = settings.use_global_lci_cache
+        elif method is None:
+            raise TypeError(
+                "`method` is required, unless a TimexLCASettings is passed as the "
+                "first argument."
+            )
+
         self.demand = demand
         self.method = method
         self.scenario = scenario
@@ -334,7 +487,7 @@ class TimexLCA:
         # Settings this object was built from, if any, and the raw values of the
         # fields that pick the background. Kept as passed (not as resolved), so
         # `run` can tell whether a settings object asks for the same background.
-        self.settings = None
+        self.settings = settings
         self._fixed_fields = {
             "database_dates": database_dates,
             "scenario": scenario,
@@ -436,31 +589,35 @@ class TimexLCA:
 
         logger.info("TimexLCA initialized.")
 
+    def __repr__(self) -> str:
+        """What a notebook shows for a cell ending in `tlca.run()`.
+
+        `run` returns the object for chaining, so this is the first thing a
+        user sees of their results - report the scores it has, rather than an
+        address in memory.
+        """
+        parts = [f"method={self.method}", f"{len(self.database_dates)} databases"]
+        for name in ("base_score", "static_score", "dynamic_score"):
+            try:
+                parts.append(f"{name}={float(getattr(self, name)):.4g}")
+            except Exception:  # not calculated (or not calculable) - just omit it
+                pass
+        return f"<TimexLCA: {', '.join(parts)}>"
+
     @classmethod
     def from_settings(cls, settings: TimexLCASettings) -> "TimexLCA":
         """Build a `TimexLCA` from a [`TimexLCASettings`][bw_timex.timex_lca.TimexLCASettings].
 
-        The settings' background fields (`TimexLCASettings.FIXED_FIELDS`) are
-        used to construct the object; the rest become the default arguments of
-        [`run`][bw_timex.timex_lca.TimexLCA.run].
+        Same as passing the settings straight to the constructor, which is the
+        shorter way to write it:
 
-        Examples
-        --------
         ```python
         settings = TimexLCASettings(demand=demand, method=method, database_dates=dates)
-        tlca = TimexLCA.from_settings(settings).run()
+        tlca = TimexLCA(settings).run()
         print(tlca.static_score)
         ```
         """
-        tlca = cls(
-            demand=settings.demand,
-            method=settings.method,
-            database_dates=settings.database_dates,
-            scenario=settings.scenario,
-            use_global_lci_cache=settings.use_global_lci_cache,
-        )
-        tlca.settings = settings
-        return tlca
+        return cls(settings)
 
     def _settings_for_run(
         self, settings: TimexLCASettings | None, overrides: dict
@@ -550,8 +707,10 @@ class TimexLCA:
     ) -> "TimexLCA":
         """Run the whole calculation: timeline, LCI, and LCIA.
 
-        Runs `build_timeline()`, `lci()`, `static_lcia()` and, unless disabled,
-        `dynamic_lcia()`.
+        Runs `build_timeline()`, `lci()`, `static_lcia()` and `dynamic_lcia()`.
+        Dynamic characterization is skipped, with a warning, when no
+        characterization function can be found for the method's biosphere flows
+        - see `dynamic_lcia_enabled`.
 
         Can be called repeatedly on one object to vary the demand, the method,
         or any knob. The background caches and, where the timeline parameters
@@ -629,7 +788,19 @@ class TimexLCA:
             logger.info("Step 3/4: Skipping static LCIA (disabled).")
 
         # Calculate dynamic LCIA
-        if settings.dynamic_lcia_enabled:
+        if settings.dynamic_lcia_enabled is False:
+            logger.info("Step 4/4: Skipping dynamic LCIA (disabled).")
+        elif settings.dynamic_lcia_enabled is None and not self._can_characterize_dynamically(
+            settings.characterization_functions
+        ):
+            logger.warning(
+                "Step 4/4: Skipping dynamic LCIA - no characterization function was "
+                f"found for the biosphere flows of {self.method}. These are matched "
+                "automatically for ecoinvent / biosphere3 flows only; for your own "
+                "flows, pass `characterization_functions={flow_id: function}`. Pass "
+                "`dynamic_lcia_enabled=True` to raise instead of skipping."
+            )
+        else:
             logger.info("Step 4/4: Calculating dynamic LCIA...")
             self.dynamic_lcia(
                 metric=settings.metric,
@@ -640,11 +811,30 @@ class TimexLCA:
                 characterization_function_co2=settings.characterization_function_co2,
                 use_disaggregated_lci=settings.use_disaggregated_lci,
             )
-        else:
-            logger.info("Step 4/4: Skipping dynamic LCIA (disabled).")
 
         logger.info("TimexLCA.run() completed successfully.")
         return self
+
+    def _can_characterize_dynamically(self, characterization_functions) -> bool:
+        """Whether dynamic characterization has a function for every flow.
+
+        `dynamic_characterization` derives them from the LCIA method, but only
+        for flows it can resolve in the configured biosphere database - a model
+        on its own biosphere database gets nothing. Probing it here keeps
+        `run()`'s default ("characterize dynamically if you can") from turning
+        into a crash on a project that never asked for it.
+        """
+        if characterization_functions:
+            return True
+
+        from dynamic_characterization import (
+            create_characterization_functions_from_method,
+        )
+
+        try:
+            return bool(create_characterization_functions_from_method(self.method))
+        except Exception:  # whatever it can't resolve, it can't characterize
+            return False
 
     @staticmethod
     def _background_key(settings: TimexLCASettings) -> tuple:
@@ -672,9 +862,9 @@ class TimexLCA:
             "static_score": (
                 score("static_score") if settings.static_lcia_enabled else float("nan")
             ),
-            "dynamic_score": (
-                score("dynamic_score") if settings.dynamic_lcia_enabled else float("nan")
-            ),
+            # nan when dynamic LCIA was disabled, and when it was skipped
+            # because the flows could not be characterized.
+            "dynamic_score": score("dynamic_score"),
         }
         for key, value in (settings.scenario or {}).items():
             row[f"scenario_{key}"] = value
@@ -694,7 +884,7 @@ class TimexLCA:
                 "expand_technosphere": settings.expand_technosphere,
                 "build_dynamic_biosphere": settings.build_dynamic_biosphere,
                 "keep_activity_dimension": settings.keep_activity_dimension,
-                "metric": settings.metric if settings.dynamic_lcia_enabled else None,
+                "metric": getattr(self, "current_metric", None),
                 "time_horizon": settings.time_horizon,
                 "fixed_time_horizon": settings.fixed_time_horizon,
                 "timeline_rows": len(self.timeline) if hasattr(self, "timeline") else 0,
@@ -997,16 +1187,7 @@ class TimexLCA:
         )
         if timeline_cache_key == self._last_timeline_build_key:
             self.timeline = self._cached_timeline
-            return self.timeline[
-                [
-                    "date_producer",
-                    "producer_name",
-                    "date_consumer",
-                    "consumer_name",
-                    "amount",
-                    "temporal_market_shares",
-                ]
-            ]
+            return self.timeline_summary
 
         if edge_filter_function is None and not traverse_background:
             logger.info(
@@ -1085,16 +1266,7 @@ class TimexLCA:
         self._cached_timeline = self.timeline
         self._dynamic_lcia_inventory_cache.clear()
 
-        return self.timeline[
-            [
-                "date_producer",
-                "producer_name",
-                "date_consumer",
-                "consumer_name",
-                "amount",
-                "temporal_market_shares",
-            ]
-        ]
+        return self.timeline_summary
 
     def lci(
         self,
@@ -1918,6 +2090,31 @@ class TimexLCA:
     ###################
     # Core properties #
     ###################
+
+    @property
+    def timeline_summary(self) -> pd.DataFrame:
+        """The readable view of `timeline`: what happens when, and sourced from where.
+
+        `timeline` itself carries the bookkeeping columns the calculation needs
+        (hashes, time-mapped ids). This is what `build_timeline` returns, and
+        what to look at after [`run`][bw_timex.timex_lca.TimexLCA.run], which
+        returns the object rather than a timeline.
+        """
+        if not hasattr(self, "timeline"):
+            raise AttributeError(
+                "Timeline not yet built. Call TimexLCA.build_timeline() or "
+                "TimexLCA.run() first."
+            )
+        return self.timeline[
+            [
+                "date_producer",
+                "producer_name",
+                "date_consumer",
+                "consumer_name",
+                "amount",
+                "temporal_market_shares",
+            ]
+        ]
 
     @property
     def base_score(self) -> float:

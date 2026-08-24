@@ -6,8 +6,75 @@ from datetime import datetime
 import bw2data as bd
 import pandas as pd
 import pytest
+from bw2data.errors import UnknownObject
 
 from bw_timex import TimexLCA, TimexLCASettings, set_database_metadata
+
+
+class TestSettingsStageGroups:
+    """Settings can be written grouped by the stage each knob belongs to.
+
+    The grouping is call-site sugar: the fields stay flat, so `run()`
+    overrides and `dataclasses.replace` are unaffected.
+    """
+
+    demand = {("foreground", "A"): 1}
+    method = ("GWP", "example")
+
+    def test_groups_set_the_same_fields_as_flat_arguments(self):
+        grouped = TimexLCASettings(
+            demand=self.demand,
+            method=self.method,
+            timeline={"temporal_grouping": "month", "cutoff": 1e-6},
+            lci={"build_dynamic_biosphere": False},
+            lcia={"metric": "GWP", "time_horizon": 20},
+        )
+        flat = TimexLCASettings(
+            demand=self.demand,
+            method=self.method,
+            temporal_grouping="month",
+            cutoff=1e-6,
+            build_dynamic_biosphere=False,
+            metric="GWP",
+            time_horizon=20,
+        )
+
+        assert grouped == flat
+
+    def test_replace_still_works_flat_on_a_grouped_settings(self):
+        """`replace` re-runs __init__ with the groups defaulted away."""
+        settings = TimexLCASettings(
+            demand=self.demand, method=self.method, lcia={"metric": "GWP"}
+        )
+
+        varied = replace(settings, time_horizon=20)
+
+        assert varied.metric == "GWP"  # carried over, not reset by the empty group
+        assert varied.time_horizon == 20
+        assert settings.time_horizon == 100  # original untouched
+
+    def test_unknown_key_in_a_group_is_rejected(self):
+        with pytest.raises(TypeError, match="temporal_groupng"):
+            TimexLCASettings(
+                demand=self.demand,
+                method=self.method,
+                timeline={"temporal_groupng": "month"},
+            )
+
+    def test_key_in_the_wrong_group_names_the_right_one(self):
+        with pytest.raises(TypeError, match="lcia"):
+            TimexLCASettings(
+                demand=self.demand, method=self.method, timeline={"metric": "GWP"}
+            )
+
+    def test_a_group_conflicting_with_an_explicit_flat_argument_is_rejected(self):
+        with pytest.raises(TypeError, match="temporal_grouping"):
+            TimexLCASettings(
+                demand=self.demand,
+                method=self.method,
+                temporal_grouping="day",
+                timeline={"temporal_grouping": "month"},
+            )
 
 
 @pytest.mark.usefixtures("temporal_grouping_db_monthly")
@@ -82,6 +149,99 @@ class TestSettingsAndRun:
         tlca.run(replace(settings, temporal_grouping="month"))
 
         assert tlca.temporal_grouping == "month"
+
+    def test_settings_can_be_passed_straight_to_the_constructor(self):
+        """`TimexLCA(settings)` - no separate builder to remember."""
+        settings = self.base_settings()
+        tlca = TimexLCA(settings)
+
+        assert tlca.settings is settings
+        assert tlca.demand == settings.demand
+        assert tlca.method == settings.method
+
+        tlca.run()
+        assert isinstance(tlca.static_score, float)
+        assert tlca.static_score != 0
+
+    def test_settings_in_the_constructor_reject_a_second_argument(self):
+        with pytest.raises(TypeError, match="TimexLCASettings"):
+            TimexLCA(self.base_settings(), self.method)
+
+    # ─── what a notebook sees after run() ───
+
+    def test_repr_reports_the_scores_a_run_produced(self):
+        """`tlca.run()` is the last line of a cell, so its repr is what's shown."""
+        tlca = TimexLCA(self.base_settings())
+        assert "static_score" not in repr(tlca)
+
+        tlca.run()
+
+        assert "TimexLCA" in repr(tlca)
+        assert f"static_score={tlca.static_score:.4g}" in repr(tlca)
+
+    def test_timeline_summary_is_what_build_timeline_returns(self):
+        """`run()` returns no timeline, so the readable view has to be reachable."""
+        tlca = TimexLCA(self.base_settings())
+        returned = tlca.build_timeline()
+
+        pd.testing.assert_frame_equal(returned, tlca.timeline_summary)
+        assert list(tlca.timeline_summary.columns) == [
+            "date_producer",
+            "producer_name",
+            "date_consumer",
+            "consumer_name",
+            "amount",
+            "temporal_market_shares",
+        ]
+
+    # ─── dynamic LCIA is opportunistic by default ───
+
+    def test_run_skips_dynamic_lcia_when_the_flows_cannot_be_characterized(self):
+        """The fixture's biosphere is not `biosphere3`, so nothing maps.
+
+        `run()` is the "just give me a result" path, so it says so and carries
+        on with the static score rather than raising.
+        """
+        tlca = TimexLCA(
+            demand={self.fu.key: 1},
+            method=self.method,
+            database_dates=self.database_dates,
+        )
+
+        tlca.run(starting_datetime=self.start)
+
+        assert isinstance(tlca.static_score, float)
+        assert not hasattr(tlca, "characterized_inventory")
+
+    def test_run_raises_when_dynamic_lcia_is_asked_for_explicitly(self):
+        tlca = TimexLCA(
+            demand={self.fu.key: 1},
+            method=self.method,
+            database_dates=self.database_dates,
+        )
+
+        with pytest.raises(UnknownObject):
+            tlca.run(starting_datetime=self.start, dynamic_lcia_enabled=True)
+
+    def test_run_on_a_plainly_constructed_object(self):
+        """`TimexLCA(...).run()` is the path the docs recommend first.
+
+        No settings object anywhere: `run()` has to fall back to the demand,
+        method and background the constructor was given, and still accept
+        per-call overrides.
+        """
+        tlca = TimexLCA(
+            demand={self.fu.key: 1},
+            method=self.method,
+            database_dates=self.database_dates,
+        )
+
+        tlca.run(starting_datetime=self.start, dynamic_lcia_enabled=False)
+
+        assert hasattr(tlca, "timeline")
+        assert isinstance(tlca.static_score, float)
+        assert tlca.static_score != 0
+        assert tlca.settings is None  # the object's own settings stay untouched
 
     def test_run_rejects_unknown_kwarg(self):
         tlca = TimexLCA.from_settings(self.base_settings())
