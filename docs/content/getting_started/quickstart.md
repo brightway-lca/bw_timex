@@ -94,7 +94,7 @@ settings = TimexLCASettings(
     method=("our", "method"), 
     time_horizon=100,
     )
-tlca = TimexLCA.(settings).run()
+tlca = TimexLCA(settings).run()
 print(tlca.dynamic_score)
 
 tlca.run(time_horizon=20) # re-run, but with different time horizon
@@ -105,7 +105,7 @@ print(tlca.dynamic_score)
 For comparing different settings conveniently, you can simply run:
 
 ```python
-comparison = tlca.compare(settings, other_settings)
+comparison = tlca.compare([settings, other_settings])
 print(comparison.summary)
 ```
 
