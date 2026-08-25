@@ -42,9 +42,9 @@ nav = [
       { "Import from Excel" = "content/examples/tutorials/import_model_from_excel.md" },
     ]},
     { "Case Studies" = [
-      { "Electric Car with premise" = "content/examples/examples/electric_vehicle_premise.md" },
-      { "Electric Car with premise (in detail)" = "content/examples/examples/electric_vehicle_premise_detailed.md" },
-      { "EV Case Study for our Paper" = "content/examples/examples/paper_case_study.md" },
+      { "Electric Car with premise" = "content/examples/case_studies/electric_vehicle_premise.md" },
+      { "Electric Car with premise (in detail)" = "content/examples/case_studies/electric_vehicle_premise_detailed.md" },
+      { "EV Case Study for our Paper" = "content/examples/case_studies/paper_case_study.md" },
     ]},
     { Advanced = [
       { "Temporal Distributions in the Background" = "content/examples/advanced/background_temporal_distributions.md" },
