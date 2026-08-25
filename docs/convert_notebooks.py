@@ -85,15 +85,15 @@ NOTEBOOK_META: dict[str, tuple[str, list[str]]] = {
         "lucide/table",
         ["tutorial", "excel", "temporal distribution"],
     ),
-    "examples/electric_vehicle_premise.ipynb": (
+    "case_studies/electric_vehicle_premise.ipynb": (
         "lucide/car-front",
         ["example", "premise", "temporal distribution"],
     ),
-    "examples/electric_vehicle_premise_detailed.ipynb": (
+    "case_studies/electric_vehicle_premise_detailed.ipynb": (
         "lucide/car-front",
         ["example", "premise", "dynamic characterization"],
     ),
-    "examples/paper_case_study.ipynb": (
+    "case_studies/paper_case_study.ipynb": (
         "lucide/file-text",
         ["example", "paper", "premise"],
     ),
