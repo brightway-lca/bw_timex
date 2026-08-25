@@ -204,6 +204,7 @@ pyrightconfig.json
 # preview workflow run the script before building.
 /docs/content/examples/tutorials/
 /docs/content/examples/examples/
+/docs/content/examples/case_studies/
 /docs/content/examples/advanced/
 
 .claude

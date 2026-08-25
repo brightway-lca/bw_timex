@@ -72,7 +72,7 @@ prospective databases built with [`premise`](https://github.com/polca/premise).*
     ![](./data/ev_lifecycle_light.svg#only-light){ .off-glb }
     ![](./data/ev_lifecycle_dark.svg#only-dark){ .off-glb }
 
-    [:material-arrow-right: View Case Study](./examples/electric_vehicle_premise.md)
+    [:material-arrow-right: View Case Study](./case_studies/electric_vehicle_premise.md)
 
     *by @TimoDiepers*
 
@@ -85,7 +85,7 @@ prospective databases built with [`premise`](https://github.com/polca/premise).*
     ![](./data/ev_lifecycle_light.svg#only-light){ .off-glb }
     ![](./data/ev_lifecycle_dark.svg#only-dark){ .off-glb }
 
-    [:material-arrow-right: View Case Study](./examples/electric_vehicle_premise_detailed.md)
+    [:material-arrow-right: View Case Study](./case_studies/electric_vehicle_premise_detailed.md)
 
     *by @TimoDiepers*
 
@@ -97,7 +97,7 @@ prospective databases built with [`premise`](https://github.com/polca/premise).*
 
     <img class="off-glb" src="./data/paper_radiative_forcing.svg" alt="" style="display: block; background-color: white;" />
 
-    [:material-arrow-right: View Case Study](./examples/paper_case_study.md)
+    [:material-arrow-right: View Case Study](./case_studies/paper_case_study.md)
 
     *by @TimoDiepers*
 
