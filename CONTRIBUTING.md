@@ -2,6 +2,16 @@
 
 We welcome contributions! If you have any questions, [open a discussion](https://github.com/brightway-lca/bw_timex/discussions) or [get in touch directly with the `bw_timex` developers ](mailto:timo.diepers@ltt.rwth-aachen.de)
 
+## Report bugs or errors
+
+Something is not working as expected? You have two options:
+
+### 🥈 Report an error
+Please open a new issue in the `bw_timex` [repository](https://github.com/brightway-lca/bw_timex/issues), describing the error and where you found it.
+A member of the bw_timex developer community will then take care of the issue, but it may take some time for your issue to be resolved.
+
+### 🥇  Fix an error yourself
+If you have a solution to the error, you can [create a fork](https://github.com/brightway-lca/bw_timex/forks) of the `bw_timex` repository, make your changes and [create a pull request](https://github.com/brightway-lca/bw_timex/pulls). The developers will assess the changes and be eternally grateful!
 
 ## Contributing to the code, examples or documentation
 
@@ -32,6 +42,12 @@ The API reference is generated from the docstrings with [mkdocstrings](https://m
   ```
 
 Both sections end up as admonitions in the rendered docs. Build the docs with `zensical build` and check that it reports no `griffe:` warnings - those point at docstrings that don't parse the way they look like they should.
+
+## Building the documentation
+Locally build the documentation via zensical through:
+```bash
+uv run docs/convert_notebooks.py && uv run --extra docs zensical serve
+```
 
 ## Releasing a new version
 
@@ -132,15 +148,6 @@ conda search -c diepers bw_timex
 
 [Read the Docs](https://docs.brightway.dev/projects/bw-timex) builds from `.readthedocs.yaml` on every push to `main`, so the release PR already triggered it. Confirm the new version renders and that the changelog page shows the new section.
 
-## Report bugs or errors
 
-Something is not working as expected? You have two options:
-
-### 🥈 Report an error
-Please open a new issue in the `bw_timex` [repository](https://github.com/brightway-lca/bw_timex/issues), describing the error and where you found it.
-A member of the bw_timex developer community will then take care of the issue, but it may take some time for your issue to be resolved.
-
-### 🥇  Fix an error yourself
-If you have a solution to the error, you can [create a fork](https://github.com/brightway-lca/bw_timex/forks) of the `bw_timex` repository, make your changes and [create a pull request](https://github.com/brightway-lca/bw_timex/pulls). The developers will assess the changes and be eternally grateful!
 
 [code of conduct]: codeofconduct
