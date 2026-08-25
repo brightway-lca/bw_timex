@@ -62,6 +62,7 @@ nav = [
     { "Helper Classes" = "api/helper_classes.md" },
     { Utils = "api/utils.md" },
     { "Database metadata" = "api/database_metadata.md" },
+    { "Scenario Builder" = "api/scenario_builder.md" },
     { Errors = "api/errors.md" },
   ]},
 ]

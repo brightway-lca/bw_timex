@@ -16,5 +16,6 @@ The main user-facing class is [`TimexLCA`](timex_lca.md). It orchestrates the ot
 - [`edge_extractor`](edge_extractor.md) — extracts and convolves temporal distributions during graph traversal.
 - [`helper_classes`](helper_classes.md) — supporting data structures used across the package.
 - [`database_metadata`](database_metadata.md) — reads and writes what a database represents: its `representative_time` and its scenario.
+- [`scenario_builder`](scenario_builder.md) — finds existing premise vintages or builds missing ones with `ensure_scenario_databases`.
 - [`errors`](errors.md) — the errors `bw_timex` raises.
 - [`utils`](utils.md) — utility functions.

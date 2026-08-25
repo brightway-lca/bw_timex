@@ -609,6 +609,16 @@ class TestTimexLCAIntegration:
 
         assert bw_timex.ensure_scenario_databases is ensure_scenario_databases
 
+    def test_package_level_shorthand_builds_without_timex_lca(self, fake_premise):
+        import bw_timex
+
+        result = bw_timex.ensure_scenario_databases({**SCENARIO, "years": [2030]})
+
+        name = "ei_cutoff_3.10.1_remind_SSP2-PkBudg500_2030"
+        assert result == {name: datetime(2030, 1, 1)}
+        assert name in bd.databases
+        assert len(fake_premise) == 1
+
     def test_create_missing_builds_and_resolves(self, fake_premise):
         from bw_timex import TimexLCA
 

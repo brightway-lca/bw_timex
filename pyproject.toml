@@ -64,7 +64,7 @@ dev = [
 ]
 
 docs = [
-  "zensical",
+  "zensical>=0.0.57",
   "mkdocstrings[python]>=1.0.0",
   "mkdocs-autorefs",
   "pymdown-extensions>=10.0",
