@@ -360,23 +360,30 @@ class ScenarioBuildInputs(BaseModel):
                 "'years': [2030, 2040]}."
             )
         years = v.get("years")
-        if not years or not isinstance(years, (list, tuple)):
-            raise ValueError(
-                "scenario must contain a non-empty `years` list to build background "
-                "databases, e.g. scenario={..., 'years': [2030, 2040]}. premise "
-                "builds one database per year."
-            )
-        if not all(isinstance(year, int) and not isinstance(year, bool) for year in years):
-            raise ValueError(
-                f"scenario `years` must be integer years, e.g. [2030, 2040], got "
-                f"{list(years)}."
-            )
-        missing = [key for key in SCENARIO_FILTER_KEYS if key not in v]
-        if missing:
-            raise ValueError(
-                f"scenario is missing {missing}, which premise needs to build a "
-                f"database. Provide all of {list(SCENARIO_FILTER_KEYS)}."
-            )
+        if years is not None:
+            if not isinstance(years, (list, tuple)):
+                raise ValueError(
+                    "scenario `years` must be a list or tuple, e.g. "
+                    "scenario={..., 'years': [2030, 2040]}."
+                )
+            if not years:
+                raise ValueError(
+                    "scenario `years` must be a non-empty list, e.g. "
+                    "scenario={..., 'years': [2030, 2040]}."
+                )
+            if not all(isinstance(year, int) and not isinstance(year, bool) for year in years):
+                raise ValueError(
+                    f"scenario `years` must be integer years, e.g. [2030, 2040], got "
+                    f"{list(years)}."
+                )
+        # Only require filter keys if years are specified (i.e., building is needed)
+        if "years" in v:
+            missing = [key for key in SCENARIO_FILTER_KEYS if key not in v]
+            if missing:
+                raise ValueError(
+                    f"scenario is missing {missing}, which premise needs to build a "
+                    f"database. Provide all of {list(SCENARIO_FILTER_KEYS)}."
+                )
         allowed = SCENARIO_FILTER_KEYS + SCENARIO_BUILD_KEYS
         unknown = [key for key in v if key not in allowed]
         if unknown:

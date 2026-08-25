@@ -22,6 +22,7 @@ from .utils import (
     get_temporal_evolution_factor,
     interactive_td_widget,
     plot_characterized_inventory_as_waterfall,
+    create_electric_vehicle_example,
 )
 
 __version__ = "1.3.0"
@@ -53,4 +54,5 @@ __all__ = [
     "interactive_td_widget",
     "plot_characterized_inventory_as_waterfall",
     "set_database_metadata",
+    "create_electric_vehicle_example",
 ]

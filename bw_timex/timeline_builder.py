@@ -46,6 +46,7 @@ class TimelineBuilder:
         graph_traversal: str = "priority",
         traverse_background: bool = False,
         interdatabase_activity_mapping=None,
+        extra_reference_databases: set = None,
         *args,
         **kwargs,
     ) -> None:
@@ -95,6 +96,12 @@ class TimelineBuilder:
         self.max_calc = max_calc
         self.traverse_background = traverse_background
         self.interdatabase_activity_mapping = interdatabase_activity_mapping
+        # Databases the foreground links into but that are not declared in
+        # `database_dates` for this run (e.g. a foreground built against one
+        # scenario's vintage, reused for a different scenario). Their leaf
+        # producers are matched by (name, reference product, location) into
+        # the declared vintages, same as sibling vintages of one scenario.
+        self.extra_reference_databases = extra_reference_databases or set()
         self._logged_reference_date_below_range = False
         self._logged_reference_date_above_range = False
 
@@ -348,6 +355,8 @@ class TimelineBuilder:
             interpolation_type=self.interpolation_type,
         )
 
+        self._check_extra_reference_producers_matched(grouped_edges)
+
         # Retrieve producer and consumer names
         grouped_edges["producer_name"] = [
             self.nodes[producer]["name"] for producer in grouped_edges["producer"]
@@ -382,6 +391,77 @@ class TimelineBuilder:
     ###################################################
     # underlying functions called by build_timeline() #
     ###################################################
+
+    def _check_extra_reference_producers_matched(self, grouped_edges: pd.DataFrame) -> None:
+        """Check that every producer in an undeclared reference database was
+        matched to a sibling in a declared vintage.
+
+        `extra_reference_databases` (databases the foreground links into
+        that are not declared in `database_dates` - see `TimexLCA.__init__`)
+        are matched into the requested vintages by (name, reference product,
+        location), same as sibling vintages of one scenario. A producer with
+        no match there is genuinely unmapped, same as any other database
+        `database_dates` never named - raise the same error, so a foreground
+        split across an unrelated, undeclared database (not just a reused
+        scenario vintage) still gets a clear, actionable message instead of
+        silently dropping that part of the inventory.
+
+        Parameters
+        ----------
+        grouped_edges : pd.DataFrame
+            The timeline edges, with `producer` and `temporal_market_shares`.
+
+        Raises
+        ------
+        UnmappedDatabaseError
+            If any producer in an extra reference database has no match.
+        """
+        if not self.extra_reference_databases:
+            return
+
+        unmatched = sorted(
+            {
+                producer
+                for producer, shares in zip(
+                    grouped_edges["producer"], grouped_edges["temporal_market_shares"]
+                )
+                if not shares
+                and self.nodes[producer]["database"] in self.extra_reference_databases
+            }
+        )
+        if not unmatched:
+            return
+
+        examples = {}
+        for node_id in unmatched:
+            node = self.nodes[node_id]
+            examples.setdefault(node["database"], []).append(node["name"])
+
+        databases = ", ".join(
+            f"'{database}' (e.g. '{names[0]}'"
+            + (f", and {len(names) - 1} more" if len(names) > 1 else "")
+            + ")"
+            for database, names in examples.items()
+        )
+        first = next(iter(examples))
+        raise UnmappedDatabaseError(
+            f"The graph traversal reached processes in database(s) that are not "
+            f"mapped to a point in time and could not be matched by (name, "
+            f"reference product, location) into any of the requested vintages "
+            f"either: {databases}. `bw_timex` places every traversed process in "
+            f"time via its database, and only the database(s) holding the "
+            f"functional unit are treated as 'dynamic' automatically, so a "
+            f"foreground split across several databases has to mark the other "
+            f"ones itself.\n"
+            f"If '{first}' is part of your foreground, mark it as dynamic:\n"
+            f"    bw_timex.set_database_metadata('{first}', representative_time='dynamic')\n"
+            f"If it represents a point in time, give it that date instead:\n"
+            f"    bw_timex.set_database_metadata('{first}', "
+            f"representative_time=datetime(2030, 1, 1))\n"
+            f"Databases mapped for this calculation: "
+            f"{sorted(self.database_dates)}. When passing `database_dates` "
+            f"explicitly, it must list every database the traversal reaches."
+        )
 
     def _check_traversed_databases_are_mapped(self, grouped_edges: pd.DataFrame) -> None:
         """
@@ -593,7 +673,7 @@ class TimelineBuilder:
         """Producers that are leaves (never traversed into) and live in a static
         background db. These are the temporal-market frontier."""
         consumers = set(edges_df["consumer"].unique())
-        static_dbs = set(self.database_dates_static.keys())
+        static_dbs = set(self.database_dates_static.keys()) | self.extra_reference_databases
         leaves = set()
         for producer in edges_df["producer"].unique():
             if producer in consumers:

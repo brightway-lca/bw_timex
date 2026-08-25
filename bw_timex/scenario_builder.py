@@ -333,6 +333,23 @@ def ensure_scenario_databases(
     """
     ScenarioBuildInputs(scenario=scenario, ecoinvent_credentials=ecoinvent_credentials)
     filters, build = split_scenario(scenario)
+
+    # If years are not specified, check if databases already exist
+    if "years" not in build:
+        sectors = build.get("sectors") or None
+        existing = find_existing_vintages(filters, sectors)
+        if existing:
+            logger.info(
+                f"Found {len(existing)} existing background vintage(s) for this "
+                f"scenario. Using them."
+            )
+            return existing
+        else:
+            raise ValueError(
+                "No background databases found for this scenario. Provide `years` in "
+                "the scenario to build them, e.g. scenario={..., 'years': [2030, 2040]}."
+            )
+
     # The same year twice would hand premise the same target name twice, and it
     # would build and write it twice.
     years = list(dict.fromkeys(build["years"]))

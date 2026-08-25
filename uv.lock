@@ -507,7 +507,7 @@ requires-dist = [
     { name = "seaborn" },
     { name = "setuptools", marker = "extra == 'testing'" },
     { name = "tqdm" },
-    { name = "zensical", marker = "extra == 'docs'", specifier = "==0.0.57" },
+    { name = "zensical", marker = "extra == 'docs'", specifier = ">=0.0.57" },
 ]
 provides-extras = ["testing", "dev", "docs", "solvers", "premise"]
 

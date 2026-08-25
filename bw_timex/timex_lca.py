@@ -97,7 +97,7 @@ class TimexLCASettings:
     #: Fields that pick the background, and so cannot vary between runs of one
     #: `TimexLCA`. Changing one means building a new object (which
     #: `TimexLCA.compare` does for you).
-    FIXED_FIELDS = ("database_dates", "scenario", "use_global_lci_cache")
+    FIXED_FIELDS = ("database_dates", "scenario", "create_missing", "use_global_lci_cache")
 
     #: The stage each knob belongs to, for the grouped spelling above. Also
     #: what the reference documentation is organised by.
@@ -137,6 +137,8 @@ class TimexLCASettings:
     method: tuple
     database_dates: Optional[dict] = None
     scenario: Optional[dict] = None
+    create_missing: bool = False
+    
     use_global_lci_cache: bool = True
     #: Name for this calculation, used to label its row in a comparison.
     label: Optional[str] = None
@@ -183,8 +185,21 @@ class TimexLCASettings:
     timeline: InitVar[Optional[dict]] = None
     lci: InitVar[Optional[dict]] = None
     lcia: InitVar[Optional[dict]] = None
+    #: Convenience to set `scenario["years"]` directly as a top-level kwarg.
+    years: InitVar[Optional[list]] = None
+    #: Convenience to merge arbitrary scenario updates. E.g., `scenario_updates={"pathway": "SSP2-Base", "years": [2030]}`.
+    scenario_updates: InitVar[Optional[dict]] = None
 
-    def __post_init__(self, timeline, lci, lcia) -> None:
+    def __post_init__(self, timeline, lci, lcia, years, scenario_updates) -> None:
+        # Merge scenario updates if provided
+        if years is not None or scenario_updates:
+            if self.scenario is None:
+                self.scenario = {}
+            if scenario_updates:
+                self.scenario.update(scenario_updates)
+            if years is not None:
+                self.scenario["years"] = years
+
         for group, given in (("timeline", timeline), ("lci", lci), ("lcia", lcia)):
             if not given:
                 continue
@@ -450,6 +465,7 @@ class TimexLCA:
             method = settings.method
             database_dates = settings.database_dates
             scenario = settings.scenario
+            create_missing = settings.create_missing
             use_global_lci_cache = settings.use_global_lci_cache
         elif method is None:
             raise TypeError(
@@ -491,6 +507,7 @@ class TimexLCA:
         self._fixed_fields = {
             "database_dates": database_dates,
             "scenario": scenario,
+            "create_missing": create_missing,
             "use_global_lci_cache": use_global_lci_cache,
         }
 
@@ -530,6 +547,44 @@ class TimexLCA:
             k: v for k, v in self.database_dates.items() if isinstance(v, datetime)
         }
 
+        # Background databases the foreground literally links into but that
+        # are not declared in `database_dates` for this run - typically a
+        # foreground built once against one scenario's vintage and then
+        # reused for a different scenario (e.g. via `TimexLCA.compare()`
+        # with a different `scenario`). Treated as background boundary/leaf
+        # nodes and matched by (name, reference product, location) into the
+        # declared vintages, the same way sibling vintages of one scenario
+        # are already matched.
+        # Biosphere databases are excluded: `find_graph_dependents()` pulls
+        # them in too (biosphere exchanges are dependencies just like
+        # technosphere ones), but their flows are not activities, have no
+        # (reference product, location) to match on, and are never part of
+        # `database_dates` in the first place - every project has one.
+        technosphere_node_types = (
+            set(bd.labels.process_node_types)
+            | set(bd.labels.product_node_types)
+            | {"multifunctional"}
+        )
+        self._extra_reference_databases = {
+            db
+            for db in self._base_lca_database_names - set(self.database_dates)
+            if (
+                AD.select(AD.type).where(AD.database == db).limit(1).scalar()
+                or bd.labels.process_node_default
+            )
+            in technosphere_node_types
+        }
+        if self._extra_reference_databases:
+            logger.info(
+                "Foreground links into {} which {} not part of the requested "
+                "background. Matching its processes into the requested "
+                "vintages by (name, reference product, location).",
+                ", ".join(sorted(self._extra_reference_databases)),
+                "is"
+                if len(self._extra_reference_databases) == 1
+                else "are",
+            )
+
         logger.info("Collecting node infos...")
         # Create some collections of nodes that will be useful down the line, e.g. all nodes from
         # the background databases that link to foreground nodes.
@@ -542,8 +597,11 @@ class TimexLCA:
         # database's `modified` token) so repeated TimexLCA objects in the same
         # session reuse them instead of re-querying. Opt out via
         # `use_global_lci_cache=False`.
+        databases_to_load = list(self.database_dates.keys()) + sorted(
+            self._extra_reference_databases
+        )
         logger.info(
-            f"Loading node metadata from {len(self.database_dates)} database(s)..."
+            f"Loading node metadata from {len(databases_to_load)} database(s)..."
         )
         self._nodes_cache = NODES_CACHE if use_global_lci_cache else {}
         project = bd.projects.current
@@ -551,7 +609,7 @@ class TimexLCA:
         # Build a cache mapping activity code to name for efficient lookups.
         # This avoids repeated database queries in plotting and labeling functions.
         self._activity_code_to_name_cache = {}
-        for db in self.database_dates.keys():
+        for db in databases_to_load:
             modified = bd.databases[db].get("modified") if db in bd.databases else None
             key = ("nodes", project, db, modified)
             db_nodes = self._nodes_cache.get(key)
@@ -1195,7 +1253,9 @@ class TimexLCA:
             )
             if self._default_edge_filter_function is None:
                 skippable = set()
-                for db in self.database_dates_static.keys():
+                for db in set(self.database_dates_static.keys()) | getattr(
+                    self, "_extra_reference_databases", set()
+                ):
                     skippable.update(node.id for node in bd.Database(db))
                 self._default_edge_filter_function = skippable.__contains__
             self.edge_filter_function = self._default_edge_filter_function
@@ -1248,6 +1308,7 @@ class TimexLCA:
             graph_traversal=graph_traversal,
             traverse_background=traverse_background,
             interdatabase_activity_mapping=self.interdatabase_activity_mapping,
+            extra_reference_databases=self._extra_reference_databases,
             *args,
             **kwargs,
         )
@@ -2760,8 +2821,13 @@ class TimexLCA:
                 bd.Database(db).find_graph_dependents()
             )
 
-        demand_dependent_background_database_names = (
-            demand_dependent_database_names & self.database_dates_static.keys()
+        # Also treat databases the foreground links into but that are not
+        # declared in `database_dates` (see `_extra_reference_databases` in
+        # `__init__`) as background: they are boundary/leaf nodes to be
+        # matched into the declared vintages, not traversed into.
+        demand_dependent_background_database_names = demand_dependent_database_names & (
+            self.database_dates_static.keys()
+            | getattr(self, "_extra_reference_databases", set())
         )
 
         # Only the ids are needed here, so we query them directly instead of
@@ -2812,7 +2878,13 @@ class TimexLCA:
         so the BFS extractor can resolve and read the respective (non-referenced)
         variant's exchanges while it is still traversing.
         """
-        static_dbs = set(self.database_dates_static.keys())
+        # Also include databases the foreground links into but that are not
+        # declared in `database_dates` (`_extra_reference_databases`), so
+        # their nodes get an entry too and can be resolved to their sibling
+        # in an actually-declared vintage.
+        static_dbs = set(self.database_dates_static.keys()) | getattr(
+            self, "_extra_reference_databases", set()
+        )
         tuples_dict = {}
         for node in self.nodes.values():
             if node["database"] not in static_dbs:
@@ -2979,6 +3051,20 @@ class TimexLCA:
             elif db_name in static_db_time_mapping:
                 self.activity_time_mapping.add(
                     (key, static_db_time_mapping[db_name]), unique_id=idx
+                )
+            elif db_name in self._extra_reference_databases:
+                # Not declared in `database_dates` for this run (a foreground
+                # link into a vintage of a different scenario, see
+                # `_extra_reference_databases`). It still occupies a real
+                # technosphere column in `base_lca` and `self.lca` (loaded via
+                # `find_graph_dependents()` on the foreground, regardless of
+                # `database_dates`), so it needs an entry to keep the
+                # time-mapping's size in sync with the matrices. Nothing
+                # legitimate looks it up: the actual relinking to the
+                # requested vintages goes through `interdatabase_activity_mapping`
+                # (by name/product/location), not through this entry.
+                self.activity_time_mapping.add(
+                    (key, "unmapped_reference"), unique_id=idx
                 )
             else:
                 raise ValueError(f"Time of activity {key} is neither datetime nor str.")
