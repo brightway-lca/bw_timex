@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 * Fixed wrong scores for background systems spanning multiple databases ([#230](https://github.com/brightway-lca/bw_timex/pull/230))
+* Fixed `compare()` runs with differing scenarios ([#231](https://github.com/brightway-lca/bw_timex/pull/231))
 
 ## [1.3.0] - 2026-08-24
 * Added `TimexLCA.run()`, which executes the whole pipeline (`build_timeline()`, `lci()`, `static_lcia()` and `dynamic_lcia()`) in one call, taking every argument of the four stages, either explicitly or through a `TimexLCASettings` object ([#223](https://github.com/brightway-lca/bw_timex/pull/223)) 
