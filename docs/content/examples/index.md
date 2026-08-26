@@ -109,6 +109,18 @@ prospective databases built with [`premise`](https://github.com/polca/premise).*
 
 <div class="grid cards" markdown>
 
+-   **📈⚖️ Scenario Comparison with `compare()`**
+
+    ---
+
+    Automatically fetch scenario databases from `premise` and compare results using configured runs with `compare()`.
+
+    [:material-arrow-right: View Example](./advanced/scenario_comparison.md)
+
+    *by @TimoDiepers*
+
+
+
 -   **🌍⏳ Temporal Distributions in the Background**
 
     ---

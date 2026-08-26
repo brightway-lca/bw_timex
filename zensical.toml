@@ -47,6 +47,7 @@ nav = [
       { "EV Case Study for our Paper" = "content/examples/case_studies/paper_case_study.md" },
     ]},
     { Advanced = [
+      { "Scenario Comparison with .compare()" = "content/examples/advanced/scenario_comparison.md" },
       { "Temporal Distributions in the Background" = "content/examples/advanced/background_temporal_distributions.md" },
       { "Background Temporalization with premise" = "content/examples/advanced/background_temporal_distributions_premise.md" },
       { "Uncertainty with Datapackages" = "content/examples/advanced/uncertainty_with_datapackages.md" },
