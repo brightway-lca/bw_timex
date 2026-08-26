@@ -485,7 +485,7 @@ requires-dist = [
     { name = "bw-temporalis", specifier = ">=1.1" },
     { name = "bw2calc", specifier = ">=2.4" },
     { name = "bw2data", specifier = ">=4.6" },
-    { name = "dynamic-characterization", specifier = ">=1.4.1" },
+    { name = "dynamic-characterization", specifier = ">=1.4.2" },
     { name = "ipython" },
     { name = "ipywidgets" },
     { name = "loguru" },
@@ -1367,7 +1367,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/a2/55/8f8cab2afd404cf57
 
 [[package]]
 name = "dynamic-characterization"
-version = "1.4.1"
+version = "1.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bw2data" },
@@ -1379,9 +1379,9 @@ dependencies = [
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-premise'" },
     { name = "pandas", version = "3.0.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-testing' or extra != 'extra-8-bw-timex-premise'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2d/2f/97c2d636ffc2126903afd1c2216441b2b3dd44c1e2c3888e9265186a6411/dynamic_characterization-1.4.1.tar.gz", hash = "sha256:4e8e6116c96270940f5e557e388d4dfeb7eef6b25621d7f8bb8afa073f0a134c", size = 1209732, upload-time = "2026-08-03T10:56:58.578Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/81/aa0188633aea8923f5922a53baa60de014a4dcf3484857aefd9e20182f46/dynamic_characterization-1.4.2.tar.gz", hash = "sha256:77e88f1c679b98c48382f7a6ba9c7b647459fd0dc423eb3a231488d90aad6be3", size = 1211254, upload-time = "2026-08-14T12:56:56.03Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e8/5d/59c7a9f13193e1dfc5304a5eb0ddfbea33d7d010b21531837ec65b173a29/dynamic_characterization-1.4.1-py3-none-any.whl", hash = "sha256:1dcbc14174358651c1558087c64734f0c2ef377ef5a73bb9dbc16c8ebdf630d0", size = 1268258, upload-time = "2026-08-03T10:56:56.915Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/89/706e432ff4ee959f6b889f55445c8567f50508b04f0d406f774be840980d/dynamic_characterization-1.4.2-py3-none-any.whl", hash = "sha256:9a820670a199fdd136aa818123e19739ef8c9dd0fa3f0d40df5386a0c54ca4fc", size = 1268791, upload-time = "2026-08-14T12:56:54.747Z" },
 ]
 
 [[package]]
