@@ -1826,25 +1826,28 @@ class TimexLCA:
         for market_id, recipe in builder.temporal_market_recipes.items():
             scale = builder.temporal_market_scales[market_id]
             # A market's background activities are the same process in
-            # different vintages, so they sit in *different* blocks, whose
-            # supply columns cover disjoint parts of the technosphere.
-            # Accumulate per block and stitch the triplets together.
-            supply_per_block = {}
+            # different vintages, so a unit supply can (and a downstream
+            # block a vintage's own demand cascades into, per
+            # `BackgroundSolver._cascading_solve`, always does) span more
+            # than one block. `supply.values` is dense over every
+            # technosphere column already, so recipe entries are summed
+            # directly; only the union of blocks anything actually
+            # touched needs slicing below.
+            combined = np.zeros(n_columns)
+            touched_blocks = set()
             for activity_id, coefficient in recipe.items():
                 supply = solver.unit_supply(activity_id)
-                scaled = supply.values * (coefficient * scale)
-                if supply.block_index in supply_per_block:
-                    supply_per_block[supply.block_index] += scaled
-                else:
-                    supply_per_block[supply.block_index] = scaled
+                combined += supply.values * (coefficient * scale)
+                touched_blocks |= supply.touched_blocks
 
             rows, columns, data = [], [], []
-            for block_index, values in supply_per_block.items():
+            for block_index in touched_blocks:
                 block_columns = solver.structure.blocks[block_index].columns
                 # A background LCI supplies a fraction of even its own block;
                 # slicing the columns it actually reaches keeps the product -
                 # and the resulting matrix - to that fraction. Only exact
                 # zeros are dropped, never small values.
+                values = combined[block_columns]
                 nonzero = np.flatnonzero(values)
                 supplied = block_columns[nonzero]
                 block_lci = (

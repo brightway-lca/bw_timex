@@ -194,7 +194,9 @@ class TestSupplyRecipes:
             3.0 * solver.unit_supply(siblings[1]).values
         )
         columns = solver.structure.blocks[block_index].columns
-        expected = solver.biosphere_matrix[:, columns].multiply(expected_supply)
+        expected = solver.biosphere_matrix[:, columns].multiply(
+            expected_supply[columns]
+        )
         difference = tlca.temporal_market_lcis[market_id][:, columns] - expected
         assert abs(difference).max() == pytest.approx(0.0, abs=1e-12)
 
