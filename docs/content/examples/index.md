@@ -54,6 +54,16 @@ anywhere without access to a commercial background database.*
 
     *by @jakobsarthur & @muelleram*
 
+-   **📈⚖️ Scenario Comparison with `compare()`**
+
+    ---
+
+    Automatically fetch scenario databases from `premise` and compare results using configured runs with `compare()`.
+
+    [:material-arrow-right: View Example](./tutorials/scenario_comparison.md)
+
+    *by @TimoDiepers*
+
 </div>
 
 ## Case Studies
@@ -108,17 +118,6 @@ prospective databases built with [`premise`](https://github.com/polca/premise).*
 *Deep dives into one optional feature each, for when the standard workflow isn't enough.*
 
 <div class="grid cards" markdown>
-
--   **📈⚖️ Scenario Comparison with `compare()`**
-
-    ---
-
-    Automatically fetch scenario databases from `premise` and compare results using configured runs with `compare()`.
-
-    [:material-arrow-right: View Example](./advanced/scenario_comparison.md)
-
-    *by @TimoDiepers*
-
 
 
 -   **🌍⏳ Temporal Distributions in the Background**

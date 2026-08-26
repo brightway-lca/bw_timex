@@ -85,6 +85,10 @@ NOTEBOOK_META: dict[str, tuple[str, list[str]]] = {
         "lucide/table",
         ["tutorial", "excel", "temporal distribution"],
     ),
+    "tutorials/5_scenario_comparison.ipynb": (
+        "lucide/git-compare",
+        ["tutorial", "scenario", "premise", "background databases"],
+    ),
     "case_studies/electric_vehicle_premise.ipynb": (
         "lucide/car-front",
         ["example", "premise", "temporal distribution"],
@@ -108,10 +112,6 @@ NOTEBOOK_META: dict[str, tuple[str, list[str]]] = {
     "advanced/uncertainty_with_datapackages.ipynb": (
         "lucide/dices",
         ["advanced", "uncertainty", "datapackages"],
-    ),
-    "advanced/scenario_comparison.ipynb": (
-        "lucide/git-compare",
-        ["advanced", "scenario", "premise", "background databases"],
     ),
 }
 
