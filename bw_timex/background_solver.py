@@ -34,16 +34,25 @@ from .block_structure import BlockStructure
 
 @dataclass(frozen=True, eq=False)
 class UnitSupply:
-    """A unit supply column, dense within the block that produced it.
+    """A unit supply column, dense over every column of the technosphere.
 
-    `values` is aligned with `structure.blocks[block_index].columns` - i.e.
-    `values[i]` is the supply of the activity at column
-    `structure.blocks[block_index].columns[i]`, not of column `i` of the
-    full matrix.
+    An activity's own block can be a pure consumer - solved first, with no
+    footprint of its own - while its actual impact lives in a block further
+    down the chain that its demand cascades into (a small hand-modified
+    database referencing the real background it draws materials from, for
+    instance). So a unit demand is not confined to the block that owns the
+    requested activity: it is solved there, then propagated into every
+    later block (consumer-first order, so a later block can depend on an
+    earlier one but never the reverse) whose right-hand side comes out
+    nonzero as a result, and so on until nothing new is touched.
+
+    `touched_blocks` names which blocks actually received a solve, so a
+    caller (`unit_aggregate`) can multiply only those blocks' biosphere
+    columns instead of the full-width matrix.
     """
 
-    block_index: int
     values: np.ndarray
+    touched_blocks: frozenset
 
 
 class BackgroundSolver:
@@ -145,9 +154,10 @@ class BackgroundSolver:
         # Lazily built, cached once per instance.
         self._column_node_ids_cache: Optional[np.ndarray] = None
         self._biosphere_node_ids_cache: Optional[np.ndarray] = None
-        self._sorted_column_ids_cache: dict = {}
+        self._sorted_column_ids_cache: Optional[tuple] = None
         self._sorted_biosphere_ids_cache: Optional[tuple] = None
         self._row_block_index = self._build_row_block_index()
+        self._column_block_index = self._build_column_block_index()
 
     # -- id-space translation ------------------------------------------------
 
@@ -186,18 +196,19 @@ class BackgroundSolver:
             self._biosphere_node_ids_cache = arr
         return self._biosphere_node_ids_cache
 
-    def _sorted_column_ids(self, block_index: int) -> tuple:
-        """Sorted node ids of a block's columns, plus the local positions
-        they came from (`sorted_ids[k]` is the id of local column
-        `order[k]`). Used to translate a node-id-keyed cache payload back
-        into this block's local column space with `np.searchsorted`.
+    def _sorted_column_ids_all(self) -> tuple:
+        """Sorted node ids of every technosphere column, plus the positions
+        they came from - like `_sorted_biosphere_ids`, but for columns.
+        Used to translate a node-id-keyed supply cache payload back into
+        this solver's full column index space with `np.searchsorted`; a
+        cached supply is no longer confined to one block (see
+        `_cascading_solve`), so the lookup can no longer be either.
         """
-        if block_index not in self._sorted_column_ids_cache:
-            block = self.structure.blocks[block_index]
-            ids = self._column_node_ids()[block.columns]
+        if self._sorted_column_ids_cache is None:
+            ids = self._column_node_ids()
             order = np.argsort(ids)
-            self._sorted_column_ids_cache[block_index] = (ids[order], order)
-        return self._sorted_column_ids_cache[block_index]
+            self._sorted_column_ids_cache = (ids[order], order)
+        return self._sorted_column_ids_cache
 
     def _sorted_biosphere_ids(self) -> tuple:
         if self._sorted_biosphere_ids_cache is None:
@@ -236,6 +247,16 @@ class BackgroundSolver:
             arr[block.rows] = block_index
         return arr
 
+    def _build_column_block_index(self) -> np.ndarray:
+        """Technosphere column index -> owning block index. The column-space
+        counterpart of `_build_row_block_index`, used to tell which blocks a
+        cached (translated) supply touches without re-walking `structure`."""
+        n_columns = self.technosphere_matrix.shape[1]
+        arr = np.full(n_columns, -1, dtype=np.int64)
+        for block_index, block in enumerate(self.structure.blocks):
+            arr[block.columns] = block_index
+        return arr
+
     # -- public API -----------------------------------------------------------
 
     def block_index_for(self, activity_id) -> int:
@@ -250,32 +271,36 @@ class BackgroundSolver:
         into it without disturbing the memo behind it.
         """
         cache_key = self.cache_key(activity_id)
-        block_index = self.block_index_for(activity_id)
 
         memoized = self._translated_supply.get(cache_key)
         if memoized is not None:
-            return UnitSupply(block_index=block_index, values=memoized.copy())
+            values, touched_blocks = memoized
+            return UnitSupply(values=values.copy(), touched_blocks=touched_blocks)
 
         cache = self._select_cache(cache_key, self.shared_cache, self._instance_supply_cache)
-        block = self.structure.blocks[block_index]
 
         if cache_key in cache:
-            sorted_ids, order = self._sorted_column_ids(block_index)
-            values = self._translate(cache[cache_key], sorted_ids, order, len(block.columns))
+            sorted_ids, order = self._sorted_column_ids_all()
+            values = self._translate(
+                cache[cache_key], sorted_ids, order, self.technosphere_matrix.shape[1]
+            )
+            touched_blocks = self._blocks_touched_by(values)
         else:
+            block_index = self.block_index_for(activity_id)
+            block = self.structure.blocks[block_index]
             rhs = np.zeros(len(block.rows))
             rhs[self._local_row(block, activity_id)] = 1.0
-            values = self.solve_block(block_index, rhs)
+            values, touched_blocks = self._cascading_solve({block_index: rhs})
 
             nonzero = np.flatnonzero(values)
-            column_ids = self._column_node_ids()[block.columns[nonzero]]
+            column_ids = self._column_node_ids()[nonzero]
             cache[cache_key] = (column_ids, values[nonzero].copy())
 
         if cache_key in self._seen_supply:
-            self._translated_supply[cache_key] = values
+            self._translated_supply[cache_key] = (values, touched_blocks)
         else:
             self._seen_supply.add(cache_key)
-        return UnitSupply(block_index=block_index, values=values.copy())
+        return UnitSupply(values=values.copy(), touched_blocks=touched_blocks)
 
     def unit_aggregate(self, activity_id) -> np.ndarray:
         """Unit LCI aggregated over biosphere rows: `B[:, cols] @ x`.
@@ -302,9 +327,7 @@ class BackgroundSolver:
             )
         else:
             supply = self.unit_supply(activity_id)
-            aggregate = np.asarray(
-                self._biosphere_submatrix(supply.block_index) @ supply.values
-            ).ravel()
+            aggregate = self._aggregate_over_touched_blocks(supply)
 
             nonzero = np.flatnonzero(aggregate)
             bio_ids = self._biosphere_node_ids()[nonzero]
@@ -323,30 +346,89 @@ class BackgroundSolver:
 
         A temporal market interpolates between vintages living in different
         background databases - different diagonal blocks - so a demand
-        routinely spans more than one, and each block is solved separately and
-        the aggregates summed.
+        routinely spans more than one, and each block is solved separately;
+        so can any block a seeded activity's demand cascades into further
+        downstream (see `_cascading_solve`), and those are included too.
 
         Nothing is cached here. The demand is a sum specific to one caller's
         grouping, so it has no stable identity to key on, unlike the per
         activity unit LCIs of `unit_supply` / `unit_aggregate`.
         """
-        by_block: dict = {}
+        seeds: dict = {}
         for activity_id, amount in demand.items():
             block_index = self.block_index_for(activity_id)
-            part = by_block.setdefault(block_index, {})
-            part[activity_id] = part.get(activity_id, 0.0) + amount
-
-        result = np.zeros(self.biosphere_matrix.shape[0])
-        for block_index, part in by_block.items():
             block = self.structure.blocks[block_index]
-            rhs = np.zeros(len(block.rows))
-            for activity_id, amount in part.items():
-                rhs[self._local_row(block, activity_id)] += amount
-            supply = self.solve_block(block_index, rhs)
-            result += np.asarray(
-                self._biosphere_submatrix(block_index) @ supply
+            rhs = seeds.setdefault(block_index, np.zeros(len(block.rows)))
+            rhs[self._local_row(block, activity_id)] += amount
+
+        values, touched_blocks = self._cascading_solve(seeds)
+        return self._aggregate_over_touched_blocks(
+            UnitSupply(values=values, touched_blocks=touched_blocks)
+        )
+
+    def _aggregate_over_touched_blocks(self, supply: "UnitSupply") -> np.ndarray:
+        """`B[:, cols] @ supply.values`, done per touched block.
+
+        A handful of small slices (`_biosphere_submatrix` is memoized per
+        block) instead of one sparse-times-dense product over the full
+        column width, most of which is zero.
+        """
+        aggregate = np.zeros(self.biosphere_matrix.shape[0])
+        for block_index in supply.touched_blocks:
+            block = self.structure.blocks[block_index]
+            local = supply.values[block.columns]
+            aggregate += np.asarray(
+                self._biosphere_submatrix(block_index) @ local
             ).ravel()
-        return result
+        return aggregate
+
+    def _blocks_touched_by(self, values: np.ndarray) -> frozenset:
+        """Which blocks have at least one nonzero entry in a global `values`."""
+        nonzero_columns = np.flatnonzero(values)
+        if len(nonzero_columns) == 0:
+            return frozenset()
+        return frozenset(int(b) for b in np.unique(self._column_block_index[nonzero_columns]))
+
+    def _cascading_solve(self, seeds: dict) -> tuple:
+        """Solve `seeds` (`{block_index: local rhs}`) and propagate forward.
+
+        A block's own row equations can depend only on already-solved,
+        earlier blocks (`BlockStructure.detect` orders blocks consumer
+        first: a block's columns may carry entries in the rows of *later*
+        blocks only, never the reverse). So one pass through every block in
+        that order, always accumulating `-(A[block.rows, :] @ full_supply)`
+        from whatever has been solved so far on top of the block's own seed
+        (if any), correctly reproduces the full monolithic solve - not just
+        for the seeded blocks, but for every block a seed's demand cascades
+        into, however many hops away.
+
+        Blocks with neither a seed nor a nonzero cross-term contribution
+        are skipped entirely (no solve bought for them), which is the
+        common case: a real project's demand touches a handful of a much
+        larger set of blocks.
+
+        Returns
+        -------
+        tuple
+            `(full_supply, touched_blocks)`: the supply, dense over every
+            technosphere column, and the `frozenset` of block indices that
+            were actually solved.
+        """
+        full_supply = np.zeros(self.technosphere_matrix.shape[1])
+        touched_blocks = set()
+        for block_index, block in enumerate(self.structure.blocks):
+            rhs = -np.asarray(
+                self.technosphere_matrix[block.rows, :] @ full_supply
+            ).ravel()
+            seed = seeds.get(block_index)
+            if seed is not None:
+                rhs = rhs + seed
+            if not np.any(rhs):
+                continue
+            values = self.solve_block(block_index, rhs)
+            full_supply[block.columns] = values
+            touched_blocks.add(block_index)
+        return full_supply, frozenset(touched_blocks)
 
     def _local_row(self, block, activity_id) -> int:
         """Position of `activity_id`'s product row within `block.rows`."""

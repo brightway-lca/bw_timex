@@ -104,6 +104,99 @@ def two_background_activities_db():
         bd.Database(db).process()
 
 
+@pytest.fixture
+@bw2test
+def chained_background_activities_db():
+    """A background activity that itself consumes from a *second* background
+    database - e.g. a hand-modified copy of a process (its own small
+    database, as `bw_timex`'s docs recommend for keeping such copies
+    isolated) that still sources its materials from the real background.
+
+    `glider` (in `db_parts`) has no direct biosphere emission of its own;
+    all of its footprint comes from `steel` (in `db_materials`), a second,
+    separate background database/block that `glider`'s block never
+    traverses into.
+    """
+    bd.Database("bio").write(
+        {
+            ("bio", "CO2"): {
+                "type": "emission",
+                "name": "carbon dioxide",
+            },
+        },
+    )
+
+    bd.Database("db_materials").write(
+        {
+            ("db_materials", "steel"): {
+                "name": "steel",
+                "location": "somewhere",
+                "reference product": "steel",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("db_materials", "steel"),
+                    },
+                    {
+                        "amount": 3,
+                        "type": "biosphere",
+                        "input": ("bio", "CO2"),
+                    },
+                ],
+            },
+        }
+    )
+
+    bd.Database("db_parts").write(
+        {
+            ("db_parts", "glider"): {
+                "name": "glider",
+                "location": "somewhere",
+                "reference product": "glider",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("db_parts", "glider"),
+                    },
+                    {
+                        "amount": 2,
+                        "type": "technosphere",
+                        "input": ("db_materials", "steel"),
+                    },
+                ],
+            },
+        }
+    )
+
+    bd.Database("foreground").write(
+        {
+            ("foreground", "A"): {
+                "name": "node a",
+                "location": "somewhere",
+                "reference product": "A",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("foreground", "A"),
+                    },
+                    {
+                        "amount": 1,
+                        "type": "technosphere",
+                        "input": ("db_parts", "glider"),
+                    },
+                ],
+            },
+        }
+    )
+
+    for db in bd.databases:
+        bd.Database(db).register()
+        bd.Database(db).process()
+
+
 def _setup():
     """A plain LCA over the fixture project, split into per-database blocks."""
     node_a = bd.get_node(database="foreground", code="A")
@@ -134,10 +227,8 @@ def _setup():
 
 
 def _full_supply(structure, supply):
-    block = structure.blocks[supply.block_index]
-    full = np.zeros(structure.n_columns)
-    full[block.columns] = supply.values
-    return full
+    # `supply.values` is already dense over every technosphere column.
+    return supply.values
 
 
 @pytest.mark.usefixtures("dynamic_biosphere_matrix_db")
@@ -160,7 +251,12 @@ class TestBackgroundSolver:
 
         supply = solver.unit_supply(background.id)
 
-        assert structure.blocks[supply.block_index].labels == frozenset({"db_2020"})
+        touched_labels = {
+            label
+            for block_index in supply.touched_blocks
+            for label in structure.blocks[block_index].labels
+        }
+        assert touched_labels == {"db_2020"}
 
     def test_unit_aggregate_matches_biosphere_times_supply(self):
         lca, structure, solver = _setup()
@@ -252,6 +348,39 @@ class TestBackgroundSolver:
 
         assert solver.factorized_blocks == set()
         assert solver.n_solves == 0
+
+
+@pytest.mark.usefixtures("chained_background_activities_db")
+class TestUnitAggregateFollowsDownstreamBlocks:
+    """A background activity's own block can be a pure consumer - solved
+    first, with an empty upstream footprint of its own - while its actual
+    biosphere impact lives entirely in a *later* block its demand cascades
+    into (`glider` consumes `steel`, a separate database/block). The unit
+    LCI must include that downstream block, not stop at the activity's own.
+    """
+
+    def test_unit_aggregate_includes_a_downstream_blocks_emissions(self):
+        lca, structure, solver = _setup()
+        glider = bd.get_node(database="db_parts", code="glider")
+        co2 = bd.get_node(database="bio", code="CO2")
+
+        aggregate = solver.unit_aggregate(glider.id)
+
+        co2_row = lca.dicts.biosphere[co2.id]
+        # glider consumes 2 steel, each steel emits 3 kg CO2 -> 6 kg CO2.
+        assert aggregate[co2_row] == pytest.approx(6.0)
+
+    def test_unit_aggregate_matches_a_whole_matrix_solve(self):
+        lca, structure, solver = _setup()
+        glider = bd.get_node(database="db_parts", code="glider")
+
+        aggregate = solver.unit_aggregate(glider.id)
+
+        demand = np.zeros(lca.technosphere_matrix.shape[0])
+        demand[lca.dicts.product[glider.id]] = 1
+        expected_supply = sp.linalg.spsolve(lca.technosphere_matrix.tocsc(), demand)
+        expected = np.asarray(lca.biosphere_matrix @ expected_supply).ravel()
+        assert np.allclose(aggregate, expected)
 
 
 @pytest.mark.usefixtures("two_background_activities_db")

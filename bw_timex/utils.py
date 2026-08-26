@@ -1119,3 +1119,153 @@ def get_temporal_evolution_factor(
             )
 
     return 1.0  # fallback
+
+def create_electric_vehicle_example(    
+    background_database_name: str,
+    foreground_database_name: str = "foreground",
+    overwrite_existing: bool = False,
+) -> None:
+    """Create a simple temporalized product system of an electric vehicle.
+
+    Parameters
+    ----------
+    background_database_name : str
+        The name of the background database.
+    foreground_database_name : str
+        The name of the foreground database.
+
+    Returns
+    -------
+    None
+        This function does not return a value, but creates a temporalized product system.
+    """
+    LIFETIME = 15  # years
+    ELECTRICITY_CONSUMPTION = 0.2  # kWh/km
+    LIFETIME_KM = 100_000  # km
+    MASS_CAR_WITHOUT_BATTERY = 840  # kg
+    MASS_BATTERY = 280  # kg
+
+    if foreground_database_name in bd.databases:
+        if overwrite_existing:
+            del bd.databases[foreground_database_name]
+        else:
+            raise ValueError(
+                f"Database '{foreground_database_name}' already exists. "
+                "Set 'overwrite_existing=True' to overwrite it."
+            )
+    foreground = bd.Database(foreground_database_name)
+    foreground.register()
+    
+    ev_production = foreground.new_node(
+        "ev_production", name="assembly of an electric vehicle", unit="unit"
+    )
+    ev_production["reference product"] = "electric vehicle"
+    ev_production.save()
+
+    driving = foreground.new_node(
+        "driving", name="driving an electric vehicle", unit="pkm over ev lifetime"
+    )
+    driving["reference product"] = "person transport"
+    driving.save()
+    
+    car_without_battery = bd.get_node(
+    database=background_database_name,
+        name="market for passenger car, electric, without battery",
+    )
+    battery = bd.get_node(
+        database=background_database_name,
+        name="market for battery, Li-ion, LiMn2O4, rechargeable",
+    )
+    electricity = bd.get_node(
+        database=background_database_name,
+        name="market group for electricity, low voltage",
+        location="GLO",
+    )
+    battery_eol = bd.get_node(
+        database=background_database_name,
+        name="market for used Li-ion battery",
+    )
+    ev_production.new_edge(input=ev_production, amount=1, type="production").save()
+
+    car_without_battery_to_ev = ev_production.new_edge(
+        input=car_without_battery, amount=MASS_CAR_WITHOUT_BATTERY, type="technosphere"
+    )
+    car_without_battery_to_ev.save()
+
+    battery_to_ev = ev_production.new_edge(
+        input=battery, amount=MASS_BATTERY, type="technosphere"
+    )
+    battery_to_ev.save()
+    
+    driving.new_edge(input=driving, amount=1, type="production").save()
+
+    ev_to_driving = driving.new_edge(input=ev_production, amount=1, type="technosphere")
+    ev_to_driving.save()
+
+    electricity_to_driving = driving.new_edge(
+        input=electricity,
+        amount=ELECTRICITY_CONSUMPTION * LIFETIME_KM,
+        type="technosphere",
+    )
+    electricity_to_driving.save()
+
+    driving_to_battery_eol = driving.new_edge(
+        input=battery_eol,
+        amount=-MASS_BATTERY,  # used battery is "produced"
+        type="technosphere",
+    )
+    driving_to_battery_eol.save()
+        
+    td_car_without_battery_production = TemporalDistribution(
+        date=np.array([-2, -1], dtype="timedelta64[Y]"),  # yearly resolution
+        amount=np.array([0.2, 0.8]),
+    )
+
+    td_assembly_and_delivery = TemporalDistribution(
+        date=np.array([-3, -2, -1], dtype="timedelta64[M]"),  # monthly resolution
+        amount=np.array([0.3, 0.5, 0.2]),
+    )
+    
+    td_battery_production = easy_timedelta_distribution(
+        start=-9,
+        end=-6,
+        resolution="M",
+        steps=4,
+        kind="normal",  # you can also use "uniform" or "triangular"
+        param=0.5,
+    )
+
+    td_electricity_consumption = easy_timedelta_distribution(
+        start=0,
+        end=LIFETIME,
+        resolution="Y",
+        steps=(LIFETIME + 1),
+        kind="uniform",
+    )
+
+    td_battery_eol = TemporalDistribution(
+        date=np.array([LIFETIME * 12 + 3], dtype="timedelta64[M]"), amount=np.array([1])
+    )
+    
+    car_without_battery_to_ev["temporal_distribution"] = td_car_without_battery_production
+    car_without_battery_to_ev.save()
+
+    battery_to_ev["temporal_distribution"] = td_battery_production
+    battery_to_ev.save()
+
+    ev_to_driving["temporal_distribution"] = td_assembly_and_delivery
+    ev_to_driving.save()
+
+    add_temporal_distribution_to_exchange(
+        td_electricity_consumption,
+        input_node=electricity,
+        output_node=driving,
+    )
+
+    add_temporal_distribution_to_exchange(
+        td_battery_eol,
+        input_node=battery_eol,
+        output_node=driving,
+    )
+    
+    logger.info(f"Created electric vehicle example in database '{foreground_database_name}'.")
