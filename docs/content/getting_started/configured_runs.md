@@ -95,6 +95,10 @@ comparison = TimexLCA.compare(
 comparison.summary  # one row per calculation
 ```
 
+!!! tip "Fetch scenarios on-the-fly"
+
+    If you compare against a pathway that is not present in the current Brightway project, it can be fetched automatically. For details see [Creating scenario databases on-the-fly](../create_premise_dbs.md#creating-scenario-databases-on-the-fly)
+
 `summary` is a DataFrame carrying the scores next to every setting that produced
 them, plus `scenario_*` columns, the timeline size and the runtime - so the table
 is its own record of the comparison, and plots directly:

@@ -30,7 +30,7 @@ nav = [
       { "Step 4 - Impact assessment" = "content/getting_started/lcia.md" },
     ]},
     { "Configured Runs & Scenario Comparison" = "content/getting_started/configured_runs.md" },
-    { "Creating premise databases On-the-fly" = "content/create_premise_dbs.md" },
+    { "Automatically Create Scenario Databases" = "content/create_premise_dbs.md" },
     { "What LCA should I do?" = "content/decisiontree.md" },
   ]},
   { Theory = "content/theory.md" },
