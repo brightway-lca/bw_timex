@@ -14,7 +14,7 @@
 [![status](https://joss.theoj.org/papers/eb9021af0207b86e02439768a4841670/status.svg)](https://joss.theoj.org/papers/eb9021af0207b86e02439768a4841670)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/bw_timex/HEAD?labpath=notebooks%2Ftutorials%2F1_getting_started.ipynb)
 
-**`bw_timex` makes your LCA use the right data for the right point in time.** It's a python package for [time-explicit Life Cycle Assessment](https://docs.brightway.dev/projects/bw-timex/en/latest/content/theory.html#terminology), built on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
+**`bw_timex` makes your LCA use the right data for the right point in time.** It's a python package for [time-explicit Life Cycle Assessment](https://docs.brightway.dev/projects/bw-timex/en/latest/content/theory/#terminology), built on top of the [Brightway LCA framework](https://docs.brightway.dev/en/latest).
 
 ## ⏳ The problem
 An LCA normally evaluates your **entire supply chain with data for a single point in time**. But an electric car built in 2025 has a battery made in 2024, is driven on an evolving electricity mix until 2040, and is recycled with 2040 technologies. Anything long-lived, or in a system that changes over time, ends up being assessed with **data that doesn't match when processes actually happen**.
