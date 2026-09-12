@@ -232,6 +232,33 @@ def convert_date_string_to_datetime(temporal_grouping, date_string) -> datetime:
     return datetime.strptime(date_string, time_res_dict[temporal_grouping])
 
 
+def year_from_time_mapped_timestamp(
+    timestamp: Union[int, str], temporal_grouping: str
+) -> Optional[int]:
+    """
+    Extracts the calendar year from a timestamp of the `activity_time_mapping`.
+
+    Timestamps are integers of the form YYYY, YYYYMM, YYYYMMDD or YYYYMMDDHH, depending on the
+    `temporal_grouping`. Foreground activities whose timing is not yet resolved carry the string
+    "dynamic" instead of an integer; for those, None is returned.
+
+    Parameters
+    ----------
+    timestamp : int or str
+        Timestamp from `activity_time_mapping`, or the string "dynamic".
+    temporal_grouping : str
+        Temporal grouping of the TimexLCA. Options are: 'year', 'month', 'day', 'hour'.
+
+    Returns
+    -------
+    int or None
+        The calendar year, or None if the timestamp is not time-resolved.
+    """
+    if isinstance(timestamp, str):
+        return None
+    return convert_date_string_to_datetime(temporal_grouping, str(timestamp)).year
+
+
 def round_datetime(date: datetime, resolution: str) -> datetime:
     """
     Round a datetime object based on a given resolution

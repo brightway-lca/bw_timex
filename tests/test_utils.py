@@ -367,3 +367,19 @@ class TestAddTemporalEvolutionToExchange:
             output_database="db_2024",
         )
         assert exc.get("temporal_evolution_amounts") == amounts
+
+
+def test_year_from_time_mapped_timestamp_all_groupings():
+    from bw_timex.utils import year_from_time_mapped_timestamp
+
+    assert year_from_time_mapped_timestamp(2024, "year") == 2024
+    assert year_from_time_mapped_timestamp(202403, "month") == 2024
+    assert year_from_time_mapped_timestamp(20240315, "day") == 2024
+    assert year_from_time_mapped_timestamp(2024031514, "hour") == 2024
+
+
+def test_year_from_time_mapped_timestamp_dynamic_sentinel():
+    """Foreground activities with unresolved timing carry the string 'dynamic'."""
+    from bw_timex.utils import year_from_time_mapped_timestamp
+
+    assert year_from_time_mapped_timestamp("dynamic", "year") is None
