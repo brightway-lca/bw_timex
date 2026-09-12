@@ -150,3 +150,69 @@ def test_translation_does_not_resolve_time_mapped_ids_through_bw2data(timex_lca_
 
     assert adapter.biosphere_edges, "biosphere edges should be populated"
     assert adapter.biosphere_flows, "biosphere flows should be populated"
+
+
+def _adapter(timex_lca, name, **kwargs):
+    from bw_timex.edges_lcia import TimexEdgeLCIA
+
+    adapter = TimexEdgeLCIA(
+        timex_lca,
+        method=("test", name),
+        filepath=str(method_path(name)),
+        **kwargs,
+    )
+    adapter.lci()
+    adapter.run_mapping(regionalized=False)
+    return adapter
+
+
+def test_constant_cf_reproduces_the_static_score(timex_lca_with_lci):
+    """A CF of 1.0 per kg CO2 must give the same total as the static bw2calc score."""
+    timex_lca_with_lci.static_lcia()
+
+    adapter = _adapter(timex_lca_with_lci, "constant_cf")
+    adapter.characterize_time_explicit()
+
+    assert adapter.score == pytest.approx(timex_lca_with_lci.static_score, rel=1e-9)
+
+
+def test_cf_is_evaluated_at_the_emission_year_not_the_process_year(timex_lca_with_lci):
+    """
+    The foreground emits 4 kg in 2024 and 6 kg in 2025, although the process itself runs in 2024.
+    With CF 1 in 2024 and CF 2 in 2025, the foreground contribution is 4*1 + 6*2 = 16.
+    Characterising at the process year would instead give (4 + 6) * 1 = 10.
+    """
+    parameters = {"test": {"cf_co2": {"2024": 1.0, "2025": 2.0}}}
+
+    adapter = _adapter(
+        timex_lca_with_lci,
+        "year_dependent_cf",
+        parameters=parameters,
+        scenario="test",
+    )
+    table = adapter.characterize_time_explicit()
+
+    foreground = table[table["consumer"] == "heat production"]
+    assert foreground["impact"].sum() == pytest.approx(16.0)
+    assert sorted(foreground["year"].unique()) == [2024, 2025]
+    assert adapter.score == pytest.approx(table["impact"].sum())
+
+
+def test_cf_table_carries_dates_and_time_mapped_activity(timex_lca_with_lci):
+    parameters = {"test": {"cf_co2": {"2024": 1.0, "2025": 2.0}}}
+
+    adapter = _adapter(
+        timex_lca_with_lci,
+        "year_dependent_cf",
+        parameters=parameters,
+        scenario="test",
+    )
+    table = adapter.characterize_time_explicit()
+
+    for column in ("supplier", "consumer", "date", "year", "amount", "CF", "impact", "activity"):
+        assert column in table.columns
+    assert sorted(table["year"].unique()) == [2024, 2025]
+    assert (table["impact"] == table["amount"] * table["CF"]).all()
+    # `year` is the rounded year the CF was evaluated at, `date` the exact emission date;
+    # dates from July 1st on round up, so the two only coincide for January dates like these.
+    assert table["date"].dt.year.equals(table["year"])
