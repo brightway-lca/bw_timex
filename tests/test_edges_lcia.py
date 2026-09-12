@@ -267,3 +267,92 @@ def test_empty_cf_table_has_the_dtypes_of_a_populated_one(timex_lca_with_lci, mo
     assert list(empty.columns) == list(populated.columns)
     assert empty.dtypes.equals(populated.dtypes)
     assert empty["date"].dt.year.empty
+
+
+def test_edges_lcia_end_to_end(timex_lca_with_lci):
+    parameters = {"test": {"cf_co2": {"2024": 1.0, "2025": 2.0}}}
+
+    table = timex_lca_with_lci.edges_lcia(
+        method=("test", "year_dependent_cf"),
+        filepath=str(method_path("year_dependent_cf")),
+        parameters=parameters,
+        scenario="test",
+        regionalized=False,
+    )
+
+    assert timex_lca_with_lci.edges_score == pytest.approx(table["impact"].sum())
+    assert timex_lca_with_lci.edges_characterized_inventory is table
+    assert timex_lca_with_lci.edges_lcia_object.score == pytest.approx(
+        timex_lca_with_lci.edges_score
+    )
+
+
+def test_edges_score_before_calculation_raises(timex_lca_with_lci):
+    with pytest.raises(AttributeError, match="edges_lcia"):
+        timex_lca_with_lci.edges_score
+
+
+def test_edges_lcia_without_lci_raises(edges_td_db):
+    from bw_timex import TimexLCA
+
+    node = bd.get_node(database="foreground", code="heat")
+    timex_lca = TimexLCA(
+        demand={node: 1},
+        method=("GWP", "example"),
+        database_dates={
+            "db_2020": datetime.strptime("2020", "%Y"),
+            "foreground": "dynamic",
+        },
+    )
+    timex_lca.build_timeline(starting_datetime=datetime(2024, 1, 1))
+
+    with pytest.raises(AttributeError, match="TimexLCA.lci"):
+        timex_lca.edges_lcia(
+            method=("test", "constant_cf"),
+            filepath=str(method_path("constant_cf")),
+        )
+
+
+def test_edges_lcia_requires_the_expanded_matrix(edges_td_db):
+    from bw_timex import TimexLCA
+
+    node = bd.get_node(database="foreground", code="heat")
+    timex_lca = TimexLCA(
+        demand={node: 1},
+        method=("GWP", "example"),
+        database_dates={
+            "db_2020": datetime.strptime("2020", "%Y"),
+            "foreground": "dynamic",
+        },
+    )
+    timex_lca.build_timeline(starting_datetime=datetime(2024, 1, 1))
+    timex_lca.lci(expand_technosphere=False)
+
+    with pytest.raises(NotImplementedError, match="expand_technosphere"):
+        timex_lca.edges_lcia(
+            method=("test", "constant_cf"),
+            filepath=str(method_path("constant_cf")),
+        )
+
+
+def test_edges_lcia_requires_the_dynamic_biosphere(edges_td_db):
+    """Without the dynamic inventory, biosphere temporal distributions would be lost silently."""
+    from bw_timex import TimexLCA
+
+    node = bd.get_node(database="foreground", code="heat")
+    timex_lca = TimexLCA(
+        demand={node: 1},
+        method=("GWP", "example"),
+        database_dates={
+            "db_2020": datetime.strptime("2020", "%Y"),
+            "foreground": "dynamic",
+        },
+    )
+    timex_lca.build_timeline(starting_datetime=datetime(2024, 1, 1))
+    timex_lca.lci(build_dynamic_biosphere=False)
+
+    with pytest.raises(ValueError, match="build_dynamic_biosphere"):
+        timex_lca.edges_lcia(
+            method=("test", "constant_cf"),
+            filepath=str(method_path("constant_cf")),
+        )

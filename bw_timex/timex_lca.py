@@ -44,6 +44,7 @@ from .utils import (
 from .validation import (
     BuildTimelineInputs,
     DynamicLCIAInputs,
+    EdgesLCIAInputs,
     LCIInputs,
     PlotDynamicInventoryInputs,
     TimexLCAInputs,
@@ -862,6 +863,121 @@ class TimexLCA:
 
         return self.characterized_inventory
 
+    def edges_lcia(
+        self,
+        method,
+        parameters: dict = None,
+        scenario: str = None,
+        weight: str = "population",
+        filepath: str = None,
+        allowed_functions: dict = None,
+        regionalized: bool = True,
+        use_disaggregated_lci: bool = False,
+    ) -> pd.DataFrame:
+        """
+        Calculates LCIA with the `edges` package, evaluating each exchange's characterization
+        factor at that exchange's own year.
+
+        `edges` (https://edges.readthedocs.io) characterizes exchanges instead of flows, which
+        allows regionalized characterization factors, characterization factors for technosphere
+        exchanges, and characterization factors given as symbolic expressions that depend on the
+        scenario year. Combined with the time-explicit inventory of bw_timex, each exchange is
+        characterized with the characterization factor of the year in which it occurs.
+
+        Biosphere exchanges are characterized at the date of the emission, taken from the dynamic
+        inventory, so emissions spread out by a temporal distribution are characterized correctly.
+        Technosphere exchanges are characterized at the vintage of the consuming process, as
+        bw_timex does not build a dynamic technosphere inventory.
+
+        This is orthogonal to `TimexLCA.dynamic_lcia()`: `edges` varies the characterization
+        factor with the year of the exchange, while the dynamic characterization varies the impact
+        with the time that has passed since the emission.
+
+        Parameters
+        ----------
+        method : tuple, str, pathlib.Path or dict
+            The edges method: a method tuple, a path to a method JSON file, or a dict with an
+            "exchanges" key. This is not the same object as `TimexLCA.method`, which is a
+            Brightway LCIA method.
+        parameters : dict, optional
+            Scenario parameters for symbolic characterization factors, in the form
+            {scenario: {parameter: {year: value}}}. Default is None.
+        scenario : str, optional
+            Name of the scenario in `parameters` to evaluate. Default is None.
+        weight : str, optional
+            Weighting scheme edges uses when aggregating regional characterization factors.
+            Default is "population".
+        filepath : str, optional
+            Path to a custom method JSON file. Default is None.
+        allowed_functions : dict, optional
+            Trusted functions that symbolic characterization factors may call. Default is None.
+        regionalized : bool, optional
+            Whether to run the location-mapping cascade of edges, which fills aggregate, dynamic,
+            contained and global regions. Default is True.
+        use_disaggregated_lci : bool, optional
+            Whether to use the disaggregated background inventory. Default is False.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per characterized exchange, including the date and year at which its
+            characterization factor was evaluated.
+
+        See also
+        --------
+        edges: Package handling the exchange-based characterization: https://edges.readthedocs.io
+        """
+        EdgesLCIAInputs(
+            method=method,
+            parameters=parameters,
+            scenario=scenario,
+            weight=weight,
+            filepath=filepath,
+            allowed_functions=allowed_functions,
+            regionalized=regionalized,
+            use_disaggregated_lci=use_disaggregated_lci,
+        )
+
+        if not hasattr(self, "lca"):
+            raise AttributeError("LCI not yet calculated. Call TimexLCA.lci() first.")
+
+        if not self.expanded_technosphere:
+            raise NotImplementedError(
+                "edges_lcia currently requires the expanded time-explicit matrices. Please call "
+                "TimexLCA.lci(expand_technosphere=True) first."
+            )
+
+        if not hasattr(self, "dynamic_inventory"):
+            raise ValueError(
+                "edges_lcia characterizes biosphere flows at the date of the emission, which is "
+                "only available in the dynamic inventory. Without it, temporal distributions on "
+                "biosphere exchanges would be silently ignored. Please call "
+                "TimexLCA.lci(build_dynamic_biosphere=True) first."
+            )
+
+        if use_disaggregated_lci and not hasattr(self, "dynamic_inventory_disaggregated"):
+            logger.info("Disaggregating background LCI...")
+            self.disaggregate_background_lci()
+            logger.info("Background LCI's disaggregated.")
+
+        from .edges_lcia import TimexEdgeLCIA
+
+        edge_kwargs = {
+            "parameters": parameters,
+            "scenario": scenario,
+            "weight": weight,
+            "filepath": filepath,
+            "allowed_functions": allowed_functions,
+        }
+        self.edges_lcia_object = TimexEdgeLCIA(self, method=method, **edge_kwargs)
+        self.edges_lcia_object.lci()
+        self.edges_lcia_object.run_mapping(regionalized=regionalized)
+        self.edges_characterized_inventory = self.edges_lcia_object.characterize_time_explicit(
+            use_disaggregated_lci=use_disaggregated_lci
+        )
+
+        return self.edges_characterized_inventory
+
     ###################
     # Core properties #
     ###################
@@ -893,6 +1009,18 @@ class TimexLCA:
                 "Characterized inventory not yet calculated. Call TimexLCA.dynamic_lcia() first."
             )
         return self.characterized_inventory["amount"].sum()
+
+    @property
+    def edges_score(self) -> float:
+        """
+        Score resulting from the characterization of the time-explicit inventory with `edges`.
+        """
+        if not hasattr(self, "edges_characterized_inventory"):
+            raise AttributeError(
+                "edges-characterized inventory not yet calculated. Call TimexLCA.edges_lcia() "
+                "first."
+            )
+        return float(self.edges_characterized_inventory["impact"].sum())
 
     ###############################################
     # Other core functions for the inner workings #
