@@ -1,0 +1,19 @@
+{
+  "name": "test constant CF",
+  "version": "1.0",
+  "unit": "kg CO2-eq",
+  "description": "Constant CF of 1.0 for carbon dioxide, used to prove conservation.",
+  "exchanges": [
+    {
+      "supplier": {
+        "name": "carbon dioxide",
+        "categories": ["air"],
+        "matrix": "biosphere"
+      },
+      "consumer": {
+        "matrix": "technosphere"
+      },
+      "value": 1.0
+    }
+  ]
+}
