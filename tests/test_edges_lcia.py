@@ -196,6 +196,9 @@ def test_cf_is_evaluated_at_the_emission_year_not_the_process_year(timex_lca_wit
     assert foreground["impact"].sum() == pytest.approx(16.0)
     assert sorted(foreground["year"].unique()) == [2024, 2025]
     assert adapter.score == pytest.approx(table["impact"].sum())
+    # The background electricity's 6 kg is characterized at the consuming process's year, 2024,
+    # where the CF is still 1.0. The overall score is therefore the foreground's 16.0 plus 6.0.
+    assert adapter.score == pytest.approx(22.0)
 
 
 def test_cf_table_carries_dates_and_time_mapped_activity(timex_lca_with_lci):
@@ -216,3 +219,51 @@ def test_cf_table_carries_dates_and_time_mapped_activity(timex_lca_with_lci):
     # `year` is the rounded year the CF was evaluated at, `date` the exact emission date;
     # dates from July 1st on round up, so the two only coincide for January dates like these.
     assert table["date"].dt.year.equals(table["year"])
+
+
+def test_static_characterization_entry_points_are_blocked(timex_lca_with_lci):
+    """
+    `lcia()` and `generate_cf_table()` would characterize the *static* inventory against whichever
+    year was evaluated last, which is exactly the silent error this integration exists to prevent.
+    """
+    adapter = _adapter(
+        timex_lca_with_lci,
+        "year_dependent_cf",
+        parameters={"test": {"cf_co2": {"2024": 1.0, "2025": 2.0}}},
+        scenario="test",
+    )
+    adapter.characterize_time_explicit()
+
+    with pytest.raises(NotImplementedError, match="characterize_time_explicit"):
+        adapter.lcia()
+
+    with pytest.raises(NotImplementedError, match="characterize_time_explicit"):
+        adapter.generate_cf_table()
+
+
+def test_cf_uncertainty_is_rejected(timex_lca_with_lci):
+    """CF uncertainty gives 3-dimensional CF matrices, which per-year characterization can't use."""
+    from bw_timex.edges_lcia import TimexEdgeLCIA
+
+    with pytest.raises(NotImplementedError, match="use_distributions"):
+        TimexEdgeLCIA(
+            timex_lca_with_lci,
+            method=("test", "constant_cf"),
+            filepath=str(method_path("constant_cf")),
+            use_distributions=True,
+        )
+
+
+def test_empty_cf_table_has_the_dtypes_of_a_populated_one(timex_lca_with_lci, monkeypatch):
+    """An empty result must still support `table["date"].dt.year` and friends."""
+    adapter = _adapter(timex_lca_with_lci, "constant_cf")
+    populated = adapter.characterize_time_explicit()
+
+    monkeypatch.setattr(adapter, "_biosphere_entries", lambda use_disaggregated_lci: None)
+    empty = adapter.characterize_time_explicit()
+
+    assert empty.empty
+    assert adapter.score == 0.0
+    assert list(empty.columns) == list(populated.columns)
+    assert empty.dtypes.equals(populated.dtypes)
+    assert empty["date"].dt.year.empty

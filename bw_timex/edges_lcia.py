@@ -29,19 +29,37 @@ try:
 except ImportError as exc:
     raise ImportError(EDGES_IMPORT_ERROR) from exc
 
-CF_TABLE_COLUMNS = [
-    "supplier",
-    "supplier categories",
-    "consumer",
-    "consumer location",
-    "activity",
-    "direction",
-    "date",
-    "year",
-    "amount",
-    "CF",
-    "impact",
-]
+# Columns of the CF table returned by `TimexEdgeLCIA.characterize_time_explicit`, with the dtypes
+# a populated table carries. The empty table uses them too, so that callers can rely on e.g.
+# `table["date"].dt.year` whether or not anything was characterized.
+CF_TABLE_DTYPES = {
+    "supplier": "str",
+    "supplier categories": "object",
+    "consumer": "str",
+    "consumer location": "str",
+    "activity": "int64",
+    "direction": "str",
+    "date": "datetime64[s]",
+    "year": "int32",
+    "amount": "float64",
+    "CF": "float64",
+    "impact": "float64",
+}
+CF_TABLE_COLUMNS = list(CF_TABLE_DTYPES)
+
+
+def empty_cf_table() -> pd.DataFrame:
+    """
+    Returns an empty CF table with the columns and dtypes of a populated one.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A zero-row frame with the columns of `CF_TABLE_COLUMNS`.
+    """
+    return pd.DataFrame(
+        {column: pd.Series(dtype=dtype) for column, dtype in CF_TABLE_DTYPES.items()}
+    )
 
 
 class TimexEdgeLCIA(EdgeLCIA):
@@ -64,9 +82,23 @@ class TimexEdgeLCIA(EdgeLCIA):
     **edge_kwargs
         Further keyword arguments for `edges.EdgeLCIA` (`parameters`, `scenario`, `weight`,
         `filepath`, `allowed_functions`).
+
+    Raises
+    ------
+    NotImplementedError
+        If `use_distributions=True` is passed. CF uncertainty makes `edges` build 3-dimensional
+        characterisation matrices, which the per-year characterisation does not support yet.
     """
 
     def __init__(self, timex_lca, method, **edge_kwargs):
+        if edge_kwargs.get("use_distributions"):
+            raise NotImplementedError(
+                "TimexEdgeLCIA does not support CF uncertainty yet: `use_distributions=True` "
+                "makes edges build 3-dimensional characterization matrices, while the per-year "
+                "characterization of the time-explicit inventory indexes 2-dimensional ones. "
+                "Run TimexEdgeLCIA without `use_distributions`."
+            )
+
         self.timex_lca = timex_lca
         self.position_to_timestamp = {}
         self.position_to_biosphere_flows_lookup = {}
@@ -226,6 +258,49 @@ class TimexEdgeLCIA(EdgeLCIA):
 
         return flows
 
+    def lcia(self) -> None:
+        """
+        Not available on a time-explicit inventory - use `characterize_time_explicit()`.
+
+        `edges.EdgeLCIA.lcia` multiplies one characterisation matrix with the *static* inventory.
+        That inventory has a single cell per `(flow, process)` and therefore cannot carry more
+        than one CF year, so emissions spread by a temporal distribution would silently be
+        characterised at their process's year. On top of that,
+        `characterize_time_explicit()` leaves `characterization_matrices` holding the CFs of the
+        last year it evaluated, so the product would be a plausible-looking but meaningless score.
+
+        Raises
+        ------
+        NotImplementedError
+            Always.
+        """
+        raise NotImplementedError(
+            "TimexEdgeLCIA.lcia() is not available: it would characterize the static inventory, "
+            "which cannot carry one CF year per emission date. Use "
+            "TimexEdgeLCIA.characterize_time_explicit() instead."
+        )
+
+    def generate_cf_table(self, *args, **kwargs) -> pd.DataFrame:
+        """
+        Not available on a time-explicit inventory - use `characterize_time_explicit()`.
+
+        `edges.EdgeLCIA.generate_cf_table` reports the amounts of the static inventory against
+        whichever characterisation matrix was evaluated last, which after
+        `characterize_time_explicit()` is the last year of the timeline. The table returned by
+        `characterize_time_explicit()` is the time-explicit equivalent, one row per exchange and
+        emission date.
+
+        Raises
+        ------
+        NotImplementedError
+            Always.
+        """
+        raise NotImplementedError(
+            "TimexEdgeLCIA.generate_cf_table() is not available: it would report the static "
+            "inventory against a single year's characterization factors. The table returned by "
+            "TimexEdgeLCIA.characterize_time_explicit() is the time-explicit equivalent."
+        )
+
     def run_mapping(self, regionalized: bool = True) -> None:
         """
         Matches the exchanges of the time-explicit inventory to the method's characterisation
@@ -296,7 +371,7 @@ class TimexEdgeLCIA(EdgeLCIA):
         if not tables:
             logger.warning("No exchanges were characterized. The edges score is 0.")
             self.score = 0.0
-            return pd.DataFrame(columns=CF_TABLE_COLUMNS)
+            return empty_cf_table()
 
         table = pd.concat(tables, ignore_index=True).sort_values(
             by=["date", "impact"], ascending=[True, False]
