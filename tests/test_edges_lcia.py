@@ -85,3 +85,68 @@ def test_fixture_emits_in_two_calendar_years(edges_td_db):
 
     assert per_year.loc[2024] == pytest.approx(4.0)
     assert per_year.loc[2025] == pytest.approx(6.0)
+
+
+@pytest.fixture
+def timex_lca_with_lci(edges_td_db):
+    """A TimexLCA with a finished time-explicit LCI, shared by the edges tests."""
+    pytest.importorskip("edges")
+
+    from bw_timex import TimexLCA
+
+    node = bd.get_node(database="foreground", code="heat")
+    timex_lca = TimexLCA(
+        demand={node: 1},
+        method=("GWP", "example"),
+        database_dates={
+            "db_2020": datetime.strptime("2020", "%Y"),
+            "foreground": "dynamic",
+        },
+    )
+    timex_lca.build_timeline(starting_datetime=datetime(2024, 1, 1))
+    timex_lca.lci()
+    return timex_lca
+
+
+def method_path(name):
+    from pathlib import Path
+
+    return Path(__file__).parent / "fixtures" / "edges_methods" / f"{name}.json"
+
+
+def test_translation_gives_each_position_its_node_metadata(timex_lca_with_lci):
+    from bw_timex.edges_lcia import TimexEdgeLCIA
+
+    adapter = TimexEdgeLCIA(
+        timex_lca_with_lci,
+        method=("test", "constant"),
+        filepath=str(method_path("constant_cf")),
+    )
+    adapter.lci()
+
+    names = {flow["name"] for flow in adapter.technosphere_flows}
+    assert "heat production" in names
+    assert "electricity production" in names
+    assert all(flow["location"] == "CH" for flow in adapter.technosphere_flows)
+    assert all("position" in flow for flow in adapter.technosphere_flows)
+
+    # one entry per matrix column, including several vintages of the same node
+    assert len(adapter.technosphere_flows) == len(timex_lca_with_lci.lca.dicts.activity)
+    assert set(adapter.position_to_timestamp) == set(
+        timex_lca_with_lci.lca.dicts.activity.values()
+    )
+
+
+def test_translation_does_not_resolve_time_mapped_ids_through_bw2data(timex_lca_with_lci):
+    """Time-mapped ids do not exist in bw2data; edges' own lci() would raise a KeyError."""
+    from bw_timex.edges_lcia import TimexEdgeLCIA
+
+    adapter = TimexEdgeLCIA(
+        timex_lca_with_lci,
+        method=("test", "constant"),
+        filepath=str(method_path("constant_cf")),
+    )
+    adapter.lci()
+
+    assert adapter.biosphere_edges, "biosphere edges should be populated"
+    assert adapter.biosphere_flows, "biosphere flows should be populated"
