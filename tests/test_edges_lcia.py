@@ -461,7 +461,16 @@ def test_edges_public_surface_is_unchanged():
         assert hasattr(EdgeLCIA, name), f"edges.EdgeLCIA lost {name}"
 
     signature = inspect.signature(EdgeLCIA.__init__)
-    for parameter in ("demand", "method", "parameters", "scenario", "filepath", "lca", "weight"):
+    for parameter in (
+        "demand",
+        "method",
+        "parameters",
+        "scenario",
+        "filepath",
+        "lca",
+        "weight",
+        "allowed_functions",
+    ):
         assert parameter in signature.parameters, f"EdgeLCIA.__init__ lost {parameter}"
 
     assert "scenario_idx" in inspect.signature(EdgeLCIA.evaluate_cfs).parameters
