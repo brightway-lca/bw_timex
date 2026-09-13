@@ -434,3 +434,37 @@ def test_edges_lcia_with_multiple_background_databases_sharing_codes(vehicle_tim
     assert not table.empty
     assert vehicle_timex_lca_with_lci.edges_score == pytest.approx(table["impact"].sum())
     assert vehicle_timex_lca_with_lci.edges_score > 0
+
+
+def test_edges_public_surface_is_unchanged():
+    """
+    The adapter depends on a narrow slice of edges. If a future edges release moves any of these,
+    this test should fail loudly rather than the integration failing subtly.
+    """
+    pytest.importorskip("edges")
+
+    import inspect
+
+    from edges import EdgeLCIA
+
+    for name in (
+        "lci",
+        "map_exchanges",
+        "map_aggregate_locations",
+        "map_dynamic_locations",
+        "map_contained_locations",
+        "map_remaining_locations_to_global",
+        "evaluate_cfs",
+        "_uses_biosphere_supplier_matrix",
+        "_uses_technosphere_supplier_matrix",
+    ):
+        assert hasattr(EdgeLCIA, name), f"edges.EdgeLCIA lost {name}"
+
+    signature = inspect.signature(EdgeLCIA.__init__)
+    for parameter in ("demand", "method", "parameters", "scenario", "filepath", "lca", "weight"):
+        assert parameter in signature.parameters, f"EdgeLCIA.__init__ lost {parameter}"
+
+    assert "scenario_idx" in inspect.signature(EdgeLCIA.evaluate_cfs).parameters
+
+    from edges.matrix_builders import build_technosphere_edges_matrix  # noqa: F401
+    from edges.utils import get_flow_matrix_positions  # noqa: F401
