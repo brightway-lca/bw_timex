@@ -504,6 +504,18 @@ class TimexEdgeLCIA(EdgeLCIA):
         consuming process. There is no dynamic technosphere inventory, so this is the finest
         resolution available for technosphere characterisation factors.
 
+        Entries whose consumer is a temporal market are dropped. A temporal market is an
+        accounting node bw_timex inserts between a foreground consumer and the background
+        database(s) it draws from, to blend supply across vintages - it is not a genuine consuming
+        activity, and its own `_translate_time_mapped_activities` metadata is that of the very
+        commodity it distributes (same name, reference product and location as the supplying
+        process, since it shares that process's code). Keeping edges into it as well as the
+        market's own downstream edge would characterize the same physical flow twice: once as
+        "supplier -> market" and again as "market -> consumer". Only the latter, which carries the
+        actual consuming process's vintage, is kept - matching how
+        `DynamicBiosphereBuilder` (see `dynamic_biosphere_builder.py`) already singles out market
+        columns instead of treating them like ordinary temporalized processes.
+
         Returns
         -------
         pandas.DataFrame or None
@@ -517,6 +529,18 @@ class TimexEdgeLCIA(EdgeLCIA):
         if coo.nnz == 0:
             return None
 
+        activity_dict = self.lca.dicts.activity
+        market_positions = {
+            activity_dict[time_mapped_id]
+            for time_mapped_id in self.timex_lca.node_collections.get("temporal_markets", set())
+            if time_mapped_id in activity_dict
+        }
+        not_market_consumer = (
+            ~np.isin(coo.col, list(market_positions))
+            if market_positions
+            else np.ones(coo.col.shape, dtype=bool)
+        )
+
         temporal_grouping = self.timex_lca.temporal_grouping
         year_by_column = {
             column: year_from_time_mapped_timestamp(
@@ -525,11 +549,20 @@ class TimexEdgeLCIA(EdgeLCIA):
             for column in np.unique(coo.col)
         }
 
-        resolved = np.array([year_by_column[column] is not None for column in coo.col], dtype=bool)
-        unresolved_count = int((~resolved).sum())
+        has_year = np.array(
+            [year_by_column[column] is not None for column in coo.col], dtype=bool
+        )
+        resolved = has_year & not_market_consumer
+        unresolved_count = int((has_year & ~not_market_consumer).sum())
         if unresolved_count:
+            logger.debug(
+                f"{unresolved_count} technosphere exchanges into a temporal market were skipped "
+                f"to avoid double-counting the physical flow the market passes on."
+            )
+        unresolved_time_count = int((~has_year).sum())
+        if unresolved_time_count:
             logger.warning(
-                f"{unresolved_count} technosphere exchanges have no resolved process time "
+                f"{unresolved_time_count} technosphere exchanges have no resolved process time "
                 f"(timestamp 'dynamic') and are not characterized."
             )
         if not resolved.any():

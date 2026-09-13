@@ -356,3 +356,37 @@ def test_edges_lcia_requires_the_dynamic_biosphere(edges_td_db):
             method=("test", "constant_cf"),
             filepath=str(method_path("constant_cf")),
         )
+
+
+def test_technosphere_cfs_are_characterized_at_the_process_vintage(timex_lca_with_lci):
+    """
+    The heat process consumes 3 kWh of electricity and runs in 2024, so with a CF of 5 per kWh in
+    2024 the technosphere impact is 15. Technosphere exchanges carry no emission dates, so the
+    vintage of the consuming process is the year used.
+
+    bw_timex inserts a temporal market node between "heat production" and the background
+    "electricity production" it draws from (even though there is only one candidate background
+    database here), so the expanded technosphere matrix carries two edges along this path, not
+    one: `electricity production (db_2020, 2020) -> market (2024)`, amount 3, and
+    `market (2024) -> heat production (2024)`, amount 3. Because the market column's metadata is
+    resolved from the same node code as the real "electricity production" process, both edges
+    match the CF's supplier pattern, and characterizing both would double-count this single
+    physical flow of 3 kWh. `_technosphere_entries()` drops edges whose consumer is a temporal
+    market, keeping only `market -> heat production`, so exactly one row is characterized, dated
+    at heat production's own vintage (2024).
+    """
+    parameters = {"test": {"cf_electricity": {"2024": 5.0, "2025": 50.0}}}
+
+    table = timex_lca_with_lci.edges_lcia(
+        method=("test", "technosphere_cf"),
+        filepath=str(method_path("technosphere_cf")),
+        parameters=parameters,
+        scenario="test",
+        regionalized=False,
+    )
+
+    assert set(table["direction"]) == {"technosphere-technosphere"}
+    assert len(table) == 1
+    assert table["consumer"].iloc[0] == "heat production"
+    assert table["impact"].sum() == pytest.approx(15.0)
+    assert sorted(table["year"].unique()) == [2024]
