@@ -14,7 +14,11 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from .utils import round_datetime_series_to_year, year_from_time_mapped_timestamp
+from .utils import (
+    resolve_temporalized_node_metadata,
+    round_datetime_series_to_year,
+    year_from_time_mapped_timestamp,
+)
 
 EDGES_IMPORT_ERROR = (
     "The `edges` package is required for TimexLCA.edges_lcia(). Install it with "
@@ -235,25 +239,26 @@ class TimexEdgeLCIA(EdgeLCIA):
                 # "temporalized" database, which does not exist in bw2data - only the original
                 # activity, under its real database, does. Its `code` is unchanged, so look it up
                 # by code alone, as bw_timex itself does elsewhere (e.g.
-                # `DynamicBiosphereBuilder.get_biosphere_exchanges`).
+                # `DynamicBiosphereBuilder.get_biosphere_exchanges`). Background vintages share
+                # codes across databases by construction, so several nodes can match one code -
+                # tolerated as long as they agree on the fields characterization matches on (see
+                # `resolve_temporalized_node_metadata`).
                 if database == "temporalized":
-                    node_cache[key] = bd.get_node(code=code)
+                    node_cache[key] = resolve_temporalized_node_metadata(code)
                 else:
-                    node_cache[key] = bd.get_node(database=database, code=code)
-            node = node_cache[key]
+                    node = bd.get_node(database=database, code=code)
+                    node_cache[key] = {
+                        "name": node.get("name"),
+                        "reference product": node.get("reference product"),
+                        "categories": node.get("categories"),
+                        "unit": node.get("unit"),
+                        "location": node.get("location"),
+                        "classifications": node.get("classifications"),
+                        "type": node.get("type"),
+                    }
+            metadata = node_cache[key]
 
-            flows.append(
-                {
-                    "name": node.get("name"),
-                    "reference product": node.get("reference product"),
-                    "categories": node.get("categories"),
-                    "unit": node.get("unit"),
-                    "location": node.get("location"),
-                    "classifications": node.get("classifications"),
-                    "type": node.get("type"),
-                    "position": position,
-                }
-            )
+            flows.append({**metadata, "position": position})
             self.position_to_timestamp[position] = timestamp
 
         return flows

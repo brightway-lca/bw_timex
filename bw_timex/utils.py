@@ -389,6 +389,67 @@ def resolve_temporalized_node_name(code: str) -> str:
     return names.pop()
 
 
+def resolve_temporalized_node_metadata(code: str) -> dict:
+    """
+    Getting the flow metadata of a node based on the code only.
+
+    Works for non-unique codes (i.e. several databases sharing the same code, as vintages of the
+    same background activity by construction do) as long as the fields that flow-based
+    characterization matches on - `name`, `reference product` and `location` - agree across all
+    of them. Where they agree, the metadata of any one match is returned, since it is otherwise
+    identical up to the vintage-specific data bw_timex has already resolved elsewhere (e.g. the
+    exchange amounts).
+
+    Parameters
+    ----------
+    code: str
+        Code of the node to resolve.
+
+    Returns
+    -------
+    dict
+        Flow metadata of the node: `name`, `reference product`, `categories`, `unit`, `location`,
+        `classifications` and `type`.
+
+    Raises
+    ------
+    UnknownObject
+        If no node with this code exists.
+    ValueError
+        If several nodes share this code but disagree on `name`, `reference product` or
+        `location`. Picking one silently in that case could match the wrong characterization
+        factor.
+    """
+    matches = list(AD.select().where(AD.code == code))
+    if not matches:
+        raise UnknownObject(f"No node found with code '{code}'")
+
+    matching_fields = ("name", "reference product", "location")
+    distinct_values = {
+        field: {obj.data.get(field) for obj in matches} for field in matching_fields
+    }
+    disagreements = {
+        field: values for field, values in distinct_values.items() if len(values) > 1
+    }
+    if disagreements:
+        raise ValueError(
+            f"Found {len(matches)} nodes with code '{code}', but they disagree on fields that "
+            f"characterization matches on: "
+            + ", ".join(f"{field}={values}" for field, values in disagreements.items())
+        )
+
+    data = matches[0].data
+    return {
+        "name": data.get("name"),
+        "reference product": data.get("reference product"),
+        "categories": data.get("categories"),
+        "unit": data.get("unit"),
+        "location": data.get("location"),
+        "classifications": data.get("classifications"),
+        "type": data.get("type"),
+    }
+
+
 def plot_characterized_inventory_as_waterfall(
     lca_obj,
     static_scores=None,

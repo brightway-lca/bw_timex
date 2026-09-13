@@ -390,3 +390,47 @@ def test_technosphere_cfs_are_characterized_at_the_process_vintage(timex_lca_wit
     assert table["consumer"].iloc[0] == "heat production"
     assert table["impact"].sum() == pytest.approx(15.0)
     assert sorted(table["year"].unique()) == [2024]
+
+
+@pytest.fixture
+def vehicle_timex_lca_with_lci(vehicle_db):
+    """A TimexLCA with two background databases sharing node codes (db_2020/db_2030/db_2040)."""
+    pytest.importorskip("edges")
+
+    from bw_timex import TimexLCA
+
+    node = bd.get_node(database="foreground", code="EV")
+    timex_lca = TimexLCA(
+        demand={node: 1},
+        method=("GWP", "example"),
+        database_dates={
+            "db_2020": datetime.strptime("2020", "%Y"),
+            "db_2030": datetime.strptime("2030", "%Y"),
+            "db_2040": datetime.strptime("2040", "%Y"),
+            "foreground": "dynamic",
+        },
+    )
+    timex_lca.build_timeline(starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"))
+    timex_lca.lci()
+    return timex_lca
+
+
+def test_edges_lcia_with_multiple_background_databases_sharing_codes(vehicle_timex_lca_with_lci):
+    """
+    Regression test: bw_timex's synthetic "temporalized" database keys carry the ORIGINAL node's
+    code, and background vintages share codes across databases by construction (e.g. `("db_2020",
+    "glider")` and `("db_2030", "glider")` in `vehicle_db`). `_translate_time_mapped_activities`
+    used to resolve such codes with `bd.get_node(code=code)`, which raises `MultipleResults` as
+    soon as more than one database shares that code - i.e. for any ordinary prospective project
+    with more than one background vintage. This must instead resolve tolerantly, taking any one
+    vintage's metadata once name/reference product/location are confirmed to agree.
+    """
+    table = vehicle_timex_lca_with_lci.edges_lcia(
+        method=("GWP", "example-edges"),
+        filepath=str(method_path("vehicle_constant_cf")),
+        regionalized=False,
+    )
+
+    assert not table.empty
+    assert vehicle_timex_lca_with_lci.edges_score == pytest.approx(table["impact"].sum())
+    assert vehicle_timex_lca_with_lci.edges_score > 0
