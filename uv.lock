@@ -4,34 +4,54 @@ requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')",
     "python_full_version < '3.12' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
     "python_full_version < '3.12' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version < '3.12' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')",
     "python_full_version >= '3.14' and sys_platform == 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version == '3.13.*' and sys_platform == 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version == '3.12.*' and sys_platform == 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version == '3.13.*' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version == '3.13.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
+    "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version == '3.12.*' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version == '3.12.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version < '3.12' and sys_platform == 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version < '3.12' and sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version < '3.12' and sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version < '3.12' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version < '3.12' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version < '3.12' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
 ]
 conflicts = [[
     { package = "bw-timex", extra = "premise" },
@@ -450,6 +470,7 @@ dependencies = [
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-premise'" },
     { name = "pandas", version = "3.0.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-testing' or extra != 'extra-8-bw-timex-premise'" },
     { name = "pydantic" },
+    { name = "pypardiso", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine == 'AMD64' and sys_platform == 'win32') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (sys_platform == 'win32' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
     { name = "seaborn" },
     { name = "tqdm" },
 ]
@@ -470,10 +491,10 @@ premise = [
     { name = "premise", extra = ["bw25"], marker = "extra == 'extra-8-bw-timex-premise'" },
 ]
 solvers = [
-    { name = "pypardiso", marker = "platform_machine != 'arm64' or sys_platform != 'darwin' or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
-    { name = "scikit-umfpack", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine != 'arm64' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (sys_platform != 'darwin' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
+    { name = "scikit-umfpack", marker = "(platform_machine != 'x86_64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or sys_platform == 'darwin' or (sys_platform != 'linux' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
 ]
 testing = [
+    { name = "packaging" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "setuptools" },
@@ -494,16 +515,19 @@ requires-dist = [
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=1.0.0" },
     { name = "nbconvert", marker = "extra == 'docs'", specifier = ">=7.0" },
     { name = "numpy" },
+    { name = "packaging", marker = "extra == 'testing'" },
     { name = "pandas" },
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "premise", extras = ["bw25"], marker = "extra == 'premise'", specifier = ">=2.4.9.2" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pylint", marker = "extra == 'dev'" },
     { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = ">=10.0" },
-    { name = "pypardiso", marker = "(platform_machine != 'arm64' and extra == 'solvers') or (sys_platform != 'darwin' and extra == 'solvers')" },
+    { name = "pypardiso", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "pypardiso", marker = "platform_machine == 'AMD64' and sys_platform == 'win32'" },
     { name = "pytest", marker = "extra == 'testing'" },
     { name = "pytest-cov", marker = "extra == 'testing'" },
-    { name = "scikit-umfpack", marker = "platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'solvers'" },
+    { name = "scikit-umfpack", marker = "sys_platform == 'darwin' and extra == 'solvers'" },
+    { name = "scikit-umfpack", marker = "platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'solvers'" },
     { name = "seaborn" },
     { name = "setuptools", marker = "extra == 'testing'" },
     { name = "tqdm" },
@@ -1783,7 +1807,7 @@ name = "intel-cmplr-lib-ur"
 version = "2026.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "umf" },
+    { name = "umf", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/15/6d/b981353d0ba8dc6d54510aba97f67ddce3872a693f41841bb77a120f512c/intel_cmplr_lib_ur-2026.0.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:5fb75293e7f1f8377cda3aac44f4e7c0c1dd38e281fecefa76ca1459382763a4", size = 31565700, upload-time = "2026-04-24T14:10:16.369Z" },
@@ -1795,7 +1819,7 @@ name = "intel-openmp"
 version = "2026.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "intel-cmplr-lib-ur" },
+    { name = "intel-cmplr-lib-ur", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6b/52/ad8da758c96299c27ac1f0345979f9202a517c4f18ef6a1e9b7a781d6948/intel_openmp-2026.0.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:c4605c63840d6dc0188610f9d0dcc5ae6c73c988f98c36c4bd807bcbd0de73bb", size = 57250534, upload-time = "2026-04-24T14:10:11.769Z" },
@@ -1809,7 +1833,9 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
 ]
 dependencies = [
     { name = "colorama", marker = "(python_full_version < '3.12' and sys_platform == 'win32') or (python_full_version >= '3.12' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
@@ -1836,25 +1862,39 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')",
     "python_full_version >= '3.14' and sys_platform == 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version == '3.13.*' and sys_platform == 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version == '3.12.*' and sys_platform == 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version == '3.13.*' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version == '3.13.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
+    "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version == '3.12.*' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version == '3.12.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
 ]
 dependencies = [
     { name = "colorama", marker = "(python_full_version >= '3.12' and sys_platform == 'win32') or (python_full_version < '3.12' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
@@ -2278,30 +2318,50 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')",
     "python_full_version < '3.12' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
     "python_full_version < '3.12' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version < '3.12' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')",
     "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version == '3.13.*' and sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version == '3.13.*' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version == '3.13.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
+    "python_full_version == '3.12.*' and sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version == '3.12.*' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version == '3.12.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version < '3.12' and sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version < '3.12' and sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
     "python_full_version < '3.12' and sys_platform == 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
     "python_full_version < '3.12' and sys_platform == 'emscripten' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version < '3.12' and sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise' and extra != 'extra-8-bw-timex-testing')",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/aa/88/262177de60548e5a2bfc46ad28232c9e9cbde697bd94132aeb80364675cb/lxml-6.0.2.tar.gz", hash = "sha256:cd79f3367bd74b317dda655dc8fcfa304d9eb6e4fb06b7168c5cf27f96e0cd62", size = 4073426, upload-time = "2025-09-22T04:04:59.287Z" }
 wheels = [
@@ -2700,9 +2760,9 @@ name = "mkl"
 version = "2026.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "intel-openmp" },
-    { name = "onemkl-license" },
-    { name = "tbb" },
+    { name = "intel-openmp", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
+    { name = "onemkl-license", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
+    { name = "tbb", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/91/97/06ad1072db8a3c4d1e6237badf660c4c754d2b513264996121c2b666d65d/mkl-2026.0.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:4a9525ddd671b422fedfc690dd9270beb65c8cbd47044b52d2a4e3f6162c9de6", size = 224036598, upload-time = "2026-04-24T14:12:43.717Z" },
@@ -2850,16 +2910,24 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.13.*' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version == '3.13.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
+    "python_full_version == '3.12.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.12.*' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version == '3.12.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/65/6e/09db70a523a96d25e115e71cc56a6f9031e7b8cd166c1ac8438307c14058/numpy-1.26.4.tar.gz", hash = "sha256:2a02aba9ed12e4ac4eb3ea9421c420301a0c6460d9830d74a9df87efa4912010", size = 15786129, upload-time = "2024-02-06T00:26:44.495Z" }
 wheels = [
@@ -2888,13 +2956,19 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'darwin'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/10/8b/c265f4823726ab832de836cdd184d0986dcf94480f81e8739692a7ac7af2/numpy-2.4.3.tar.gz", hash = "sha256:483a201202b73495f00dbc83796c6ae63137a9bdade074f7648b3e32613412dd", size = 20727743, upload-time = "2026-03-09T07:58:53.426Z" }
 wheels = [
@@ -3017,16 +3091,24 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.13.*' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version == '3.13.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
+    "python_full_version == '3.12.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.12.*' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version == '3.12.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
 ]
 dependencies = [
     { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-premise'" },
@@ -3085,13 +3167,19 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'darwin'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
 ]
 dependencies = [
     { name = "numpy", version = "2.4.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-testing' or extra != 'extra-8-bw-timex-premise'" },
@@ -3835,11 +3923,11 @@ name = "pypardiso"
 version = "0.4.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "mkl" },
-    { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-premise'" },
-    { name = "numpy", version = "2.4.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-testing' or extra != 'extra-8-bw-timex-premise'" },
-    { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-premise'" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-testing' or extra != 'extra-8-bw-timex-premise'" },
+    { name = "mkl", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
+    { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform != 'emscripten' and extra == 'extra-8-bw-timex-premise') or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
+    { name = "numpy", version = "2.4.3", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform != 'emscripten' and extra != 'extra-8-bw-timex-premise') or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
+    { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform != 'emscripten' and extra == 'extra-8-bw-timex-premise') or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform != 'emscripten' and extra != 'extra-8-bw-timex-premise') or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0a/f8/38f3c9983ffc789fa7ddda88cf2ce388a489698ba73edb9e5355a564966e/pypardiso-0.4.7.tar.gz", hash = "sha256:0f307c749ace576d9de5c63ce39af0e850d8f772697260454f3deb0202a7a92d", size = 13851, upload-time = "2025-11-02T23:11:32.229Z" }
 wheels = [
@@ -4443,10 +4531,10 @@ name = "scikit-umfpack"
 version = "0.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise') or (sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (sys_platform == 'win32' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
-    { name = "numpy", version = "2.4.3", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise') or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
-    { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-bw-timex-premise') or (sys_platform == 'emscripten' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (sys_platform == 'win32' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'extra-8-bw-timex-premise') or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
+    { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise') or (platform_machine == 'x86_64' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise') or (sys_platform != 'linux' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
+    { name = "numpy", version = "2.4.3", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise') or (sys_platform == 'darwin' and extra == 'extra-8-bw-timex-testing') or (sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise') or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
+    { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-bw-timex-premise') or (platform_machine == 'x86_64' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing') or (sys_platform == 'darwin' and extra == 'extra-8-bw-timex-premise') or (sys_platform != 'linux' and extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-bw-timex-premise') or (sys_platform == 'darwin' and extra == 'extra-8-bw-timex-testing') or (sys_platform == 'darwin' and extra != 'extra-8-bw-timex-premise') or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c9/87/e9837fbc60271bcbc569911814f3e63cb40c75aa4904a3d1d82cf8f5e079/scikit_umfpack-0.4.2.tar.gz", hash = "sha256:7cd652e6559804a52379f4ff367cfad54d6f7a6fc65a5e0bd26d26a1282c3f64", size = 33827, upload-time = "2025-07-08T08:52:41.643Z" }
 
@@ -4457,16 +4545,24 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.13.*' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version == '3.13.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
+    "python_full_version == '3.12.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.12.*' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version == '3.12.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
 ]
 dependencies = [
     { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-premise'" },
@@ -4494,13 +4590,19 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'darwin'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
 ]
 dependencies = [
     { name = "numpy", version = "2.4.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-testing' or extra != 'extra-8-bw-timex-premise'" },
@@ -4752,7 +4854,7 @@ name = "tbb"
 version = "2023.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "tcmlib" },
+    { name = "tcmlib", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/aa/d2/9a994ce9b18182b04783282eba77e236d23919acf42a886d72fe14fc78a4/tbb-2023.0.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:482f57656386ea14b96e8da36b3fcc4cd880834ef0f328ba09e8e2e3c639285e", size = 6785156, upload-time = "2026-04-24T14:10:01.59Z" },
@@ -4934,7 +5036,7 @@ name = "umf"
 version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "tcmlib" },
+    { name = "tcmlib", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-bw-timex-premise' and extra == 'extra-8-bw-timex-testing')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c4/72/2e0182f4e6a727a15d0a8a99a82182a4f5bdec1a4f5767acfd2abdc72070/umf-1.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:567152c5ee6b8e16cc56b29a8a9a6b918de1febf89877f71ea2e8247ef39fc32", size = 424455, upload-time = "2026-04-24T14:13:51.436Z" },
@@ -5181,16 +5283,24 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version == '3.13.*' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.13.*' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version == '3.13.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
+    "python_full_version == '3.12.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.12.*' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version == '3.12.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
 ]
 dependencies = [
     { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-premise'" },
@@ -5209,13 +5319,19 @@ source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin'",
+    "python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'darwin'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
     "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
 ]
 dependencies = [
     { name = "numpy", version = "2.4.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-bw-timex-testing' or extra != 'extra-8-bw-timex-premise'" },
