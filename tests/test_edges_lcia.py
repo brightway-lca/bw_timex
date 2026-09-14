@@ -477,3 +477,75 @@ def test_edges_public_surface_is_unchanged():
 
     from edges.matrix_builders import build_technosphere_edges_matrix  # noqa: F401
     from edges.utils import get_flow_matrix_positions  # noqa: F401
+
+
+def test_technosphere_only_method_needs_no_dynamic_biosphere(edges_td_db):
+    """
+    A method whose CFs only apply to technosphere exchanges never reads an emission date, so the
+    dynamic-inventory guard must not fire for it: `lci(build_dynamic_biosphere=False)` is what
+    `TimexLCA.lci` itself recommends when emission timing does not matter.
+    """
+    pytest.importorskip("edges")
+
+    from bw_timex import TimexLCA
+
+    node = bd.get_node(database="foreground", code="heat")
+    timex_lca = TimexLCA(
+        demand={node: 1},
+        method=("GWP", "example"),
+        database_dates={
+            "db_2020": datetime.strptime("2020", "%Y"),
+            "foreground": "dynamic",
+        },
+    )
+    timex_lca.build_timeline(starting_datetime=datetime(2024, 1, 1))
+    timex_lca.lci(build_dynamic_biosphere=False)
+
+    assert not hasattr(timex_lca, "dynamic_inventory")
+
+    parameters = {"test": {"cf_electricity": {"2024": 5.0, "2025": 50.0}}}
+    table = timex_lca.edges_lcia(
+        method=("test", "technosphere_cf"),
+        filepath=str(method_path("technosphere_cf")),
+        parameters=parameters,
+        scenario="test",
+        regionalized=False,
+    )
+
+    assert set(table["direction"]) == {"technosphere-technosphere"}
+    assert timex_lca.edges_score == pytest.approx(table["impact"].sum())
+    # Same 15.0 as `test_technosphere_cfs_are_characterized_at_the_process_vintage`, which builds
+    # the dynamic biosphere: technosphere characterization reads the technosphere flow matrix and
+    # the vintage of the consuming process, both of which come from the expanded static matrices.
+    # The dynamic biosphere only adds emission dates to biosphere rows, so it changes nothing here.
+    assert len(table) == 1
+    assert table["impact"].sum() == pytest.approx(15.0)
+    assert sorted(table["year"].unique()) == [2024]
+
+
+def test_edges_lcia_with_the_default_regionalized_mapping(timex_lca_with_lci):
+    """
+    The default `regionalized=True` runs edges' four-step location cascade after the direct
+    matching. Every activity of `edges_td_db` sits in "CH" and `constant_cf`'s supplier is matched
+    by name and category only, so the cascade has nothing left to fill in: the score must be the
+    conservation result of the direct matching, 16.0 kg CO2 (4 + 6 kg from the foreground heat
+    process, 6 kg from the background electricity), i.e. the static bw2calc score. A cascade step
+    that matched an already-matched exchange a second time, or dropped one, would show up here.
+    """
+    timex_lca_with_lci.static_lcia()
+
+    table = timex_lca_with_lci.edges_lcia(
+        method=("test", "constant"),
+        filepath=str(method_path("constant_cf")),
+    )
+
+    assert timex_lca_with_lci.edges_lcia_object.applied_strategies == [
+        "map_exchanges",
+        "map_aggregate_locations",
+        "map_dynamic_locations",
+        "map_contained_locations",
+        "map_remaining_locations_to_global",
+    ]
+    assert timex_lca_with_lci.edges_score == pytest.approx(16.0)
+    assert timex_lca_with_lci.edges_score == pytest.approx(timex_lca_with_lci.static_score)
+    assert sorted(table["year"].unique()) == [2024, 2025]

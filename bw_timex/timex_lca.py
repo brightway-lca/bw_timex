@@ -887,7 +887,10 @@ class TimexLCA:
         Biosphere exchanges are characterized at the date of the emission, taken from the dynamic
         inventory, so emissions spread out by a temporal distribution are characterized correctly.
         Technosphere exchanges are characterized at the vintage of the consuming process, as
-        bw_timex does not build a dynamic technosphere inventory.
+        bw_timex does not build a dynamic technosphere inventory. A method whose characterization
+        factors only apply to technosphere exchanges therefore never needs an emission date and
+        also works on an inventory built with `lci(build_dynamic_biosphere=False)`; a method that
+        characterizes biosphere exchanges requires the dynamic inventory.
 
         This is orthogonal to `TimexLCA.dynamic_lcia()`: `edges` varies the characterization
         factor with the year of the exchange, while the dynamic characterization varies the impact
@@ -947,19 +950,6 @@ class TimexLCA:
                 "TimexLCA.lci(expand_technosphere=True) first."
             )
 
-        if not hasattr(self, "dynamic_inventory"):
-            raise ValueError(
-                "edges_lcia characterizes biosphere flows at the date of the emission, which is "
-                "only available in the dynamic inventory. Without it, temporal distributions on "
-                "biosphere exchanges would be silently ignored. Please call "
-                "TimexLCA.lci(build_dynamic_biosphere=True) first."
-            )
-
-        if use_disaggregated_lci and not hasattr(self, "dynamic_inventory_disaggregated"):
-            logger.info("Disaggregating background LCI...")
-            self.disaggregate_background_lci()
-            logger.info("Background LCI's disaggregated.")
-
         from .edges_lcia import TimexEdgeLCIA
 
         edge_kwargs = {
@@ -970,6 +960,25 @@ class TimexLCA:
             "allowed_functions": allowed_functions,
         }
         self.edges_lcia_object = TimexEdgeLCIA(self, method=method, **edge_kwargs)
+
+        # Only methods that actually characterize biosphere exchanges need the dynamic inventory.
+        # A technosphere-only method (e.g. a GeoPolRisk-style criticality method) characterizes at
+        # the vintage of the consuming process and never reads an emission date, so it also works
+        # on an `lci(build_dynamic_biosphere=False)` inventory.
+        if self.edges_lcia_object._uses_biosphere_supplier_matrix():
+            if not hasattr(self, "dynamic_inventory"):
+                raise ValueError(
+                    "edges_lcia characterizes biosphere flows at the date of the emission, which "
+                    "is only available in the dynamic inventory. Without it, temporal "
+                    "distributions on biosphere exchanges would be silently ignored. Please call "
+                    "TimexLCA.lci(build_dynamic_biosphere=True) first."
+                )
+
+            if use_disaggregated_lci and not hasattr(self, "dynamic_inventory_disaggregated"):
+                logger.info("Disaggregating background LCI...")
+                self.disaggregate_background_lci()
+                logger.info("Background LCI's disaggregated.")
+
         self.edges_lcia_object.lci()
         self.edges_lcia_object.run_mapping(regionalized=regionalized)
         self.edges_characterized_inventory = self.edges_lcia_object.characterize_time_explicit(

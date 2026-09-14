@@ -349,7 +349,9 @@ class TimexEdgeLCIA(EdgeLCIA):
         pandas.DataFrame
             One row per characterised exchange, with the date and year used for its CF. Columns
             are `supplier`, `supplier categories`, `consumer`, `consumer location`, `activity`,
-            `direction`, `date`, `year`, `amount`, `CF` and `impact`.
+            `direction`, `date`, `year`, `amount`, `CF` and `impact`. Exchanges the method does
+            not cover (CF of 0) are left out; how many they are and what share of the total
+            exchange amount they carry is reported on the debug log.
         """
         slices = {}
         biosphere_entries = self._biosphere_entries(use_disaggregated_lci)
@@ -381,7 +383,23 @@ class TimexEdgeLCIA(EdgeLCIA):
         table = pd.concat(tables, ignore_index=True).sort_values(
             by=["date", "impact"], ascending=[True, False]
         )
-        table = table[table["CF"] != 0].reset_index(drop=True)
+        uncharacterized = table["CF"] == 0
+        dropped_count = int(uncharacterized.sum())
+        if dropped_count:
+            total_amount = float(table["amount"].abs().sum())
+            dropped_amount = float(table.loc[uncharacterized, "amount"].abs().sum())
+            share = dropped_amount / total_amount if total_amount else 0.0
+            # Debug rather than warning: a characterization method deliberately covers a subset of
+            # the inventory (a CO2 method leaves every other flow at CF 0), so a zero CF is the
+            # normal case for most exchanges and a warning would fire on every single run. The
+            # share of the total amount is what tells a genuinely unmatched exchange apart from an
+            # intentionally uncovered one, and it is available to anyone who turns on debug logs.
+            logger.debug(
+                f"{dropped_count} of {len(table)} exchanges have no characterization factor "
+                f"(CF == 0) and are dropped from the CF table. They carry {share:.1%} of the "
+                f"total exchange amount."
+            )
+        table = table[~uncharacterized].reset_index(drop=True)
         self.score = float(table["impact"].sum())
         return table
 
@@ -455,13 +473,19 @@ class TimexEdgeLCIA(EdgeLCIA):
         Parameters
         ----------
         use_disaggregated_lci : bool
-            If True, uses the disaggregated dynamic inventory of the background.
+            If True, uses the disaggregated dynamic inventory of the background, which
+            `TimexLCA.edges_lcia` has already built by the time it gets here.
 
         Returns
         -------
         pandas.DataFrame or None
             Columns `row`, `column`, `amount`, `date` and `year`, or None if there is nothing to
             characterise.
+
+        Raises
+        ------
+        AttributeError
+            If the (disaggregated) dynamic inventory the method needs has not been calculated.
         """
         if not self._uses_biosphere_supplier_matrix():
             return None
@@ -473,7 +497,11 @@ class TimexEdgeLCIA(EdgeLCIA):
                 "build_dynamic_biosphere=True before characterizing with edges."
             )
         if use_disaggregated_lci and not hasattr(timex, "dynamic_inventory_disaggregated"):
-            timex.disaggregate_background_lci()
+            raise AttributeError(
+                "Disaggregated dynamic inventory not yet calculated. Call "
+                "TimexLCA.disaggregate_background_lci() before characterizing with edges, or go "
+                "through TimexLCA.edges_lcia(use_disaggregated_lci=True), which does it for you."
+            )
 
         inventory = (
             timex.dynamic_inventory_disaggregated
