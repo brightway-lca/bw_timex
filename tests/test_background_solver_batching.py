@@ -5,11 +5,17 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
+from bw_timex.solvers import select_backend
+
 from .test_background_solver import (  # noqa: F401
     _setup,
     chained_background_activities_db,
     two_background_activities_db,
 )
+
+
+def _pardiso_active():
+    return select_backend() == "pardiso"
 
 
 @pytest.mark.usefixtures("two_background_activities_db")
@@ -205,3 +211,84 @@ class TestPrepareBatchLivenessAcrossBlocks:
             assert aggregate[lca.dicts.biosphere[co2.id]] == pytest.approx(
                 expected_co2
             )
+
+
+@pytest.mark.skipif(not _pardiso_active(), reason="pardiso backend not active")
+@pytest.mark.usefixtures("two_background_activities_db")
+class TestPardisoDoesNotRefactorize:
+    """MKL Pardiso keeps exactly one factorization alive, so alternating
+    blocks re-analyses and re-factorizes on every hop. `_call_pardiso` runs
+    with phase 12 or 13 when a numeric factorization happens and phase 33
+    when an existing one is reused, which makes thrash directly countable.
+    """
+
+    def test_batched_prepare_factorizes_once_per_block(self, monkeypatch):
+        from pypardiso.pardiso_wrapper import PyPardisoSolver
+
+        phases = []
+        original = PyPardisoSolver._call_pardiso
+
+        def spy(self, A, b):
+            phases.append(self.phase)
+            return original(self, A, b)
+
+        monkeypatch.setattr(PyPardisoSolver, "_call_pardiso", spy)
+
+        _, _, solver = _setup()
+        c1 = bd.get_node(database="db_2020", code="C1")
+        c2 = bd.get_node(database="db_2020", code="C2")
+        solver.prepare([c1.id, c2.id])
+
+        factorizations = [p for p in phases if p in (12, 13)]
+        # One block touched, one chunk -> exactly one numeric factorization,
+        # however many activities the batch carries.
+        assert len(factorizations) == 1
+
+    def test_factorizations_do_not_scale_with_activity_count(self, monkeypatch):
+        from pypardiso.pardiso_wrapper import PyPardisoSolver
+
+        counts = []
+        original = PyPardisoSolver._call_pardiso
+
+        def run(ids):
+            phases = []
+
+            def spy(self, A, b):
+                phases.append(self.phase)
+                return original(self, A, b)
+
+            monkeypatch.setattr(PyPardisoSolver, "_call_pardiso", spy)
+            _, _, solver = _setup()
+            solver.prepare(ids)
+            return len([p for p in phases if p in (12, 13)])
+
+        c1 = bd.get_node(database="db_2020", code="C1")
+        c2 = bd.get_node(database="db_2020", code="C2")
+        counts.append(run([c1.id]))
+        counts.append(run([c1.id, c2.id] * 10))
+
+        assert counts[0] == counts[1]
+
+
+@pytest.mark.usefixtures("two_background_activities_db")
+class TestBlockSolversAreReused:
+
+    def test_each_block_builds_one_solver_across_chunks(self):
+        _, _, solver = _setup()
+        solver.max_batch_bytes = 1  # one column per chunk
+        c1 = bd.get_node(database="db_2020", code="C1")
+        c2 = bd.get_node(database="db_2020", code="C2")
+
+        built = []
+        original = solver._block_solver
+
+        def counting(block_index):
+            if block_index not in solver._block_solvers:
+                built.append(block_index)
+            return original(block_index)
+
+        solver._block_solver = counting
+        solver.prepare([c1.id, c2.id])
+
+        # Two chunks, one shared block: the LU is built once and reused.
+        assert built == [solver.block_index_for(c1.id)]
