@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from bw2data.errors import MultipleResults, UnknownObject
+from bw2data.tests import bw2test
 from bw_temporalis import TemporalDistribution
 
 from bw_timex.utils import (
@@ -18,6 +19,7 @@ from bw_timex.utils import (
     extract_date_as_string,
     get_exchange,
     get_temporal_evolution_factor,
+    resolve_temporalized_node_metadata,
     resolve_temporalized_node_name,
     round_datetime,
 )
@@ -253,6 +255,58 @@ class TestResolveTemporalizedNodeName:
             resolve_temporalized_node_name("nonexistent_code")
 
 
+# --- resolve_temporalized_node_metadata (DB-dependent) ---
+
+
+@pytest.mark.usefixtures("temporal_grouping_db_monthly")
+class TestResolveTemporalizedNodeMetadata:
+    def test_unique_code(self):
+        metadata = resolve_temporalized_node_metadata("A")
+        assert metadata["name"] == "A"
+        assert metadata["reference product"] == "A"
+        assert metadata["location"] == "somewhere"
+
+    def test_shared_code_agreeing_fields(self):
+        # "C" exists in both db_2022 and db_2024, with the same name, reference product and
+        # location - only the amount of its CO2 exchange differs between the two vintages.
+        metadata = resolve_temporalized_node_metadata("C")
+        assert metadata["name"] == "C"
+        assert metadata["reference product"] == "C"
+        assert metadata["location"] == "somewhere"
+
+    def test_unknown_code(self):
+        with pytest.raises(UnknownObject):
+            resolve_temporalized_node_metadata("nonexistent_code")
+
+
+class TestResolveTemporalizedNodeMetadataDisagreement:
+    @bw2test
+    def test_shared_code_disagreeing_location_raises(self):
+        bd.Database("db_2020").write(
+            {
+                ("db_2020", "X"): {
+                    "name": "widget",
+                    "location": "here",
+                    "reference product": "widget",
+                    "exchanges": [],
+                },
+            }
+        )
+        bd.Database("db_2030").write(
+            {
+                ("db_2030", "X"): {
+                    "name": "widget",
+                    "location": "there",
+                    "reference product": "widget",
+                    "exchanges": [],
+                },
+            }
+        )
+
+        with pytest.raises(ValueError, match="X"):
+            resolve_temporalized_node_metadata("X")
+
+
 # --- get_exchange (DB-dependent) ---
 
 
@@ -367,3 +421,19 @@ class TestAddTemporalEvolutionToExchange:
             output_database="db_2024",
         )
         assert exc.get("temporal_evolution_amounts") == amounts
+
+
+def test_year_from_time_mapped_timestamp_all_groupings():
+    from bw_timex.utils import year_from_time_mapped_timestamp
+
+    assert year_from_time_mapped_timestamp(2024, "year") == 2024
+    assert year_from_time_mapped_timestamp(202403, "month") == 2024
+    assert year_from_time_mapped_timestamp(20240315, "day") == 2024
+    assert year_from_time_mapped_timestamp(2024031514, "hour") == 2024
+
+
+def test_year_from_time_mapped_timestamp_dynamic_sentinel():
+    """Foreground activities with unresolved timing carry the string 'dynamic'."""
+    from bw_timex.utils import year_from_time_mapped_timestamp
+
+    assert year_from_time_mapped_timestamp("dynamic", "year") is None

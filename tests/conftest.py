@@ -13,6 +13,7 @@ from .fixtures.background_td_multdate_consumer_fixture import (
 )
 from .fixtures.background_td_multibio_db_fixture import background_td_multibio_db
 from .fixtures.dynamic_biomatrix_db_fixture import dynamic_biosphere_matrix_db
+from .fixtures.edges_td_db_fixture import edges_td_db
 from .fixtures.explicit_process_product_db_fixture import explicit_process_product_db
 from .fixtures.nonunitary_db_fixture import nonunitary_db
 from .fixtures.process_at_base_database_time_db_fixture import (

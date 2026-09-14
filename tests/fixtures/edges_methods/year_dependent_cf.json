@@ -1,0 +1,26 @@
+{
+  "name": "test year-dependent CF",
+  "version": "1.0",
+  "unit": "kg CO2-eq",
+  "description": "CF that doubles from one year to the next, to expose the CF evaluation year.",
+  "interpolation": {
+    "axis": "scenario_idx",
+    "axis_type": "year",
+    "method": "linear",
+    "extrapolation": "nearest"
+  },
+  "exchanges": [
+    {
+      "supplier": {
+        "name": "carbon dioxide",
+        "categories": ["air"],
+        "matrix": "biosphere"
+      },
+      "consumer": {
+        "matrix": "technosphere"
+      },
+      "value": 1.0,
+      "value_expression": "cf_co2"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "test technosphere CF",
+  "version": "1.0",
+  "unit": "risk points",
+  "description": "CF on the electricity exchange, to cover technosphere characterization.",
+  "exchanges": [
+    {
+      "supplier": {
+        "name": "electricity production",
+        "reference product": "electricity",
+        "location": "CH",
+        "matrix": "technosphere"
+      },
+      "consumer": {
+        "location": "CH",
+        "matrix": "technosphere"
+      },
+      "value": 1.0,
+      "value_expression": "cf_electricity"
+    }
+  ]
+}

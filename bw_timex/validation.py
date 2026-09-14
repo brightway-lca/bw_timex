@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 from typing import Callable, Literal, Optional, Union
 
 import bw2data as bd
@@ -154,6 +155,35 @@ class DynamicLCIAInputs(BaseModel):
     characterization_functions: Optional[dict] = None
     characterization_function_co2: Optional[Callable] = None
     use_disaggregated_lci: bool = False
+
+
+class EdgesLCIAInputs(BaseModel):
+    """Validates inputs to TimexLCA.edges_lcia"""
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    method: Union[tuple, str, Path, dict]
+    parameters: Optional[dict] = None
+    scenario: Optional[str] = None
+    weight: str = "population"
+    filepath: Optional[Union[str, Path]] = None
+    allowed_functions: Optional[dict] = None
+    regionalized: bool = True
+    use_disaggregated_lci: bool = False
+
+    @field_validator("method")
+    @classmethod
+    def validate_method(cls, v):
+        if isinstance(v, tuple) and not v:
+            raise ValueError(
+                "method must be a non-empty tuple, a path to an edges method JSON file, "
+                "or a dict containing an 'exchanges' key."
+            )
+        if isinstance(v, dict) and "exchanges" not in v:
+            raise ValueError(
+                "An edges method given as a dict must contain an 'exchanges' key."
+            )
+        return v
 
 
 class TemporalDistributionExchangeInputs(BaseModel):

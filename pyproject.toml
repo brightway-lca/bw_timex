@@ -80,6 +80,10 @@ solvers = [
     "pypardiso; sys_platform != 'darwin' or platform_machine != 'arm64'",
 ]
 
+edges = [
+    "edges>=1.4.1; python_version < '3.13'",
+]
+
 [tool.setuptools]
 license-files = ["LICENSE"]
 package-data = {bw_timex = ["*.md", "*.txt", "data/*.json"]}
