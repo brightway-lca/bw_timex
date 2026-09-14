@@ -19,6 +19,7 @@ import os
 import platform
 import sys
 import warnings
+from typing import Optional
 
 BACKENDS = ("pardiso", "umfpack", "superlu")
 
@@ -64,7 +65,7 @@ def umfpack_available() -> bool:
     return True
 
 
-def select_backend(override: str = None) -> str:
+def select_backend(override: Optional[str] = None) -> str:
     """Name of the block-solver backend to use.
 
     `override`, else `BW_TIMEX_BLOCK_SOLVER`, else the best available.
@@ -117,7 +118,7 @@ def _suboptimal_message(sys_platform: str, machine: str) -> str:
 
 
 def warn_if_suboptimal(
-    backend: str, sys_platform: str = None, machine: str = None
+    backend: str, sys_platform: Optional[str] = None, machine: Optional[str] = None
 ) -> None:
     """Warn once per process when `backend` is not the best one available.
 
