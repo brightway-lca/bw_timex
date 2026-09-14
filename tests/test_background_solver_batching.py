@@ -273,22 +273,59 @@ class TestPardisoDoesNotRefactorize:
 @pytest.mark.usefixtures("two_background_activities_db")
 class TestBlockSolversAreReused:
 
-    def test_each_block_builds_one_solver_across_chunks(self):
+    def test_each_block_builds_one_solver_across_chunks(self, monkeypatch):
+        """Checking `block_index not in solver._block_solvers` before
+        delegating only proves the dict gained an entry - a regression that
+        rebuilds the backend on every call but still stores it under
+        `block_index` (dropping reuse, keeping the write) is invisible to
+        that check, since the key is present from the first call onward.
+
+        Guard the real thing instead: `make_block_solver` is where a
+        factorization actually happens, so spy on the name as imported into
+        `bw_timex.background_solver` (not on `bw_timex.solvers`, where the
+        patch would not be seen) and count calls directly; and capture the
+        memoized backend object after every chunk, asserting it is the same
+        object throughout rather than merely present.
+        """
+        import bw_timex.background_solver as background_solver_module
+
         _, _, solver = _setup()
         solver.max_batch_bytes = 1  # one column per chunk
         c1 = bd.get_node(database="db_2020", code="C1")
         c2 = bd.get_node(database="db_2020", code="C2")
+        block_index = solver.block_index_for(c1.id)
+        assert solver.block_index_for(c2.id) == block_index
+        assert solver.chunk_size() == 1
 
-        built = []
-        original = solver._block_solver
+        calls = []
+        original_make_block_solver = background_solver_module.make_block_solver
 
-        def counting(block_index):
-            if block_index not in solver._block_solvers:
-                built.append(block_index)
-            return original(block_index)
+        def spy(backend, submatrix):
+            calls.append(submatrix)
+            return original_make_block_solver(backend, submatrix)
 
-        solver._block_solver = counting
+        monkeypatch.setattr(background_solver_module, "make_block_solver", spy)
+
+        snapshots = []
+        original_solve_and_cache_chunk = solver._solve_and_cache_chunk
+
+        def snapshotting(activity_ids):
+            original_solve_and_cache_chunk(activity_ids)
+            snapshots.append(solver._block_solvers.get(block_index))
+
+        solver._solve_and_cache_chunk = snapshotting
+
         solver.prepare([c1.id, c2.id])
 
-        # Two chunks, one shared block: the LU is built once and reused.
-        assert built == [solver.block_index_for(c1.id)]
+        # Two chunks, one shared block: the actual factorization call must
+        # happen exactly once for this block, no matter how many chunks
+        # touch it.
+        assert len(calls) == 1
+        assert calls[0] is solver._submatrix(block_index)
+
+        # And the memoized backend object must be the SAME object after
+        # every chunk that touched the block - the identity check a
+        # rebuild-but-still-store regression cannot satisfy.
+        assert len(snapshots) == 2  # two pending activities, chunk size 1
+        assert snapshots[0] is not None
+        assert all(obj is snapshots[0] for obj in snapshots)
