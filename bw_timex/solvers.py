@@ -21,6 +21,8 @@ import sys
 import warnings
 from typing import Optional
 
+import numpy as np
+
 BACKENDS = ("pardiso", "umfpack", "superlu")
 
 _warned = False
@@ -141,3 +143,91 @@ def warn_if_suboptimal(
         SolverPerformanceWarning,
         stacklevel=3,
     )
+
+
+class _SuperLUBlockSolver:
+    """SciPy's built-in SuperLU. Always available; takes a 2-D RHS natively."""
+
+    name = "superlu"
+
+    def __init__(self, submatrix):
+        from scipy.sparse.linalg import splu
+
+        self._lu = splu(submatrix.tocsc())
+
+    def solve(self, rhs):
+        return self._lu.solve(rhs)
+
+
+class _UmfpackBlockSolver:
+    """UMFPACK through SciPy's `factorized`.
+
+    The closure holds a persistent LU, but rejects a 2-D right-hand side
+    (`ValueError: object too deep for desired array`), so a batch is looped
+    column by column. Each column is still only a triangular solve against
+    the one factorization.
+    """
+
+    name = "umfpack"
+
+    def __init__(self, submatrix):
+        from scipy.sparse.linalg import factorized
+
+        self._solve_one = factorized(submatrix.tocsc())
+
+    def solve(self, rhs):
+        if rhs.ndim == 1:
+            return np.asarray(self._solve_one(rhs), dtype=float)
+        out = np.empty(rhs.shape, dtype=float)
+        for j in range(rhs.shape[1]):
+            out[:, j] = np.asarray(self._solve_one(np.ascontiguousarray(rhs[:, j])))
+        return out
+
+
+class _PardisoBlockSolver:
+    """MKL Pardiso through `pypardiso`'s module-global solver.
+
+    A 2-D right-hand side goes into one native call with `nrhs = k`, which is
+    the whole reason this backend is preferred: one analysis, one numeric
+    factorization, k triangular solves, all inside MKL.
+
+    The CSR submatrix is held here because `pypardiso.spsolve` runs
+    `A.tocsr()` on every call, which would otherwise be an O(nnz) copy per
+    chunk.
+    """
+
+    name = "pardiso"
+
+    def __init__(self, csr_submatrix):
+        self._csr = csr_submatrix
+        if not self._csr.has_sorted_indices:
+            self._csr.sort_indices()
+
+    def solve(self, rhs):
+        from pypardiso import spsolve as pardiso_spsolve
+
+        result = pardiso_spsolve(self._csr, rhs, squeeze=False)
+        result = np.asarray(result, dtype=float)
+        if rhs.ndim == 1:
+            return result.ravel()
+        return result
+
+
+def make_block_solver(backend: str, submatrix):
+    """Build the block solver named by `backend` over `submatrix`.
+
+    The pardiso backend declines a block with an empty row: `_check_A` raises
+    `ValueError('Matrix A is singular, because it contains empty row(s)')`
+    for one, and a single degenerate block must not fail an entire `lci()`.
+    SuperLU handles it instead.
+    """
+    if backend == "pardiso":
+        csr = submatrix.tocsr()
+        if not np.diff(csr.indptr).all():
+            return _SuperLUBlockSolver(submatrix)
+        return _PardisoBlockSolver(csr)
+    if backend == "umfpack":
+        return _UmfpackBlockSolver(submatrix)
+    if backend == "superlu":
+        return _SuperLUBlockSolver(submatrix)
+    raise ValueError(f"Unknown block solver {backend!r}")

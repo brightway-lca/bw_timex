@@ -2,12 +2,16 @@
 
 import warnings
 
+import numpy as np
 import pytest
+import scipy.sparse as sp
 
 from bw_timex.solvers import (
     SolverPerformanceWarning,
+    make_block_solver,
     reset_warning_state,
     select_backend,
+    umfpack_available,
     warn_if_suboptimal,
 )
 
@@ -103,3 +107,87 @@ def test_warning_category_is_filterable():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         warn_if_suboptimal("superlu", sys_platform="darwin", machine="arm64")
+
+
+def _pardiso_importable():
+    try:
+        import pypardiso
+
+        return pypardiso.pypardiso_solver.libmkl is not None
+    except ImportError:
+        return False
+
+
+def _available_backends():
+    names = ["superlu"]
+    if umfpack_available():
+        names.append("umfpack")
+    if _pardiso_importable():
+        names.append("pardiso")
+    return names
+
+
+def _test_matrix():
+    return sp.csc_matrix(
+        np.array([[4.0, 1.0, 0.0], [1.0, 3.0, 1.0], [0.0, 1.0, 2.0]])
+    )
+
+
+@pytest.mark.parametrize("backend", _available_backends())
+def test_backend_solves_a_one_dimensional_rhs(backend):
+    matrix = _test_matrix()
+    solver = make_block_solver(backend, matrix)
+    rhs = np.array([1.0, 2.0, 3.0])
+
+    result = solver.solve(rhs)
+
+    assert result.ndim == 1
+    assert np.allclose(matrix @ result, rhs)
+
+
+@pytest.mark.parametrize("backend", _available_backends())
+def test_backend_solves_a_two_dimensional_rhs(backend):
+    matrix = _test_matrix()
+    solver = make_block_solver(backend, matrix)
+    rhs = np.array([[1.0, 0.0, 2.0], [2.0, 1.0, 0.0], [3.0, 1.0, 1.0]])
+
+    result = solver.solve(rhs)
+
+    assert result.shape == (3, 3)
+    assert np.allclose(matrix @ result, rhs)
+
+
+@pytest.mark.parametrize("backend", _available_backends())
+def test_two_dimensional_solve_matches_column_by_column(backend):
+    matrix = _test_matrix()
+    solver = make_block_solver(backend, matrix)
+    rhs = np.array([[1.0, 0.0], [2.0, 1.0], [3.0, 1.0]])
+
+    batched = solver.solve(rhs)
+    columns = np.column_stack(
+        [solver.solve(np.ascontiguousarray(rhs[:, j])) for j in range(rhs.shape[1])]
+    )
+
+    assert np.allclose(batched, columns)
+
+
+@pytest.mark.skipif(not _pardiso_importable(), reason="MKL not available")
+def test_pardiso_falls_back_when_a_block_row_is_empty():
+    # pypardiso's _check_A raises on an empty row; SuperLU is used instead so
+    # one degenerate block cannot fail the whole LCI.
+    matrix = sp.csr_matrix(
+        np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
+    )
+    solver = make_block_solver("pardiso", matrix)
+    assert solver.name == "superlu"
+
+
+@pytest.mark.skipif(not _pardiso_importable(), reason="MKL not available")
+def test_pardiso_backend_stores_csr_once():
+    matrix = _test_matrix()
+    solver = make_block_solver("pardiso", matrix)
+    first = solver._csr
+    solver.solve(np.ones(3))
+    solver.solve(np.ones(3))
+    assert solver._csr is first
+    assert solver._csr.format == "csr"
