@@ -31,6 +31,11 @@ from ._lci_cache import BACKGROUND_AGGREGATE_CACHE, BACKGROUND_SUPPLY_CACHE
 from .block_structure import BlockStructure
 from .solvers import make_block_solver, select_backend, warn_if_suboptimal
 
+# Dense working-set budget for one batched cascade. A chunk holds a
+# `(n_columns, k)` supply, so this caps k rather than the batch: the caches
+# it writes are sparse and stay.
+DEFAULT_MAX_BATCH_BYTES = 512 * 1024 * 1024
+
 
 @dataclass(frozen=True, eq=False)
 class UnitSupply:
@@ -90,6 +95,7 @@ class BackgroundSolver:
         product_dict,
         biosphere_dict,
         structure: BlockStructure,
+        max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES,
     ) -> None:
         self.technosphere_matrix = technosphere_matrix.tocsc()
         self.biosphere_matrix = biosphere_matrix.tocsc()
@@ -97,6 +103,7 @@ class BackgroundSolver:
         self.product_dict = product_dict
         self.biosphere_dict = biosphere_dict
         self.structure = structure
+        self.max_batch_bytes = max_batch_bytes
 
         self.backend_name = select_backend()
         warn_if_suboptimal(self.backend_name)
@@ -472,43 +479,93 @@ class BackgroundSolver:
             self.factorized_blocks.add(block_index)
         return solver
 
+    def chunk_size(self) -> int:
+        """How many right-hand sides one cascade may carry.
+
+        A cascade holds a dense `(n_columns, k)` supply, so `k` is what the
+        memory budget caps. At least one, or a batch could never run.
+        """
+        per_column = self.technosphere_matrix.shape[1] * 8
+        return max(1, int(self.max_batch_bytes // per_column))
+
     def prepare(self, activity_ids, n_jobs: Optional[int] = None) -> None:
-        """Pre-factorize blocks that will pay off, for a batch of activities.
+        """Solve every uncached activity in `activity_ids`, in one batch.
 
-        Groups the *uncached* ids by the block a solve for them would use,
-        and factorizes only blocks with more than one pending solve:
-        factorizing an ecoinvent-sized block costs roughly a hundred times a
-        single `spsolve` on it, so it only pays off once several solves in
-        that block share the cost.
+        Ids are counted by identity, not occurrence: callers collect them per
+        temporal market, and distinct markets of the same process demand the
+        very same background vintages, so repeats are the norm.
 
-        `activity_ids` is counted by *identity*, not by occurrence. Callers
-        collect it per temporal market, and distinct markets of the same
-        process at different times demand the very same background vintages -
-        so repeats are the norm. Counting them twice would buy an LU for a
-        block that needs a single solve, which is the exact trade this method
-        exists to avoid.
+        The batch is cut into chunks of `chunk_size()` and each chunk is one
+        `_cascading_solve` with that many right-hand side columns. Every
+        block a chunk reaches is therefore factorized once and solved for all
+        of its columns in a single call - on pardiso, one MKL analysis plus
+        one numeric factorization plus `k` triangular solves. Each chunk is
+        reduced to sparse cache payloads before the next is solved, so the
+        dense working set never exceeds `max_batch_bytes`.
+
+        Both the supply and the aggregate cache are filled, because the
+        aggregate is one `B[:, block.columns] @ chunk` matmul per touched
+        block rather than one per activity.
 
         `n_jobs` is accepted for a future parallel implementation and
         ignored here.
         """
-        pending_counts: dict = {}
-        pending_keys: set = set()
+        pending = []
+        seen: set = set()
         for activity_id in activity_ids:
             cache_key = self.cache_key(activity_id)
-            if cache_key in pending_keys:
+            if cache_key in seen:
                 continue
             cache = self._select_cache(
                 cache_key, self.shared_cache, self._instance_supply_cache
             )
             if cache_key in cache:
                 continue
-            pending_keys.add(cache_key)
-            block_index = self.block_index_for(activity_id)
-            pending_counts[block_index] = pending_counts.get(block_index, 0) + 1
+            seen.add(cache_key)
+            pending.append(activity_id)
 
-        for block_index, count in pending_counts.items():
-            if count > 1:
-                self._factorize_block(block_index)
+        chunk = self.chunk_size()
+        for start in range(0, len(pending), chunk):
+            self._solve_and_cache_chunk(pending[start : start + chunk])
+
+    def _solve_and_cache_chunk(self, activity_ids: list) -> None:
+        """One batched cascade over `activity_ids`, then cache every column."""
+        seeds: dict = {}
+        width = len(activity_ids)
+        for column, activity_id in enumerate(activity_ids):
+            block_index = self.block_index_for(activity_id)
+            block = self.structure.blocks[block_index]
+            seed = seeds.get(block_index)
+            if seed is None:
+                seed = np.zeros((len(block.rows), width))
+                seeds[block_index] = seed
+            seed[self._local_row(block, activity_id), column] = 1.0
+
+        supply, touched_blocks = self._cascading_solve(seeds)
+
+        aggregate = np.zeros((self.biosphere_matrix.shape[0], width))
+        for block_index in touched_blocks:
+            block = self.structure.blocks[block_index]
+            aggregate += np.asarray(
+                self._biosphere_submatrix(block_index) @ supply[block.columns, :]
+            )
+
+        column_ids = self._column_node_ids()
+        biosphere_ids = self._biosphere_node_ids()
+        for column, activity_id in enumerate(activity_ids):
+            cache_key = self.cache_key(activity_id)
+
+            values = supply[:, column]
+            nonzero = np.flatnonzero(values)
+            self._select_cache(
+                cache_key, self.shared_cache, self._instance_supply_cache
+            )[cache_key] = (column_ids[nonzero], values[nonzero].copy())
+
+            column_aggregate = aggregate[:, column]
+            nonzero = np.flatnonzero(column_aggregate)
+            self._select_cache(
+                cache_key, self.shared_aggregate_cache, self._instance_aggregate_cache
+            )[cache_key] = (biosphere_ids[nonzero], column_aggregate[nonzero].copy())
 
     def prepare_blocks(self, block_indices) -> None:
         """Pre-factorize every block that will be solved more than once.

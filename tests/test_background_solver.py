@@ -328,26 +328,25 @@ class TestBackgroundSolver:
         )
         assert np.allclose(result, expected)
 
-    def test_prepare_factorizes_only_blocks_with_several_pending_solves(self):
+    def test_prepare_solves_a_single_pending_activity(self):
         _, _, solver = _setup()
         background = bd.get_node(database="db_2020", code="C")
 
         solver.prepare([background.id])
 
-        assert solver.factorized_blocks == set()
+        assert solver.n_rhs_solved == 1
+        assert solver.cache_key(background.id) in solver._instance_supply_cache
 
     def test_prepare_counts_repeated_ids_as_one_pending_solve(self):
         # Every temporal market of the same process demands the same
         # background vintages, so callers hand `prepare` the same id many
-        # times. One distinct activity is one solve, and an LU costs roughly
-        # a hundred of those - it must not be bought here.
+        # times. One distinct activity must be one right-hand side column.
         _, _, solver = _setup()
         background = bd.get_node(database="db_2020", code="C")
 
         solver.prepare([background.id, background.id, background.id])
 
-        assert solver.factorized_blocks == set()
-        assert solver.n_solves == 0
+        assert solver.n_rhs_solved == 1
 
     def test_solver_reports_its_backend(self):
         from bw_timex.solvers import select_backend
@@ -430,20 +429,18 @@ class TestPrepareWithSeveralPendingSolvesInOneBlock:
     than the ad-hoc `spsolve` path.
     """
 
-    def test_prepare_factorizes_the_shared_block_without_solving(self):
+    def test_prepare_solves_the_shared_block_in_one_call(self):
         _, _, solver = _setup()
         c1 = bd.get_node(database="db_2020", code="C1")
         c2 = bd.get_node(database="db_2020", code="C2")
         block_index = solver.block_index_for(c1.id)
-        # Sanity: both activities must land in the same block, or this test
-        # would not exercise the `count > 1` branch at all.
         assert solver.block_index_for(c2.id) == block_index
 
         solver.prepare([c1.id, c2.id])
 
         assert solver.factorized_blocks == {block_index}
-        # Factorizing an LU is not the same as solving with it.
-        assert solver.n_solves == 0
+        assert solver.n_solves == 1
+        assert solver.n_rhs_solved == 2
 
     def test_supply_after_prepare_matches_a_direct_solve(self):
         lca, structure, solver = _setup()
@@ -461,9 +458,11 @@ class TestPrepareWithSeveralPendingSolvesInOneBlock:
             expected = sp.linalg.spsolve(lca.technosphere_matrix.tocsc(), demand)
             assert np.allclose(_full_supply(structure, supply), expected)
 
-        # Both solves went through the cached-LU branch of `solve_block`,
-        # not a fresh ad-hoc `spsolve` - still one real solve each.
-        assert solver.n_solves == 2
+        # `prepare` now solves the whole batch itself - one call carrying
+        # both right-hand sides - so both `unit_supply` calls above are pure
+        # cache hits, not fresh solves.
+        assert solver.n_solves == 1
+        assert solver.n_rhs_solved == 2
 
 
 @pytest.mark.usefixtures("dynamic_biosphere_matrix_db")
