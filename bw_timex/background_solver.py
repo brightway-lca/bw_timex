@@ -32,8 +32,9 @@ from .block_structure import BlockStructure
 from .solvers import make_block_solver, select_backend, warn_if_suboptimal
 
 # Dense working-set budget for one batched cascade. A chunk holds a
-# `(n_columns, k)` supply, so this caps k rather than the batch: the caches
-# it writes are sparse and stay.
+# `(n_columns, k)` supply AND a `(n_biosphere_rows, k)` aggregate at the same
+# time, so this caps k against their combined cost rather than the batch: the
+# caches it writes are sparse and stay.
 DEFAULT_MAX_BATCH_BYTES = 512 * 1024 * 1024
 
 
@@ -482,10 +483,14 @@ class BackgroundSolver:
     def chunk_size(self) -> int:
         """How many right-hand sides one cascade may carry.
 
-        A cascade holds a dense `(n_columns, k)` supply, so `k` is what the
-        memory budget caps. At least one, or a batch could never run.
+        A cascade holds a dense `(n_columns, k)` supply AND a dense
+        `(n_biosphere_rows, k)` aggregate at the same time, so `k` is capped
+        against their combined per-column cost. At least one, or a batch
+        could never run.
         """
-        per_column = self.technosphere_matrix.shape[1] * 8
+        per_column = (
+            self.technosphere_matrix.shape[1] + self.biosphere_matrix.shape[0]
+        ) * 8
         return max(1, int(self.max_batch_bytes // per_column))
 
     def prepare(self, activity_ids, n_jobs: Optional[int] = None) -> None:

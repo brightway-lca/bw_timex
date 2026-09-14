@@ -114,7 +114,9 @@ class TestPrepareSolvesTheBatch:
     def test_chunk_size_respects_the_memory_budget(self):
         _, _, solver = _setup()
         n_columns = solver.technosphere_matrix.shape[1]
-        solver.max_batch_bytes = n_columns * 8 * 4
+        n_biosphere_rows = solver.biosphere_matrix.shape[0]
+        per_column = (n_columns + n_biosphere_rows) * 8
+        solver.max_batch_bytes = per_column * 4
 
         assert solver.chunk_size() == 4
 
@@ -174,3 +176,32 @@ class TestPrepareBatchLivenessAcrossBlocks:
             demand[lca.dicts.product[node.id]] = 1
             expected = sp.linalg.spsolve(lca.technosphere_matrix.tocsc(), demand)
             assert np.allclose(solver.unit_supply(node.id).values, expected)
+
+    def test_prepared_aggregate_matches_independent_solves(self):
+        # `glider`'s own block emits nothing - its whole footprint comes from
+        # `_solve_and_cache_chunk`'s `for block_index in touched_blocks`
+        # aggregate sum pulling in the downstream `steel` block. Nothing
+        # else in this suite calls `unit_aggregate` after a `prepare()` that
+        # spans both blocks, so a regression in that summing loop would slip
+        # through unnoticed without this test.
+        lca, _, solver = _setup()
+        glider = bd.get_node(database="db_parts", code="glider")
+        steel = bd.get_node(database="db_materials", code="steel")
+
+        solver.prepare([glider.id, steel.id])
+
+        for node, expected_co2 in ((glider, 6.0), (steel, 3.0)):
+            demand = np.zeros(lca.technosphere_matrix.shape[0])
+            demand[lca.dicts.product[node.id]] = 1
+            expected_supply = sp.linalg.spsolve(lca.technosphere_matrix.tocsc(), demand)
+            expected_aggregate = np.asarray(
+                lca.biosphere_matrix @ expected_supply
+            ).ravel()
+
+            aggregate = solver.unit_aggregate(node.id)
+
+            assert np.allclose(aggregate, expected_aggregate)
+            co2 = bd.get_node(database="bio", code="CO2")
+            assert aggregate[lca.dicts.biosphere[co2.id]] == pytest.approx(
+                expected_co2
+            )
