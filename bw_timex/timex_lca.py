@@ -116,6 +116,7 @@ class TimexLCASettings:
         ),
         "lci": (
             "build_dynamic_biosphere",
+            "lci_strategy",
             "expand_technosphere",
             "keep_activity_dimension",
         ),
@@ -157,7 +158,8 @@ class TimexLCASettings:
 
     # LCI parameters
     build_dynamic_biosphere: bool = True
-    expand_technosphere: bool = True
+    lci_strategy: str = "auto"
+    expand_technosphere: Optional[bool] = None
     keep_activity_dimension: bool = True
 
     # LCIA parameters
@@ -355,6 +357,7 @@ class TimexLCA:
     tlca.dynamic_lcia(metric="radiative_forcing")
     ```
     """
+    AUTO_FROM_TIMELINE_ROWS = 1000
 
     def __init__(
         self,
@@ -834,6 +837,7 @@ class TimexLCA:
         logger.info("Step 2/4: Calculating LCI...")
         self.lci(
             build_dynamic_biosphere=settings.build_dynamic_biosphere,
+            strategy=settings.lci_strategy,
             expand_technosphere=settings.expand_technosphere,
             keep_activity_dimension=settings.keep_activity_dimension,
         )
@@ -939,6 +943,7 @@ class TimexLCA:
                 "max_calc": settings.max_calc,
                 "graph_traversal": settings.graph_traversal,
                 "traverse_background": settings.traverse_background,
+                "lci_strategy": settings.lci_strategy,
                 "expand_technosphere": settings.expand_technosphere,
                 "build_dynamic_biosphere": settings.build_dynamic_biosphere,
                 "keep_activity_dimension": settings.keep_activity_dimension,
@@ -1332,18 +1337,21 @@ class TimexLCA:
     def lci(
         self,
         build_dynamic_biosphere: Optional[bool] = True,
-        expand_technosphere: Optional[bool] = True,
+        expand_technosphere: Optional[bool] = None,
         keep_activity_dimension: Optional[bool] = True,
         group_background_by_time: Optional[bool] = None,
+        strategy: str = "auto",
     ) -> None:
         """
         Calculates the time-explicit LCI.
 
         There are two ways to generate time-explicit LCIs:
-        If `expand_technosphere' is True, the biosphere and technosphere matrices are expanded by inserting
+        If strategy is `"expand_technosphere"`, the biosphere and technosphere matrices are expanded by inserting
         time-specific processes via the `MatrixModifier` class by calling `TimexLCA.build_datapackage().
-        Otherwise ('expand_technosphere' is False), it generates a dynamic inventory directly from the
-        timeline without technosphere matrix calculations.
+        If strategy is `"from_timeline"`, it generates a dynamic inventory directly from the timeline
+        without technosphere matrix calculations.
+        If strategy is `"auto"` (default), direct timeline calculation is used only for long timelines
+        (`len(timeline) > 1000`), otherwise expanded matrices are used.
 
         Next to the choice above concerning how to retrieve the time-explicit inventory, users
         can also decide if they want to retain all temporal information at the biosphere level
@@ -1357,12 +1365,11 @@ class TimexLCA:
         build_dynamic_biosphere: bool
             if True, build the dynamic biosphere matrix and calculate the dynamic LCI.
             Default is True.
-        expand_technosphere: bool
-            if True, creates an expanded time-explicit technosphere and biosphere matrix and
-            calculates the LCI from it.
-            if False, creates no new technosphere, but calculates the dynamic inventory directly
-            from the timeline. Building from the timeline currently only works if
-            `build_dynamic_biosphere` is also True.
+        expand_technosphere: bool, optional
+            Legacy alias for strategy selection. Use `strategy` instead.
+        strategy: {"from_timeline", "expand_technosphere", "auto"}
+            LCI construction strategy. `"auto"` picks `"from_timeline"` only when the timeline
+            has more than 1000 rows and `"expand_technosphere"` otherwise.
         keep_activity_dimension: bool
             if True (default), the dynamic inventory keeps one column per emitting
             activity, which is what a contribution analysis needs.
@@ -1405,11 +1412,12 @@ class TimexLCA:
           Method to calculate the dynamic inventory if `build_dynamic_biosphere` is True.
         """
 
-        LCIInputs(
+        inputs = LCIInputs(
             build_dynamic_biosphere=build_dynamic_biosphere,
             expand_technosphere=expand_technosphere,
             keep_activity_dimension=keep_activity_dimension,
             group_background_by_time=group_background_by_time,
+            strategy=strategy,
         )
 
         if hasattr(self, "dynamic_inventory"):
@@ -1428,6 +1436,27 @@ class TimexLCA:
                 "Timeline not yet built. Call TimexLCA.build_timeline() first."
             )
 
+        if inputs.expand_technosphere is not None:
+            strategy = (
+                "expand_technosphere"
+                if inputs.expand_technosphere
+                else "from_timeline"
+            )
+            logger.warning(
+                "`expand_technosphere` is deprecated; use `strategy` instead."
+            )
+        else:
+            strategy = inputs.strategy
+
+        expand_technosphere = self._resolve_lci_strategy(strategy)
+        if not expand_technosphere and not build_dynamic_biosphere:
+            raise ValueError(
+                "Currently, it is not possible to skip the construction of the dynamic "
+                "biosphere when building the inventories from the timeline. "
+                "Please either set build_dynamic_biosphere=True or choose "
+                "strategy='expand_technosphere'."
+            )
+
         # mapping of the demand id to demand time
         self.demand_timing = self.create_demand_timing()
 
@@ -1444,7 +1473,7 @@ class TimexLCA:
         else:  # setup for timeline approach
             logger.info(
                 "Disaggregated lci is not yet implemented with this option.\n" \
-                "Please use expand_technosphere=True if you want to perform a contribution analysis on the background processes."
+                "Please use strategy='expand_technosphere' if you want to perform a contribution analysis on the background processes."
             )
             self.collect_temporalized_processes_from_timeline()
             data_obs = self.data_objs
@@ -1549,6 +1578,26 @@ class TimexLCA:
                     keep_activity_dimension=keep_activity_dimension,
                     group_background_by_time=group_by_time,
                 )
+
+    def _resolve_lci_strategy(self, strategy: str) -> bool:
+        """Resolve a public LCI strategy string to the internal bool switch."""
+        if strategy == "expand_technosphere":
+            return True
+        if strategy == "from_timeline":
+            return False
+        if strategy != "auto":
+            raise ValueError(
+                "Unknown strategy. Expected one of: "
+                "'from_timeline', 'expand_technosphere', 'auto'."
+            )
+        use_timeline = len(self.timeline) > self.AUTO_FROM_TIMELINE_ROWS
+        logger.info(
+            "LCI strategy 'auto' selected '{}' for timeline with {} rows (threshold: {}).",
+            "from_timeline" if use_timeline else "expand_technosphere",
+            len(self.timeline),
+            self.AUTO_FROM_TIMELINE_ROWS,
+        )
+        return not use_timeline
 
     def _technosphere_database_labels(self) -> tuple[np.ndarray, np.ndarray]:
         """Source database of every technosphere column and row of `self.lca`.
@@ -1891,7 +1940,7 @@ class TimexLCA:
         if not self.expanded_technosphere:
             raise NotImplementedError(
                 "Currently the disaggregation of background processes is only possible\n\
-                    if the expanded matrix has been built. Please call TimexLCA.lci(expand_technosphere=True) first."
+                    if the expanded matrix has been built. Please call TimexLCA.lci(strategy='expand_technosphere') first."
             )
         # create array_dict for fast lookup
         # (key becomes index, value becomes value of 1D array)
@@ -1983,7 +2032,7 @@ class TimexLCA:
         if not hasattr(self, "dynamic_inventory_df"):
             raise AttributeError(
                 "Dynamic inventory not yet calculated. Call "
-                "TimexLCA.lci(expand_technosphere=False, build_dynamic_biosphere=True) first."
+                "TimexLCA.lci(strategy='from_timeline', build_dynamic_biosphere=True) first."
             )
         self.lca.load_lcia_data()
         diagonal = self.lca.characterization_matrix.diagonal()
@@ -2091,7 +2140,7 @@ class TimexLCA:
             if not self.expanded_technosphere:
                 raise NotImplementedError(
                     "Currently the disaggregation of background processes is only possible if the \
-                        expanded matrix has been built. Please call TimexLCA.lci(expand_technosphere=True) first."
+                        expanded matrix has been built. Please call TimexLCA.lci(strategy='expand_technosphere') first."
                 )
             # Check if disaggregated inventory is available
             # otherwise disaggregate the background LCI

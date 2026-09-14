@@ -193,17 +193,30 @@ class LCIInputs(BaseModel):
     """Validates inputs to TimexLCA.lci"""
 
     build_dynamic_biosphere: bool = True
-    expand_technosphere: bool = True
+    expand_technosphere: Optional[bool] = None
+    strategy: Literal["from_timeline", "expand_technosphere", "auto"] = "auto"
     keep_activity_dimension: bool = True
     group_background_by_time: Optional[bool] = None
 
     @model_validator(mode="after")
     def validate_combination(self) -> "LCIInputs":
-        if not self.expand_technosphere and not self.build_dynamic_biosphere:
+        if self.expand_technosphere is not None and self.strategy != "auto":
+            raise ValueError(
+                "Pass either `strategy` or `expand_technosphere`, not both. "
+                "Use only `strategy` unless you rely on legacy code."
+            )
+        effective_expand = self.expand_technosphere
+        if effective_expand is None and self.strategy in (
+            "from_timeline",
+            "expand_technosphere",
+        ):
+            effective_expand = self.strategy == "expand_technosphere"
+        if effective_expand is False and not self.build_dynamic_biosphere:
             raise ValueError(
                 "Currently, it is not possible to skip the construction of the dynamic "
                 "biosphere when building the inventories from the timeline. "
-                "Please either set build_dynamic_biosphere=True or expand_technosphere=True."
+                "Please either set build_dynamic_biosphere=True or choose "
+                "strategy='expand_technosphere'."
             )
         if not self.keep_activity_dimension and not self.build_dynamic_biosphere:
             raise ValueError(

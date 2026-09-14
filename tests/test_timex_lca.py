@@ -60,6 +60,27 @@ class TestTimexLCAProperties:
         with pytest.raises(ValueError, match="not possible to skip"):
             self.tlca.lci(expand_technosphere=False, build_dynamic_biosphere=False)
 
+    def test_lci_strategy_and_legacy_expand_are_mutually_exclusive(self):
+        self.tlca.build_timeline(
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+        )
+        with pytest.raises(ValueError, match="Pass either `strategy` or `expand_technosphere`"):
+            self.tlca.lci(strategy="from_timeline", expand_technosphere=True)
+
+    def test_lci_auto_strategy_switches_at_timeline_threshold(self):
+        self.tlca.build_timeline(
+            starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),
+        )
+        timeline_rows = len(self.tlca.timeline)
+
+        self.tlca.AUTO_FROM_TIMELINE_ROWS = timeline_rows + 1
+        self.tlca.lci(strategy="auto", build_dynamic_biosphere=False)
+        assert self.tlca.expanded_technosphere is True
+
+        self.tlca.AUTO_FROM_TIMELINE_ROWS = max(timeline_rows - 1, 0)
+        self.tlca.lci(strategy="auto", build_dynamic_biosphere=True)
+        assert self.tlca.expanded_technosphere is False
+
     def test_lci_with_stale_timeline_raises_helpful_error(self):
         self.tlca.build_timeline(
             starting_datetime=datetime.strptime("2024-01-02", "%Y-%m-%d"),

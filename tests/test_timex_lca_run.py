@@ -150,6 +150,14 @@ class TestSettingsAndRun:
 
         assert tlca.temporal_grouping == "month"
 
+    def test_run_uses_lci_strategy_from_settings(self):
+        settings = self.base_settings(lci_strategy="from_timeline")
+        tlca = TimexLCA.from_settings(settings)
+
+        tlca.run()
+
+        assert tlca.expanded_technosphere is False
+
     def test_settings_can_be_passed_straight_to_the_constructor(self):
         """`TimexLCA(settings)` - no separate builder to remember."""
         settings = self.base_settings()
