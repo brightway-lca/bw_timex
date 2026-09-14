@@ -26,10 +26,10 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 import numpy as np
-from scipy.sparse.linalg import factorized, spsolve
 
 from ._lci_cache import BACKGROUND_AGGREGATE_CACHE, BACKGROUND_SUPPLY_CACHE
 from .block_structure import BlockStructure
+from .solvers import make_block_solver, select_backend, warn_if_suboptimal
 
 
 @dataclass(frozen=True, eq=False)
@@ -98,6 +98,9 @@ class BackgroundSolver:
         self.biosphere_dict = biosphere_dict
         self.structure = structure
 
+        self.backend_name = select_backend()
+        warn_if_suboptimal(self.backend_name)
+
         # Cache key routing: a `("db_code", ...)` key names a background
         # process identity that is stable across `TimexLCA` objects (same
         # project/db/code, unchanged since), so it is safe to share; anything
@@ -120,6 +123,10 @@ class BackgroundSolver:
         # Solves performed; cache hits do not count. Exposed for tests and
         # for callers deciding whether pre-factorizing was worth it.
         self.n_solves = 0
+
+        # Right-hand side columns solved. With a batched cascade one solve
+        # call can carry many, so `n_solves` no longer implies this.
+        self.n_rhs_solved = 0
 
         # Factorizations are per-instance only, never module-level: an LU of
         # an ecoinvent-sized block is large (several times the matrix it
@@ -437,26 +444,25 @@ class BackgroundSolver:
     def solve_block(self, block_index: int, rhs: np.ndarray) -> np.ndarray:
         """Solve `A[block.rows][:, block.columns] x = rhs` for one block.
 
-        Uses a cached LU (from `prepare`) when one exists for this block,
-        else a one-off `spsolve`. Every call is a real linear solve and
-        increments `n_solves` - caching happens one level up, in
-        `unit_supply`/`unit_aggregate`.
-
-        One right-hand side at a time, and not for want of trying: bundling
-        `k` of them into a single `(n_rows, k)` solve is not available here,
-        because with `scikit-umfpack` installed `scipy`'s `factorized`
-        returns a UMFPACK solver that rejects a 2-D right-hand side, and
-        falling back to SuperLU to get one costs more than the bundling
-        saves.
+        `rhs` is `(n_rows,)` or `(n_rows, k)`; the result matches its rank.
+        A block's solver is built on first use and kept in `_block_solvers`,
+        so every backend factorizes a given block at most once per instance -
+        except pardiso, whose factorization lives in MKL's single global slot
+        and is rebuilt whenever another block has been solved since.
         """
-        solve = self._block_solvers.get(block_index)
-        if solve is not None:
-            result = solve(rhs)
-        else:
-            sub = self._submatrix(block_index)
-            result = spsolve(sub, rhs)
+        solver = self._block_solver(block_index)
+        result = np.asarray(solver.solve(rhs), dtype=float)
         self.n_solves += 1
-        return np.asarray(result, dtype=float)
+        self.n_rhs_solved += 1 if rhs.ndim == 1 else rhs.shape[1]
+        return result
+
+    def _block_solver(self, block_index: int):
+        solver = self._block_solvers.get(block_index)
+        if solver is None:
+            solver = make_block_solver(self.backend_name, self._submatrix(block_index))
+            self._block_solvers[block_index] = solver
+            self.factorized_blocks.add(block_index)
+        return solver
 
     def prepare(self, activity_ids, n_jobs: Optional[int] = None) -> None:
         """Pre-factorize blocks that will pay off, for a batch of activities.
@@ -537,8 +543,5 @@ class BackgroundSolver:
         return self._block_biosphere_submatrices[block_index]
 
     def _factorize_block(self, block_index: int) -> None:
-        if block_index in self.factorized_blocks:
-            return
-        sub = self._submatrix(block_index)
-        self._block_solvers[block_index] = factorized(sub)
-        self.factorized_blocks.add(block_index)
+        """Build this block's solver ahead of the solves that will use it."""
+        self._block_solver(block_index)

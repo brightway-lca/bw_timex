@@ -349,6 +349,44 @@ class TestBackgroundSolver:
         assert solver.factorized_blocks == set()
         assert solver.n_solves == 0
 
+    def test_solver_reports_its_backend(self):
+        from bw_timex.solvers import select_backend
+
+        _, _, solver = _setup()
+        assert solver.backend_name == select_backend()
+
+    def test_solve_block_accepts_a_two_dimensional_rhs(self):
+        lca, structure, solver = _setup()
+        block_index = solver.block_index_for(
+            bd.get_node(database="db_2020", code="C").id
+        )
+        block = structure.blocks[block_index]
+        rhs = np.column_stack(
+            [
+                np.arange(1, len(block.rows) + 1, dtype=float),
+                np.arange(2, len(block.rows) + 2, dtype=float),
+            ]
+        )
+
+        result = solver.solve_block(block_index, rhs)
+
+        assert result.shape == (len(block.rows), 2)
+        for j in range(2):
+            expected = solver.solve_block(block_index, np.ascontiguousarray(rhs[:, j]))
+            assert np.allclose(result[:, j], expected)
+
+    def test_n_rhs_solved_counts_columns(self):
+        _, structure, solver = _setup()
+        block_index = solver.block_index_for(
+            bd.get_node(database="db_2020", code="C").id
+        )
+        block = structure.blocks[block_index]
+
+        solver.solve_block(block_index, np.ones((len(block.rows), 3)))
+
+        assert solver.n_solves == 1
+        assert solver.n_rhs_solved == 3
+
 
 @pytest.mark.usefixtures("chained_background_activities_db")
 class TestUnitAggregateFollowsDownstreamBlocks:
