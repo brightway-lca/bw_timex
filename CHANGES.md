@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 * Added `TimexLCA.edges_lcia()`: characterization with the [`edges`](https://edges.readthedocs.io) package, evaluating each exchange's characterization factor at its own year. Biosphere flows are characterized at the date of the emission taken from the dynamic inventory, so temporal distributions on biosphere exchanges are respected; technosphere flows are characterized at the vintage of the consuming process, since bw_timex has no dynamic technosphere inventory. Install with `pip install bw_timex[edges]` (Python < 3.13).
+* Fixed `TimexEdgeLCIA.statistics()` raising `UnknownObject`: `edges` labels its coverage summary with the demand activity resolved through `bw2data`, which cannot see bw_timex's time-mapped ids. The summary (CFs used, characterized versus uncharacterized exchanges) is the diagnostic that reveals flows a method did not match, so it now works on a time-explicit demand.
 * Fixed `edges_lcia()` double-counting technosphere flows that pass through a temporal market: bw_timex inserts a market node between a consuming process and its background supplier, and that market carries the supplying commodity's own identity, so a technosphere characterization factor could match both `background -> market` and `market -> consumer`. Only the latter edge, dated at the consuming process's vintage, is now characterized.
 
 ## [1.1.1] - 2026-06-23

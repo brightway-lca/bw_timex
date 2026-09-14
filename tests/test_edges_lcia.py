@@ -221,6 +221,24 @@ def test_cf_table_carries_dates_and_time_mapped_activity(timex_lca_with_lci):
     assert table["date"].dt.year.equals(table["year"])
 
 
+def test_statistics_reports_coverage_for_a_time_mapped_demand(timex_lca_with_lci, capsys):
+    """
+    `edges`' own `statistics()` labels its summary with the demand activity, resolved through
+    bw2data. A time-explicit demand is keyed by time-mapped ids, which exist only inside bw_timex,
+    so the inherited method raised `UnknownObject`. It is the diagnostic that tells a user their
+    flows did not match any CF, so it has to work.
+    """
+    adapter = _adapter(timex_lca_with_lci, "constant_cf")
+    adapter.characterize_time_explicit()
+
+    adapter.statistics()
+
+    printed = capsys.readouterr().out
+    assert "heat production" in printed
+    assert "CFs in method" in printed
+    assert "Exc. characterized" in printed
+
+
 def test_static_characterization_entry_points_are_blocked(timex_lca_with_lci):
     """
     `lcia()` and `generate_cf_table()` would characterize the *static* inventory against whichever

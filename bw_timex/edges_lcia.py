@@ -66,6 +66,27 @@ def empty_cf_table() -> pd.DataFrame:
     )
 
 
+class _NamedDemandKey(int):
+    """
+    A time-mapped id that also answers ``key["name"]``.
+
+    `edges.EdgeLCIA.statistics` first tries ``demand_key["name"]`` and only falls back to a
+    `bw2data` lookup on `TypeError`. Subclassing `int` keeps the key usable everywhere an id is
+    expected while letting that first attempt succeed, so no lookup of a time-mapped id is
+    attempted.
+    """
+
+    def __new__(cls, value: int, name: str) -> "_NamedDemandKey":
+        key = super().__new__(cls, value)
+        key._name = name
+        return key
+
+    def __getitem__(self, item: str) -> str:
+        if item == "name":
+            return self._name
+        raise KeyError(item)
+
+
 class TimexEdgeLCIA(EdgeLCIA):
     """
     `edges.EdgeLCIA` subclass that understands bw_timex's time-explicit matrices.
@@ -305,6 +326,42 @@ class TimexEdgeLCIA(EdgeLCIA):
             "inventory against a single year's characterization factors. The table returned by "
             "TimexEdgeLCIA.characterize_time_explicit() is the time-explicit equivalent."
         )
+
+    def statistics(self):
+        """
+        Prints `edges`' coverage summary for the time-explicit inventory.
+
+        `edges.EdgeLCIA.statistics` labels its summary with the name of the demand activity,
+        which it resolves through `bw2data`. The demand of a time-explicit LCA is keyed by
+        time-mapped ids, which exist only inside `bw_timex`, so the inherited method raises
+        `UnknownObject`. This override supplies the resolved name and then delegates, leaving the
+        rest of the summary (CF counts, characterized versus uncharacterized exchanges, ignored
+        locations) untouched.
+
+        Returns
+        -------
+        None
+            Prints the summary table.
+        """
+        original_demand = self.lca.demand
+        try:
+            self.lca.demand = {
+                _NamedDemandKey(time_mapped_id, self._demand_name(time_mapped_id)): amount
+                for time_mapped_id, amount in original_demand.items()
+            }
+            return super().statistics()
+        finally:
+            self.lca.demand = original_demand
+
+    def _demand_name(self, time_mapped_id: int) -> str:
+        """Resolves the name of a time-mapped demand id, falling back to its code."""
+        (database, code), _ = self.timex_lca.activity_time_mapping.reversed[time_mapped_id]
+        try:
+            if database == "temporalized":
+                return resolve_temporalized_node_metadata(code)["name"]
+            return bd.get_node(database=database, code=code).get("name", code)
+        except Exception:  # pragma: no cover - labelling must never break the summary
+            return str(code)
 
     def run_mapping(self, regionalized: bool = True) -> None:
         """
