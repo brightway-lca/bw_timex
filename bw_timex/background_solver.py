@@ -401,39 +401,47 @@ class BackgroundSolver:
 
         A block's own row equations can depend only on already-solved,
         earlier blocks (`BlockStructure.detect` orders blocks consumer
-        first: a block's columns may carry entries in the rows of *later*
-        blocks only, never the reverse). So one pass through every block in
-        that order, always accumulating `-(A[block.rows, :] @ full_supply)`
-        from whatever has been solved so far on top of the block's own seed
-        (if any), correctly reproduces the full monolithic solve - not just
-        for the seeded blocks, but for every block a seed's demand cascades
-        into, however many hops away.
+        first), so one pass in that order reproduces the monolithic solve.
 
-        Blocks with neither a seed nor a nonzero cross-term contribution
-        are skipped entirely (no solve bought for them), which is the
-        common case: a real project's demand touches a handful of a much
-        larger set of blocks.
+        `seeds` values are `(n_block_rows,)` or `(n_block_rows, k)`, and all
+        of them must agree; the returned supply matches that rank. A
+        k-column pass is the batched form: every block it reaches is
+        factorized once and solved for all k columns in one call.
 
-        Returns
-        -------
-        tuple
-            `(full_supply, touched_blocks)`: the supply, dense over every
-            technosphere column, and the `frozenset` of block indices that
-            were actually solved.
+        Within a batch, a column that has no nonzero right-hand side in a
+        block is dropped from that block's solve - the 2-D counterpart of
+        the old "skip blocks a demand never reaches" behaviour.
         """
-        full_supply = np.zeros(self.technosphere_matrix.shape[1])
+        first_seed = next(iter(seeds.values()), None)
+        width = (
+            first_seed.shape[1]
+            if first_seed is not None and first_seed.ndim == 2
+            else None
+        )
+        n_columns = self.technosphere_matrix.shape[1]
+        full_supply = (
+            np.zeros(n_columns) if width is None else np.zeros((n_columns, width))
+        )
         touched_blocks = set()
         for block_index, block in enumerate(self.structure.blocks):
-            rhs = -np.asarray(
-                self.technosphere_matrix[block.rows, :] @ full_supply
-            ).ravel()
+            product = self.technosphere_matrix[block.rows, :] @ full_supply
+            shape = (
+                (len(block.rows),) if width is None else (len(block.rows), width)
+            )
+            rhs = -np.asarray(product).reshape(shape)
             seed = seeds.get(block_index)
             if seed is not None:
                 rhs = rhs + seed
             if not np.any(rhs):
                 continue
-            values = self.solve_block(block_index, rhs)
-            full_supply[block.columns] = values
+            if width is None:
+                full_supply[block.columns] = self.solve_block(block_index, rhs)
+            else:
+                live = np.flatnonzero(np.any(rhs != 0, axis=0))
+                solved = self.solve_block(
+                    block_index, np.ascontiguousarray(rhs[:, live])
+                )
+                full_supply[np.ix_(block.columns, live)] = solved
             touched_blocks.add(block_index)
         return full_supply, frozenset(touched_blocks)
 
