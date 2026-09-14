@@ -37,6 +37,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         py-version: ["3.11", "3.12", "3.13"]
+        include:
+          - os: ubuntu-latest
+            expect-solver: pardiso
+          - os: windows-latest
+            expect-solver: pardiso
+          - os: macos-latest
+            expect-solver: superlu
 
     steps:
       - uses: actions/checkout@v7
@@ -50,8 +57,22 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra testing
 
+      - name: Install SuiteSparse for the UMFPACK leg
+        if: matrix.os == 'ubuntu-latest' && matrix.py-version == '3.13'
+        run: sudo apt-get update && sudo apt-get install -y libsuitesparse-dev && uv pip install scikit-umfpack
+
       - name: Test with pytest
+        env:
+          BW_TIMEX_EXPECT_SOLVER: ${{ matrix.expect-solver }}
         run: uv run pytest --cov-report xml
+
+      - name: Cross-backend equivalence
+        if: matrix.os == 'ubuntu-latest' && matrix.py-version == '3.13'
+        run: |
+          for backend in pardiso umfpack superlu; do
+            BW_TIMEX_BLOCK_SOLVER=$backend BW_TIMEX_EXPECT_SOLVER=$backend \
+              uv run pytest tests/test_background_solver.py tests/test_background_solver_batching.py tests/test_solvers.py -q --no-cov || exit 1
+          done
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.py-version == '3.13'

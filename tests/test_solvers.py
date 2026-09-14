@@ -1,5 +1,6 @@
 """Backend selection and the solver performance warning."""
 
+import os
 import warnings
 
 import numpy as np
@@ -191,3 +192,14 @@ def test_pardiso_backend_stores_csr_once():
     solver.solve(np.ones(3))
     assert solver._csr is first
     assert solver._csr.format == "csr"
+
+
+@pytest.mark.skipif(
+    "BW_TIMEX_EXPECT_SOLVER" not in os.environ,
+    reason="BW_TIMEX_EXPECT_SOLVER not set; only enforced in CI",
+)
+def test_active_backend_is_the_one_ci_expects():
+    # Without this, a failed pypardiso resolution or a missing mkl_rt
+    # degrades silently to SuperLU and the suite still goes green - the
+    # exact failure mode this whole change exists to fix.
+    assert select_backend() == os.environ["BW_TIMEX_EXPECT_SOLVER"]
