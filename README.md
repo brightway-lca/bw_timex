@@ -38,31 +38,6 @@ Most useful for long-lived products, strongly evolving production systems, and b
 - [Walkthrough](https://docs.brightway.dev/projects/bw-timex/en/latest/content/getting_started/)
 - [Example Collection](https://docs.brightway.dev/projects/bw-timex/en/latest/content/examples/)
 
-### Solvers
-
-`bw_timex` spends most of `lci()` solving sparse linear systems, so the solver
-matters more than anything else for runtime.
-
-On x86_64 Linux and Windows, `pip install bw_timex` installs
-[`pypardiso`](https://pypi.org/project/pypardiso/) (Intel MKL) automatically. This
-adds roughly 290 MB on Linux and 210 MB on Windows.
-
-On macOS and other architectures, MKL has no wheel. Install UMFPACK instead:
-
-```bash
-brew install suite-sparse          # macOS
-apt install libsuitesparse-dev     # Linux aarch64
-pip install "bw_timex[solvers]"
-```
-
-Without either, `bw_timex` falls back to SciPy's SuperLU and warns once per
-session. Silence it with `BW_TIMEX_NO_SOLVER_WARNING=1`, or force a specific
-backend with `BW_TIMEX_BLOCK_SOLVER=pardiso|umfpack|superlu`.
-
-**conda users:** run `conda install -c conda-forge pypardiso` before installing
-`bw_timex`, so pip sees the requirement satisfied instead of pulling a second
-copy of MKL.
-
 ## 📚 Citation
 If `bw_timex` supports your scientific work, please consider citing our companion publications:
 - The conceptual framework and formalization of time-explicit LCA are described in our [methodology paper](https://doi.org/10.1007/s11367-025-02539-3)

@@ -16,7 +16,7 @@ tags:
 
 [uv](https://docs.astral.sh/uv/) is a fast, modern Python package manager written in Rust. It's significantly faster than pip and handles dependency resolution more reliably. Installing uv is a [one-liner](https://docs.astral.sh/uv/getting-started/installation/#standalone-installer).
 
-=== "Linux, Windows, or macOS (x64)"
+=== "Linux or Windows (x86-64)"
 
     === "New Project"
 
@@ -25,7 +25,7 @@ tags:
         ```bash
         uv init my-timex-project
         cd my-timex-project
-        uv add bw_timex pypardiso
+        uv add bw_timex
         ```
 
         Run your scripts with:
@@ -55,7 +55,7 @@ tags:
         Install `bw_timex`:
 
         ```bash
-        uv pip install bw_timex pypardiso
+        uv pip install bw_timex
         ```
 
     === "Existing Environment"
@@ -63,14 +63,16 @@ tags:
         If you already have an activated virtual environment:
 
         ```bash
-        uv pip install bw_timex pypardiso
+        uv pip install bw_timex
         ```
 
-=== "macOS (Apple Silicon/ARM)"
+=== "macOS (Apple Silicon or Intel)"
 
     !!! note
 
-        Fast calculations need `SuiteSparse` through [scikit-umfpack](https://github.com/scikit-umfpack/scikit-umfpack/). `uv` manages your Python environment, but you must first install the system-level `SuiteSparse` dependencies via [Homebrew](https://brew.sh).
+        Fast calculations on macOS need `SuiteSparse`. `uv` manages your Python
+        environment, but this system-level library has to come from
+        [Homebrew](https://brew.sh) first.
 
     Install system dependencies:
 
@@ -83,7 +85,7 @@ tags:
         ```bash
         uv init my-timex-project
         cd my-timex-project
-        uv add bw_timex scikit-umfpack
+        uv add "bw_timex[solvers]"
         ```
 
         Run Jupyter (without adding it to the project):
@@ -97,12 +99,12 @@ tags:
         ```bash
         uv venv .venv  # skip if reusing an existing environment
         source .venv/bin/activate
-        uv pip install bw_timex scikit-umfpack
+        uv pip install "bw_timex[solvers]"
         ```
 
 ## Installing `bw_timex` using `pip`
 
-=== "Linux, Windows, or macOS (x64)"
+=== "Linux or Windows (x86-64)"
 
     1. Install `python` from [the website](https://www.python.org/downloads/), your system package manager, or [Homebrew](https://docs.brew.sh/Homebrew-and-Python).
 
@@ -124,16 +126,16 @@ tags:
     5. Install `bw_timex`:
 
         ```bash
-        pip install bw_timex pypardiso
+        pip install bw_timex
         ```
 
     You can also use pip to install useful libraries like `jupyterlab`.
 
-=== "macOS (Apple Silicon/ARM)"
+=== "macOS (Apple Silicon or Intel)"
 
     !!! note
 
-        Fast calculations need `SuiteSparse` through [scikit-umfpack](https://github.com/scikit-umfpack/scikit-umfpack/). This background library can be installed via [homebrew](https://brew.sh/), as shown in this section, or via `conda` or `mamba`, as shown below.
+        Fast calculations on macOS need `SuiteSparse`. This background library can be installed via [homebrew](https://brew.sh/), as shown in this section, or via `conda` or `mamba`, as shown below.
 
     1. Install `python` from [Homebrew](https://docs.brew.sh/Homebrew-and-Python).
 
@@ -160,7 +162,7 @@ tags:
     5. Install `bw_timex`:
 
         ```bash
-        pip install bw_timex scikit-umfpack
+        pip install "bw_timex[solvers]"
         ```
 
     You can also use pip to install useful libraries like `jupyterlab`.
@@ -172,7 +174,7 @@ tags:
     1. A working installation of [`conda`](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html) or [`mamba`](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html). If you are using `conda`, we recommend installing the [libmamba solver](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community).
     2. Basic knowledge of [Conda environments](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html)
 
-=== "Linux, Windows, or macOS (x64)"
+=== "Linux or Windows (x86-64)"
 
     1. Create a new Conda environment with `bw_timex`:
 
@@ -192,11 +194,11 @@ tags:
         conda install -c conda-forge jupyterlab
         ```
 
-=== "macOS (Apple Silicon/ARM)"
+=== "macOS (Apple Silicon or Intel)"
 
     !!! note
 
-        Brightway runs on the new Apple Silicon ARM architecture. However, the super-fast linear algebra software library `pypardiso` is not compatible with the ARM processor architecture. To avoid critical errors during instruction that would break core functionality, a different version of Brightway (`brightway_nosolver`) and a different linear algebra software library (`scikit-umfpack`) must be installed.
+        Brightway runs on macOS, but its default linear algebra library `pypardiso` does not. To avoid critical errors during installation that would break core functionality, a different version of Brightway (`brightway_nosolver`) and a different linear algebra library (`scikit-umfpack`) must be installed.
 
     1. Create a new Conda environment with `bw_timex`:
 
