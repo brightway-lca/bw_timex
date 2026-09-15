@@ -609,17 +609,40 @@ class TimexLCA:
         # Build a cache mapping activity code to name for efficient lookups.
         # This avoids repeated database queries in plotting and labeling functions.
         self._activity_code_to_name_cache = {}
+        db_cache_keys = {}
+        missing_dbs = []
         for db in databases_to_load:
             modified = bd.databases[db].get("modified") if db in bd.databases else None
             key = ("nodes", project, db, modified)
-            db_nodes = self._nodes_cache.get(key)
-            if db_nodes is None:
-                # Only the scalar columns are read here; the pickled `data`
-                # blob of a node is loaded lazily, if it is needed at all.
-                columns = [getattr(AD, name) for name in LazyActivity.COLUMN_NAMES]
-                rows = AD.select(*columns).where(AD.database == db).tuples()
-                db_nodes = {row[0]: LazyActivity(row) for row in rows}
-                self._nodes_cache[key] = db_nodes
+            db_cache_keys[db] = key
+            if key not in self._nodes_cache:
+                missing_dbs.append(db)
+
+        if missing_dbs:
+            # One query for every not-yet-cached database, rather than one
+            # `WHERE database == db` query per database: each of those pays
+            # for an indexed lookup that has to bounce, per row, between the
+            # `(database, code)` index and the main table's data pages -
+            # random I/O that dwarfs a single sequential-ish `IN (...)` scan
+            # once a database has tens of thousands of nodes. Only the
+            # scalar columns are read; the pickled `data` blob of a node is
+            # loaded lazily, if it is needed at all. Also runs through the
+            # raw DB-API cursor instead of peewee's row iterator, since
+            # peewee's per-row field coercion is pure overhead for these
+            # plain int/string columns.
+            columns = [getattr(AD, name) for name in LazyActivity.COLUMN_NAMES]
+            query = AD.select(*columns).where(AD.database.in_(missing_dbs)).tuples()
+            sql, params = query.sql()
+            cursor = AD._meta.database.connection().cursor()
+            cursor.execute(sql, params)
+            by_db = {db: {} for db in missing_dbs}
+            for row in cursor.fetchall():
+                by_db[row[2]][row[0]] = LazyActivity(row)
+            for db in missing_dbs:
+                self._nodes_cache[db_cache_keys[db]] = by_db[db]
+
+        for db in databases_to_load:
+            db_nodes = self._nodes_cache[db_cache_keys[db]]
             self.nodes.update(db_nodes)
             for node in db_nodes.values():
                 self._activity_code_to_name_cache[node["code"]] = node["name"]
@@ -1252,11 +1275,18 @@ class TimexLCA:
                 "No edge filter function provided. Skipping all edges in background databases."
             )
             if self._default_edge_filter_function is None:
-                skippable = set()
-                for db in set(self.database_dates_static.keys()) | getattr(
+                # `self.nodes` (built in __init__) already carries every id
+                # and database for these databases, so this is a pure
+                # in-memory filter - no need to re-query and re-materialize
+                # full `Activity` proxies just to read `.id`.
+                target_dbs = set(self.database_dates_static.keys()) | getattr(
                     self, "_extra_reference_databases", set()
-                ):
-                    skippable.update(node.id for node in bd.Database(db))
+                )
+                skippable = {
+                    node_id
+                    for node_id, node in self.nodes.items()
+                    if node["database"] in target_dbs
+                }
                 self._default_edge_filter_function = skippable.__contains__
             self.edge_filter_function = self._default_edge_filter_function
         elif edge_filter_function is not None:
