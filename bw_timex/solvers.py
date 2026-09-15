@@ -263,6 +263,26 @@ class _PardisoBlockSolver:
         return result
 
 
+def _reject_empty_rows(csr) -> None:
+    """Raise if `csr` has a zero row, naming where and why.
+
+    A square block with an empty row is singular, and no backend can
+    factorize it - pardiso's `_check_A` refuses it outright, SuperLU's `splu`
+    raises `RuntimeError: Factor is exactly singular`. Naming the condition
+    once, here, keeps the diagnosis precise instead of surfacing whichever
+    backend's internal error happens to fire first.
+    """
+    empty_rows = np.flatnonzero(np.diff(csr.indptr) == 0)
+    if len(empty_rows):
+        raise ValueError(
+            f"Block is singular: {len(empty_rows)} of its {csr.shape[0]} rows are "
+            f"empty (first at index {int(empty_rows[0])}), so the block contains a "
+            "product that nothing inside it produces. No sparse solver can "
+            "factorize this; the block structure or the underlying inventory "
+            "needs fixing."
+        )
+
+
 def make_block_solver(backend: str, submatrix):
     """Build the block solver named by `backend` over `submatrix`.
 
@@ -270,16 +290,19 @@ def make_block_solver(backend: str, submatrix):
     this machine cannot provide raises instead of quietly handing back an
     object that reports the requested name while solving with something else.
 
-    The pardiso backend declines a block with an empty row: `_check_A` raises
-    `ValueError('Matrix A is singular, because it contains empty row(s)')`
-    for one, and a single degenerate block must not fail an entire `lci()`.
-    SuperLU handles it instead - the one deliberate, documented substitution.
+    A block with an empty row is rejected here, for every backend. Such a
+    block is square with a zero row, i.e. singular, and no backend can solve
+    it: pardiso's `_check_A` raises
+    `ValueError('Matrix A is singular, because it contains empty row(s)')`,
+    and SuperLU's `splu` raises `RuntimeError: Factor is exactly singular`.
+    Routing one to the other only exchanges a precise diagnosis for a vague
+    one, so the condition is named once, here, where the offending rows can
+    still be pointed at.
     """
     require_backend(backend)
+    csr = submatrix.tocsr()
+    _reject_empty_rows(csr)
     if backend == "pardiso":
-        csr = submatrix.tocsr()
-        if not np.diff(csr.indptr).all():
-            return _SuperLUBlockSolver(submatrix)
         return _PardisoBlockSolver(csr)
     if backend == "umfpack":
         return _UmfpackBlockSolver(submatrix)
@@ -304,9 +327,13 @@ def make_persistent_block_solver(submatrix, backend: Optional[str] = None):
     SuperLU. The pardiso multi-RHS win is unaffected - it lives on the batched
     path (`BackgroundSolver.prepare`), where one call carries every column and
     the global slot is used once per block.
+
+    An empty-row block is rejected exactly as in `make_block_solver`, so both
+    entry points report the same diagnosis for the same degeneracy.
     """
     if backend is None:
         backend = select_backend()
+    _reject_empty_rows(submatrix.tocsr())
     if backend == "umfpack":
         return _UmfpackBlockSolver(submatrix)
     return _SuperLUBlockSolver(submatrix)

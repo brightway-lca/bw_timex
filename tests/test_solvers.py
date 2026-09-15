@@ -257,15 +257,27 @@ def test_persistent_block_solver_never_delegates_to_pardiso(
     assert np.allclose(matrix @ solver.solve(np.array([1.0, 2.0, 3.0])), [1.0, 2.0, 3.0])
 
 
-@pytest.mark.skipif(not _pardiso_importable(), reason="MKL not available")
-def test_pardiso_falls_back_when_a_block_row_is_empty(_fresh_warning_state):
-    # pypardiso's _check_A raises on an empty row; SuperLU is used instead so
-    # one degenerate block cannot fail the whole LCI.
+@pytest.mark.parametrize("backend", _available_backends())
+def test_an_empty_block_row_is_rejected_by_every_backend(
+    backend, _fresh_warning_state
+):
+    # A square block with a zero row is singular, so no backend can factorize
+    # it: pardiso's _check_A refuses it and SuperLU's splu raises "Factor is
+    # exactly singular". The condition is named once, where the offending row
+    # can still be reported, rather than surfacing as whichever backend's
+    # internal error happens to fire first.
     matrix = sp.csr_matrix(
         np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
     )
-    solver = make_block_solver("pardiso", matrix)
-    assert solver.name == "superlu"
+    with pytest.raises(ValueError, match="singular"):
+        make_block_solver(backend, matrix)
+
+
+@pytest.mark.parametrize("backend", _available_backends())
+def test_a_block_without_empty_rows_is_accepted(backend, _fresh_warning_state):
+    # Guards the check above against over-reach: a well-formed block must
+    # still build a solver.
+    assert make_block_solver(backend, _test_matrix()).name == backend
 
 
 @pytest.mark.skipif(not _pardiso_importable(), reason="MKL not available")
