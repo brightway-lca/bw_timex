@@ -13,6 +13,11 @@ Three backends, in preference order:
   LU per block, but its closure rejects a 2-D RHS, so columns are looped.
 - `superlu` (SciPy's built-in): `splu` gives a persistent LU and takes a 2-D
   RHS, and is always available.
+
+Pardiso's advantage is confined to the batched path. Its factorization lives
+in MKL's single global slot, so a caller that alternates between blocks with
+separate right-hand sides re-factorizes on every hop; such callers ask for
+`make_persistent_block_solver` instead, which guarantees a per-object LU.
 """
 
 import os
@@ -67,10 +72,55 @@ def umfpack_available() -> bool:
     return True
 
 
+_INSTALL_HINTS = {
+    "pardiso": (
+        "install it with `pip install pypardiso` and make sure an `mkl_rt` shared "
+        "library is loadable (set PYPARDISO_MKL_RT if it lives somewhere unusual)"
+    ),
+    "umfpack": (
+        "install it with `pip install scikit-umfpack` after the SuiteSparse system "
+        'library (`brew install suite-sparse` / `apt install libsuitesparse-dev`), '
+        'or `pip install "bw_timex[solvers]"`'
+    ),
+}
+
+
+def backend_available(name: str) -> bool:
+    """Whether `name`'s underlying library is actually usable on this machine."""
+    if name == "pardiso":
+        return pardiso_available()
+    if name == "umfpack":
+        return umfpack_available()
+    if name == "superlu":
+        return True
+    raise ValueError(
+        f"Unknown block solver {name!r}; expected one of {', '.join(BACKENDS)}"
+    )
+
+
+def require_backend(name: str) -> str:
+    """Return `name`, or raise if the machine cannot actually provide it.
+
+    An unavailable backend must never be returned. SciPy's `factorized`
+    silently hands back a SuperLU closure when `scikits.umfpack` is missing,
+    so an unverified `umfpack` request produces an object that *reports*
+    umfpack while solving with SuperLU - a silent, platform-dependent
+    degradation indistinguishable from the bug this module exists to remove.
+    """
+    if backend_available(name):
+        return name
+    raise RuntimeError(
+        f"Block solver {name!r} was requested but is not available on this "
+        f"machine: {_INSTALL_HINTS[name]}."
+    )
+
+
 def select_backend(override: Optional[str] = None) -> str:
     """Name of the block-solver backend to use.
 
-    `override`, else `BW_TIMEX_BLOCK_SOLVER`, else the best available.
+    `override`, else `BW_TIMEX_BLOCK_SOLVER`, else the best available. A
+    requested backend is verified, not taken on trust: an unknown name raises
+    `ValueError`, a known but unavailable one `RuntimeError`.
     """
     name = override or os.environ.get("BW_TIMEX_BLOCK_SOLVER")
     if name:
@@ -79,7 +129,7 @@ def select_backend(override: Optional[str] = None) -> str:
             raise ValueError(
                 f"Unknown block solver {name!r}; expected one of {', '.join(BACKENDS)}"
             )
-        return name
+        return require_backend(name)
     if pardiso_available():
         return "pardiso"
     if umfpack_available():
@@ -216,11 +266,16 @@ class _PardisoBlockSolver:
 def make_block_solver(backend: str, submatrix):
     """Build the block solver named by `backend` over `submatrix`.
 
+    `backend` is verified first (`require_backend`), so asking for a backend
+    this machine cannot provide raises instead of quietly handing back an
+    object that reports the requested name while solving with something else.
+
     The pardiso backend declines a block with an empty row: `_check_A` raises
     `ValueError('Matrix A is singular, because it contains empty row(s)')`
     for one, and a single degenerate block must not fail an entire `lci()`.
-    SuperLU handles it instead.
+    SuperLU handles it instead - the one deliberate, documented substitution.
     """
+    require_backend(backend)
     if backend == "pardiso":
         csr = submatrix.tocsr()
         if not np.diff(csr.indptr).all():
@@ -231,3 +286,27 @@ def make_block_solver(backend: str, submatrix):
     if backend == "superlu":
         return _SuperLUBlockSolver(submatrix)
     raise ValueError(f"Unknown block solver {backend!r}")
+
+
+def make_persistent_block_solver(submatrix, backend: Optional[str] = None):
+    """Build a block solver that *owns* its factorization for its lifetime.
+
+    Use this - not `make_block_solver` - when one block will be solved many
+    times with separate right-hand sides, interleaved with solves of other
+    blocks. That access pattern is exactly what MKL Pardiso is worst at:
+    `pypardiso` keeps a single global factorization slot and re-runs the
+    analysis and the numeric factorization whenever the matrix handed to
+    `spsolve` differs from the previous call, so alternating between B blocks
+    over T rounds costs T*B full factorizations instead of B.
+
+    SuperLU's `splu` and UMFPACK's `factorized` both hold their own LU inside
+    the returned object, so either is safe here; pardiso is substituted with
+    SuperLU. The pardiso multi-RHS win is unaffected - it lives on the batched
+    path (`BackgroundSolver.prepare`), where one call carries every column and
+    the global slot is used once per block.
+    """
+    if backend is None:
+        backend = select_backend()
+    if backend == "umfpack":
+        return _UmfpackBlockSolver(submatrix)
+    return _SuperLUBlockSolver(submatrix)
