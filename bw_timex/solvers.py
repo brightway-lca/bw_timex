@@ -20,10 +20,12 @@ separate right-hand sides re-factorizes on every hop; such callers ask for
 `make_persistent_block_solver` instead, which guarantees a per-object LU.
 """
 
+import glob
 import os
 import platform
 import sys
 import warnings
+from ctypes.util import find_library
 from typing import Optional
 
 import numpy as np
@@ -137,24 +139,73 @@ def select_backend(override: Optional[str] = None) -> str:
     return "superlu"
 
 
+# Where a SuiteSparse installed by the usual system package managers puts
+# libumfpack. `find_library` alone is not enough on macOS: Homebrew's lib
+# directory is not on the default dyld search path, so a perfectly good
+# SuiteSparse is invisible to it.
+_SUITESPARSE_LIB_DIRS = (
+    "/opt/homebrew/opt/suite-sparse/lib",  # Homebrew, Apple Silicon
+    "/usr/local/opt/suite-sparse/lib",  # Homebrew, Intel
+    "/usr/local/lib",
+    "/usr/lib",
+    "/usr/lib64",
+    "/usr/lib/x86_64-linux-gnu",
+    "/usr/lib/aarch64-linux-gnu",
+)
+
+
+def suitesparse_present() -> bool:
+    """Whether the SuiteSparse C library looks installed on this system.
+
+    Only used to sharpen the advice below. `scikit-umfpack` is a *binding*
+    to this library and a separate install, and conflating the two is the
+    likeliest way for someone who has done half the job to be told to do the
+    half they already did.
+    """
+    if find_library("umfpack"):
+        return True
+    return any(
+        glob.glob(os.path.join(directory, "libumfpack*"))
+        for directory in _SUITESPARSE_LIB_DIRS
+    )
+
+
+def _install_umfpack_advice(system_install: str) -> str:
+    """How to get UMFPACK, given what is already on the machine.
+
+    `system_install` is the command that provides the C library on this
+    platform.
+    """
+    if suitesparse_present():
+        return (
+            "The SuiteSparse system library is already installed here, but its "
+            "Python binding is not - those are two separate installs. Add the "
+            'binding with: pip install "bw_timex[solvers]"'
+        )
+    return (
+        "Install UMFPACK - both the system library and its Python binding - with: "
+        f'{system_install} && pip install "bw_timex[solvers]"'
+    )
+
+
 def _suboptimal_message(sys_platform: str, machine: str) -> str:
     """What to tell a user stuck on SuperLU, per platform.
 
     Every branch names something that works on the machine reading it. A
-    recommendation that cannot succeed there is worse than staying quiet.
+    recommendation that cannot succeed there is worse than staying quiet, and
+    one that tells someone to redo a step they have already done is worse
+    still - it reads as the advice being wrong rather than incomplete.
     """
     prefix = (
         "bw_timex is solving background systems with SciPy's SuperLU, which is "
         "substantially slower than the alternatives. "
     )
     if sys_platform == "darwin":
-        return prefix + (
-            'Install UMFPACK with: brew install suite-sparse && pip install "bw_timex[solvers]"'
-        )
+        return prefix + _install_umfpack_advice("brew install swig suite-sparse")
     if sys_platform == "linux" and machine != "x86_64":
         return prefix + (
-            "Intel MKL has no wheel for this architecture. Install UMFPACK with: "
-            'apt install libsuitesparse-dev && pip install "bw_timex[solvers]"'
+            "Intel MKL has no wheel for this architecture. "
+            + _install_umfpack_advice("apt install libsuitesparse-dev")
         )
     if (sys_platform == "linux" and machine == "x86_64") or (
         sys_platform == "win32" and machine == "AMD64"

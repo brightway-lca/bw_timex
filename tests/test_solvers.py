@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
+from bw_timex import solvers
 from bw_timex.solvers import (
     BACKENDS,
     SolverPerformanceWarning,
@@ -141,18 +142,55 @@ def test_no_warning_when_a_fast_backend_is_active(_fresh_warning_state, backend)
 @pytest.mark.parametrize(
     "sys_platform,machine,needle",
     [
-        ("darwin", "arm64", "brew install suite-sparse"),
-        ("darwin", "x86_64", "brew install suite-sparse"),
+        ("darwin", "arm64", "brew install swig suite-sparse"),
+        ("darwin", "x86_64", "brew install swig suite-sparse"),
         ("linux", "aarch64", "libsuitesparse-dev"),
         ("linux", "x86_64", "PYPARDISO_MKL_RT"),
         ("win32", "AMD64", "PYPARDISO_MKL_RT"),
     ],
 )
 def test_superlu_warning_names_a_command_that_works_there(
-    _fresh_warning_state, sys_platform, machine, needle
+    _fresh_warning_state, monkeypatch, sys_platform, machine, needle
 ):
+    # Pinned to "SuiteSparse absent", so the expected text does not depend on
+    # what happens to be installed on the machine running the suite.
+    monkeypatch.setattr(solvers, "suitesparse_present", lambda: False)
     with pytest.warns(SolverPerformanceWarning, match=needle):
         warn_if_suboptimal("superlu", sys_platform=sys_platform, machine=machine)
+
+
+@pytest.mark.parametrize(
+    "sys_platform,machine",
+    [("darwin", "arm64"), ("darwin", "x86_64"), ("linux", "aarch64")],
+)
+def test_warning_does_not_repeat_a_step_already_done(
+    _fresh_warning_state, monkeypatch, sys_platform, machine
+):
+    # With SuiteSparse already installed, telling someone to install
+    # SuiteSparse reads as the advice being wrong rather than incomplete. The
+    # missing piece is the Python binding, and that is what must be named.
+    monkeypatch.setattr(solvers, "suitesparse_present", lambda: True)
+    with pytest.warns(SolverPerformanceWarning) as record:
+        warn_if_suboptimal("superlu", sys_platform=sys_platform, machine=machine)
+    message = str(record[0].message)
+    assert "bw_timex[solvers]" in message
+    assert "two separate installs" in message
+    assert "brew install" not in message
+    assert "apt install" not in message
+
+
+def test_suitesparse_probe_finds_a_library_next_to_it(monkeypatch, tmp_path):
+    # `find_library` misses a Homebrew SuiteSparse, because Homebrew's lib
+    # directory is not on the default dyld search path - which is exactly how
+    # an installed SuiteSparse came to be reported as missing.
+    monkeypatch.setattr(solvers, "find_library", lambda name: None)
+
+    (tmp_path / "libumfpack.6.dylib").touch()
+    monkeypatch.setattr(solvers, "_SUITESPARSE_LIB_DIRS", (str(tmp_path),))
+    assert solvers.suitesparse_present() is True
+
+    monkeypatch.setattr(solvers, "_SUITESPARSE_LIB_DIRS", (str(tmp_path / "nope"),))
+    assert solvers.suitesparse_present() is False
 
 
 def test_windows_arm_warning_recommends_nothing_installable(_fresh_warning_state):
