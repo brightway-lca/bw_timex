@@ -48,6 +48,42 @@ def _block_solve_counts(solver, builder):
     return counts
 
 
+def _batched_solve_cost(solver, by_market):
+    """Solve calls `prepare()` would need for `by_market`'s activities.
+
+    Not one per activity: `prepare()` cuts the uncached activities into chunks
+    of `solver.chunk_size()` right-hand side columns and spends one solve call
+    per block a chunk reaches, so the cost is
+    `ceil(n_uncached / chunk_size) * n_blocks`. Counting per activity - as
+    this comparison did before the cascade was batched - overstates it by up
+    to a factor of `chunk_size`, which on a real model is in the thousands.
+
+    Every `_tlca()` starts from a cleared cache, so every distinct activity
+    here is uncached at the moment the choice is made.
+    """
+    pending, blocks = set(), set()
+    for demand in by_market.values():
+        for activity_id in demand:
+            cache_key = solver.cache_key(activity_id)
+            if cache_key in pending:
+                continue
+            pending.add(cache_key)
+            blocks.add(solver.block_index_for(activity_id))
+    chunks = -(-len(pending) // max(1, solver.chunk_size()))
+    return chunks * len(blocks)
+
+
+def _grouped_solve_cost(solver, by_time):
+    """Solve calls grouping would need: one per distinct `(time, block)`."""
+    return len(
+        {
+            (time, solver.block_index_for(activity_id))
+            for time, demand in by_time.items()
+            for activity_id in demand
+        }
+    )
+
+
 def _rows_by_flow_and_date(tlca):
     """Dynamic inventory keyed by what a row *means*, not where it sits."""
     return {
@@ -348,14 +384,10 @@ class TestGroupingIsGated:
         solver = tlca._background_solver
 
         by_market, by_time = builder.collect_background_demand_plan()
-        per_process = len({solver.cache_key(a) for d in by_market.values() for a in d})
-        grouped = len(
-            {
-                (time, solver.block_index_for(act))
-                for time, demand in by_time.items()
-                for act in demand
-            }
-        )
+        per_process = _batched_solve_cost(solver, by_market)
+        grouped = _grouped_solve_cost(solver, by_time)
+
+        assert per_process > 0  # cold cache: there was something to compare
         assert builder.group_background_by_time == (grouped < per_process)
 
     def test_planning_walks_the_timeline_once(self):
@@ -374,7 +406,9 @@ class TestGroupingIsGated:
 
     def test_the_cheaper_strategy_is_the_one_chosen(self):
         # The rule itself, rather than an outcome that depends on the fixture:
-        # group exactly when it needs strictly fewer solves.
+        # group exactly when it needs strictly fewer solve calls than the
+        # *batched* per-process path - which is far fewer calls than it has
+        # activities, so the two sides must be counted in the same unit.
         tlca = _tlca()
         tlca.lci(
             expand_technosphere=False,
@@ -384,19 +418,12 @@ class TestGroupingIsGated:
         builder = tlca.dynamic_biosphere_builder
         solver = tlca._background_solver
 
-        per_process = len(
-            {
-                solver.cache_key(act)
-                for demand in builder.collect_background_demands().values()
-                for act in demand
-            }
+        per_process = _batched_solve_cost(
+            solver, builder.collect_background_demands()
         )
-        grouped = len(
-            {
-                (time, solver.block_index_for(act))
-                for time, demand in builder.collect_background_demands_by_time().items()
-                for act in demand
-            }
+        grouped = _grouped_solve_cost(
+            solver, builder.collect_background_demands_by_time()
         )
 
+        assert per_process > 0
         assert builder.group_background_by_time == (grouped < per_process)
