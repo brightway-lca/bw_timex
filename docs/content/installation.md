@@ -176,10 +176,14 @@ tags:
 
 === "Linux or Windows (x86-64)"
 
+    !!! note
+
+        `bw_timex`'s conda package can't pin platform-specific run dependencies (it's built `noarch`), so `pypardiso` - the fastest linear algebra solver for `lci()` - isn't installed automatically. Add it yourself, as shown below.
+
     1. Create a new Conda environment with `bw_timex`:
 
         ```bash
-        conda create -n timex -c conda-forge -c cmutel -c diepers bw_timex
+        conda create -n timex -c conda-forge -c cmutel -c diepers bw_timex pypardiso
         ```
 
     2. Activate the environment:

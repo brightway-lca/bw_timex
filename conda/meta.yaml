@@ -17,6 +17,11 @@
    test suite passes against 0.6. Drop these entries once conda catches up. #}
 {% set unpinned_on_conda = ["bw_graph_tools"] %}
 
+{# PEP 508 environment markers (e.g. `; sys_platform == "linux"`) aren't valid
+   conda MatchSpecs, and conda selectors don't work per-consumer on a noarch
+   package (they're baked in at build time on one machine). Drop these -
+   pypardiso stays a pip/PyPI-only optional speedup. #}
+
 package:
   name: bw_timex
   version: {{ version }}
@@ -38,10 +43,12 @@ requirements:
   run:
     - python {{ requires_python }}
 {% for dep in pyproject["project"]["dependencies"] %}
+{%- if ";" not in dep %}
 {#- conda wants a space between name and constraint, PEP 508 does not #}
 {%- set spec = dep | replace(">=", " >=") | replace("<=", " <=") | replace("==", " ==") | replace("!=", " !=") | replace("~=", " ~=") %}
 {%- set name = spec.split(" ")[0] %}
     - {{ conda_names.get(name, name) }} {{ "" if name in unpinned_on_conda else spec.split(" ")[1:] | join(" ") }}
+{%- endif %}
 {%- endfor %}
 
 test:
