@@ -20,9 +20,16 @@ def two_background_activities_db():
     Kept local to this test module rather than added to
     `dynamic_biomatrix_db_fixture.py`: other tests (`test_lci_cache.py`,
     `test_dynamic_biomatrix_construction.py`) assert on that fixture's exact
-    contents. `prepare()`'s `count > 1` factorization branch needs at least
-    two pending solves landing in the same block, which the single-activity
-    `db_2020` of the shared fixture can never provide.
+    contents. Batching needs at least two pending solves landing in the same
+    block, which the single-activity `db_2020` of the shared fixture can
+    never provide.
+
+    C1 and C2 are deliberately in the *same* database and therefore the same
+    diagonal block. That makes this fixture the right one for "one block, one
+    solve call, many right-hand sides" and the wrong one for anything about
+    moving between blocks: with a single block there is nothing to alternate
+    with, so a cross-block assertion made here would hold no matter what the
+    code did. Use `chained_background_activities_db` for those.
     """
     bd.Database("bio").write(
         {
@@ -137,6 +144,131 @@ def chained_background_activities_db():
                         "amount": 1,
                         "type": "production",
                         "input": ("db_materials", "steel"),
+                    },
+                    {
+                        "amount": 3,
+                        "type": "biosphere",
+                        "input": ("bio", "CO2"),
+                    },
+                ],
+            },
+        }
+    )
+
+    bd.Database("db_parts").write(
+        {
+            ("db_parts", "glider"): {
+                "name": "glider",
+                "location": "somewhere",
+                "reference product": "glider",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("db_parts", "glider"),
+                    },
+                    {
+                        "amount": 2,
+                        "type": "technosphere",
+                        "input": ("db_materials", "steel"),
+                    },
+                ],
+            },
+        }
+    )
+
+    bd.Database("foreground").write(
+        {
+            ("foreground", "A"): {
+                "name": "node a",
+                "location": "somewhere",
+                "reference product": "A",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("foreground", "A"),
+                    },
+                    {
+                        "amount": 1,
+                        "type": "technosphere",
+                        "input": ("db_parts", "glider"),
+                    },
+                ],
+            },
+        }
+    )
+
+    for db in bd.databases:
+        bd.Database(db).register()
+        bd.Database(db).process()
+
+
+@pytest.fixture
+@bw2test
+def chained_background_two_step_materials_db():
+    """Like `chained_background_activities_db` - `glider` (`db_parts`) still
+    cascades into a second block, `db_materials` - but `db_materials` itself
+    now has *two* activities, `coke` and `steel` (`steel` consumes `coke`),
+    so it is a 2x2 block rather than 1x1.
+
+    Purpose-built for `TestPardisoAcrossTwoBlocks`: `pypardiso`'s
+    factorization cache is content-based, not identity-based
+    (`PyPardisoSolver._is_already_factorized` compares CSR `indptr`,
+    `indices` and `data` with `np.array_equal`). `chained_background_activities_db`
+    gives both `db_parts` and `db_materials` the exact same trivial `[[1.0]]`
+    submatrix - a single activity with a unit production exchange and
+    nothing else - so alternating between them never actually forces MKL to
+    re-factorize: the two blocks are different to `bw_timex`'s block
+    structure but identical, byte for byte, to pypardiso's cache. Making
+    `db_materials` a 2x2 block gives it a different `indptr`/`indices` shape
+    from `db_parts`'s 1x1 block - a structural difference no float tweak
+    could accidentally undo - so the two blocks this fixture produces are
+    genuinely distinguishable to pypardiso's cache, and alternating between
+    them really does force a re-factorization.
+    """
+    bd.Database("bio").write(
+        {
+            ("bio", "CO2"): {
+                "type": "emission",
+                "name": "carbon dioxide",
+            },
+        },
+    )
+
+    bd.Database("db_materials").write(
+        {
+            ("db_materials", "coke"): {
+                "name": "coke",
+                "location": "somewhere",
+                "reference product": "coke",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("db_materials", "coke"),
+                    },
+                    {
+                        "amount": 1,
+                        "type": "biosphere",
+                        "input": ("bio", "CO2"),
+                    },
+                ],
+            },
+            ("db_materials", "steel"): {
+                "name": "steel",
+                "location": "somewhere",
+                "reference product": "steel",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("db_materials", "steel"),
+                    },
+                    {
+                        "amount": 0.5,
+                        "type": "technosphere",
+                        "input": ("db_materials", "coke"),
                     },
                     {
                         "amount": 3,
@@ -328,26 +460,63 @@ class TestBackgroundSolver:
         )
         assert np.allclose(result, expected)
 
-    def test_prepare_factorizes_only_blocks_with_several_pending_solves(self):
+    def test_prepare_solves_a_single_pending_activity(self):
         _, _, solver = _setup()
         background = bd.get_node(database="db_2020", code="C")
 
         solver.prepare([background.id])
 
-        assert solver.factorized_blocks == set()
+        assert solver.n_rhs_solved == 1
+        assert solver.cache_key(background.id) in solver._instance_supply_cache
 
     def test_prepare_counts_repeated_ids_as_one_pending_solve(self):
         # Every temporal market of the same process demands the same
         # background vintages, so callers hand `prepare` the same id many
-        # times. One distinct activity is one solve, and an LU costs roughly
-        # a hundred of those - it must not be bought here.
+        # times. One distinct activity must be one right-hand side column.
         _, _, solver = _setup()
         background = bd.get_node(database="db_2020", code="C")
 
         solver.prepare([background.id, background.id, background.id])
 
-        assert solver.factorized_blocks == set()
-        assert solver.n_solves == 0
+        assert solver.n_rhs_solved == 1
+
+    def test_solver_reports_its_backend(self):
+        from bw_timex.solvers import select_backend
+
+        _, _, solver = _setup()
+        assert solver.backend_name == select_backend()
+
+    def test_solve_block_accepts_a_two_dimensional_rhs(self):
+        lca, structure, solver = _setup()
+        block_index = solver.block_index_for(
+            bd.get_node(database="db_2020", code="C").id
+        )
+        block = structure.blocks[block_index]
+        rhs = np.column_stack(
+            [
+                np.arange(1, len(block.rows) + 1, dtype=float),
+                np.arange(2, len(block.rows) + 2, dtype=float),
+            ]
+        )
+
+        result = solver.solve_block(block_index, rhs)
+
+        assert result.shape == (len(block.rows), 2)
+        for j in range(2):
+            expected = solver.solve_block(block_index, np.ascontiguousarray(rhs[:, j]))
+            assert np.allclose(result[:, j], expected)
+
+    def test_n_rhs_solved_counts_columns(self):
+        _, structure, solver = _setup()
+        block_index = solver.block_index_for(
+            bd.get_node(database="db_2020", code="C").id
+        )
+        block = structure.blocks[block_index]
+
+        solver.solve_block(block_index, np.ones((len(block.rows), 3)))
+
+        assert solver.n_solves == 1
+        assert solver.n_rhs_solved == 3
 
 
 @pytest.mark.usefixtures("chained_background_activities_db")
@@ -385,27 +554,24 @@ class TestUnitAggregateFollowsDownstreamBlocks:
 
 @pytest.mark.usefixtures("two_background_activities_db")
 class TestPrepareWithSeveralPendingSolvesInOneBlock:
-    """Covers `prepare()`'s `count > 1` branch end-to-end: two background
-    activities sharing a block get that block LU-factorized, and the
-    subsequent `unit_supply` calls actually go through `solve_block`'s
-    cached-LU branch (`solve = self._block_solvers.get(block_index)`) rather
-    than the ad-hoc `spsolve` path.
+    """Covers `prepare()` end-to-end when several pending activities share a
+    block: the block is solved once, for both right-hand sides at the same
+    time, and the subsequent `unit_supply` calls are served from the cache
+    that batched solve filled rather than solving anything themselves.
     """
 
-    def test_prepare_factorizes_the_shared_block_without_solving(self):
+    def test_prepare_solves_the_shared_block_in_one_call(self):
         _, _, solver = _setup()
         c1 = bd.get_node(database="db_2020", code="C1")
         c2 = bd.get_node(database="db_2020", code="C2")
         block_index = solver.block_index_for(c1.id)
-        # Sanity: both activities must land in the same block, or this test
-        # would not exercise the `count > 1` branch at all.
         assert solver.block_index_for(c2.id) == block_index
 
         solver.prepare([c1.id, c2.id])
 
         assert solver.factorized_blocks == {block_index}
-        # Factorizing an LU is not the same as solving with it.
-        assert solver.n_solves == 0
+        assert solver.n_solves == 1
+        assert solver.n_rhs_solved == 2
 
     def test_supply_after_prepare_matches_a_direct_solve(self):
         lca, structure, solver = _setup()
@@ -423,9 +589,11 @@ class TestPrepareWithSeveralPendingSolvesInOneBlock:
             expected = sp.linalg.spsolve(lca.technosphere_matrix.tocsc(), demand)
             assert np.allclose(_full_supply(structure, supply), expected)
 
-        # Both solves went through the cached-LU branch of `solve_block`,
-        # not a fresh ad-hoc `spsolve` - still one real solve each.
-        assert solver.n_solves == 2
+        # `prepare` now solves the whole batch itself - one call carrying
+        # both right-hand sides - so both `unit_supply` calls above are pure
+        # cache hits, not fresh solves.
+        assert solver.n_solves == 1
+        assert solver.n_rhs_solved == 2
 
 
 @pytest.mark.usefixtures("dynamic_biosphere_matrix_db")

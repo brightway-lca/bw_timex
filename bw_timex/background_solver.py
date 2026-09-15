@@ -26,10 +26,27 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 import numpy as np
-from scipy.sparse.linalg import factorized, spsolve
 
 from ._lci_cache import BACKGROUND_AGGREGATE_CACHE, BACKGROUND_SUPPLY_CACHE
 from .block_structure import BlockStructure
+from .solvers import (
+    make_block_solver,
+    make_persistent_block_solver,
+    select_backend,
+    warn_if_suboptimal,
+)
+
+# Budget for the two PERSISTENT dense buffers a batched cascade holds at once:
+# the `(n_columns, k)` supply and the `(n_biosphere_rows, k)` aggregate. It is
+# what `chunk_size()` divides, and it bounds those two buffers only - not the
+# process. Each block additionally allocates `(n_block_rows, k)` transients
+# while it is being solved (the cascade product, its negation, the sliced
+# right-hand side, the returned solution), and a backend may add more of that
+# shape internally: `pypardiso.spsolve` copies the matrix and keeps its own
+# right-hand side and solution arrays. Those are transient and block-sized
+# rather than accumulating, but they are real, and this number does not
+# pretend to cover them.
+DEFAULT_MAX_BATCH_BYTES = 512 * 1024 * 1024
 
 
 @dataclass(frozen=True, eq=False)
@@ -79,6 +96,19 @@ class BackgroundSolver:
     structure
         The `BlockStructure` describing how `technosphere_matrix` splits
         into diagonal blocks.
+    max_batch_bytes
+        Budget for the two persistent dense buffers one batched cascade
+        holds, in bytes; `chunk_size()` divides it to decide how many
+        right-hand side columns `prepare()` may carry at once. See
+        `DEFAULT_MAX_BATCH_BYTES` for what it does and does not cover.
+
+    Attributes
+    ----------
+    backend_name : str
+        The sparse solver backend this instance solves blocks with
+        (`"pardiso"`, `"umfpack"` or `"superlu"`), chosen once in
+        `__init__` by `solvers.select_backend`. Read it to find out what a
+        run actually used; set `BW_TIMEX_BLOCK_SOLVER` to force it.
     """
 
     def __init__(
@@ -90,6 +120,7 @@ class BackgroundSolver:
         product_dict,
         biosphere_dict,
         structure: BlockStructure,
+        max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES,
     ) -> None:
         self.technosphere_matrix = technosphere_matrix.tocsc()
         self.biosphere_matrix = biosphere_matrix.tocsc()
@@ -97,6 +128,10 @@ class BackgroundSolver:
         self.product_dict = product_dict
         self.biosphere_dict = biosphere_dict
         self.structure = structure
+        self.max_batch_bytes = max_batch_bytes
+
+        self.backend_name = select_backend()
+        warn_if_suboptimal(self.backend_name)
 
         # Cache key routing: a `("db_code", ...)` key names a background
         # process identity that is stable across `TimexLCA` objects (same
@@ -121,10 +156,23 @@ class BackgroundSolver:
         # for callers deciding whether pre-factorizing was worth it.
         self.n_solves = 0
 
-        # Factorizations are per-instance only, never module-level: an LU of
-        # an ecoinvent-sized block is large (several times the matrix it
+        # Right-hand side columns solved. With a batched cascade one solve
+        # call can carry many, so `n_solves` no longer implies this.
+        self.n_rhs_solved = 0
+
+        # Block solvers are kept per-instance and never module-level: an LU
+        # of an ecoinvent-sized block is large (several times the matrix it
         # came from), and several of them cached across a session would
         # undo the memory savings this module exists for.
+        #
+        # What each entry *holds* depends on the backend. SuperLU and UMFPACK
+        # solvers own their LU, so an entry here is the factorization. The
+        # pardiso solver owns only the CSR block: its factorization lives in
+        # MKL's single GLOBAL slot, shared by every pardiso solver in the
+        # process, and is discarded as soon as another block is solved. That
+        # is why callers that revisit blocks one right-hand side at a time go
+        # through `_factorize_block`, which forces a genuinely per-object
+        # factorization (see `prepare_blocks`).
         self._block_solvers: dict = {}
         self.factorized_blocks: set = set()
         self._block_submatrices: dict = {}
@@ -394,39 +442,56 @@ class BackgroundSolver:
 
         A block's own row equations can depend only on already-solved,
         earlier blocks (`BlockStructure.detect` orders blocks consumer
-        first: a block's columns may carry entries in the rows of *later*
-        blocks only, never the reverse). So one pass through every block in
-        that order, always accumulating `-(A[block.rows, :] @ full_supply)`
-        from whatever has been solved so far on top of the block's own seed
-        (if any), correctly reproduces the full monolithic solve - not just
-        for the seeded blocks, but for every block a seed's demand cascades
-        into, however many hops away.
+        first), so one pass in that order reproduces the monolithic solve.
 
-        Blocks with neither a seed nor a nonzero cross-term contribution
-        are skipped entirely (no solve bought for them), which is the
-        common case: a real project's demand touches a handful of a much
-        larger set of blocks.
+        `seeds` values are `(n_block_rows,)` or `(n_block_rows, k)`, and all
+        of them must agree; the returned supply matches that rank. A
+        k-column pass is the batched form: every block it reaches is
+        factorized once and solved for all k columns in one call.
 
-        Returns
-        -------
-        tuple
-            `(full_supply, touched_blocks)`: the supply, dense over every
-            technosphere column, and the `frozenset` of block indices that
-            were actually solved.
+        Within a batch, a column that has no nonzero right-hand side in a
+        block is dropped from that block's solve - the 2-D counterpart of
+        the old "skip blocks a demand never reaches" behaviour.
+
+        Every seed must match the rank and width taken from the first one;
+        a mixed-rank `seeds` dict is a caller bug, and is asserted rather
+        than left to broadcast into a silently wrong answer.
         """
-        full_supply = np.zeros(self.technosphere_matrix.shape[1])
+        first_seed = next(iter(seeds.values()), None)
+        width = (
+            first_seed.shape[1]
+            if first_seed is not None and first_seed.ndim == 2
+            else None
+        )
+        n_columns = self.technosphere_matrix.shape[1]
+        full_supply = (
+            np.zeros(n_columns) if width is None else np.zeros((n_columns, width))
+        )
         touched_blocks = set()
         for block_index, block in enumerate(self.structure.blocks):
-            rhs = -np.asarray(
-                self.technosphere_matrix[block.rows, :] @ full_supply
-            ).ravel()
+            product = self.technosphere_matrix[block.rows, :] @ full_supply
+            shape = (
+                (len(block.rows),) if width is None else (len(block.rows), width)
+            )
+            rhs = -np.asarray(product).reshape(shape)
             seed = seeds.get(block_index)
             if seed is not None:
+                assert seed.shape == rhs.shape, (
+                    f"seed for block {block_index} has shape {seed.shape}, "
+                    f"expected {rhs.shape}; all seeds must share the rank and "
+                    f"width of the first one"
+                )
                 rhs = rhs + seed
             if not np.any(rhs):
                 continue
-            values = self.solve_block(block_index, rhs)
-            full_supply[block.columns] = values
+            if width is None:
+                full_supply[block.columns] = self.solve_block(block_index, rhs)
+            else:
+                live = np.flatnonzero(np.any(rhs != 0, axis=0))
+                solved = self.solve_block(
+                    block_index, np.ascontiguousarray(rhs[:, live])
+                )
+                full_supply[np.ix_(block.columns, live)] = solved
             touched_blocks.add(block_index)
         return full_supply, frozenset(touched_blocks)
 
@@ -437,64 +502,130 @@ class BackgroundSolver:
     def solve_block(self, block_index: int, rhs: np.ndarray) -> np.ndarray:
         """Solve `A[block.rows][:, block.columns] x = rhs` for one block.
 
-        Uses a cached LU (from `prepare`) when one exists for this block,
-        else a one-off `spsolve`. Every call is a real linear solve and
-        increments `n_solves` - caching happens one level up, in
-        `unit_supply`/`unit_aggregate`.
-
-        One right-hand side at a time, and not for want of trying: bundling
-        `k` of them into a single `(n_rows, k)` solve is not available here,
-        because with `scikit-umfpack` installed `scipy`'s `factorized`
-        returns a UMFPACK solver that rejects a 2-D right-hand side, and
-        falling back to SuperLU to get one costs more than the bundling
-        saves.
+        `rhs` is `(n_rows,)` or `(n_rows, k)`; the result matches its rank.
+        A block's solver is built on first use and kept in `_block_solvers`,
+        so every backend factorizes a given block at most once per instance -
+        except pardiso, whose factorization lives in MKL's single global slot
+        and is rebuilt whenever another block has been solved since. Callers
+        that will revisit blocks one right-hand side at a time ask for a
+        persistent factorization first, via `prepare_blocks`.
         """
-        solve = self._block_solvers.get(block_index)
-        if solve is not None:
-            result = solve(rhs)
-        else:
-            sub = self._submatrix(block_index)
-            result = spsolve(sub, rhs)
+        solver = self._block_solver(block_index)
+        result = np.asarray(solver.solve(rhs), dtype=float)
         self.n_solves += 1
-        return np.asarray(result, dtype=float)
+        self.n_rhs_solved += 1 if rhs.ndim == 1 else rhs.shape[1]
+        return result
+
+    def _block_solver(self, block_index: int):
+        solver = self._block_solvers.get(block_index)
+        if solver is None:
+            solver = make_block_solver(self.backend_name, self._submatrix(block_index))
+            self._block_solvers[block_index] = solver
+            self.factorized_blocks.add(block_index)
+        return solver
+
+    def chunk_size(self) -> int:
+        """How many right-hand sides one cascade may carry.
+
+        A cascade holds a dense `(n_columns, k)` supply AND a dense
+        `(n_biosphere_rows, k)` aggregate at the same time, so `k` is capped
+        against their combined per-column cost. At least one, or a batch
+        could never run.
+
+        `max_batch_bytes` bounds exactly those two persistent buffers, and
+        nothing else. While a block is being solved, the cascade also holds
+        `(n_block_rows, k)` transients - the cascade product, the negated
+        right-hand side, the sliced live columns, the returned solution - and
+        the backend may hold more of that shape internally (`pypardiso`
+        copies the matrix and keeps its own right-hand side and solution
+        arrays). Those are block-sized and transient rather than
+        accumulating, but a run's true peak is above this budget, not at it.
+        """
+        per_column = (
+            self.technosphere_matrix.shape[1] + self.biosphere_matrix.shape[0]
+        ) * 8
+        return max(1, int(self.max_batch_bytes // per_column))
 
     def prepare(self, activity_ids, n_jobs: Optional[int] = None) -> None:
-        """Pre-factorize blocks that will pay off, for a batch of activities.
+        """Solve every uncached activity in `activity_ids`, in one batch.
 
-        Groups the *uncached* ids by the block a solve for them would use,
-        and factorizes only blocks with more than one pending solve:
-        factorizing an ecoinvent-sized block costs roughly a hundred times a
-        single `spsolve` on it, so it only pays off once several solves in
-        that block share the cost.
+        Ids are counted by identity, not occurrence: callers collect them per
+        temporal market, and distinct markets of the same process demand the
+        very same background vintages, so repeats are the norm.
 
-        `activity_ids` is counted by *identity*, not by occurrence. Callers
-        collect it per temporal market, and distinct markets of the same
-        process at different times demand the very same background vintages -
-        so repeats are the norm. Counting them twice would buy an LU for a
-        block that needs a single solve, which is the exact trade this method
-        exists to avoid.
+        The batch is cut into chunks of `chunk_size()` and each chunk is one
+        `_cascading_solve` with that many right-hand side columns. Every
+        block a chunk reaches is therefore factorized once and solved for all
+        of its columns in a single call - on pardiso, one MKL analysis plus
+        one numeric factorization plus `k` triangular solves. Each chunk is
+        reduced to sparse cache payloads before the next is solved, so the two
+        persistent dense buffers stay inside `max_batch_bytes` (per-block
+        transients and solver-internal copies are on top of it - see
+        `chunk_size`).
+
+        Both the supply and the aggregate cache are filled, because the
+        aggregate is one `B[:, block.columns] @ chunk` matmul per touched
+        block rather than one per activity.
 
         `n_jobs` is accepted for a future parallel implementation and
         ignored here.
         """
-        pending_counts: dict = {}
-        pending_keys: set = set()
+        pending = []
+        seen: set = set()
         for activity_id in activity_ids:
             cache_key = self.cache_key(activity_id)
-            if cache_key in pending_keys:
+            if cache_key in seen:
                 continue
             cache = self._select_cache(
                 cache_key, self.shared_cache, self._instance_supply_cache
             )
             if cache_key in cache:
                 continue
-            pending_keys.add(cache_key)
-            block_index = self.block_index_for(activity_id)
-            pending_counts[block_index] = pending_counts.get(block_index, 0) + 1
+            seen.add(cache_key)
+            pending.append(activity_id)
 
-        for block_index, count in pending_counts.items():
-            if count > 1:
-                self._factorize_block(block_index)
+        chunk = self.chunk_size()
+        for start in range(0, len(pending), chunk):
+            self._solve_and_cache_chunk(pending[start : start + chunk])
+
+    def _solve_and_cache_chunk(self, activity_ids: list) -> None:
+        """One batched cascade over `activity_ids`, then cache every column."""
+        seeds: dict = {}
+        width = len(activity_ids)
+        for column, activity_id in enumerate(activity_ids):
+            block_index = self.block_index_for(activity_id)
+            block = self.structure.blocks[block_index]
+            seed = seeds.get(block_index)
+            if seed is None:
+                seed = np.zeros((len(block.rows), width))
+                seeds[block_index] = seed
+            seed[self._local_row(block, activity_id), column] = 1.0
+
+        supply, touched_blocks = self._cascading_solve(seeds)
+
+        aggregate = np.zeros((self.biosphere_matrix.shape[0], width))
+        for block_index in touched_blocks:
+            block = self.structure.blocks[block_index]
+            aggregate += np.asarray(
+                self._biosphere_submatrix(block_index) @ supply[block.columns, :]
+            )
+
+        column_ids = self._column_node_ids()
+        biosphere_ids = self._biosphere_node_ids()
+        for column, activity_id in enumerate(activity_ids):
+            cache_key = self.cache_key(activity_id)
+
+            values = supply[:, column]
+            nonzero = np.flatnonzero(values)
+            self._select_cache(
+                cache_key, self.shared_cache, self._instance_supply_cache
+            )[cache_key] = (column_ids[nonzero], values[nonzero].copy())
+
+            column_aggregate = aggregate[:, column]
+            nonzero = np.flatnonzero(column_aggregate)
+            self._select_cache(
+                cache_key, self.shared_aggregate_cache, self._instance_aggregate_cache
+            )[cache_key] = (biosphere_ids[nonzero], column_aggregate[nonzero].copy())
 
     def prepare_blocks(self, block_indices) -> None:
         """Pre-factorize every block that will be solved more than once.
@@ -502,8 +633,24 @@ class BackgroundSolver:
         The counterpart of `prepare` for callers that solve combined demands
         (`aggregate_for_demand`) rather than per-activity unit LCIs: they know
         which blocks they will hit and how often, but not which activities.
-        Same trade as `prepare` - an LU of an ecoinvent-sized block costs
-        roughly a hundred solves, so a block solved once must not buy one.
+
+        This is the access pattern a single global factorization slot is
+        worst at. Each grouped solve is one time step's demand, which
+        routinely spans several blocks (see `aggregate_for_demand`), so the
+        blocks are revisited in rotation with a separate right-hand side every
+        time. On pardiso that means MKL re-analyses and re-factorizes on every
+        hop - T time steps over B blocks costs T*B factorizations. So the
+        solver built here is a persistent one (`make_persistent_block_solver`)
+        regardless of the active backend: B factorizations, then triangular
+        solves. `prepare`'s batched path is untouched and still gets pardiso's
+        multi-RHS win, where one call carries every column of a chunk.
+
+        The `count > 1` guard is not vestigial. A block that the whole grouped
+        build solves exactly once gains nothing from a persistent LU - it
+        would be one factorization either way - and forcing SuperLU on it
+        would take that single solve away from a faster backend. Such a block
+        is left to `solve_block`, which builds the active backend's own solver
+        lazily.
         """
         counts: dict = {}
         for block_index in block_indices:
@@ -537,8 +684,19 @@ class BackgroundSolver:
         return self._block_biosphere_submatrices[block_index]
 
     def _factorize_block(self, block_index: int) -> None:
-        if block_index in self.factorized_blocks:
+        """Give this block a solver that owns its factorization, ahead of use.
+
+        Deliberately not `_block_solver`: that builds the *active backend's*
+        solver, and the pardiso one holds no factorization of its own - only
+        the CSR block, with the actual factorization in MKL's global slot,
+        gone the moment another block is solved. A pardiso solver already
+        stored for this block is therefore replaced; a SuperLU or UMFPACK one
+        already owns its LU and is kept.
+        """
+        existing = self._block_solvers.get(block_index)
+        if existing is not None and getattr(existing, "name", None) != "pardiso":
             return
-        sub = self._submatrix(block_index)
-        self._block_solvers[block_index] = factorized(sub)
+        self._block_solvers[block_index] = make_persistent_block_solver(
+            self._submatrix(block_index), self.backend_name
+        )
         self.factorized_blocks.add(block_index)

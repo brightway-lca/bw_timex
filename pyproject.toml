@@ -44,6 +44,11 @@ dependencies = [
     "ipython",
     "ipywidgets",
     "pydantic>=2.0",
+    # MKL Pardiso is the fastest solver for the repeated block solves in
+    # `lci()`, and `mkl` publishes wheels only for manylinux_2_28_x86_64 and
+    # win_amd64 - so this is gated to exactly those. Adds ~290 MB on Linux.
+    "pypardiso; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "pypardiso; sys_platform == 'win32' and platform_machine == 'AMD64'",
 ]
 
 [project.urls]
@@ -56,6 +61,7 @@ testing = [
     "setuptools",
     "pytest",
     "pytest-cov",
+    "packaging",
 ]
 
 dev = [
@@ -71,9 +77,14 @@ docs = [
   "nbconvert>=7.0",
 ]
 
+# `scikit-umfpack` is SDIST-only and builds against SuiteSparse, so it can
+# never be a hard dependency: it would make every macOS install compile and
+# fail where the headers are absent. Offered here for the platforms MKL has
+# no wheel for. Needs `brew install suite-sparse` or
+# `apt install libsuitesparse-dev` first.
 solvers = [
-    "scikit-umfpack; sys_platform == 'darwin' and platform_machine == 'arm64'",
-    "pypardiso; sys_platform != 'darwin' or platform_machine != 'arm64'",
+    "scikit-umfpack; sys_platform == 'darwin'",
+    "scikit-umfpack; sys_platform == 'linux' and platform_machine != 'x86_64'",
 ]
 
 premise = ["premise[bw25]>=2.4.9.2"]
