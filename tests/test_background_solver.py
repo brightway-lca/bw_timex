@@ -204,6 +204,131 @@ def chained_background_activities_db():
         bd.Database(db).process()
 
 
+@pytest.fixture
+@bw2test
+def chained_background_two_step_materials_db():
+    """Like `chained_background_activities_db` - `glider` (`db_parts`) still
+    cascades into a second block, `db_materials` - but `db_materials` itself
+    now has *two* activities, `coke` and `steel` (`steel` consumes `coke`),
+    so it is a 2x2 block rather than 1x1.
+
+    Purpose-built for `TestPardisoAcrossTwoBlocks`: `pypardiso`'s
+    factorization cache is content-based, not identity-based
+    (`PyPardisoSolver._is_already_factorized` compares CSR `indptr`,
+    `indices` and `data` with `np.array_equal`). `chained_background_activities_db`
+    gives both `db_parts` and `db_materials` the exact same trivial `[[1.0]]`
+    submatrix - a single activity with a unit production exchange and
+    nothing else - so alternating between them never actually forces MKL to
+    re-factorize: the two blocks are different to `bw_timex`'s block
+    structure but identical, byte for byte, to pypardiso's cache. Making
+    `db_materials` a 2x2 block gives it a different `indptr`/`indices` shape
+    from `db_parts`'s 1x1 block - a structural difference no float tweak
+    could accidentally undo - so the two blocks this fixture produces are
+    genuinely distinguishable to pypardiso's cache, and alternating between
+    them really does force a re-factorization.
+    """
+    bd.Database("bio").write(
+        {
+            ("bio", "CO2"): {
+                "type": "emission",
+                "name": "carbon dioxide",
+            },
+        },
+    )
+
+    bd.Database("db_materials").write(
+        {
+            ("db_materials", "coke"): {
+                "name": "coke",
+                "location": "somewhere",
+                "reference product": "coke",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("db_materials", "coke"),
+                    },
+                    {
+                        "amount": 1,
+                        "type": "biosphere",
+                        "input": ("bio", "CO2"),
+                    },
+                ],
+            },
+            ("db_materials", "steel"): {
+                "name": "steel",
+                "location": "somewhere",
+                "reference product": "steel",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("db_materials", "steel"),
+                    },
+                    {
+                        "amount": 0.5,
+                        "type": "technosphere",
+                        "input": ("db_materials", "coke"),
+                    },
+                    {
+                        "amount": 3,
+                        "type": "biosphere",
+                        "input": ("bio", "CO2"),
+                    },
+                ],
+            },
+        }
+    )
+
+    bd.Database("db_parts").write(
+        {
+            ("db_parts", "glider"): {
+                "name": "glider",
+                "location": "somewhere",
+                "reference product": "glider",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("db_parts", "glider"),
+                    },
+                    {
+                        "amount": 2,
+                        "type": "technosphere",
+                        "input": ("db_materials", "steel"),
+                    },
+                ],
+            },
+        }
+    )
+
+    bd.Database("foreground").write(
+        {
+            ("foreground", "A"): {
+                "name": "node a",
+                "location": "somewhere",
+                "reference product": "A",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("foreground", "A"),
+                    },
+                    {
+                        "amount": 1,
+                        "type": "technosphere",
+                        "input": ("db_parts", "glider"),
+                    },
+                ],
+            },
+        }
+    )
+
+    for db in bd.databases:
+        bd.Database(db).register()
+        bd.Database(db).process()
+
+
 def _setup():
     """A plain LCA over the fixture project, split into per-database blocks."""
     node_a = bd.get_node(database="foreground", code="A")

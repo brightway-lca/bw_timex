@@ -10,6 +10,7 @@ from bw_timex.solvers import select_backend
 from .test_background_solver import (  # noqa: F401
     _setup,
     chained_background_activities_db,
+    chained_background_two_step_materials_db,
     two_background_activities_db,
 )
 
@@ -26,8 +27,18 @@ def _phase_spy(monkeypatch):
     currently in MKL's single global slot, then solves with phase 33. So a
     phase-12 (or 13, when factorization is skipped) entry is one full
     analyse-and-factorise, and counting them counts thrash directly.
+
+    Also forgets whatever an *earlier* test last left factorized in that
+    global slot. `pypardiso`'s cache is keyed on matrix content, not test
+    boundaries, and plenty of tests solve a trivial single-activity `[[1.0]]`
+    block - so without this, a phase count here could silently come out one
+    short simply because some previous test happened to leave the exact same
+    content behind, not because this test's code failed to re-factorize.
     """
+    import pypardiso
     from pypardiso.pardiso_wrapper import PyPardisoSolver
+
+    pypardiso.ps.remove_stored_factorization()
 
     phases = []
     original = PyPardisoSolver._call_pardiso
@@ -323,13 +334,27 @@ class TestPardisoDoesNotRefactorize:
 
 
 @pytest.mark.skipif(not _pardiso_active(), reason="pardiso backend not active")
-@pytest.mark.usefixtures("chained_background_activities_db")
+@pytest.mark.usefixtures("chained_background_two_step_materials_db")
 class TestPardisoAcrossTwoBlocks:
     """The same phase counting, on a fixture that actually has two blocks.
 
     `glider` lives in `db_parts` and cascades into `steel` in `db_materials`,
     so a cascade genuinely hops between two different matrices and MKL's
     single global factorization slot can be made to thrash.
+
+    This deliberately does *not* reuse `chained_background_activities_db`:
+    that fixture gives both `db_parts` and `db_materials` the exact same
+    trivial `[[1.0]]` submatrix (one activity, one unit production
+    exchange), and pypardiso's factorization cache
+    (`PyPardisoSolver._is_already_factorized`) compares matrices by content
+    (`indptr`/`indices`/`data`), not by which block `bw_timex` thinks they
+    are. Two content-identical blocks never actually force a re-factorization
+    when alternated between, so a count taken there could not tell correct
+    behaviour from thrash. `chained_background_two_step_materials_db` gives
+    `db_materials` a second activity (`coke`, consumed by `steel`), making it
+    a 2x2 block - structurally different from `db_parts`'s 1x1 block, not
+    merely different by a float - so the two blocks below are genuinely
+    distinguishable to pypardiso's cache.
 
     The batch order is `[steel, glider]` on purpose. With `[glider, steel]`
     the cascade happens to leave the steel block factorized at the end of the
@@ -353,8 +378,10 @@ class TestPardisoAcrossTwoBlocks:
 
         solver.prepare([steel.id, glider.id])
 
-        # Two blocks, one chunk carrying both columns: the cascade enters each
-        # block once, so each is analysed and factorized exactly once.
+        # Two blocks - the 1x1 `db_parts` block and the 2x2 `db_materials`
+        # block, genuinely different content - one chunk carrying both
+        # columns: the cascade enters each block once, so each is analysed
+        # and factorized exactly once.
         assert len(_numeric_factorizations(phases)) == 2
 
     def test_chunking_costs_a_refactorization_per_revisit(self, monkeypatch):
