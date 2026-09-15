@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-* Improved `TimexLCA.__init__` node-metadata loading and `build_timeline`'s default edge filter, cutting setup time roughly 6x (init ~4.9x, `build_timeline` ~11x) on a multi-database background by replacing a per-database SQL query with one batched query bypassing peewee's per-row overhead, and by building the default skippable-node set from already-loaded node metadata instead of re-querying and re-materializing full `Activity` proxies
+
+## [1.3.2] - 2026-09-15
+* Fixed support for pypardiso solver when using caching ([#234](https://github.com/brightway-lca/bw_timex/pull/234))
+* Added performance improvements for `TimexLCA.__init__` node-metadata loading and `build_timeline`'s default edge filter, reducing computation time significantly ([#235](https://github.com/brightway-lca/bw_timex/pull/235))
 
 ## [1.3.1] - 2026-08-26
 * Fixed wrong scores for background systems spanning multiple databases ([#230](https://github.com/brightway-lca/bw_timex/pull/230))
