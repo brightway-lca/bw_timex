@@ -1712,9 +1712,12 @@ class TimexLCA:
         Two strategies produce the same numbers:
 
         - *per background process* - one unit LCI per distinct background
-          activity, linearly combined per temporal market. Costs one solve per
-          uncached activity, and the results are cached across `TimexLCA`
-          objects in a session, so a warm run costs nothing at all.
+          activity, linearly combined per temporal market. `prepare()` batches
+          these: a chunk of `solver.chunk_size()` activities is one solve call
+          per block it reaches, so the cost is
+          `ceil(n_uncached / chunk_size) * n_blocks` calls, not one per
+          activity. The results are cached across `TimexLCA` objects in a
+          session, so a warm run costs nothing at all.
         - *per time step* - sum the background demands of every market row
           landing at the same time, and solve those sums. Costs one solve per
           `(time, block)` pair, caches nothing, but is independent of how many
@@ -1725,6 +1728,12 @@ class TimexLCA:
         steps the second. Both counts are known here, so when
         `group_background_by_time` is `None` the smaller one is taken; a
         `True`/`False` from the caller overrides that.
+
+        The comparison is between *solve calls* on either side, which is why
+        the batching matters: with a chunk size in the thousands, a wide
+        foreground that once looked like thousands of solves is a handful, and
+        an uncalibrated count would hand the work to grouping long after
+        grouping stopped being the cheaper option.
 
         Returns
         -------
@@ -1767,9 +1776,24 @@ class TimexLCA:
             return bool(group_background_by_time)
 
         solver = self._background_solver
-        pending = {
-            solver.cache_key(activity_id) for activity_id in activity_ids
-        } - set(solver.shared_cache) - set(solver._instance_supply_cache)
+        cached = set(solver.shared_cache) | set(solver._instance_supply_cache)
+        pending = set()
+        pending_blocks = set()
+        for activity_id in activity_ids:
+            cache_key = solver.cache_key(activity_id)
+            if cache_key in cached or cache_key in pending:
+                continue
+            pending.add(cache_key)
+            pending_blocks.add(solver.block_index_for(activity_id))
+
+        # What `prepare()` actually costs: the pending activities are cut into
+        # chunks of `chunk_size()` columns, and each chunk is one solve call
+        # per block it reaches. Counting one solve per activity (as this did
+        # before the batched cascade) overstates it by up to `chunk_size`, and
+        # would send wide foregrounds to grouping for no reason. Zero pending
+        # activities means a warm cache: nothing to beat, so never group.
+        chunk = max(1, solver.chunk_size())
+        prepared_solves = -(-len(pending) // chunk) * len(pending_blocks)
 
         grouped_solves = len(
             {
@@ -1779,10 +1803,11 @@ class TimexLCA:
             }
         )
 
-        if grouped_solves < len(pending):
+        if pending and grouped_solves < prepared_solves:
             logger.info(
                 f"Solving the background per time step ({grouped_solves} solves) "
-                f"instead of per process ({len(pending)})."
+                f"instead of per process ({prepared_solves} batched solves for "
+                f"{len(pending)} uncached activities)."
             )
             self._prepare_grouped_blocks(grouped)
             return True
