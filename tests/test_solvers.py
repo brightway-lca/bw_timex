@@ -20,11 +20,15 @@ from bw_timex.solvers import (
 
 
 def _pardiso_importable():
+    # `pypardiso` exports its module-global solver as `ps`; `pypardiso_solver`
+    # is the name it carries inside `scipy_aliases`, not on the package. Read
+    # the wrong one and this raises AttributeError - which, being caught
+    # nowhere, fails collection rather than reporting "no pardiso here".
     try:
         import pypardiso
 
-        return pypardiso.pypardiso_solver.libmkl is not None
-    except ImportError:
+        return pypardiso.ps.libmkl is not None
+    except (ImportError, AttributeError):
         return False
 
 
@@ -60,12 +64,7 @@ def _fresh_warning_state(monkeypatch):
 def test_select_backend_matches_environment_capability(_fresh_warning_state):
     # Expectation derived independently of bw_timex's own probes, so this
     # cannot pass by reading the same flag the implementation reads.
-    try:
-        import pypardiso
-
-        pardiso = pypardiso.pypardiso_solver.libmkl is not None
-    except ImportError:
-        pardiso = False
+    pardiso = _pardiso_importable()
     try:
         import scikits.umfpack  # noqa: F401
 
