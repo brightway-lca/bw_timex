@@ -20,9 +20,16 @@ def two_background_activities_db():
     Kept local to this test module rather than added to
     `dynamic_biomatrix_db_fixture.py`: other tests (`test_lci_cache.py`,
     `test_dynamic_biomatrix_construction.py`) assert on that fixture's exact
-    contents. `prepare()`'s `count > 1` factorization branch needs at least
-    two pending solves landing in the same block, which the single-activity
-    `db_2020` of the shared fixture can never provide.
+    contents. Batching needs at least two pending solves landing in the same
+    block, which the single-activity `db_2020` of the shared fixture can
+    never provide.
+
+    C1 and C2 are deliberately in the *same* database and therefore the same
+    diagonal block. That makes this fixture the right one for "one block, one
+    solve call, many right-hand sides" and the wrong one for anything about
+    moving between blocks: with a single block there is nothing to alternate
+    with, so a cross-block assertion made here would hold no matter what the
+    code did. Use `chained_background_activities_db` for those.
     """
     bd.Database("bio").write(
         {
@@ -422,11 +429,10 @@ class TestUnitAggregateFollowsDownstreamBlocks:
 
 @pytest.mark.usefixtures("two_background_activities_db")
 class TestPrepareWithSeveralPendingSolvesInOneBlock:
-    """Covers `prepare()`'s `count > 1` branch end-to-end: two background
-    activities sharing a block get that block LU-factorized, and the
-    subsequent `unit_supply` calls actually go through `solve_block`'s
-    cached-LU branch (`solve = self._block_solvers.get(block_index)`) rather
-    than the ad-hoc `spsolve` path.
+    """Covers `prepare()` end-to-end when several pending activities share a
+    block: the block is solved once, for both right-hand sides at the same
+    time, and the subsequent `unit_supply` calls are served from the cache
+    that batched solve filled rather than solving anything themselves.
     """
 
     def test_prepare_solves_the_shared_block_in_one_call(self):

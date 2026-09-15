@@ -18,6 +18,32 @@ def _pardiso_active():
     return select_backend() == "pardiso"
 
 
+def _phase_spy(monkeypatch):
+    """Record the Pardiso phase of every `_call_pardiso`, returning the list.
+
+    `pypardiso.spsolve` runs `solver.factorize(A)` - phase 12, one
+    `_call_pardiso` - whenever the matrix it is handed differs from the one
+    currently in MKL's single global slot, then solves with phase 33. So a
+    phase-12 (or 13, when factorization is skipped) entry is one full
+    analyse-and-factorise, and counting them counts thrash directly.
+    """
+    from pypardiso.pardiso_wrapper import PyPardisoSolver
+
+    phases = []
+    original = PyPardisoSolver._call_pardiso
+
+    def spy(self, A, b):
+        phases.append(self.phase)
+        return original(self, A, b)
+
+    monkeypatch.setattr(PyPardisoSolver, "_call_pardiso", spy)
+    return phases
+
+
+def _numeric_factorizations(phases):
+    return [phase for phase in phases if phase in (12, 13)]
+
+
 @pytest.mark.usefixtures("two_background_activities_db")
 class TestCascadingSolveWithMatrixRHS:
 
@@ -118,13 +144,42 @@ class TestPrepareSolvesTheBatch:
             )
 
     def test_chunk_size_respects_the_memory_budget(self):
-        _, _, solver = _setup()
-        n_columns = solver.technosphere_matrix.shape[1]
-        n_biosphere_rows = solver.biosphere_matrix.shape[0]
-        per_column = (n_columns + n_biosphere_rows) * 8
-        solver.max_batch_bytes = per_column * 4
+        """The invariant the docstring claims: the two persistent dense
+        buffers of one chunk fit inside `max_batch_bytes`.
 
-        assert solver.chunk_size() == 4
+        Measured, not recomputed. Restating `chunk_size`'s own arithmetic and
+        asserting the two agree validates neither the formula nor the budget -
+        both sides move together under any change. `per_column` here is the
+        real size of one column of the buffers `_solve_and_cache_chunk`
+        actually allocates: a `(n_columns, k)` supply and a
+        `(n_biosphere_rows, k)` aggregate.
+        """
+        _, _, solver = _setup()
+        per_column = (
+            np.zeros((solver.technosphere_matrix.shape[1], 1)).nbytes
+            + np.zeros((solver.biosphere_matrix.shape[0], 1)).nbytes
+        )
+
+        for budget in (
+            per_column,
+            per_column * 2,
+            per_column * 3 + 7,
+            per_column * 40,
+            per_column * 40 - 1,
+        ):
+            solver.max_batch_bytes = budget
+            chunk = solver.chunk_size()
+
+            assert chunk >= 1
+            assert chunk * per_column <= budget
+            # ... and it is the largest chunk that fits, so the budget is
+            # actually spent rather than merely respected.
+            assert (chunk + 1) * per_column > budget
+
+        # A budget too small for even one column still yields a runnable
+        # batch - a chunk of zero could never make progress.
+        solver.max_batch_bytes = 1
+        assert solver.chunk_size() == 1
 
     def test_prepare_solves_each_block_once_per_chunk(self):
         _, _, solver = _setup()
@@ -220,19 +275,16 @@ class TestPardisoDoesNotRefactorize:
     blocks re-analyses and re-factorizes on every hop. `_call_pardiso` runs
     with phase 12 or 13 when a numeric factorization happens and phase 33
     when an existing one is reused, which makes thrash directly countable.
+
+    Necessary but NOT sufficient on their own: `two_background_activities_db`
+    puts C1 and C2 in the same `db_2020` block, so there is only one block
+    here and alternation is impossible by construction - these counts hold
+    however badly a multi-block path thrashes. `TestPardisoAcrossTwoBlocks`
+    below is where that is actually tested.
     """
 
     def test_batched_prepare_factorizes_once_per_block(self, monkeypatch):
-        from pypardiso.pardiso_wrapper import PyPardisoSolver
-
-        phases = []
-        original = PyPardisoSolver._call_pardiso
-
-        def spy(self, A, b):
-            phases.append(self.phase)
-            return original(self, A, b)
-
-        monkeypatch.setattr(PyPardisoSolver, "_call_pardiso", spy)
+        phases = _phase_spy(monkeypatch)
 
         _, _, solver = _setup()
         c1 = bd.get_node(database="db_2020", code="C1")
@@ -268,6 +320,144 @@ class TestPardisoDoesNotRefactorize:
         counts.append(run([c1.id, c2.id] * 10))
 
         assert counts[0] == counts[1]
+
+
+@pytest.mark.skipif(not _pardiso_active(), reason="pardiso backend not active")
+@pytest.mark.usefixtures("chained_background_activities_db")
+class TestPardisoAcrossTwoBlocks:
+    """The same phase counting, on a fixture that actually has two blocks.
+
+    `glider` lives in `db_parts` and cascades into `steel` in `db_materials`,
+    so a cascade genuinely hops between two different matrices and MKL's
+    single global factorization slot can be made to thrash.
+
+    The batch order is `[steel, glider]` on purpose. With `[glider, steel]`
+    the cascade happens to leave the steel block factorized at the end of the
+    first chunk, so the second chunk reuses it and chunking looks free -
+    which would make the assertion below unable to distinguish a batched run
+    from a thrashing one.
+    """
+
+    def _nodes(self):
+        return (
+            bd.get_node(database="db_materials", code="steel"),
+            bd.get_node(database="db_parts", code="glider"),
+        )
+
+    def test_one_chunk_factorizes_each_block_exactly_once(self, monkeypatch):
+        phases = _phase_spy(monkeypatch)
+
+        _, _, solver = _setup()
+        steel, glider = self._nodes()
+        assert solver.block_index_for(steel.id) != solver.block_index_for(glider.id)
+
+        solver.prepare([steel.id, glider.id])
+
+        # Two blocks, one chunk carrying both columns: the cascade enters each
+        # block once, so each is analysed and factorized exactly once.
+        assert len(_numeric_factorizations(phases)) == 2
+
+    def test_chunking_costs_a_refactorization_per_revisit(self, monkeypatch):
+        phases = _phase_spy(monkeypatch)
+
+        _, _, solver = _setup()
+        solver.max_batch_bytes = 1  # one column per chunk
+        assert solver.chunk_size() == 1
+        steel, glider = self._nodes()
+
+        solver.prepare([steel.id, glider.id])
+
+        # Chunk 1 (`steel`) factorizes the steel block. Chunk 2 (`glider`)
+        # factorizes the glider block, then cascades back into steel - whose
+        # factorization the glider solve has just evicted from MKL's single
+        # slot - so steel is factorized a second time. Three, not two: the
+        # cost of revisiting a block with a separate right-hand side, which
+        # is exactly what one chunk carrying every column avoids.
+        assert len(_numeric_factorizations(phases)) == 3
+
+
+@pytest.mark.usefixtures("chained_background_activities_db")
+class TestGroupedSolvesReuseOneFactorizationPerBlock:
+    """`aggregate_for_demand` is called once per time step by the grouped
+    background path, each call a fresh 1-D cascade across every block the
+    demand touches. That is the access pattern a single global factorization
+    slot is worst at, so `prepare_blocks` must hand those blocks a solver
+    that owns its own factorization - on every backend, pardiso included.
+    """
+
+    def _demand(self, amount=1.0):
+        steel = bd.get_node(database="db_materials", code="steel")
+        glider = bd.get_node(database="db_parts", code="glider")
+        return {steel.id: amount, glider.id: amount}
+
+    def _prepared_solver(self, n_time_steps):
+        _, _, solver = _setup()
+        demand = self._demand()
+        blocks = [solver.block_index_for(activity_id) for activity_id in demand]
+        assert len(set(blocks)) == 2, "fixture must span two blocks"
+        # What `TimexLCA._prepare_grouped_blocks` does: every time step names
+        # the blocks its demand touches, so a revisited block is counted more
+        # than once and gets pre-factorized.
+        solver.prepare_blocks(blocks * n_time_steps)
+        return solver
+
+    def test_factorize_block_builds_a_solver_that_owns_its_factorization(self):
+        # Backend-agnostic: the object `prepare_blocks` leaves behind must not
+        # be one whose "factorization" lives in a shared global slot.
+        solver = self._prepared_solver(3)
+
+        assert len(solver.factorized_blocks) == 2
+        for block_index in solver.factorized_blocks:
+            assert solver._block_solvers[block_index].name != "pardiso"
+
+    def test_repeated_grouped_solves_reuse_the_prepared_solvers(self):
+        # Backend-agnostic counterpart of the pardiso phase count below: no
+        # new solver object may be built by any number of grouped solves.
+        solver = self._prepared_solver(3)
+        prepared = dict(solver._block_solvers)
+        assert prepared
+
+        for _ in range(3):
+            solver.aggregate_for_demand(self._demand())
+
+        assert set(solver._block_solvers) == set(prepared)
+        for block_index, block_solver in prepared.items():
+            assert solver._block_solvers[block_index] is block_solver
+
+    def test_repeated_grouped_solves_stay_numerically_correct(self):
+        # The reuse above is only worth having if it still gives the right
+        # answer: a stale or wrongly-backed factorization would not.
+        lca, _, _ = _setup()
+        solver = self._prepared_solver(3)
+        co2_row = lca.dicts.biosphere[bd.get_node(database="bio", code="CO2").id]
+
+        # 1 steel (3 kg CO2) + 1 glider (2 steel -> 6 kg CO2) = 9 kg CO2.
+        for _ in range(3):
+            aggregate = solver.aggregate_for_demand(self._demand())
+            assert aggregate[co2_row] == pytest.approx(9.0)
+
+    @pytest.mark.skipif(not _pardiso_active(), reason="pardiso backend not active")
+    def test_factorizations_do_not_grow_with_the_number_of_grouped_solves(
+        self, monkeypatch
+    ):
+        """The regression this whole fix exists for.
+
+        Before it, `_factorize_block` was a no-op on pardiso - it stored a CSR
+        and nothing else - so every one of T time steps re-analysed and
+        re-factorized each of the B blocks its demand reached: T*B full MKL
+        factorizations where the pre-branch per-block SuperLU LU cost B.
+        Counting the phases for two different T is what makes that visible;
+        a single T could not tell T*B from B.
+        """
+
+        def factorizations_for(n_time_steps):
+            phases = _phase_spy(monkeypatch)
+            solver = self._prepared_solver(n_time_steps)
+            for _ in range(n_time_steps):
+                solver.aggregate_for_demand(self._demand())
+            return len(_numeric_factorizations(phases))
+
+        assert factorizations_for(10) == factorizations_for(2)
 
 
 @pytest.mark.usefixtures("two_background_activities_db")
