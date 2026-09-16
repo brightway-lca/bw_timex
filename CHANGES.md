@@ -6,8 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-* Added an iterative block solver: background blocks and the functional unit are solved by a Jacobi-preconditioned Neumann series instead of an LU factorization, falling back to the LU backend for any block the series cannot handle (zero diagonal, divergence, or too large a backward error). On the premise EV teaching notebook this takes `lci()` from ~23 s to ~4 s, with the same results. Set `BW_TIMEX_NO_ITERATIVE_SOLVER=1` to solve every block with the LU backend instead ([#PR](https://github.com/brightway-lca/bw_timex/pull/PR))
-* Added performance improvement for `BlockStructure.detect`, which grouped the matrix nonzeros with `np.unique(..., axis=0)`; counting encoded group pairs instead takes that step from ~0.9 s to ~0.01 s on a premise-sized technosphere ([#PR](https://github.com/brightway-lca/bw_timex/pull/PR))
+* Added an iterative block solver: background blocks and the functional unit are solved by a Jacobi-preconditioned Neumann series instead of an LU factorization, falling back to the LU backend for any block the series cannot handle (zero diagonal, divergence, or too large a backward error). On the premise EV teaching notebook this takes `lci()` from ~23 s to ~4 s, with the same results. Set `BW_TIMEX_NO_ITERATIVE_SOLVER=1` to solve every block with the LU backend instead ([#236](https://github.com/brightway-lca/bw_timex/pull/236))
+* Added performance improvement for `BlockStructure.detect`, which grouped the matrix nonzeros with `np.unique(..., axis=0)`; counting encoded group pairs instead takes that step from ~0.9 s to ~0.01 s on a premise-sized technosphere ([#236](https://github.com/brightway-lca/bw_timex/pull/236))
 
 ## [1.3.2] - 2026-09-15
 * Fixed support for pypardiso solver when using caching ([#234](https://github.com/brightway-lca/bw_timex/pull/234))
