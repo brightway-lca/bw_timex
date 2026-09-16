@@ -10,10 +10,13 @@ import scipy.sparse as sp
 
 from bw_timex.solvers import (
     BACKENDS,
+    backend_available,
     make_block_solver,
     make_persistent_block_solver,
     select_backend,
 )
+
+AVAILABLE = [name for name in BACKENDS if backend_available(name)]
 
 
 def _leontief_block(n=40, seed=0):
@@ -113,26 +116,46 @@ def test_a_solution_far_larger_than_its_demand_is_still_accepted():
     _assert_matches(result, _lu_reference(matrix, rhs))
 
 
-def test_a_block_whose_jacobi_iteration_diverges_falls_back_to_lu():
+@pytest.mark.parametrize("backend", AVAILABLE)
+def test_a_block_whose_jacobi_iteration_diverges_falls_back_to_lu(backend):
     # Nonsingular, but `I - D^-1 A` has spectral radius 4: the series runs away.
+    # Parametrized so each backend is exercised as the fallback target, not
+    # only whichever one this machine prefers.
     matrix = sp.csc_matrix(np.array([[1.0, 4.0], [4.0, 1.0]]))
     rhs = np.array([1.0, 2.0])
 
-    solver = make_block_solver(select_backend(), matrix, allow_iterative=True)
+    solver = make_block_solver(backend, matrix, allow_iterative=True)
     result = solver.solve(rhs)
 
     assert solver.fell_back
+    assert solver._fallback.name == backend
     assert np.allclose(matrix @ result, rhs)
 
 
-def test_a_block_with_a_zero_diagonal_falls_back_to_lu():
+@pytest.mark.parametrize("backend", AVAILABLE)
+def test_a_fallen_back_block_stays_on_its_backend(backend):
+    # The fallback is built once and reused, so a block that could not be
+    # iterated does not retry the series on every later solve.
+    matrix = sp.csc_matrix(np.array([[1.0, 4.0], [4.0, 1.0]]))
+    solver = make_block_solver(backend, matrix, allow_iterative=True)
+
+    solver.solve(np.array([1.0, 2.0]))
+    first = solver._fallback
+    second = solver.solve(np.array([[1.0, 0.0], [2.0, 1.0]]))
+
+    assert solver._fallback is first
+    assert np.allclose(matrix @ second, np.array([[1.0, 0.0], [2.0, 1.0]]))
+
+
+@pytest.mark.parametrize("backend", AVAILABLE)
+def test_a_block_with_a_zero_diagonal_falls_back_to_lu(backend):
     # No Jacobi preconditioner without a full diagonal.
     matrix = sp.csc_matrix(np.array([[0.0, 1.0], [1.0, 0.0]]))
     rhs = np.array([1.0, 2.0])
 
-    solver = make_block_solver(select_backend(), matrix, allow_iterative=True)
+    solver = make_block_solver(backend, matrix, allow_iterative=True)
 
-    assert solver.name in BACKENDS
+    assert solver.name == backend
     assert np.allclose(matrix @ solver.solve(rhs), rhs)
 
 
@@ -144,13 +167,29 @@ def test_an_empty_block_row_is_still_rejected():
         make_block_solver(select_backend(), matrix, allow_iterative=True)
 
 
-def test_env_var_disables_the_iterative_path(monkeypatch):
+@pytest.mark.parametrize("backend", AVAILABLE)
+def test_env_var_disables_the_iterative_path(monkeypatch, backend):
     monkeypatch.setenv("BW_TIMEX_NO_ITERATIVE_SOLVER", "1")
-    backend = select_backend()
 
     solver = make_block_solver(backend, _leontief_block(), allow_iterative=True)
 
     assert solver.name == backend
+
+
+@pytest.mark.parametrize("backend", AVAILABLE)
+def test_persistent_solver_falls_back_to_a_factorization_it_owns(backend):
+    # `make_persistent_block_solver` never hands back a pardiso solver, whose
+    # factorization lives in MKL's one global slot. That has to hold for the
+    # fallback behind the series too.
+    matrix = sp.csc_matrix(np.array([[1.0, 4.0], [4.0, 1.0]]))
+    rhs = np.array([1.0, 2.0])
+
+    solver = make_persistent_block_solver(matrix, backend, allow_iterative=True)
+    result = solver.solve(rhs)
+
+    assert solver.fell_back
+    assert solver._fallback.name != "pardiso"
+    assert np.allclose(matrix @ result, rhs)
 
 
 def test_persistent_solver_can_be_iterative_too():
