@@ -104,8 +104,11 @@ class BackgroundSolver:
 
     Attributes
     ----------
+    allow_iterative : bool
+        Whether blocks may be solved by Neumann series instead of an LU
+        factorization. `backend_name` stays the fallback either way.
     backend_name : str
-        The sparse solver backend this instance solves blocks with
+        The LU backend this instance falls back to
         (`"pardiso"`, `"umfpack"` or `"superlu"`), chosen once in
         `__init__` by `solvers.select_backend`. Read it to find out what a
         run actually used; set `BW_TIMEX_BLOCK_SOLVER` to force it.
@@ -121,6 +124,7 @@ class BackgroundSolver:
         biosphere_dict,
         structure: BlockStructure,
         max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES,
+        allow_iterative: bool = True,
     ) -> None:
         self.technosphere_matrix = technosphere_matrix.tocsc()
         self.biosphere_matrix = biosphere_matrix.tocsc()
@@ -131,6 +135,8 @@ class BackgroundSolver:
         self.max_batch_bytes = max_batch_bytes
 
         self.backend_name = select_backend()
+        # Solve blocks iteratively, with `backend_name`'s LU as the fallback.
+        self.allow_iterative = allow_iterative
         warn_if_suboptimal(self.backend_name)
 
         # Cache key routing: a `("db_code", ...)` key names a background
@@ -519,7 +525,11 @@ class BackgroundSolver:
     def _block_solver(self, block_index: int):
         solver = self._block_solvers.get(block_index)
         if solver is None:
-            solver = make_block_solver(self.backend_name, self._submatrix(block_index))
+            solver = make_block_solver(
+                self.backend_name,
+                self._submatrix(block_index),
+                allow_iterative=self.allow_iterative,
+            )
             self._block_solvers[block_index] = solver
             self.factorized_blocks.add(block_index)
         return solver
@@ -697,6 +707,8 @@ class BackgroundSolver:
         if existing is not None and getattr(existing, "name", None) != "pardiso":
             return
         self._block_solvers[block_index] = make_persistent_block_solver(
-            self._submatrix(block_index), self.backend_name
+            self._submatrix(block_index),
+            self.backend_name,
+            allow_iterative=self.allow_iterative,
         )
         self.factorized_blocks.add(block_index)

@@ -517,9 +517,9 @@ class TestBlockSolversAreReused:
         calls = []
         original_make_block_solver = background_solver_module.make_block_solver
 
-        def spy(backend, submatrix):
+        def spy(backend, submatrix, **kwargs):
             calls.append(submatrix)
-            return original_make_block_solver(backend, submatrix)
+            return original_make_block_solver(backend, submatrix, **kwargs)
 
         monkeypatch.setattr(background_solver_module, "make_block_solver", spy)
 

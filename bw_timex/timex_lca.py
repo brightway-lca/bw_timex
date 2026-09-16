@@ -45,6 +45,7 @@ from .database_metadata import resolve_database_dates_from_metadata
 from .dynamic_biosphere_builder import DynamicBiosphereBuilder
 from .helper_classes import InterDatabaseMapping, LazyActivity, TimeMappingDict
 from .matrix_modifier import MatrixModifier
+from .solvers import make_block_solver, select_backend
 from .timeline_builder import TimelineBuilder
 from .utils import (
     convert_date_string_to_datetime,
@@ -537,7 +538,9 @@ class TimexLCA:
             demand=self.demand, method=self.method
         )
         self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
-        self.base_lca.lci()
+        self.base_lca.load_lci_data()
+        self.base_lca.build_demand_array()
+        self._solve_functional_unit(self.base_lca)
         self.base_lca.lcia()
 
         # Create static_only dict that excludes dynamic processes that will be exploded later.
@@ -755,7 +758,9 @@ class TimexLCA:
             demand=demand, method=method
         )
         self.base_lca = LCA(fu, data_objs=data_objs, remapping_dicts=remapping)
-        self.base_lca.lci()
+        self.base_lca.load_lci_data()
+        self.base_lca.build_demand_array()
+        self._solve_functional_unit(self.base_lca)
         self.base_lca.lcia()
         self._last_timeline_build_key = None
         self._cached_timeline = None
@@ -1488,7 +1493,9 @@ class TimexLCA:
 
         logger.info("Calculating dynamic inventory...")
         if not build_dynamic_biosphere:
-            self.lca.lci()
+            self.lca.load_lci_data()
+            self.lca.build_demand_array()
+            self._solve_functional_unit(self.lca)
         else:  # building dynamic biosphere
             if expand_technosphere:
                 # Build matrices and dicts without solving; whether the fu
@@ -1536,7 +1543,7 @@ class TimexLCA:
                     # Background unit LCIs are solved by `BackgroundSolver`,
                     # never through `self.lca`, so the main matrix is solved
                     # exactly once and there is nothing to factorize for.
-                    self.lca.lci_calculation()
+                    self._solve_functional_unit(self.lca)
                     LCI_SOLVE_CACHE[solve_key] = (
                         self.lca.supply_array.copy(),
                         self.lca.inventory.copy(),
@@ -1654,6 +1661,26 @@ class TimexLCA:
             )
             return np.zeros(n_columns, dtype=np.int8), np.zeros(n_rows, dtype=np.int8)
         return column_labels.astype(str), row_labels.astype(str)
+
+    @staticmethod
+    def _solve_functional_unit(lca) -> None:
+        """Fill `lca.supply_array` and `lca.inventory` for its demand array.
+
+        Replaces `bw2calc`'s `lci_calculation`, which factorizes the whole
+        expanded technosphere for this one right-hand side. The matrix is
+        handed to `make_block_solver` as a single block, so the Neumann
+        series solves it where it can and the LU backend takes over where it
+        cannot.
+        """
+        solver = make_block_solver(
+            select_backend(), lca.technosphere_matrix, allow_iterative=True
+        )
+        supply = np.asarray(solver.solve(lca.demand_array), dtype=float)
+        lca.supply_array = supply
+        count = len(lca.dicts.activity)
+        lca.inventory = lca.biosphere_matrix @ sparse.spdiags(
+            [supply], [0], count, count
+        )
 
     def _build_background_solver(self) -> BackgroundSolver:
         """A `BackgroundSolver` over the current `self.lca`'s matrices.
