@@ -122,3 +122,62 @@ def test_solving_blockwise_reproduces_a_direct_solve():
 
     expected = sp.linalg.spsolve(matrix, demand)
     assert np.allclose(supply, expected)
+
+
+def test_repeated_cross_group_entries_give_the_same_blocks():
+    # Summed duplicates in the COO input, so the same group pair is seen many
+    # times over. The decomposition must not depend on how often it appears.
+    entries = [(0, 0, 1.0), (1, 1, 1.0)] + [(1, 0, -0.1)] * 20
+    matrix = _matrix(entries, 2)
+    labels = np.array(["fg", "bg"])
+
+    structure = BlockStructure.detect(matrix, labels)
+
+    assert _columns(structure) == [[0], [1]]
+
+
+def test_unsorted_column_indices_still_decompose_correctly():
+    matrix = _matrix(
+        [(0, 0, 1.0), (2, 0, -0.5), (1, 1, 1.0), (2, 1, -0.5), (2, 2, 1.0)], 3
+    )
+    for column in range(3):
+        start, end = matrix.indptr[column], matrix.indptr[column + 1]
+        matrix.indices[start:end] = matrix.indices[start:end][::-1]
+        matrix.data[start:end] = matrix.data[start:end][::-1]
+    matrix.has_sorted_indices = False
+    labels = np.array(["fg", "fg", "bg"])
+
+    structure = BlockStructure.detect(matrix, labels)
+
+    assert _columns(structure) == [[0, 1], [2]]
+
+
+def test_many_groups_decompose_into_blocks_that_reproduce_a_direct_solve():
+    # A wide, randomly linked group graph: the encoding of group pairs has to
+    # survive more groups than the small fixtures above exercise.
+    rng = np.random.default_rng(0)
+    n_groups, per_group = 12, 4
+    n = n_groups * per_group
+    labels = np.array([f"db{index // per_group}" for index in range(n)])
+    dense = np.eye(n)
+    for column in range(n):
+        group = column // per_group
+        # Consume only from later groups, so the system stays triangular.
+        for other in range(group + 1, n_groups):
+            if rng.random() < 0.3:
+                dense[other * per_group + rng.integers(per_group), column] = -0.1
+    matrix = sp.csc_matrix(dense)
+
+    structure = BlockStructure.detect(matrix, labels)
+
+    assert len(structure.blocks) == n_groups
+    assert not structure.is_degenerate
+    demand = np.zeros(n)
+    demand[0] = 1.0
+    supply = np.zeros(n)
+    for block in structure.blocks:
+        rhs = demand[block.rows] - np.asarray(matrix[block.rows, :] @ supply)
+        supply[block.columns] = sp.linalg.spsolve(
+            matrix[block.rows][:, block.columns].tocsc(), rhs
+        )
+    assert np.allclose(supply, sp.linalg.spsolve(matrix, demand))

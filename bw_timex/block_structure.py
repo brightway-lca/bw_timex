@@ -101,9 +101,17 @@ class BlockStructure:
         entries_per_column = np.diff(matrix.indptr)
         column_group_per_entry = np.repeat(group_of_column, entries_per_column)
         row_group_per_entry = group_of_row[matrix.indices]
-        pairs = np.unique(
-            np.stack([column_group_per_entry, row_group_per_entry], axis=1), axis=0
+        # Each (column group, row group) pair is encoded as one integer and
+        # counted into `n_groups ** 2` bins. `np.unique(..., axis=0)` on the
+        # stacked pairs does the same thing by lexsorting a void view of all
+        # `2 * nnz` values, which costs ~0.9 s on a premise-sized matrix
+        # against ~0.01 s here.
+        seen = np.bincount(
+            column_group_per_entry * n_groups + row_group_per_entry,
+            minlength=n_groups * n_groups,
         )
+        codes = np.flatnonzero(seen)
+        pairs = np.stack([codes // n_groups, codes % n_groups], axis=1)
         off_diagonal = pairs[pairs[:, 0] != pairs[:, 1]]
 
         # "Column group C has entries in row group R" means C consumes from R,

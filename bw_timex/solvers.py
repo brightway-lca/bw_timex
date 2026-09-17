@@ -1,11 +1,12 @@
-"""Sparse solver backends for per-block background solving.
+"""Sparse solvers for per-block background solving.
 
 `bw_timex` solves one diagonal block of the technosphere at a time, many
-times over, so which sparse solver is available dominates `lci()` runtime.
-This module probes what the machine actually has - never what its platform
-suggests - and wraps each option behind one `solve(rhs)` interface.
+times over. Blocks are solved iteratively (`_IterativeBlockSolver`, a
+Jacobi-preconditioned Neumann series, no factorization); the LU backends
+below are the fallback for blocks that series cannot handle, and what a
+caller gets when it does not pass `allow_iterative`.
 
-Three backends, in preference order:
+Three LU backends, in preference order:
 
 - `pardiso` (Intel MKL, via `pypardiso`): the only one that takes a 2-D
   right-hand side into a single native call with `nrhs > 1`.
@@ -31,6 +32,25 @@ from typing import Optional
 import numpy as np
 
 BACKENDS = ("pardiso", "umfpack", "superlu")
+
+# A column of the Neumann series stops when its increment is this small
+# relative to the column itself. Terms keep shrinking geometrically - each one
+# is computed from the previous, so there is no roundoff floor to stall on -
+# and 1e-15 buys agreement with an LU solve to ~1e-14 for ~25 extra terms.
+ITERATIVE_RTOL = 1e-15
+
+# Largest backward error, per column, a converged series may leave before the
+# block is handed to an LU backend instead:
+# `||A x - b|| / (||A|| ||x|| + ||b||)`. Scaling by `||b||` alone would reject
+# correct solves of any system whose solution dwarfs its demand - a functional
+# unit of one vehicle pulling 20,000 kWh does exactly that.
+ITERATIVE_RESIDUAL_TOL = 1e-9
+
+# Cap on series terms. Premise-sized blocks converge in ~110.
+ITERATIVE_MAX_ITERATIONS = 500
+
+# Consecutive growing increments before the series is called divergent.
+ITERATIVE_DIVERGENCE_PATIENCE = 5
 
 _warned = False
 
@@ -314,6 +334,125 @@ class _PardisoBlockSolver:
         return result
 
 
+class _IterativeBlockSolver:
+    """A block solved by summing the Jacobi-preconditioned Neumann series
+    `A^-1 b = sum_k (I - D^-1 A)^k D^-1 b`, with no factorization.
+
+    On a premise-sized vintage block (43.6k rows, 525k nonzeros) that is
+    ~110 sparse matrix products, 20-25 ms per right-hand side, against ~4 s
+    for the UMFPACK factorization the block would otherwise need.
+
+    A block with a zero on its diagonal is rejected in `__init__`; one whose
+    series diverges or misses `residual_tol` falls back from `solve`. Either
+    way `fallback` - a zero-argument callable, so no LU is built unless it is
+    needed - provides the solver used from then on.
+    """
+
+    name = "iterative"
+
+    def __init__(
+        self,
+        submatrix,
+        fallback,
+        rtol: float = ITERATIVE_RTOL,
+        residual_tol: float = ITERATIVE_RESIDUAL_TOL,
+        max_iterations: int = ITERATIVE_MAX_ITERATIONS,
+    ):
+        import scipy.sparse as sp
+
+        matrix = submatrix.tocsr()
+        diagonal = matrix.diagonal()
+        if np.any(diagonal == 0):
+            raise _NoJacobiPreconditioner(
+                f"{int(np.count_nonzero(diagonal == 0))} diagonal entries are zero"
+            )
+        self.rtol = rtol
+        self.residual_tol = residual_tol
+        self.max_iterations = max_iterations
+        self._matrix = matrix
+        # `||A||_inf`, the scale the backward error in `_accept` is measured
+        # against. One pass over the nonzeros, once per block.
+        self._matrix_norm = float(abs(matrix).sum(axis=1).max())
+        self._inverse_diagonal = 1.0 / diagonal
+        # `I - D^-1 A`, built once and reused by every solve on this block.
+        self._iteration_matrix = (
+            sp.eye(matrix.shape[0], format="csr")
+            - sp.diags(self._inverse_diagonal) @ matrix
+        ).tocsr()
+        self._iteration_matrix.eliminate_zeros()
+
+        self._build_fallback = fallback
+        self._fallback = None
+        self.fell_back = False
+        # Series terms summed so far, across every solve. Diagnostic.
+        self.iterations = 0
+
+    def solve(self, rhs):
+        if self._fallback is not None:
+            return self._fallback.solve(rhs)
+
+        two_dimensional = rhs.ndim == 2
+        columns = rhs if two_dimensional else rhs.reshape(-1, 1)
+        solution = self._series(columns)
+        if solution is None:
+            self._fallback = self._build_fallback()
+            self.fell_back = True
+            return self._fallback.solve(rhs)
+        return solution if two_dimensional else solution.ravel()
+
+    def _series(self, columns):
+        """The summed series, or None if this block cannot be iterated.
+
+        Convergence is judged per column, not on the norm of the batch: a
+        cascade carries columns many orders of magnitude apart.
+        """
+        solution = self._inverse_diagonal[:, None] * columns
+        term = solution.copy()
+        previous = None
+        growing = 0
+        for _ in range(self.max_iterations):
+            term = self._iteration_matrix @ term
+            solution += term
+            self.iterations += 1
+            increment = np.linalg.norm(term, axis=0)
+            if not np.all(np.isfinite(increment)):
+                return None
+            if np.all(increment <= self.rtol * np.linalg.norm(solution, axis=0)):
+                return self._accept(solution, columns)
+            largest = increment.max()
+            if previous is not None and largest > previous:
+                growing += 1
+                if growing >= ITERATIVE_DIVERGENCE_PATIENCE:
+                    return None
+            else:
+                growing = 0
+            previous = largest
+        return None
+
+    def _accept(self, solution, columns):
+        """The converged sum, or None if its backward error is too large."""
+        residual = np.linalg.norm(self._matrix @ solution - columns, axis=0)
+        scale = self._matrix_norm * np.linalg.norm(solution, axis=0) + np.linalg.norm(
+            columns, axis=0
+        )
+        relative = np.divide(
+            residual, scale, out=np.zeros_like(residual), where=scale > 0
+        )
+        if not np.all(np.isfinite(relative)) or relative.max() > self.residual_tol:
+            return None
+        return solution
+
+
+def iterative_solver_enabled() -> bool:
+    """Whether the series path may be used. `BW_TIMEX_NO_ITERATIVE_SOLVER`
+    turns it off process-wide, leaving every block on the LU backend."""
+    return not os.environ.get("BW_TIMEX_NO_ITERATIVE_SOLVER")
+
+
+class _NoJacobiPreconditioner(Exception):
+    """The block has a zero on its diagonal, so it cannot be iterated."""
+
+
 def _reject_empty_rows(csr) -> None:
     """Raise if `csr` has a zero row, naming where and why.
 
@@ -334,8 +473,12 @@ def _reject_empty_rows(csr) -> None:
         )
 
 
-def make_block_solver(backend: str, submatrix):
+def make_block_solver(backend: str, submatrix, allow_iterative: bool = False):
     """Build the block solver named by `backend` over `submatrix`.
+
+    With `allow_iterative`, returns an `_IterativeBlockSolver` that builds
+    `backend`'s LU only if the series cannot solve the block. Off by default,
+    so naming a backend returns that backend's object.
 
     `backend` is verified first (`require_backend`), so asking for a backend
     this machine cannot provide raises instead of quietly handing back an
@@ -353,16 +496,38 @@ def make_block_solver(backend: str, submatrix):
     require_backend(backend)
     csr = submatrix.tocsr()
     _reject_empty_rows(csr)
-    if backend == "pardiso":
-        return _PardisoBlockSolver(csr)
-    if backend == "umfpack":
-        return _UmfpackBlockSolver(submatrix)
-    if backend == "superlu":
-        return _SuperLUBlockSolver(submatrix)
-    raise ValueError(f"Unknown block solver {backend!r}")
+
+    def build_lu():
+        if backend == "pardiso":
+            return _PardisoBlockSolver(csr)
+        if backend == "umfpack":
+            return _UmfpackBlockSolver(submatrix)
+        if backend == "superlu":
+            return _SuperLUBlockSolver(submatrix)
+        raise ValueError(f"Unknown block solver {backend!r}")
+
+    if allow_iterative:
+        iterative = _try_iterative(csr, build_lu)
+        if iterative is not None:
+            return iterative
+    return build_lu()
 
 
-def make_persistent_block_solver(submatrix, backend: Optional[str] = None):
+def _try_iterative(csr, build_lu):
+    """An iterative solver for this block, or None when the path is switched
+    off or the block has no Jacobi preconditioner. Non-convergence is not
+    decided here; that falls back from inside `solve`."""
+    if not iterative_solver_enabled():
+        return None
+    try:
+        return _IterativeBlockSolver(csr, build_lu)
+    except _NoJacobiPreconditioner:
+        return None
+
+
+def make_persistent_block_solver(
+    submatrix, backend: Optional[str] = None, allow_iterative: bool = False
+):
     """Build a block solver that *owns* its factorization for its lifetime.
 
     Use this - not `make_block_solver` - when one block will be solved many
@@ -384,7 +549,18 @@ def make_persistent_block_solver(submatrix, backend: Optional[str] = None):
     """
     if backend is None:
         backend = select_backend()
-    _reject_empty_rows(submatrix.tocsr())
-    if backend == "umfpack":
-        return _UmfpackBlockSolver(submatrix)
-    return _SuperLUBlockSolver(submatrix)
+    csr = submatrix.tocsr()
+    _reject_empty_rows(csr)
+
+    def build_lu():
+        if backend == "umfpack":
+            return _UmfpackBlockSolver(submatrix)
+        return _SuperLUBlockSolver(submatrix)
+
+    if allow_iterative:
+        # Persistent in the sense meant here: the iteration matrix is built
+        # once and reused, so revisiting the block costs no re-analysis.
+        iterative = _try_iterative(csr, build_lu)
+        if iterative is not None:
+            return iterative
+    return build_lu()

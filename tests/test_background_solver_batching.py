@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
-from bw_timex.solvers import select_backend
+from bw_timex.solvers import iterative_solver_enabled, select_backend
 
 from .test_background_solver import (  # noqa: F401
     _setup,
@@ -279,8 +279,57 @@ class TestPrepareBatchLivenessAcrossBlocks:
             )
 
 
+@pytest.fixture
+def lu_block_solver(monkeypatch):
+    """Pin a test to the LU path.
+
+    The tests below count MKL factorization phases. Blocks are solved by
+    Neumann series by default, which factorizes nothing, so those counts are
+    all zero unless the series is switched off - and a test whose subject
+    never runs passes for the wrong reason.
+    """
+    monkeypatch.setenv("BW_TIMEX_NO_ITERATIVE_SOLVER", "1")
+    assert not iterative_solver_enabled()
+
+
 @pytest.mark.skipif(not _pardiso_active(), reason="pardiso backend not active")
 @pytest.mark.usefixtures("two_background_activities_db")
+class TestPardisoIsNotEnteredOnTheDefaultPath:
+    """What pardiso does when the series is available: nothing.
+
+    The counts below are the point of the iterative solver on the backend
+    where a factorization is cheapest to reach - if MKL is still entered on
+    an ordinary run, the series is not doing the work.
+    """
+
+    def test_a_default_run_makes_no_mkl_calls(self, monkeypatch):
+        phases = _phase_spy(monkeypatch)
+
+        _, _, solver = _setup()
+        c1 = bd.get_node(database="db_2020", code="C1")
+        c2 = bd.get_node(database="db_2020", code="C2")
+        solver.prepare([c1.id, c2.id])
+
+        assert solver.n_solves == 1
+        assert phases == []
+        assert {s.name for s in solver._block_solvers.values()} == {"iterative"}
+
+    def test_the_answer_is_the_one_pardiso_gives(self, monkeypatch):
+        c1 = bd.get_node(database="db_2020", code="C1")
+
+        _, structure, iterative = _setup()
+        from_series = iterative.unit_supply(c1.id).values
+
+        monkeypatch.setenv("BW_TIMEX_NO_ITERATIVE_SOLVER", "1")
+        _, _, direct = _setup()
+        assert direct.backend_name == "pardiso"
+        from_pardiso = direct.unit_supply(c1.id).values
+
+        assert np.allclose(from_series, from_pardiso, rtol=1e-10, atol=0)
+
+
+@pytest.mark.skipif(not _pardiso_active(), reason="pardiso backend not active")
+@pytest.mark.usefixtures("two_background_activities_db", "lu_block_solver")
 class TestPardisoDoesNotRefactorize:
     """MKL Pardiso keeps exactly one factorization alive, so alternating
     blocks re-analyses and re-factorizes on every hop. `_call_pardiso` runs
@@ -334,7 +383,7 @@ class TestPardisoDoesNotRefactorize:
 
 
 @pytest.mark.skipif(not _pardiso_active(), reason="pardiso backend not active")
-@pytest.mark.usefixtures("chained_background_two_step_materials_db")
+@pytest.mark.usefixtures("chained_background_two_step_materials_db", "lu_block_solver")
 class TestPardisoAcrossTwoBlocks:
     """The same phase counting, on a fixture that actually has two blocks.
 
@@ -464,6 +513,7 @@ class TestGroupedSolvesReuseOneFactorizationPerBlock:
             assert aggregate[co2_row] == pytest.approx(9.0)
 
     @pytest.mark.skipif(not _pardiso_active(), reason="pardiso backend not active")
+    @pytest.mark.usefixtures("lu_block_solver")
     def test_factorizations_do_not_grow_with_the_number_of_grouped_solves(
         self, monkeypatch
     ):
@@ -517,9 +567,9 @@ class TestBlockSolversAreReused:
         calls = []
         original_make_block_solver = background_solver_module.make_block_solver
 
-        def spy(backend, submatrix):
+        def spy(backend, submatrix, **kwargs):
             calls.append(submatrix)
-            return original_make_block_solver(backend, submatrix)
+            return original_make_block_solver(backend, submatrix, **kwargs)
 
         monkeypatch.setattr(background_solver_module, "make_block_solver", spy)
 

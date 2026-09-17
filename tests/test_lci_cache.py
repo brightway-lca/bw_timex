@@ -175,10 +175,19 @@ class TestModuleLevelLCICache:
     def test_expanded_lci_solves_the_main_matrix_exactly_once(self, monkeypatch):
         # Since background unit LCIs never run through `self.lca` any more, the
         # expanded matrix needs one solve and no `redo_lci` reset afterwards.
+        # The solve is `_solve_functional_unit`, which replaced bw2calc's
+        # `lci_calculation` for the whole-matrix right-hand side.
+        import bw_timex.timex_lca as timex_lca
+
         tlca = _make_tlca()
-        calls = {"lci_calculation": 0, "redo_lci": 0}
+        calls = {"functional_unit_solve": 0, "lci_calculation": 0, "redo_lci": 0}
+        original_solve = timex_lca.TimexLCA._solve_functional_unit
         original_lci_calculation = bw2calc.LCA.lci_calculation
         original_redo_lci = bw2calc.LCA.redo_lci
+
+        def counting_solve(lca_obj, *args, **kwargs):
+            calls["functional_unit_solve"] += 1
+            return original_solve(lca_obj, *args, **kwargs)
 
         def counting_lci_calculation(lca_obj, *args, **kwargs):
             calls["lci_calculation"] += 1
@@ -188,11 +197,18 @@ class TestModuleLevelLCICache:
             calls["redo_lci"] += 1
             return original_redo_lci(lca_obj, *args, **kwargs)
 
+        monkeypatch.setattr(
+            timex_lca.TimexLCA, "_solve_functional_unit", staticmethod(counting_solve)
+        )
         monkeypatch.setattr(bw2calc.LCA, "lci_calculation", counting_lci_calculation)
         monkeypatch.setattr(bw2calc.LCA, "redo_lci", counting_redo_lci)
         tlca.lci(expand_technosphere=True, build_dynamic_biosphere=True)
 
-        assert calls == {"lci_calculation": 1, "redo_lci": 0}
+        assert calls == {
+            "functional_unit_solve": 1,
+            "lci_calculation": 0,
+            "redo_lci": 0,
+        }
         # And the surviving fu inventory really is the functional unit's.
         assert tlca._background_solver.n_solves > 0
         tlca.static_lcia()
