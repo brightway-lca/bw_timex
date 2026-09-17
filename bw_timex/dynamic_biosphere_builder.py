@@ -9,7 +9,6 @@ from .helper_classes import SetList
 from .utils import (
     convert_date_string_to_datetime,
     get_reference_product_production_amount,
-    get_temporal_evolution_factor,
 )
 
 
@@ -283,16 +282,9 @@ class DynamicBiosphereBuilder:
                 ).date
                 date = td_producer[0]
 
-                # Get temporal evolution factor for this timestamp
-                temporal_evolution_factor = 1.0
-                if hasattr(row, "temporal_evolution") and row.temporal_evolution is not None:
-                    reference = getattr(row, "temporal_evolution_reference", "producer")
-                    reference_time = (
-                        row.date_consumer if reference == "consumer" else time_in_datetime
-                    )
-                    temporal_evolution_factor = get_temporal_evolution_factor(
-                        row.temporal_evolution, reference_time
-                    )
+                # No temporal evolution scaling here: these entries are per unit of
+                # the producing process, and the evolution of an exchange is already
+                # carried by the timeline amounts that scale them.
 
                 for input_id, exc_amount, temporal_distribution in (
                     self.get_biosphere_exchanges(
@@ -308,7 +300,6 @@ class DynamicBiosphereBuilder:
                             dates = td_producer  # datetime array, same time as producer
                             values = [
                                 exc_amount
-                                * temporal_evolution_factor
                                 * td_values[
                                     np.argmin(
                                         np.abs(
@@ -321,11 +312,11 @@ class DynamicBiosphereBuilder:
                         else:
                             # we can add a datetime of len(1) to a timedelta of len(N) easily
                             dates = td_producer + td_dates
-                            values = exc_amount * temporal_evolution_factor * td_values
+                            values = exc_amount * td_values
 
                     else:  # exchange has no TD
                         dates = td_producer  # datetime array, same time as producer
-                        values = [exc_amount * temporal_evolution_factor]
+                        values = [exc_amount]
 
                     # Add entries to dynamic bio matrix
                     for date, amount in zip(dates, values):

@@ -352,3 +352,9 @@ walks through that choice.
 All of this is optional: without it, exchange amounts stay constant over time. And it
 applies to the foreground only — background processes evolve through the time-specific
 databases above.
+
+The [timeline](build_process_timeline.md) reports the evolved amounts: an exchange that
+carries temporal evolution shows up with its `amount` (and `cumulative_amount`) already
+scaled by the factor for that row's date, and the factor itself in a
+`temporal_evolution_factor` column, so it can be read back against the exchange's base
+amount.

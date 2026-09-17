@@ -7,10 +7,7 @@ import numpy as np
 import pandas as pd
 
 from .helper_classes import InterDatabaseMapping
-from .utils import (
-    get_reference_product_production_amount,
-    get_temporal_evolution_factor,
-)
+from .utils import get_reference_product_production_amount
 
 
 class MatrixModifier:
@@ -256,16 +253,8 @@ class MatrixModifier:
             production_exchange_amount
         )  # abs value used for scaling to preserve the sign of the exchange
 
-        # Apply temporal evolution scaling if present
-        if hasattr(row, "temporal_evolution") and row.temporal_evolution is not None:
-            reference = getattr(row, "temporal_evolution_reference", "producer")
-            reference_date = (
-                row.date_consumer if reference == "consumer" else row.date_producer
-            )
-            factor = get_temporal_evolution_factor(
-                row.temporal_evolution, reference_date
-            )
-            scaled_amount *= factor
+        # `row.amount` already carries the temporal evolution factor: the timeline
+        # applies it once, when it is built.
 
         if new_producer_id == new_consumer_id:
             # A process consuming its own product: this lands on the diagonal,
