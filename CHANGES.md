@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* Added `xtick_interval` to `plot_characterized_inventory_as_waterfall`, which labels only every n-th time step so the axis stays readable when the inventory spans many of them ([#238](https://github.com/brightway-lca/bw_timex/pull/238))
 
 ## [1.3.2] - 2026-09-15
 * Fixed support for pypardiso solver when using caching ([#234](https://github.com/brightway-lca/bw_timex/pull/234))
