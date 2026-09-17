@@ -15,6 +15,7 @@ from .utils import (
     convert_date_string_to_datetime,
     extract_date_as_integer,
     extract_date_as_string,
+    get_temporal_evolution_factor,
     linear_interpolation_weights,
     nearest_date_weight,
     round_datetime,
@@ -311,6 +312,8 @@ class TimelineBuilder:
         grouped_edges["hash_producer"] = grouped_edges["date_producer"].map(hash_cache)
         grouped_edges["hash_consumer"] = grouped_edges["date_consumer"].map(hash_cache)
 
+        grouped_edges = self._apply_temporal_evolution(grouped_edges)
+
         grouped_edges = self._drop_edges_of_unsupplied_consumers(grouped_edges)
 
         self._check_traversed_databases_are_mapped(grouped_edges)
@@ -383,9 +386,47 @@ class TimelineBuilder:
                 "temporal_market_shares",
                 "temporal_evolution",
                 "temporal_evolution_reference",
+                "temporal_evolution_factor",
             ]
         ]
 
+        return grouped_edges
+
+    def _apply_temporal_evolution(self, grouped_edges: pd.DataFrame) -> pd.DataFrame:
+        """Scale the amounts of edges that carry temporal evolution.
+
+        An edge's temporal evolution says how much of it happens at a given point in
+        calendar time, so the factor for each row is looked up at that row's own date -
+        the producer's by default, the consumer's if the exchange says so - and applied
+        to `amount` and `cumulative_amount` here, once, while the timeline is built.
+        The timeline therefore reports the amounts that are actually used downstream,
+        and the matrix builders consume it as-is.
+
+        The factor itself is kept in `temporal_evolution_factor` so a scaled row can
+        still be read back against the exchange's unscaled amount.
+
+        Note that only the edge carrying the evolution is scaled. The cumulative amounts
+        of edges *upstream* of it still reflect the unscaled demand, since graph
+        traversal - and the cutoffs applied during it - runs before any of this.
+        """
+        if grouped_edges.empty:
+            grouped_edges["temporal_evolution_factor"] = pd.Series(dtype=float)
+            return grouped_edges
+
+        factors = [
+            get_temporal_evolution_factor(
+                row.temporal_evolution,
+                row.date_consumer
+                if row.temporal_evolution_reference == "consumer"
+                else row.date_producer,
+            )
+            if row.temporal_evolution
+            else 1.0
+            for row in grouped_edges.itertuples()
+        ]
+        grouped_edges["temporal_evolution_factor"] = factors
+        grouped_edges["amount"] = grouped_edges["amount"] * factors
+        grouped_edges["cumulative_amount"] = grouped_edges["cumulative_amount"] * factors
         return grouped_edges
 
     ###################################################

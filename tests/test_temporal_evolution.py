@@ -518,3 +518,188 @@ def test_temporal_evolution_applied_with_bfs_traversal():
     assert score("bfs") == pytest.approx(7.5, rel=1e-4)
     # and bfs must agree with the priority traversal
     assert score("bfs") == pytest.approx(score("priority"), rel=1e-4)
+
+
+from dynamic_characterization.ipcc_ar6 import characterize_co2  # noqa: E402
+
+
+@bw2test
+def test_timeline_amounts_carry_the_evolution_factor():
+    """The timeline reports the evolved amount, and the factor that produced it."""
+    bd.Database("bio").write(
+        {("bio", "CO2"): {"type": "emission", "name": "carbon dioxide"}}
+    )
+    for db_name in ("db_2020", "db_2030"):
+        bd.Database(db_name).write(
+            {
+                (db_name, "electricity"): {
+                    "name": "electricity production",
+                    "location": "somewhere",
+                    "reference product": "electricity",
+                    "exchanges": [
+                        {
+                            "amount": 1,
+                            "type": "production",
+                            "input": (db_name, "electricity"),
+                        },
+                        {"amount": 1.0, "type": "biosphere", "input": ("bio", "CO2")},
+                    ],
+                },
+            }
+        )
+
+    bd.Database("foreground").write(
+        {
+            ("foreground", "consumer"): {
+                "name": "consuming process",
+                "location": "somewhere",
+                "reference product": "consuming process",
+                "exchanges": [
+                    {
+                        "amount": 1,
+                        "type": "production",
+                        "input": ("foreground", "consumer"),
+                    },
+                    {
+                        "amount": 10,
+                        "type": "technosphere",
+                        "input": ("db_2020", "electricity"),
+                        "temporal_distribution": TemporalDistribution(
+                            date=np.array([0], dtype="timedelta64[Y]"),
+                            amount=np.array([1.0]),
+                        ),
+                        "temporal_evolution_factors": {
+                            datetime(2020, 1, 1): 1.0,
+                            datetime(2030, 1, 1): 0.5,
+                        },
+                    },
+                ],
+            },
+        }
+    )
+    bd.Method(("GWP", "example")).write([(("bio", "CO2"), 1)])
+    for db in bd.databases:
+        bd.Database(db).register()
+        bd.Database(db).process()
+
+    tlca = TimexLCA(
+        demand={("foreground", "consumer"): 1},
+        method=("GWP", "example"),
+        database_dates={
+            "db_2020": datetime(2020, 1, 1),
+            "db_2030": datetime(2030, 1, 1),
+            "foreground": "dynamic",
+        },
+    )
+    tlca.build_timeline(starting_datetime="2025-01-01")
+
+    electricity_rows = tlca.timeline[
+        tlca.timeline["producer_name"] == "electricity production"
+    ]
+    # 2025 sits halfway between the two anchors, so the factor is 0.75
+    assert electricity_rows["temporal_evolution_factor"].tolist() == pytest.approx(
+        [0.75], abs=1e-3
+    )
+    assert electricity_rows["amount"].tolist() == pytest.approx([7.5], abs=1e-2)
+    assert electricity_rows["cumulative_amount"].tolist() == pytest.approx([7.5], abs=1e-2)
+
+
+@bw2test
+def test_dynamic_score_matches_hardcoded_amount_for_foreground_producer():
+    """A flat factor on a foreground-to-foreground edge is the same as scaling the amount.
+
+    The producer here is a temporalized process, not a background market, which is the
+    case where the factor could be applied twice - once on the technosphere entry and
+    once on the producer's biosphere flows - and so silently squared.
+    """
+    bd.Database("bio").write(
+        {("bio", "CO2"): {"type": "emission", "name": "carbon dioxide"}}
+    )
+    for db_name in ("db_2020", "db_2030"):
+        bd.Database(db_name).write(
+            {
+                (db_name, "input"): {
+                    "name": "background input",
+                    "location": "somewhere",
+                    "reference product": "background input",
+                    "exchanges": [
+                        {"amount": 1, "type": "production", "input": (db_name, "input")},
+                        {"amount": 1.0, "type": "biosphere", "input": ("bio", "CO2")},
+                    ],
+                },
+            }
+        )
+
+    def foreground_db(name, amount, evolution):
+        middle_exchange = {
+            "amount": amount,
+            "type": "technosphere",
+            "input": (name, "middle"),
+            "temporal_distribution": TemporalDistribution(
+                date=np.array([0], dtype="timedelta64[Y]"),
+                amount=np.array([1.0]),
+            ),
+        }
+        if evolution is not None:
+            middle_exchange["temporal_evolution_factors"] = evolution
+        bd.Database(name).write(
+            {
+                (name, "middle"): {
+                    "name": f"middle process ({name})",
+                    "location": "somewhere",
+                    "reference product": f"middle product ({name})",
+                    "exchanges": [
+                        {"amount": 1, "type": "production", "input": (name, "middle")},
+                        {"amount": 2.0, "type": "biosphere", "input": ("bio", "CO2")},
+                        {
+                            "amount": 3.0,
+                            "type": "technosphere",
+                            "input": ("db_2020", "input"),
+                        },
+                    ],
+                },
+                (name, "final"): {
+                    "name": f"final process ({name})",
+                    "location": "somewhere",
+                    "reference product": f"final product ({name})",
+                    "exchanges": [
+                        {"amount": 1, "type": "production", "input": (name, "final")},
+                        middle_exchange,
+                    ],
+                },
+            }
+        )
+
+    foreground_db("foreground", 10, {datetime(2020, 1, 1): 0.5, datetime(2040, 1, 1): 0.5})
+    foreground_db("foreground_hardcoded", 5, None)
+
+    bd.Method(("GWP", "example")).write([(("bio", "CO2"), 1)])
+    for db in bd.databases:
+        bd.Database(db).register()
+        bd.Database(db).process()
+
+    def run(database):
+        tlca = TimexLCA(
+            demand={(database, "final"): 1},
+            method=("GWP", "example"),
+            database_dates={
+                "db_2020": datetime(2020, 1, 1),
+                "db_2030": datetime(2030, 1, 1),
+                database: "dynamic",
+            },
+        )
+        tlca.build_timeline(starting_datetime="2025-01-01")
+        tlca.lci()
+        tlca.static_lcia()
+        tlca.dynamic_lcia(
+            metric="GWP",
+            time_horizon=100,
+            characterization_functions={bd.get_node(code="CO2").id: characterize_co2},
+        )
+        return tlca
+
+    evolved = run("foreground")
+    hardcoded = run("foreground_hardcoded")
+
+    assert evolved.static_score == pytest.approx(hardcoded.static_score, rel=1e-9)
+    assert evolved.dynamic_score == pytest.approx(hardcoded.dynamic_score, rel=1e-9)

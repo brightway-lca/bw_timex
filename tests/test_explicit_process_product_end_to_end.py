@@ -363,6 +363,8 @@ def test_multilayer_explicit_process_product_chain_with_evolution():
     evolved_component_rows = evolved_tlca.timeline[
         evolved_tlca.timeline["producer_name"] == "component process"
     ]
+    # The timeline reports the amounts that are actually used: halved by the factor,
+    # which is looked up at the consumer's date here, as the exchange asks for.
     assert sorted(
         (
             row.date_consumer.year,
@@ -370,8 +372,14 @@ def test_multilayer_explicit_process_product_chain_with_evolution():
             float(row.amount),
         )
         for row in evolved_component_rows.itertuples()
-    ) == pytest.approx(observed_component_timeline)
+    ) == pytest.approx(
+        [
+            (consumer_year, producer_year, amount * 0.5)
+            for consumer_year, producer_year, amount in observed_component_timeline
+        ]
+    )
     assert set(evolved_component_rows["temporal_evolution_reference"]) == {"consumer"}
+    assert set(evolved_component_rows["temporal_evolution_factor"]) == {0.5}
     assert evolved_tlca.static_score == pytest.approx(4.0)
 
 
