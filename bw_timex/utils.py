@@ -367,6 +367,7 @@ def plot_characterized_inventory_as_waterfall(
     static_scores=None,
     prospective_scores=None,
     order_stacked_activities=None,
+    xtick_interval=None,
 ):
     """
     Plot a stacked waterfall chart of characterized inventory data. As comparison,
@@ -382,6 +383,10 @@ def plot_characterized_inventory_as_waterfall(
         Dictionary of prospective scores. Default is None.
     order_stacked_activities : list, optional
         List of activities to order the stacked bars in the waterfall plot. Default is None.
+    xtick_interval : int, optional
+        Label only every n-th time step, which keeps the axis readable when the inventory
+        spans many of them. The `static` and `prospective` columns, if shown, keep their
+        labels either way. Default is None, which labels every step.
 
     Returns
     -------
@@ -479,6 +484,14 @@ def plot_characterized_inventory_as_waterfall(
     ax.set_ylabel("GWP [kg CO2-eq]")
     ax.set_xlabel("")
     plt.xticks(rotation=45, ha="right")
+
+    if xtick_interval:
+        time_step = 0
+        for label in ax.get_xticklabels():
+            if label.get_text() in ("static", "prospective"):
+                continue
+            label.set_visible(time_step % xtick_interval == 0)
+            time_step += 1
 
     if static_scores:
         ax.axvline(x=0.5, color="black", linestyle="--", lw=1)
