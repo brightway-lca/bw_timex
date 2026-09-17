@@ -423,3 +423,81 @@ class TestAddTemporalEvolutionToExchange:
             output_database="db_2024",
         )
         assert exc.get("temporal_evolution_amounts") == amounts
+
+
+# --- plot_characterized_inventory_as_waterfall ---
+
+
+class _FakeTimexLCA:
+    """The bare minimum the waterfall plot reads off a TimexLCA."""
+
+    temporal_grouping = "year"
+
+    def __init__(self, years):
+        self.characterized_inventory = pd.DataFrame(
+            {
+                "date": pd.to_datetime([f"{year}-01-01" for year in years]),
+                "activity": [1] * len(years),
+                "amount": [1.0] * len(years),
+            }
+        )
+        self.activity_time_mapping = {}
+
+    def get_activity_name_from_time_mapped_id(self, _):
+        return "some process"
+
+
+@pytest.mark.parametrize(
+    "interval, expected_labels",
+    [
+        (None, [str(year) for year in range(2025, 2037)]),
+        (5, ["2025", "2030", "2035"]),
+        (4, ["2025", "2029", "2033"]),
+    ],
+)
+def test_waterfall_xtick_interval(monkeypatch, interval, expected_labels):
+    """`xtick_interval` labels every n-th time step and hides the rest."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from bw_timex.utils import plot_characterized_inventory_as_waterfall
+
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+
+    plot_characterized_inventory_as_waterfall(
+        _FakeTimexLCA(range(2025, 2037)), xtick_interval=interval
+    )
+    visible = [
+        label.get_text() for label in plt.gca().get_xticklabels() if label.get_visible()
+    ]
+    assert visible == expected_labels
+    plt.close("all")
+
+
+def test_waterfall_xtick_interval_keeps_static_and_prospective_labels(monkeypatch):
+    """Those two columns are not time steps, so they keep their labels."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from bw_timex.utils import plot_characterized_inventory_as_waterfall
+
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+
+    plot_characterized_inventory_as_waterfall(
+        _FakeTimexLCA(range(2025, 2037)),
+        static_scores={"some process": 3.0},
+        prospective_scores={"some process": 2.0},
+        xtick_interval=5,
+    )
+    visible = {
+        label.get_text()
+        for label in plt.gca().get_xticklabels()
+        if label.get_visible()
+    }
+    assert {"static", "prospective"} <= visible
+    assert visible == {"static", "prospective", "2025", "2030", "2035"}
+    plt.close("all")
