@@ -196,10 +196,21 @@ def test_columns_and_shape():
 
 
 def test_a_shared_pairing_is_ticked_on_both_sides():
+    # image/SSP1-PkBudg500 is a PROSPECTIVE_SCENARIO_MAP entry, but whether it
+    # is *also* in the premise side of the table depends on what the
+    # installed premise's catalogue happens to contain (Correction 4: no test
+    # may assume the premise/prospective intersection is non-empty). Skip
+    # cleanly rather than let a missing row raise IndexError on .iloc[0].
     table = available_scenarios()
-    row = table[
+    matches = table[
         (table.iam_model == "image") & (table.pathway == "SSP1-PkBudg500")
-    ].iloc[0]
+    ]
+    if matches.empty:
+        pytest.skip(
+            "the installed premise's catalogue has no image/SSP1-PkBudg500 "
+            "pathway; nothing to check here"
+        )
+    row = matches.iloc[0]
     assert row.premise and row.prospective
     assert (row.iam, row.ssp, row.rcp) == ("IMAGE", "SSP1", "2.6")
 
