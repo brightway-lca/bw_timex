@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* Added prospective characterization scenarios derived per axis from the background scenario: `iam` and `ssp` come from `(iam_model, pathway)` via `bw_timex.PROSPECTIVE_IAM_MAP` (`image` -> IMAGE-SSP1, `message` -> MESSAGE-SSP2, `remind` -> REMIND-SSP5), and `rcp` only from a pathway that literally names one (e.g. `SSP2-RCP26`). Neither axis is guessed: an `iam_model` with no Watanabe counterpart (`remind-eu`, `tiam-ucl`, `gcam`, `witch`), an IAM/SSP mismatch, or a pathway naming a carbon budget, a policy or a ScenarioMIP warming level instead of an RCP raises, with a message stating what derived, what did not, and the `characterization_scenario` line to add
+* Added the `characterization_scenario` LCIA setting to state (or override) any part of the derived scenario explicitly; a partial value merges with what derives, so `{"rcp": "2.6"}` alone suffices once `iam`/`ssp` are derived, and it also lets a prospective metric be used without a premise background at all
+* Added `bw_timex.available_scenarios()`, listing the premise and prospective scenario catalogues side by side, plus the `bw_timex.PROSPECTIVE_IAM_MAP` and `bw_timex.VALID_SCENARIOS` tables it is built from
+* Added `cf_iam`, `cf_ssp` and `cf_rcp` columns to `ComparisonResult.summary`, recording which prospective factors produced each row
+* Added forwarding of `time_varying_re`, `fallback_to_ipcc` and `characterize_biogenic_uptake` from `dynamic_lcia()`/`run()` to `dynamic_characterization.characterize`; these were accepted as arguments but silently dropped before reaching it
+* Fixed `create_missing` not being part of a comparison's background identity (`TimexLCA._background_key`), so two settings differing only in `create_missing` no longer share one `TimexLCA` object, matching the guard already enforced in `run()`
 
 ## [1.4.0] - 2026-09-18
 * Added an iterative block solver: background blocks and the functional unit are solved by a Jacobi-preconditioned Neumann series instead of an LU factorization, falling back to the LU backend for any block the series cannot handle (zero diagonal, divergence, or too large a backward error). On the premise EV teaching notebook this takes `lci()` from ~23 s to ~4 s, with the same results. Set `BW_TIMEX_NO_ITERATIVE_SOLVER=1` to solve every block with the LU backend instead ([#236](https://github.com/brightway-lca/bw_timex/pull/236))
