@@ -166,12 +166,13 @@ def _derive_axes(iam_model: Optional[str], pathway: Optional[str]) -> Dict[str, 
     else:
         ssp_axis = _Axis(ssp_value, "from the pathway prefix.")
 
-    iam_model_norm = str(iam_model).lower() if iam_model else None
-    iam_entry = PROSPECTIVE_IAM_MAP.get(iam_model_norm) if iam_model_norm else None
+    # Both call sites (`_axes_for_scenario`, `available_scenarios`'s catalogue
+    # loop) only ever pass a truthy `iam_model`, so there is no "no iam_model
+    # at all" branch here to worry about.
+    iam_model_norm = str(iam_model).lower()
+    iam_entry = PROSPECTIVE_IAM_MAP.get(iam_model_norm)
 
-    if iam_model_norm is None:
-        iam_axis = _Axis(None, "no match: no background scenario to derive from.")
-    elif iam_entry is None:
+    if iam_entry is None:
         iam_axis = _Axis(None, _iam_unrecognized_reason(iam_model, iam_model_norm))
     elif ssp_value != iam_entry["ssp"]:
         iam_axis = _Axis(
@@ -329,15 +330,60 @@ def resolve_characterization_scenario(
     raise ValueError(_unresolved_message(metric, scenario, axes))
 
 
+def _suggested_override(metric: str, axes: Dict[str, _Axis]) -> Tuple[str, str]:
+    """A `lcia={...}` snippet tailored to what did and did not derive.
+
+    Returns `(note, snippet)`. Never suggests an IAM/SSP unrelated to what the
+    background actually derived: when `iam`/`ssp` derived exactly and only
+    `rcp` is missing, the suggestion is the partial form the spec says
+    "alone suffices" - naming the *same* IAM/SSP the axes block above already
+    showed, not a fixed example. When `iam`/`ssp` did not derive, the full
+    triple offered is a *suggestion to confirm*, guessed from the pathway's
+    SSP prefix when there is one (so it at least matches the SSP the user
+    typed), and is labelled as a guess rather than presented as a fact.
+    """
+    iam_value, ssp_value = axes["iam"].value, axes["ssp"].value
+
+    if iam_value and ssp_value:
+        valid_rcps = _valid_rcps_for_ssp(ssp_value)
+        suggested_rcp = valid_rcps[0] if valid_rcps else "2.6"
+        note = (
+            f"{iam_value}-{ssp_value} already derives from your background; "
+            f"only rcp is missing, so this alone suffices:"
+        )
+        body = f'{{"rcp": "{suggested_rcp}"}}'
+    else:
+        guessed_ssp = ssp_value or "SSP2"
+        guessed_iam = _watanabe_iam_for_ssp(guessed_ssp) or "MESSAGE"
+        valid_rcps = _valid_rcps_for_ssp(guessed_ssp)
+        suggested_rcp = valid_rcps[0] if valid_rcps else "2.6"
+        basis = (
+            f"the pathway's own SSP prefix ({guessed_ssp})"
+            if ssp_value
+            else "no information at all - replace every key"
+        )
+        note = (
+            f"iam/ssp did not derive, so this is only a guess based on "
+            f"{basis} - confirm it is the future you mean before using it:"
+        )
+        body = (
+            f'{{"iam": "{guessed_iam}", "ssp": "{guessed_ssp}", '
+            f'"rcp": "{suggested_rcp}"}}'
+        )
+
+    snippet = (
+        f"    lcia={{\"metric\": \"{metric}\",\n"
+        f"          \"characterization_scenario\": {body}}}"
+    )
+    return note, snippet
+
+
 def _unresolved_message(
     metric: str, scenario: Optional[dict], axes: Dict[str, _Axis]
 ) -> str:
     """What to tell someone whose prospective metric has no scenario."""
-    override = (
-        f"    lcia={{\"metric\": \"{metric}\",\n"
-        f"          \"characterization_scenario\": "
-        f"{{\"iam\": \"MESSAGE\", \"ssp\": \"SSP2\", \"rcp\": \"2.6\"}}}}"
-    )
+    note, snippet = _suggested_override(metric, axes)
+
     if scenario and scenario.get("iam_model") and scenario.get("pathway"):
         axes_block = "\n".join(axes[axis].line(axis) for axis in ("iam", "ssp", "rcp"))
 
@@ -354,7 +400,7 @@ def _unresolved_message(
             f"background scenario {scenario['iam_model']} / {scenario['pathway']} does "
             f"not fully determine one.\n\n"
             f"{axes_block}\n\n"
-            f"State the scenario explicitly:\n\n{override}"
+            f"{note}\n\n{snippet}"
             f"{hint}\n\n"
             f"bw_timex.available_scenarios() lists both catalogues side by side."
         )
@@ -362,7 +408,7 @@ def _unresolved_message(
         f"metric={metric!r} needs a prospective characterization scenario, and this "
         f"TimexLCA has no background scenario to derive one from (it was built with "
         f"database_dates, or with no scenario at all).\n\n"
-        f"Choose one explicitly:\n\n{override}\n\n"
+        f"{note}\n\n{snippet}\n\n"
         f"bw_timex.available_scenarios(usable_for='prospective') lists the options."
     )
 

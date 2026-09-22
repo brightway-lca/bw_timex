@@ -227,6 +227,49 @@ def test_only_rcp_missing_raises_with_iam_and_ssp_shown_as_derived():
     assert "ssp  -> SSP2, from the pathway prefix." in message
     assert "rcp  -> no match: 'L' is a ScenarioMIP warming level, not an RCP." in message
     assert "MESSAGE-SSP2 is available for RCPs 2.6, 4.5, 6.0, 8.5." in message
+    # The suggested fix is the partial form the spec says "alone suffices"
+    # here, not a full triple naming some unrelated IAM/SSP.
+    assert '"characterization_scenario": {"rcp": "2.6"}' in message
+
+
+@pytest.mark.parametrize(
+    "iam_model, pathway, iam, ssp, rcps",
+    [
+        ("image", "SSP1-Base", "IMAGE", "SSP1", "2.6, 4.5, 8.5"),
+        ("remind", "SSP5-Base", "REMIND", "SSP5", "2.6, 4.5, 6.0, 8.5"),
+    ],
+)
+def test_suggested_override_names_the_backgrounds_own_iam_ssp_not_message_ssp2(
+    iam_model, pathway, iam, ssp, rcps
+):
+    # Regression test: the suggested "State the scenario explicitly" snippet
+    # used to be a hardcoded {"iam": "MESSAGE", "ssp": "SSP2", "rcp": "2.6"}
+    # regardless of what actually derived. For a background whose iam/ssp
+    # derive exactly (only rcp missing, as here), pasting that hardcoded
+    # snippet would have silently switched the run to an unrelated IAM/SSP.
+    # The snippet must instead either name *this* background's own iam/ssp,
+    # or (as it does today) use the partial {"rcp": ...} form and omit
+    # iam/ssp entirely, since they already derive.
+    from dynamic_characterization.prospective import reset_scenario
+
+    reset_scenario()
+    with pytest.raises(ValueError) as error:
+        resolve_characterization_scenario(
+            metric="pGWP",
+            characterization_scenario=None,
+            scenario={"iam_model": iam_model, "pathway": pathway},
+        )
+    message = str(error.value)
+    assert f"{iam}-{ssp} is available for RCPs {rcps}." in message
+    assert f"{iam}-{ssp} already derives from your background" in message
+    # The two most likely wrong, unrelated IAM/SSP names must never appear as
+    # a suggestion when they aren't this background's own.
+    for other_iam, other_ssp in {("MESSAGE", "SSP2"), ("REMIND", "SSP5"), ("IMAGE", "SSP1")} - {
+        (iam, ssp)
+    }:
+        assert f'"iam": "{other_iam}"' not in message
+        assert f'"ssp": "{other_ssp}"' not in message
+    assert '"characterization_scenario": {"rcp":' in message
 
 
 def test_no_background_scenario_at_all_raises():
