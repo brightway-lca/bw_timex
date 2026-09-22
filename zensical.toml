@@ -64,6 +64,7 @@ nav = [
     { Utils = "api/utils.md" },
     { "Database metadata" = "api/database_metadata.md" },
     { "Scenario Builder" = "api/scenario_builder.md" },
+    { "Prospective Scenarios" = "api/prospective_scenarios.md" },
     { Errors = "api/errors.md" },
   ]},
 ]

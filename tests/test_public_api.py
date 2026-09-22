@@ -54,3 +54,12 @@ def test_utils_are_exposed_at_top_level(name):
 def test_all_names_are_importable():
     for name in bw_timex.__all__:
         assert hasattr(bw_timex, name), f"{name} in __all__ but not importable"
+
+
+def test_prospective_scenario_helpers_are_exposed():
+    assert bw_timex.available_scenarios is not None
+    # ("image", "SSP1-RCP26") is not a pathway premise can build for SSP1 (RCP-named
+    # pathways only exist there for SSP2), so it was never a real entry in the map;
+    # use an actual key instead.
+    assert ("image", "SSP1-PkBudg500") in bw_timex.PROSPECTIVE_SCENARIO_MAP
+    assert ("IMAGE", "SSP1", "2.6") in bw_timex.VALID_SCENARIOS
