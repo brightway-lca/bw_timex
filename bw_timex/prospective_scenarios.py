@@ -38,12 +38,18 @@ PROSPECTIVE_METRICS = frozenset(
 #: level they correspond to.
 PROSPECTIVE_SCENARIO_MAP: Dict[Tuple[str, str], Dict[str, str]] = {
     # IMAGE - SSP1
-    ("image", "SSP1-RCP19"): {"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"},
-    ("image", "SSP1-RCP26"): {"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"},
+    #
+    # premise's real IMAGE pathway catalogue (see
+    # `premise/iam_variables_mapping/constants.yaml`, `SUPPORTED_PATHWAYS`) has
+    # no "SSP1-RCP19", "SSP1-RCP26" or "SSP1-NDC": RCP-named and NDC pathways
+    # only exist there for SSP2 (and SSP5 for NDC). Those three keys used to be
+    # listed here but named pathways premise cannot build, so they were dead
+    # entries; removed.
     ("image", "SSP1-PkBudg500"): {"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"},
+    ("image", "SSP1-PkBudg650"): {"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"},
+    ("image", "SSP1-PkBudg1000"): {"iam": "IMAGE", "ssp": "SSP1", "rcp": "4.5"},
     ("image", "SSP1-PkBudg1150"): {"iam": "IMAGE", "ssp": "SSP1", "rcp": "4.5"},
     ("image", "SSP1-NPi"): {"iam": "IMAGE", "ssp": "SSP1", "rcp": "4.5"},
-    ("image", "SSP1-NDC"): {"iam": "IMAGE", "ssp": "SSP1", "rcp": "4.5"},
     ("image", "SSP1-Base"): {"iam": "IMAGE", "ssp": "SSP1", "rcp": "8.5"},
     # REMIND - SSP5
     ("remind", "SSP5-PkBudg500"): {"iam": "REMIND", "ssp": "SSP5", "rcp": "2.6"},
@@ -186,3 +192,175 @@ def _unresolved_message(metric: str, scenario: Optional[dict]) -> str:
         f"Choose one explicitly:\n\n{override}\n\n"
         f"bw_timex.available_scenarios(usable_for='prospective') lists the options."
     )
+
+
+import pandas as pd
+
+_USABLE_FOR = {None, "premise", "prospective", "both"}
+
+
+def _premise_catalogue() -> Tuple[set, bool]:
+    """Every `(iam_model, pathway)` premise can build, and whether that is complete.
+
+    premise validates `NewDatabase(model=..., pathway=...)` against two lists,
+    `SUPPORTED_MODELS` and `SUPPORTED_PATHWAYS`, defined in
+    `premise/iam_variables_mapping/constants.yaml`. That file - not the
+    `data/iam_output_files` directory, which holds only the scenario files a
+    given install happens to have already fetched - is premise's actual
+    catalogue, so this reads it and takes the cross product of the two lists.
+
+    Falls back to the pairings this module already knows about, and reports
+    `complete=False`, whenever premise is not installed or that file is
+    missing, unreadable or missing either list: `available_scenarios()` must
+    never raise because of this.
+    """
+    try:
+        import premise
+    except ImportError:
+        return {key for key in PROSPECTIVE_SCENARIO_MAP}, False
+
+    from pathlib import Path
+
+    path = Path(premise.__file__).parent / "iam_variables_mapping" / "constants.yaml"
+    if not path.is_file():
+        return {key for key in PROSPECTIVE_SCENARIO_MAP}, False
+
+    try:
+        import yaml
+
+        data = yaml.safe_load(path.read_text())
+        models = data["SUPPORTED_MODELS"]
+        pathways = data["SUPPORTED_PATHWAYS"]
+        catalogue = {
+            (str(model).lower(), pathway) for model in models for pathway in pathways
+        }
+    except Exception as error:  # noqa: BLE001 - any parse/shape problem degrades, never raises
+        logger.info(
+            f"Could not read premise's scenario catalogue from {path} ({error!r}); "
+            "falling back to the pairings bw_timex maps to prospective "
+            "characterization factors."
+        )
+        return {key for key in PROSPECTIVE_SCENARIO_MAP}, False
+
+    if not catalogue:
+        return {key for key in PROSPECTIVE_SCENARIO_MAP}, False
+    return catalogue, True
+
+
+def _years_in_project(iam_model: str, pathway: str) -> str:
+    """The vintage years this project already holds for a pairing, as text."""
+    import bw2data as bd
+
+    years = []
+    for name in bd.databases:
+        metadata = bd.databases[name]
+        if str(metadata.get("iam_model", "")).lower() != iam_model:
+            continue
+        if metadata.get("pathway") != pathway:
+            continue
+        representative_time = metadata.get("representative_time")
+        if hasattr(representative_time, "year"):
+            years.append(representative_time.year)
+        elif isinstance(representative_time, str) and representative_time[:4].isdigit():
+            years.append(int(representative_time[:4]))
+    return ", ".join(str(year) for year in sorted(set(years)))
+
+
+def available_scenarios(usable_for: Optional[str] = None) -> pd.DataFrame:
+    """Every scenario known to either side, and which side knows it.
+
+    A background scenario and a prospective characterization scenario are
+    different things, and plenty of studies want only one of them: a premise
+    background characterized with IPCC AR6 factors, or the prospective factors
+    on a hand-built background. This lists both catalogues, so a row says what
+    it can be used for rather than only what both support.
+
+    Parameters
+    ----------
+    usable_for : str, optional
+        `"premise"` keeps the scenarios premise can build, `"prospective"` those
+        with prospective characterization factors, `"both"` those usable
+        together with no manual pairing. The default lists everything.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns `iam_model`, `pathway` (the premise side, NA when premise has no
+        such scenario), `iam`, `ssp`, `rcp` (the Watanabe side, NA when there is
+        no exact pairing), the flags `premise` and `prospective`, and
+        `in_project`: the vintage years this project already holds, as text.
+
+    Examples
+    --------
+    ```python
+    import bw_timex
+
+    bw_timex.available_scenarios(usable_for="both")
+    ```
+    """
+    if usable_for not in _USABLE_FOR:
+        raise ValueError(
+            f"`usable_for` must be one of 'premise', 'prospective', 'both' or None, "
+            f"not {usable_for!r}."
+        )
+
+    catalogue, complete = _premise_catalogue()
+    rows = []
+
+    for iam_model, pathway in sorted(catalogue):
+        mapped = PROSPECTIVE_SCENARIO_MAP.get((iam_model, pathway))
+        rows.append(
+            {
+                "iam_model": iam_model,
+                "pathway": pathway,
+                "iam": mapped["iam"] if mapped else pd.NA,
+                "ssp": mapped["ssp"] if mapped else pd.NA,
+                "rcp": mapped["rcp"] if mapped else pd.NA,
+                "premise": True,
+                "prospective": mapped is not None,
+                "in_project": _years_in_project(iam_model, pathway),
+            }
+        )
+
+    paired = {
+        (value["iam"], value["ssp"], value["rcp"])
+        for key, value in PROSPECTIVE_SCENARIO_MAP.items()
+        if key in catalogue
+    }
+    for iam, ssp, rcp in sorted(VALID_SCENARIOS):
+        if (iam, ssp, rcp) in paired:
+            continue
+        rows.append(
+            {
+                "iam_model": pd.NA,
+                "pathway": pd.NA,
+                "iam": iam,
+                "ssp": ssp,
+                "rcp": rcp,
+                "premise": False,
+                "prospective": True,
+                "in_project": "",
+            }
+        )
+
+    table = pd.DataFrame(rows, columns=[
+        "iam_model", "pathway", "iam", "ssp", "rcp",
+        "premise", "prospective", "in_project",
+    ])
+
+    if not complete:
+        logger.info(
+            "premise is not installed, or its scenario catalogue could not be "
+            "read, so the premise side of this table lists only the scenarios "
+            'bw_timex maps to prospective characterization factors. Install it '
+            'with: pip install "bw_timex[premise]"'
+        )
+
+    if usable_for == "premise":
+        table = table[table.premise]
+    elif usable_for == "prospective":
+        table = table[table.prospective]
+    elif usable_for == "both":
+        table = table[table.premise & table.prospective]
+
+    return table.reset_index(drop=True)
