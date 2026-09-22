@@ -161,26 +161,38 @@ to learn and the dict can be handed straight to it. Added to
 `TimexLCASettings`'s flat fields and to `STAGE_GROUPS["lcia"]`. Validated by
 `DynamicLCIAInputs` against `VALID_SCENARIOS` when given.
 
-### 3. `characterize(scenario=...)` — an argument, not module state
+### 3. `characterize(scenario=...)` — an argument, not a session setting
 
 `dynamic_characterization.characterize` gains `scenario: dict | None = None`.
-When given, it is threaded to the prospective characterization functions; when
-not, they fall back to the module global as today.
+When given, that scenario applies for the duration of the call and nothing else
+changes; when omitted, behaviour is exactly as today.
 
-Mechanically: the four prospective CF functions (`characterize_co2`,
-`characterize_co2_uptake`, `characterize_ch4`, `characterize_n2o`) gain
-`scenario: dict | None = None`, defaulting to `get_scenario()` when `None`.
-`_build_characterization_functions` binds the requested scenario with
-`functools.partial` when it constructs the CF registry. User-supplied CF
-callables are untouched and keep reading the global if that is what they do.
+Mechanically this is a scoped override of the module state, not a rebinding of
+the characterization functions:
 
-A `scenario_context(scenario)` context manager is added next to `set_scenario`
-for the case where a user CF reads the global and the caller still wants a
-scoped scenario.
+```python
+@contextmanager
+def scenario_context(scenario: dict | None):
+    """Apply `scenario` for the duration of the block, then restore."""
+```
 
-This is the change that makes per-row scenarios possible at all. Nothing mutates
-the global, so a `compare()` neither leaks between its rows nor clobbers what the
-user set in their session.
+`characterize` wraps its body in `scenario_context(scenario)`; the previous value
+is restored on exit, including when the body raises. `scenario_context` is
+exported from `dynamic_characterization.prospective` alongside `set_scenario`.
+
+Rebinding the CF functions with `functools.partial` was considered and rejected:
+`_characterize_pgtp` (`dynamic_characterization.py:680-695`) dispatches on
+*function identity* (`char_func in (prospective_characterize_co2, ...)`) to pick
+the matching AGTP function, and `_CHARACTERIZATION_FUNCTION_CACHE` is keyed
+without a scenario because the CF functions are scenario-independent today.
+Partials would break both. A scoped override keeps every identity check, the
+cache, the `agtp.*` helpers that read the scenario themselves, and any
+user-supplied CF that reads the global — all unchanged.
+
+The scope is a single `characterize` call, so `compare()` can pass a different
+scenario per row without leaking between rows and without clobbering what the
+user set in their session. The override is not thread-safe; that is stated in
+the docstring, and matches how the module already behaves.
 
 ### 4. Resolution and precedence in `TimexLCA`
 
@@ -293,12 +305,17 @@ added to `TimexLCASettings` and to `STAGE_GROUPS["lcia"]`, passed through
 `dynamic_characterization`:
 
 - `characterize(scenario=...)` produces the same numbers as `set_scenario(...)`
-  followed by `characterize()`, and leaves the global untouched.
+  followed by `characterize()`, and leaves the session scenario as it found it
+  (including when it was unset).
 - Two `characterize` calls with different `scenario` arguments in one process
   give different results.
-- CF functions called with an explicit `scenario` ignore the global; called
-  without one they read it; with neither they raise `NO_SCENARIO_MESSAGE`.
-- `scenario_context` restores the previous global, including on exception.
+- `characterize` with no scenario and none set raises `NO_SCENARIO_MESSAGE` for
+  a prospective metric, unchanged.
+- `scenario_context` restores the previous value, including on exception, and
+  restores "unset" when nothing was set.
+- `_characterize_pgtp`'s identity dispatch still picks the right AGTP function
+  under a scoped scenario (a CO2 row characterized with `scenario=` gives
+  `pGTP == 1.0`).
 - Out-of-bounds emission years warn once, not once per row.
 
 ## Documentation
@@ -359,6 +376,14 @@ entries needed; both tutorials already exist in the nav.
 `TimexLCASettings` (the `lcia` group listing) and `TimexLCA.compare` gain the new
 settings; `PROSPECTIVE_SCENARIO_MAP` is added to `docs/api/timex_lca.md` so the
 table renders in the reference.
+
+**`docs/content/getting_started/lcia.md`** — add the prospective metrics to the
+list of available metrics, with the scenario requirement and a pointer to
+`available_scenarios()`.
+
+**`docs/content/getting_started/configured_runs.md`** — add
+`characterization_scenario` to the `lcia` group shown there, and one sentence
+that a prospective metric takes its scenario from `scenario` unless overridden.
 
 **`docs/content/create_premise_dbs.md`** — a short note that the premise pathway
 chosen here also decides the prospective characterization scenario, with a link
