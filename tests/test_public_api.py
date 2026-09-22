@@ -58,8 +58,5 @@ def test_all_names_are_importable():
 
 def test_prospective_scenario_helpers_are_exposed():
     assert bw_timex.available_scenarios is not None
-    # ("image", "SSP1-RCP26") is not a pathway premise can build for SSP1 (RCP-named
-    # pathways only exist there for SSP2), so it was never a real entry in the map;
-    # use an actual key instead.
-    assert ("image", "SSP1-PkBudg500") in bw_timex.PROSPECTIVE_SCENARIO_MAP
+    assert bw_timex.PROSPECTIVE_IAM_MAP["image"] == {"iam": "IMAGE", "ssp": "SSP1"}
     assert ("IMAGE", "SSP1", "2.6") in bw_timex.VALID_SCENARIOS

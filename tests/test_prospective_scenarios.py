@@ -1,67 +1,108 @@
-"""The bridge between premise background scenarios and Watanabe CF scenarios."""
+"""The bridge between premise background scenarios and Watanabe CF scenarios.
+
+`PROSPECTIVE_SCENARIO_MAP` (a whole `(iam_model, pathway)` -> whole `(iam, ssp,
+rcp)` table) has been replaced by `PROSPECTIVE_IAM_MAP` plus per-axis
+derivation (`bw_timex/prospective_scenarios.py`, AMENDMENT section of
+`docs/superpowers/specs/2026-09-22-prospective-scenario-integration-design.md`).
+The old table asserted an RCP for pathways named after carbon budgets, policy
+assumptions or ScenarioMIP warming levels - premise's own metadata does not
+support that (no RCP field, and only 3 of premise's 33 pathways literally name
+an RCP), so the old table entries and the tests asserting them are gone.
+"""
 
 import pytest
 from bw2data.tests import bw2test
 
 from bw_timex.prospective_scenarios import (
-    PROSPECTIVE_SCENARIO_MAP,
+    PROSPECTIVE_IAM_MAP,
     available_scenarios,
-    lookup_prospective_scenario,
+    derive_prospective_scenario,
     resolve_characterization_scenario,
 )
 
-IMAGE_LOW = {"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"}
+MESSAGE_RCP26 = {"iam": "MESSAGE", "ssp": "SSP2", "rcp": "2.6"}
 
 
-def test_every_table_entry_is_a_valid_watanabe_scenario():
-    from dynamic_characterization.prospective import VALID_SCENARIOS
-
-    for key, value in PROSPECTIVE_SCENARIO_MAP.items():
-        triple = (value["iam"], value["ssp"], value["rcp"])
-        assert triple in VALID_SCENARIOS, f"{key} maps to invalid {triple}"
-
-
-def test_lookup_hits_a_known_pairing():
-    assert lookup_prospective_scenario(
-        {"iam_model": "image", "pathway": "SSP1-PkBudg500"}
-    ) == IMAGE_LOW
+def test_iam_map_only_has_iams_watanabe_pairs():
+    assert PROSPECTIVE_IAM_MAP == {
+        "image": {"iam": "IMAGE", "ssp": "SSP1"},
+        "message": {"iam": "MESSAGE", "ssp": "SSP2"},
+        "remind": {"iam": "REMIND", "ssp": "SSP5"},
+    }
 
 
-def test_lookup_is_case_insensitive_on_iam_model():
-    assert lookup_prospective_scenario(
-        {"iam_model": "IMAGE", "pathway": "SSP1-PkBudg500"}
-    ) == IMAGE_LOW
+def test_full_derivation_hits_an_rcp_named_pathway():
+    assert derive_prospective_scenario(
+        {"iam_model": "message", "pathway": "SSP2-RCP26"}
+    ) == MESSAGE_RCP26
 
 
-def test_lookup_ignores_extra_scenario_keys():
-    assert lookup_prospective_scenario(
+def test_full_derivation_is_case_insensitive_on_iam_model():
+    assert derive_prospective_scenario(
+        {"iam_model": "MESSAGE", "pathway": "SSP2-RCP26"}
+    ) == MESSAGE_RCP26
+
+
+def test_full_derivation_ignores_extra_scenario_keys():
+    assert derive_prospective_scenario(
         {
-            "iam_model": "image",
-            "pathway": "SSP1-PkBudg500",
+            "iam_model": "message",
+            "pathway": "SSP2-RCP26",
             "system_model": "cutoff",
             "ecoinvent_version": "3.10.1",
             "years": [2020, 2030],
         }
-    ) == IMAGE_LOW
+    ) == MESSAGE_RCP26
 
 
-def test_lookup_misses_a_pairing_without_an_exact_counterpart():
-    assert lookup_prospective_scenario(
+def test_full_derivation_of_no_scenario_is_none():
+    assert derive_prospective_scenario(None) is None
+    assert derive_prospective_scenario({}) is None
+
+
+@pytest.mark.parametrize(
+    "suffix", ["PkBudg500", "PkBudg650", "NPi", "Base", "rollBack", "L", "VLHO"]
+)
+def test_budget_policy_and_warming_level_pathways_never_yield_an_rcp(suffix):
+    # image/SSP1-<suffix> derives iam and ssp (IMAGE, SSP1) but never an RCP:
+    # none of these names one, and the old table's substitution (Base -> the
+    # highest RCP, budgets -> "the closest" RCP) is exactly what this change
+    # removes.
+    assert derive_prospective_scenario(
+        {"iam_model": "image", "pathway": f"SSP1-{suffix}"}
+    ) is None
+
+
+def test_rcp19_is_parsed_but_rejected_rather_than_rounded():
+    # SSP2-RCP19 literally names an RCP, but Watanabe et al. do not provide
+    # RCP1.9 for MESSAGE-SSP2 (only 2.6/4.5/6.0/8.5); the nearest RCP must not
+    # be substituted.
+    assert derive_prospective_scenario(
+        {"iam_model": "message", "pathway": "SSP2-RCP19"}
+    ) is None
+
+
+def test_iam_ssp_mismatch_derives_nothing():
+    # The very common premise setup remind + SSP2-* has no Watanabe pairing:
+    # REMIND is paired with SSP5, not SSP2.
+    assert derive_prospective_scenario(
         {"iam_model": "remind", "pathway": "SSP2-PkBudg500"}
     ) is None
 
 
-def test_lookup_of_no_scenario_is_none():
-    assert lookup_prospective_scenario(None) is None
-    assert lookup_prospective_scenario({}) is None
+@pytest.mark.parametrize("iam_model", ["remind-eu", "tiam-ucl", "gcam", "witch"])
+def test_iam_models_with_no_watanabe_counterpart_derive_nothing(iam_model):
+    assert derive_prospective_scenario(
+        {"iam_model": iam_model, "pathway": "SSP2-RCP26"}
+    ) is None
 
 
-def test_lookup_returns_a_copy():
-    first = lookup_prospective_scenario({"iam_model": "image", "pathway": "SSP1-PkBudg500"})
+def test_derivation_returns_a_fresh_dict():
+    first = derive_prospective_scenario({"iam_model": "message", "pathway": "SSP2-RCP26"})
     first["rcp"] = "8.5"
-    assert lookup_prospective_scenario(
-        {"iam_model": "image", "pathway": "SSP1-PkBudg500"}
-    ) == IMAGE_LOW
+    assert derive_prospective_scenario(
+        {"iam_model": "message", "pathway": "SSP2-RCP26"}
+    ) == MESSAGE_RCP26
 
 
 def test_non_prospective_metric_resolves_to_none():
@@ -72,34 +113,54 @@ def test_non_prospective_metric_resolves_to_none():
     ) is None
 
 
-def test_explicit_scenario_wins_over_the_table():
+def test_explicit_full_scenario_wins_over_derivation():
     explicit = {"iam": "MESSAGE", "ssp": "SSP2", "rcp": "4.5"}
     assert resolve_characterization_scenario(
         metric="pGWP",
         characterization_scenario=explicit,
-        scenario={"iam_model": "image", "pathway": "SSP1-PkBudg500"},
+        scenario={"iam_model": "message", "pathway": "SSP2-RCP26"},
     ) == explicit
 
 
-def test_table_is_used_when_nothing_explicit_is_given():
+def test_derivation_is_used_when_nothing_explicit_is_given():
     assert resolve_characterization_scenario(
         metric="pGWP",
         characterization_scenario=None,
-        scenario={"iam_model": "image", "pathway": "SSP1-PkBudg500"},
-    ) == IMAGE_LOW
+        scenario={"iam_model": "message", "pathway": "SSP2-RCP26"},
+    ) == MESSAGE_RCP26
 
 
-def test_session_default_is_used_below_the_table():
+def test_partial_characterization_scenario_is_filled_in_from_derivation():
+    # message/SSP2-L derives iam=MESSAGE, ssp=SSP2 but no rcp (L is a
+    # ScenarioMIP warming level). Supplying only the missing axis is enough.
+    assert resolve_characterization_scenario(
+        metric="pGWP",
+        characterization_scenario={"rcp": "2.6"},
+        scenario={"iam_model": "message", "pathway": "SSP2-L"},
+    ) == MESSAGE_RCP26
+
+
+def test_partial_characterization_scenario_key_wins_over_derivation():
+    # The background would derive rcp=2.6 (SSP2-RCP26), but an explicit rcp
+    # overrides it.
+    assert resolve_characterization_scenario(
+        metric="pGWP",
+        characterization_scenario={"rcp": "4.5"},
+        scenario={"iam_model": "message", "pathway": "SSP2-RCP26"},
+    ) == {"iam": "MESSAGE", "ssp": "SSP2", "rcp": "4.5"}
+
+
+def test_session_default_is_used_below_full_derivation():
     from dynamic_characterization.prospective import reset_scenario, set_scenario
 
     set_scenario(iam="MESSAGE", ssp="SSP2", rcp="4.5")
     try:
-        # table wins over the session default
+        # full derivation wins over the session default
         assert resolve_characterization_scenario(
             metric="pGWP",
             characterization_scenario=None,
-            scenario={"iam_model": "image", "pathway": "SSP1-PkBudg500"},
-        ) == IMAGE_LOW
+            scenario={"iam_model": "message", "pathway": "SSP2-RCP26"},
+        ) == MESSAGE_RCP26
         # session default is used when there is nothing to derive from
         assert resolve_characterization_scenario(
             metric="pGWP", characterization_scenario=None, scenario=None
@@ -108,7 +169,27 @@ def test_session_default_is_used_below_the_table():
         reset_scenario()
 
 
-def test_unmappable_pairing_raises_with_the_override_spelled_out():
+def test_session_default_is_used_when_only_rcp_is_missing_and_unset_explicitly():
+    # A background that derives iam/ssp but not rcp (message/SSP2-L) still
+    # raises rather than silently pulling in the session default: the session
+    # default sits below *full* derivation, but a partial derivation with no
+    # explicit characterization_scenario does not resolve at all - it is not
+    # "full derivation", so falls through to the session default, exactly like
+    # a background with nothing derived at all.
+    from dynamic_characterization.prospective import reset_scenario, set_scenario
+
+    set_scenario(iam="MESSAGE", ssp="SSP2", rcp="8.5")
+    try:
+        assert resolve_characterization_scenario(
+            metric="pGWP",
+            characterization_scenario=None,
+            scenario={"iam_model": "message", "pathway": "SSP2-L"},
+        ) == {"iam": "MESSAGE", "ssp": "SSP2", "rcp": "8.5"}
+    finally:
+        reset_scenario()
+
+
+def test_unmappable_iam_model_raises_with_per_axis_diagnostics():
     from dynamic_characterization.prospective import reset_scenario
 
     reset_scenario()
@@ -116,13 +197,36 @@ def test_unmappable_pairing_raises_with_the_override_spelled_out():
         resolve_characterization_scenario(
             metric="pGWP",
             characterization_scenario=None,
-            scenario={"iam_model": "remind", "pathway": "SSP2-PkBudg500"},
+            scenario={"iam_model": "remind-eu", "pathway": "SSP2-NDC"},
         )
     message = str(error.value)
-    assert "remind" in message and "SSP2-PkBudg500" in message
+    assert "remind-eu" in message and "SSP2-NDC" in message
     assert "characterization_scenario" in message
     assert "available_scenarios" in message
-    assert "REMIND-SSP5" in message
+    # Per-axis diagnostics: iam fails (no Watanabe counterpart), ssp succeeds
+    # (read straight off the pathway prefix, independent of iam_model), rcp
+    # fails ('NDC' is a policy assumption).
+    assert "iam  -> no match" in message
+    assert "ssp  -> SSP2, from the pathway prefix." in message
+    assert "rcp  -> no match: 'NDC' is a policy assumption, not an RCP." in message
+    assert "SSP2-RCP19 / SSP2-RCP26 / SSP2-RCP45" in message
+
+
+def test_only_rcp_missing_raises_with_iam_and_ssp_shown_as_derived():
+    from dynamic_characterization.prospective import reset_scenario
+
+    reset_scenario()
+    with pytest.raises(ValueError) as error:
+        resolve_characterization_scenario(
+            metric="pGWP",
+            characterization_scenario=None,
+            scenario={"iam_model": "message", "pathway": "SSP2-L"},
+        )
+    message = str(error.value)
+    assert "iam  -> MESSAGE, from iam_model." in message
+    assert "ssp  -> SSP2, from the pathway prefix." in message
+    assert "rcp  -> no match: 'L' is a ScenarioMIP warming level, not an RCP." in message
+    assert "MESSAGE-SSP2 is available for RCPs 2.6, 4.5, 6.0, 8.5." in message
 
 
 def test_no_background_scenario_at_all_raises():
@@ -165,42 +269,36 @@ def _premise_installed() -> bool:
     return True
 
 
-@pytest.mark.skipif(not _premise_installed(), reason="premise is not installed")
-def test_every_table_key_is_a_real_premise_pairing():
-    """Would have caught the SSP1-RCP19/RCP26/NDC entries: those pathway
-    names are not in premise's own catalogue, so PROSPECTIVE_SCENARIO_MAP
-    must only ever name IAMs and pathways premise actually supports."""
-    import yaml
-    from pathlib import Path
-
-    import premise
-
-    path = Path(premise.__file__).parent / "iam_variables_mapping" / "constants.yaml"
-    data = yaml.safe_load(path.read_text())
-    supported_models = {str(model).lower() for model in data["SUPPORTED_MODELS"]}
-    supported_pathways = set(data["SUPPORTED_PATHWAYS"])
-
-    for iam_model, pathway in PROSPECTIVE_SCENARIO_MAP:
-        assert iam_model in supported_models, (
-            f"{iam_model!r} is not one of premise's SUPPORTED_MODELS"
-        )
-        assert pathway in supported_pathways, (
-            f"{pathway!r} is not one of premise's SUPPORTED_PATHWAYS"
-        )
-
-
 def test_columns_and_shape():
     table = available_scenarios()
     assert list(table.columns) == EXPECTED_COLUMNS
     assert len(table) > 0
 
 
-def test_a_shared_pairing_is_ticked_on_both_sides():
-    # image/SSP1-PkBudg500 is a PROSPECTIVE_SCENARIO_MAP entry, but whether it
-    # is *also* in the premise side of the table depends on what the
-    # installed premise's catalogue happens to contain (Correction 4: no test
-    # may assume the premise/prospective intersection is non-empty). Skip
-    # cleanly rather than let a missing row raise IndexError on .iloc[0].
+@pytest.mark.skipif(not _premise_installed(), reason="premise is not installed")
+def test_a_fully_derived_pairing_is_ticked_on_both_sides():
+    table = available_scenarios()
+    matches = table[
+        (table.iam_model == "message") & (table.pathway == "SSP2-RCP26")
+    ]
+    if matches.empty:
+        pytest.skip(
+            "the installed premise's catalogue has no message/SSP2-RCP26 "
+            "pathway; nothing to check here"
+        )
+    row = matches.iloc[0]
+    assert row.premise and row.prospective
+    assert (row.iam, row.ssp, row.rcp) == ("MESSAGE", "SSP2", "2.6")
+
+
+@pytest.mark.skipif(not _premise_installed(), reason="premise is not installed")
+def test_a_partly_derived_pairing_gets_iam_ssp_but_not_rcp_or_prospective():
+    # image/SSP1-PkBudg500 used to assert rcp=2.6 in the old table; now iam
+    # and ssp derive (IMAGE, SSP1) but rcp does not (PkBudg500 is a carbon
+    # budget, not an RCP), so the row is genuinely only partly usable: iam/ssp
+    # are filled in (not NA) so a reader can see it needs only an explicit
+    # rcp, but prospective stays False and rcp stays NA since pGWP cannot run
+    # on this row with no further input.
     table = available_scenarios()
     matches = table[
         (table.iam_model == "image") & (table.pathway == "SSP1-PkBudg500")
@@ -211,8 +309,33 @@ def test_a_shared_pairing_is_ticked_on_both_sides():
             "pathway; nothing to check here"
         )
     row = matches.iloc[0]
-    assert row.premise and row.prospective
-    assert (row.iam, row.ssp, row.rcp) == ("IMAGE", "SSP1", "2.6")
+    assert row.premise
+    assert not row.prospective
+    assert row.iam == "IMAGE"
+    assert row.ssp == "SSP1"
+    import pandas as pd
+
+    assert pd.isna(row.rcp)
+
+
+def test_a_totally_unmapped_pairing_gets_no_iam_or_ssp_either():
+    table = available_scenarios()
+    matches = table[
+        (table.iam_model == "remind") & (table.pathway == "SSP2-PkBudg500")
+    ]
+    if matches.empty:
+        pytest.skip(
+            "the installed premise's catalogue has no remind/SSP2-PkBudg500 "
+            "pathway; nothing to check here"
+        )
+    row = matches.iloc[0]
+    assert row.premise
+    assert not row.prospective
+    import pandas as pd
+
+    assert pd.isna(row.iam)
+    assert pd.isna(row.ssp)
+    assert pd.isna(row.rcp)
 
 
 def test_prospective_only_rows_exist_and_have_no_premise_side():
@@ -236,26 +359,11 @@ def test_usable_for_prospective_returns_only_prospective_rows():
 def test_usable_for_both_returns_only_shared_rows():
     table = available_scenarios(usable_for="both")
     assert (table.premise & table.prospective).all()
-    # Every shared row is a table entry. The reverse need not hold: a mapped
-    # pairing whose premise scenario the installed premise does not ship is
-    # simply absent from the premise catalogue. Whether the intersection is
-    # non-empty depends on what premise's local install supports, so this
-    # only asserts the subset invariant, not a row count.
-    shared = {(row.iam_model, row.pathway) for row in table.itertuples()}
-    assert shared <= set(PROSPECTIVE_SCENARIO_MAP)
-
-    # Specific mappings, asserted directly through the table rather than
-    # through whatever happens to intersect with the installed premise.
-    assert PROSPECTIVE_SCENARIO_MAP[("image", "SSP1-PkBudg500")] == {
-        "iam": "IMAGE",
-        "ssp": "SSP1",
-        "rcp": "2.6",
-    }
-    assert PROSPECTIVE_SCENARIO_MAP[("message", "SSP2-RCP26")] == {
-        "iam": "MESSAGE",
-        "ssp": "SSP2",
-        "rcp": "2.6",
-    }
+    # Every shared row is one where the full triple derives.
+    for row in table.itertuples():
+        assert derive_prospective_scenario(
+            {"iam_model": row.iam_model, "pathway": row.pathway}
+        ) == {"iam": row.iam, "ssp": row.ssp, "rcp": row.rcp}
 
 
 def test_usable_for_rejects_an_unknown_value():

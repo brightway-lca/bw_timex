@@ -184,9 +184,11 @@ class TimexLCASettings:
     characterization_function_co2: Optional[dict] = None
     #: Prospective characterization scenario, as `{"iam": ..., "ssp": ...,
     #: "rcp": ...}`. Only used by the prospective metrics. `None` (the default)
-    #: derives it from `scenario` via `PROSPECTIVE_SCENARIO_MAP`. Unlike
-    #: `scenario` this does not select databases, so it may vary between runs of
-    #: one `TimexLCA`.
+    #: derives it from `scenario`, axis by axis - see
+    #: `bw_timex.prospective_scenarios`. Any key given here wins over the
+    #: derived value for that axis; keys left out are filled in from the
+    #: derivation when it succeeds. Unlike `scenario` this does not select
+    #: databases, so it may vary between runs of one `TimexLCA`.
     characterization_scenario: Optional[dict] = None
     #: Passed to `dynamic_characterization.characterize`. Use a radiative
     #: efficiency that evolves over the decay period instead of a fixed one from
@@ -2155,9 +2157,9 @@ class TimexLCA:
         Dynamic climate change metrics are supported for "GWP", "radiative_forcing",
         "pGWP", "pGTP", and "prospective_radiative_forcing". The latter three are
         the prospective metrics: they take their characterization scenario from
-        `TimexLCASettings.scenario` (the background scenario, mapped through
-        `PROSPECTIVE_SCENARIO_MAP`) unless `characterization_scenario` says
-        otherwise.
+        `TimexLCASettings.scenario` (the background scenario, derived axis by
+        axis - see `bw_timex.prospective_scenarios`) unless
+        `characterization_scenario` says otherwise, in full or in part.
         The time horizon for the impact assessment can be set with the `time_horizon` parameter,
         defaulting to 100 years. The `fixed_time_horizon` parameter determines whether the emission
         time horizon for all emissions is calculated from a specific starting point `time_horizon_start`
@@ -2192,8 +2194,10 @@ class TimexLCA:
             Prospective characterization scenario, as `{"iam": ..., "ssp": ...,
             "rcp": ...}`. Only used by the prospective metrics ("pGWP", "pGTP",
             "prospective_radiative_forcing"). Default is None, which derives it
-            from `TimexLCASettings.scenario` via `PROSPECTIVE_SCENARIO_MAP`.
-            Unlike `scenario`, this does not select databases, so it may vary
+            from `TimexLCASettings.scenario`, axis by axis (see
+            `bw_timex.prospective_scenarios`). A partial dict here is filled in
+            from that derivation for whichever axes it leaves out. Unlike
+            `scenario`, this does not select databases, so it may vary
             between calls on one `TimexLCA`.
         time_varying_re: bool, optional
             Passed to `dynamic_characterization.characterize`. Use a radiative

@@ -12,7 +12,7 @@ from .errors import UnmappedDatabaseError
 from .helper_classes import SetList
 from .matrix_modifier import MatrixModifier
 from .prospective_scenarios import (
-    PROSPECTIVE_SCENARIO_MAP,
+    PROSPECTIVE_IAM_MAP,
     VALID_SCENARIOS,
     available_scenarios,
 )
@@ -49,7 +49,7 @@ __all__ = [
     # errors
     "UnmappedDatabaseError",
     # prospective characterization scenarios
-    "PROSPECTIVE_SCENARIO_MAP",
+    "PROSPECTIVE_IAM_MAP",
     "VALID_SCENARIOS",
     "available_scenarios",
     # utils
