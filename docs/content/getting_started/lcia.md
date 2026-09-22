@@ -96,6 +96,40 @@ tlca.plot_dynamic_characterized_inventory()
 ![Plot showing the radiative forcing over time](../data/dynamic_characterized_inventory_gwp.svg){ style="display:block;margin:0 auto" }
 <br />
 
+## Prospective metrics
+
+`radiative_forcing` and `GWP` above use the IPCC AR6 characterization functions: fixed values, derived from today's atmosphere. `bw_timex` also provides three metrics whose factors instead vary by future scenario, from [Watanabe et al. (2026)](https://doi.org/10.1021/acs.est.5b01118):
+
+| metric | unit | factors |
+|---|---|---|
+| `radiative_forcing` | W/m² | IPCC AR6 |
+| `GWP` | kg CO₂-eq | IPCC AR6 |
+| `prospective_radiative_forcing` | W/m² | Watanabe et al. (2026) |
+| `pGWP` | kg CO₂-eq | Watanabe et al. (2026) |
+| `pGTP` | kg CO₂-eq | Watanabe et al. (2026) |
+
+These three need a *characterization scenario*: which IAM, SSP and RCP the factors describe. With a premise background, `iam` and `ssp` are usually derived from the `scenario` the `TimexLCA` was built with (via `bw_timex.PROSPECTIVE_IAM_MAP`), but `rcp` only derives when the premise `pathway` literally names one, e.g. `SSP2-RCP26` → `"2.6"`. Most premise pathways name a carbon budget, a policy or a warming level instead (`SSP2-PkBudg500`, `SSP2-NDC`, ...), and those never yield an RCP - so most runs need at least an explicit RCP:
+
+```python
+tlca.dynamic_lcia(
+    metric="pGWP",
+    time_horizon=100,
+    characterization_scenario={"rcp": "2.6"},  # iam/ssp still derived from `scenario`
+)
+```
+
+or the full triple, e.g. when there is no background `scenario` to derive from at all (a `TimexLCA` built from `database_dates`):
+
+```python
+tlca.dynamic_lcia(
+    metric="pGWP",
+    time_horizon=100,
+    characterization_scenario={"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"},
+)
+```
+
+Leaving `characterization_scenario` out entirely raises rather than guessing, and the error states exactly which of `iam`/`ssp`/`rcp` did and did not derive, plus a suggested override. `bw_timex.available_scenarios()` lists which scenarios have prospective factors, which premise can build, and which support both - see the [API reference](../../api/prospective_scenarios.md).
+
 For most of the functions we used here, there are numerous optional arguments and settings you can tweak. We explore some of them in our other [Examples](../examples/index.md), but when in doubt check out our [docstrings](../../api/index.md), which provide information also for the more advanced settings - so please browse through them as needed ☀️ 
 
 Instead of running the whole `build_timeline()`, `lci()`, `static_lcia()` and `dynamic_lcia()` pipeline yourself, you can also take the short route through a simple `.run`-call, as described under [Configured Runs & Scenario Comparisons](configured_runs.md).

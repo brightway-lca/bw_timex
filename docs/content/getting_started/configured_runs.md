@@ -34,6 +34,7 @@ settings = TimexLCASettings(
     lcia={
         "metric": "radiative_forcing",
         "time_horizon": 100,
+        "characterization_scenario": None,  # only for pGWP/pGTP/prospective_radiative_forcing
         # other settings from .static_lcia() or .dynamic_lcia()
     },
     label="built 2020", # optional
@@ -45,6 +46,19 @@ A `TimexLCASettings` object holds everything a calculation needs, including dema
 The `timeline` / `lci` / `lcia` groups in the settings configuration keep a long settings block readable, but they are entirely
 optional: `TimexLCASettings(..., starting_datetime=..., graph_traversal=..., metric=...)` builds the same
 object.
+
+For the prospective metrics (`pGWP`, `pGTP`, `prospective_radiative_forcing`) the characterization
+factors depend on a scenario too. It is derived, axis by axis, from `scenario` - the same setting
+that picks the background databases - so a comparison that varies `scenario` normally varies both
+halves together. That derivation is only exact when the premise `pathway` supports it: the
+`remind` / `SSP2-NDC` scenario in the example above derives neither `iam` (`remind` pairs with
+SSP5 in Watanabe et al., not SSP2) nor `rcp` (`NDC` names a policy, not an RCP), so running a
+prospective metric on it needs an explicit `characterization_scenario`, e.g.
+`{"iam": "REMIND", "ssp": "SSP5", "rcp": "2.6"}`. `characterization_scenario` also overrides the
+derived value axis by axis when only some of it should differ, or supplies the scenario in full
+when there is no background `scenario` to derive from at all. See
+[Impact assessment](lcia.md#prospective-metrics) and `bw_timex.available_scenarios()` for what
+derives and what does not.
 
 ## Running a configured time-explicit LCA
 

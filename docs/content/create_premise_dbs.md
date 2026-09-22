@@ -34,6 +34,20 @@ database_dates = ensure_scenario_databases(
 The returned `database_dates` mapping contains the databases found or built and
 the point in time each represents. 
 
+!!! note "The pathway also decides the characterization factors"
+
+    If you later run a prospective metric (`pGWP`, `pGTP`,
+    `prospective_radiative_forcing`), the `iam_model` and `pathway` you pick here
+    also decide which scenario-dependent characterization factors apply -
+    `bw_timex` derives them axis by axis (see [Impact
+    assessment](getting_started/lcia.md#prospective-metrics)). Not every premise
+    pathway has a full counterpart: `remind` / `SSP2-PkBudg500` above, for
+    example, derives neither the IAM/SSP axis (`remind` pairs with SSP5, not
+    SSP2) nor the RCP (`PkBudg500` is a carbon budget, not an RCP), and would
+    need an explicit `characterization_scenario` on the prospective metric.
+    `bw_timex.available_scenarios()` shows which pathways do have a full
+    counterpart.
+
 ## Creating scenario databases on-the-fly
 
 You can also trigger the same builder while
