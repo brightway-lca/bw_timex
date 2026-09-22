@@ -89,6 +89,74 @@ a pairing bw_timex will not make for them.
 Lookups are case-insensitive on `iam_model` (premise writes `"remind"`,
 metadata elsewhere may say `"REMIND"`).
 
+### 1a. AMENDMENT (supersedes the table described above)
+
+The table as first specified mapped a whole premise `(iam_model, pathway)` to a
+whole Watanabe `(iam, ssp, rcp)`, which meant asserting an RCP for pathways whose
+names are carbon budgets (`PkBudg650`), policy assumptions (`NDC`, `NPi`, `Base`)
+or ScenarioMIP warming levels (`L`, `M`, `VLHO`). Checking premise's own data
+settled that this cannot be done exactly:
+
+- premise records only `{premise_version, iam_model, pathway, representative_time,
+  ecoinvent_version, system_model}` on a database (`premise/utils.py:163-205`).
+  **There is no RCP field**, so `(iam_model, pathway)` is the entire scenario
+  identity available, and bw_timex is right to key on exactly that pair.
+- Of premise's 33 pathways, only **3** name an RCP (`SSP2-RCP19`, `SSP2-RCP26`,
+  `SSP2-RCP45`). The other 30 name a budget, a policy or a warming level.
+- The RCP genuinely matters: measured on the Watanabe data, CO2 radiative
+  efficiency in 2100 falls 42% from RCP2.6 to RCP8.5. The SSP matters too — at a
+  fixed RCP the spread across the five IAM-SSP pairs is 11.9% (RCP4.5) and 70.8%
+  (RCP8.5). Neither axis may be guessed.
+
+So the rule becomes "exact match or raise", applied per axis:
+
+- **`iam` and `ssp`** are derived from `(iam_model, pathway)` and are always
+  exact. `iam_model` must name a Watanabe IAM (`image`, `message`, `remind`); the
+  pathway's SSP prefix must be the SSP that IAM is paired with. `remind-eu`,
+  `tiam-ucl`, `gcam` and `witch` have no counterpart and raise, as does any
+  IAM/SSP mismatch such as `remind` + `SSP2-*`.
+- **`rcp`** is derived only when the pathway literally names one
+  (`SSP2-RCP26` -> `"2.6"`, `SSP2-RCP19` -> `"1.9"` if Watanabe has it, else
+  raise). A budget, policy or warming level never yields an RCP.
+- Anything not derivable raises, and the message names the nearest alternatives.
+
+`PROSPECTIVE_SCENARIO_MAP` therefore becomes a small, defensible mapping from
+`iam_model` to `(iam, ssp)` rather than a long list of budget-to-RCP assertions:
+
+```python
+PROSPECTIVE_IAM_MAP = {
+    "image":   {"iam": "IMAGE",   "ssp": "SSP1"},
+    "message": {"iam": "MESSAGE", "ssp": "SSP2"},
+    "remind":  {"iam": "REMIND",  "ssp": "SSP5"},
+}
+```
+
+The error a non-RCP pathway produces is the main UX of this feature, so it states
+what was derived, what was not, and what to do:
+
+```
+ValueError: metric='pGWP' needs a prospective characterization scenario, and the
+background scenario remind-eu / SSP2-NDC does not fully determine one.
+
+  iam  -> no match: 'remind-eu' is a regional REMIND variant; Watanabe et al.
+          (2026) parameterise IMAGE (SSP1), MESSAGE (SSP2), AIM (SSP3),
+          GCAM4 (SSP4) and REMIND (SSP5).
+  ssp  -> SSP2, from the pathway prefix.
+  rcp  -> no match: 'NDC' is a policy assumption, not an RCP. Only premise's
+          SSP2-RCP19 / SSP2-RCP26 / SSP2-RCP45 name one.
+
+State the scenario explicitly:
+
+    lcia={"metric": "pGWP",
+          "characterization_scenario": {"iam": "MESSAGE", "ssp": "SSP2", "rcp": "2.6"}}
+
+MESSAGE-SSP2 is available for RCPs 2.6, 4.5, 6.0, 8.5.
+bw_timex.available_scenarios() lists both catalogues side by side.
+```
+
+When only the RCP is missing (e.g. `message` + `SSP2-L`), `iam` and `ssp` are
+still derived and `characterization_scenario={"rcp": "2.6"}` alone suffices.
+
 ### 1b. Discoverability: `available_scenarios()`
 
 Today only one of the two scenario lists exists. `dynamic_characterization`
