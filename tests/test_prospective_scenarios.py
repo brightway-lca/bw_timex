@@ -169,13 +169,12 @@ def test_session_default_is_used_below_full_derivation():
         reset_scenario()
 
 
-def test_session_default_is_used_when_only_rcp_is_missing_and_unset_explicitly():
-    # A background that derives iam/ssp but not rcp (message/SSP2-L) still
-    # raises rather than silently pulling in the session default: the session
-    # default sits below *full* derivation, but a partial derivation with no
-    # explicit characterization_scenario does not resolve at all - it is not
-    # "full derivation", so falls through to the session default, exactly like
-    # a background with nothing derived at all.
+def test_session_default_fills_only_the_axis_that_did_not_derive():
+    # message/SSP2-L derives iam=MESSAGE, ssp=SSP2 but not rcp (L is a
+    # ScenarioMIP warming level). With no explicit characterization_scenario,
+    # the session default fills in only the missing rcp axis - it does not
+    # get to override iam/ssp, and here it agrees with them anyway, so no
+    # conflict warning fires.
     from dynamic_characterization.prospective import reset_scenario, set_scenario
 
     set_scenario(iam="MESSAGE", ssp="SSP2", rcp="8.5")
@@ -187,6 +186,35 @@ def test_session_default_is_used_when_only_rcp_is_missing_and_unset_explicitly()
         ) == {"iam": "MESSAGE", "ssp": "SSP2", "rcp": "8.5"}
     finally:
         reset_scenario()
+
+
+def test_session_default_is_overridden_by_a_contradicting_derived_axis():
+    # A stale session default from earlier in the session (REMIND-SSP5-RCP8.5)
+    # must not leak into a background that derives a different iam/ssp
+    # exactly: image/SSP1-PkBudg500 derives iam=IMAGE, ssp=SSP1 (rcp does not
+    # derive, PkBudg500 is a carbon budget). The derived axes win outright;
+    # only the undetermined rcp axis is filled from the session default, and
+    # since iam/ssp conflict with the session default's, a warning names both.
+    from dynamic_characterization.prospective import reset_scenario, set_scenario
+    from loguru import logger
+
+    set_scenario(iam="REMIND", ssp="SSP5", rcp="8.5")
+    messages = []
+    sink_id = logger.add(messages.append, level="WARNING")
+    try:
+        result = resolve_characterization_scenario(
+            metric="pGWP",
+            characterization_scenario=None,
+            scenario={"iam_model": "image", "pathway": "SSP1-PkBudg500"},
+        )
+    finally:
+        logger.remove(sink_id)
+        reset_scenario()
+
+    assert result == {"iam": "IMAGE", "ssp": "SSP1", "rcp": "8.5"}
+    warning_texts = [str(m) for m in messages]
+    assert any("iam" in w and "IMAGE" in w and "REMIND" in w for w in warning_texts)
+    assert any("ssp" in w and "SSP1" in w and "SSP5" in w for w in warning_texts)
 
 
 def test_unmappable_iam_model_raises_with_per_axis_diagnostics():
@@ -419,3 +447,14 @@ def test_in_project_is_empty_without_matching_databases():
     # The test project holds no premise-built vintages.
     table = available_scenarios(usable_for="both")
     assert (table.in_project == "").all()
+
+
+@pytest.mark.skipif(not _premise_installed(), reason="premise is not installed")
+def test_static_pathway_is_not_in_the_premise_catalogue():
+    # "static" is premise's non-prospective mode (no IAM projection at all),
+    # not a scenario - it names no IAM/SSP/RCP and premise's own scenario
+    # data archive ships nothing for it, so it does not belong in a table of
+    # scenarios. It used to be included via the raw SUPPORTED_MODELS x
+    # SUPPORTED_PATHWAYS cross product.
+    table = available_scenarios(usable_for="premise")
+    assert "static" not in set(table.pathway)

@@ -3,6 +3,7 @@ from typing import Callable, Literal, Optional, Union
 
 import bw2data as bd
 from bw_temporalis import TemporalDistribution
+from dynamic_characterization.prospective import VALID_SCENARIOS
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 DynamicLCIAMetric = Literal[
@@ -233,14 +234,35 @@ class DynamicLCIAInputs(BaseModel):
     @field_validator("characterization_scenario")
     @classmethod
     def validate_characterization_scenario(cls, v: Optional[dict]) -> Optional[dict]:
+        """Accept a full or partial `{"iam", "ssp", "rcp"}` dict.
+
+        A partial dict is meaningful: whichever axes it leaves out are filled
+        in from the background scenario downstream, in
+        `resolve_characterization_scenario`
+        (`bw_timex/prospective_scenarios.py`). Only unknown keys are rejected
+        here; the merged result is validated against `VALID_SCENARIOS` there,
+        since a partial dict cannot be checked against it directly. When all
+        three keys are already given, though, there is nothing to merge, so
+        it is checked immediately - fail fast rather than waiting for a
+        background to be resolved.
+        """
         if v is None:
             return v
-        missing = {"iam", "ssp", "rcp"} - set(v)
-        if missing:
+        unknown = set(v) - {"iam", "ssp", "rcp"}
+        if unknown:
             raise ValueError(
-                f"characterization_scenario needs the keys 'iam', 'ssp' and 'rcp'; "
-                f"missing {sorted(missing)}."
+                f"characterization_scenario only accepts the keys 'iam', 'ssp' "
+                f"and 'rcp'; got unexpected key(s) {sorted(unknown)}."
             )
+        if set(v) == {"iam", "ssp", "rcp"}:
+            triple = (v["iam"], v["ssp"], v["rcp"])
+            if triple not in VALID_SCENARIOS:
+                raise ValueError(
+                    f"{triple} is not a scenario provided by Watanabe et al. "
+                    f"(2026). See "
+                    f"dynamic_characterization.prospective.VALID_SCENARIOS, or "
+                    f"bw_timex.available_scenarios(usable_for='prospective')."
+                )
         return v
 
 

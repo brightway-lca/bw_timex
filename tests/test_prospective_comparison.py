@@ -111,6 +111,50 @@ def test_two_characterization_scenarios_share_one_object(electric_vehicle_settin
     assert scores.iloc[0] != scores.iloc[1]
 
 
+def test_skipped_dynamic_lcia_row_does_not_leak_the_previous_rows_scenario(
+    electric_vehicle_settings,
+):
+    """A row that shares one `TimexLCA` with a previous prospective row, but
+    itself skips dynamic LCIA, must not report the previous row's
+    `cf_iam`/`cf_ssp`/`cf_rcp` next to `dynamic_score=NaN`.
+
+    Regression test for `current_characterization_scenario` not being
+    cleared by `TimexLCA._clear_stale_results` alongside `current_metric`
+    and `current_time_horizon`: without the fix, the second row here would
+    still report `IMAGE`/`SSP1`/`2.6` from the first row even though it
+    never ran `dynamic_lcia` itself.
+    """
+    co2_id = bd.get_node(database="bio", code="CO2").id
+    base = replace(
+        electric_vehicle_settings,
+        characterization_functions={co2_id: characterize_co2_prospective},
+    )
+    comparison = TimexLCA.compare(
+        [
+            replace(
+                base,
+                metric="pGWP",
+                characterization_scenario={"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"},
+                label="prospective",
+            ),
+            replace(
+                base,
+                metric="GWP",
+                dynamic_lcia_enabled=False,
+                label="skipped",
+            ),
+        ],
+        keep_objects=True,
+    )
+    assert comparison.objects["prospective"] is comparison.objects["skipped"]
+
+    skipped_row = comparison.summary[comparison.summary.label == "skipped"].iloc[0]
+    assert pd.isna(skipped_row.dynamic_score)
+    assert pd.isna(skipped_row.cf_iam)
+    assert pd.isna(skipped_row.cf_ssp)
+    assert pd.isna(skipped_row.cf_rcp)
+
+
 def test_settings_differing_only_in_create_missing_do_not_share_an_object(
     electric_vehicle_settings,
 ):

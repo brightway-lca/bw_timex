@@ -263,8 +263,9 @@ def resolve_characterization_scenario(
 
     Precedence, highest first: an explicit `characterization_scenario`
     (merged with whatever the background derives, for any key it leaves out),
-    the full derivation from the background scenario, the session default set
-    with `dynamic_characterization.prospective.set_scenario`.
+    the full derivation from the background scenario, a merge of whatever
+    derives with the session default set with
+    `dynamic_characterization.prospective.set_scenario`.
 
     A partially-supplied `characterization_scenario` is meaningful: any key it
     leaves out is filled in from the background's derivation when that axis
@@ -272,9 +273,13 @@ def resolve_characterization_scenario(
     MESSAGE-SSP2-RCP2.6, because `iam` and `ssp` derive exactly there even
     though `rcp` does not.
 
-    The session default sits below the derivation on purpose: someone who set
+    The session default sits below the background on purpose: someone who set
     it once in a notebook and then compares two backgrounds should get the two
-    matching factor sets, not one stale set carried across both.
+    matching factor sets, not one stale set carried across both. It only ever
+    *fills in* axes the background did not derive - it never overrides an
+    axis that did derive. When fewer than three axes derive, the session
+    default fills the rest; if the session default disagrees with an axis
+    that did derive, the derived value wins and a warning names both.
 
     Returns None for a non-prospective metric, which then never derives
     anything and never raises over a missing pairing.
@@ -318,12 +323,51 @@ def resolve_characterization_scenario(
     except RuntimeError:
         from_session = None
 
-    if from_session:
-        resolved = _validate(from_session)
+    # Derived axes always win: the session default only fills in axes that
+    # did not derive. A session value that disagrees with a derived axis is
+    # overridden, not merged, and that override is warned about - it means
+    # a stale `set_scenario()` from earlier in the session would otherwise
+    # silently contradict what this background actually is.
+    merged = dict(from_session) if from_session else {}
+    conflicts = [
+        (axis, merged[axis], value)
+        for axis, value in derived.items()
+        if axis in merged and merged[axis] != value
+    ]
+    merged.update(derived)
+
+    if len(merged) == 3:
+        for axis, session_value, derived_value in conflicts:
+            logger.warning(
+                f"{metric}: characterization axis {axis!r} derived as "
+                f"{derived_value!r} from the background scenario, overriding "
+                f"the session default {session_value!r} set with "
+                f"set_scenario()."
+            )
+        resolved = _validate(merged)
+        derived_axes = sorted(derived)
+        session_axes = sorted(set(merged) - set(derived))
+        parts = []
+        if derived_axes:
+            if scenario and scenario.get("iam_model") and scenario.get("pathway"):
+                background_note = (
+                    f" (background {scenario['iam_model']} / "
+                    f"{scenario['pathway']})"
+                )
+            else:
+                background_note = ""
+            parts.append(
+                f"{', '.join(derived_axes)} from the background{background_note}"
+            )
+        if session_axes:
+            parts.append(
+                f"{', '.join(session_axes)} from the session default set "
+                f"with set_scenario()"
+            )
         logger.info(
             f"{metric}: characterization scenario "
             f"{resolved['iam']}-{resolved['ssp']}-RCP{resolved['rcp']} "
-            f"from the session default set with set_scenario()"
+            f"({'; '.join(parts)})"
         )
         return resolved
 
@@ -419,14 +463,21 @@ _USABLE_FOR = {None, "premise", "prospective", "both"}
 
 
 def _premise_catalogue() -> Tuple[set, bool]:
-    """Every `(iam_model, pathway)` premise can build, and whether that is complete.
+    """Every `(iam_model, pathway)` premise *accepts*, and whether that is complete.
 
     premise validates `NewDatabase(model=..., pathway=...)` against two lists,
     `SUPPORTED_MODELS` and `SUPPORTED_PATHWAYS`, defined in
-    `premise/iam_variables_mapping/constants.yaml`. That file - not the
-    `data/iam_output_files` directory, which holds only the scenario files a
-    given install happens to have already fetched - is premise's actual
-    catalogue, so this reads it and takes the cross product of the two lists.
+    `premise/iam_variables_mapping/constants.yaml`, checked independently of
+    each other - so the cross product taken here is the set of pairs premise
+    will *accept as an argument*, not the set of pairs it can actually build.
+    Whether the underlying scenario data exists is a separate question,
+    decided by what premise's downloadable data archive
+    (https://doi.org/10.5281/zenodo.21790981) contains for that model, which
+    this function does not check: as of this writing that archive has no
+    `message_SSP2-RCP26`/`RCP45` files at all, and its only RCP-named
+    scenario data is `tiam-ucl_SSP2-RCP19/26/45` - so a pair marked accepted
+    here can still fail with a missing-data error inside `NewDatabase`. See
+    `available_scenarios`'s docstring.
 
     Falls back to whatever `(iam_model, pathway)` pairs this project's
     databases already declare, and reports `complete=False`, whenever premise
@@ -449,7 +500,10 @@ def _premise_catalogue() -> Tuple[set, bool]:
 
         data = yaml.safe_load(path.read_text())
         models = data["SUPPORTED_MODELS"]
-        pathways = data["SUPPORTED_PATHWAYS"]
+        # "static" is not a scenario pathway - it is premise's non-prospective
+        # mode (no IAM projection applied at all), so it names no IAM/SSP/RCP
+        # and does not belong in a table of scenarios.
+        pathways = [p for p in data["SUPPORTED_PATHWAYS"] if p != "static"]
         catalogue = {
             (str(model).lower(), pathway) for model in models for pathway in pathways
         }
@@ -515,6 +569,21 @@ def available_scenarios(usable_for: Optional[str] = None) -> pd.DataFrame:
     shown as if nothing derived. `prospective` is only True, and `rcp` only
     filled in, when the full triple derives and the row needs no
     `characterization_scenario` at all.
+
+    **`premise=True` means premise *accepts* that `(iam_model, pathway)` pair**
+    as an argument to `NewDatabase` - it validates the model and the pathway
+    against two independent lists, not against each other, and not against
+    what scenario data it can actually download. It does **not** mean
+    premise's data archive ships a file for that pair: as of this writing,
+    premise's Zenodo archive (record 21790981) has no `message_SSP2-RCP26` or
+    `message_SSP2-RCP45` files, and the only RCP-named scenario data it ships
+    at all is `tiam-ucl_SSP2-RCP19/26/45` - so even the two rows this table
+    marks `premise=True, prospective=True` (`usable_for="both"`) cannot be
+    built end to end today; `NewDatabase` will fail on missing data before a
+    database exists to run a prospective metric against. Treat `premise=True`
+    as "premise will not reject this pair up front", not as "this background
+    is buildable right now" - check premise's own archive, or try the build,
+    to know that.
 
     Parameters
     ----------

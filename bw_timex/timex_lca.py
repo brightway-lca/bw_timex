@@ -806,6 +806,7 @@ class TimexLCA:
             "characterized_inventory",
             "current_metric",
             "current_time_horizon",
+            "current_characterization_scenario",
             "dynamic_inventory",
             "dynamic_inventory_df",
             "dynamic_inventory_disaggregated",
