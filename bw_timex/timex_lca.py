@@ -282,7 +282,11 @@ class ComparisonResult:
         One row per calculation: its label, its scores, the settings it was run
         with, how long it took, and the error it raised, if any. Scenario
         metadata is spread over `scenario_*` columns, so scenarios can be
-        grouped and plotted directly.
+        grouped and plotted directly. `cf_iam` / `cf_ssp` / `cf_rcp` say which
+        prospective characterization scenario produced the row's scores (as
+        resolved by `TimexLCA.dynamic_lcia`, see
+        `current_characterization_scenario`); they are NaN for static metrics,
+        which do not use one.
     settings : list[TimexLCASettings]
         The settings of each row, in the same order - the full record of what
         produced the comparison.
@@ -953,10 +957,14 @@ class TimexLCA:
         """Hashable identity of the background a settings object asks for.
 
         Two calculations can share one `TimexLCA` exactly when these match.
+        Mirrors `TimexLCASettings.FIXED_FIELDS`: a field that cannot change
+        between runs of one object must also decide whether two settings can
+        share one.
         """
         return (
             tuple(sorted((k, str(v)) for k, v in (settings.database_dates or {}).items())),
             tuple(sorted((k, str(v)) for k, v in (settings.scenario or {}).items())),
+            settings.create_missing,
             settings.use_global_lci_cache,
         )
 
@@ -978,6 +986,16 @@ class TimexLCA:
             # because the flows could not be characterized.
             "dynamic_score": score("dynamic_score"),
         }
+        characterization_scenario = getattr(
+            self, "current_characterization_scenario", None
+        ) or {}
+        row.update(
+            {
+                "cf_iam": characterization_scenario.get("iam", float("nan")),
+                "cf_ssp": characterization_scenario.get("ssp", float("nan")),
+                "cf_rcp": characterization_scenario.get("rcp", float("nan")),
+            }
+        )
         for key, value in (settings.scenario or {}).items():
             row[f"scenario_{key}"] = value
         row.update(
