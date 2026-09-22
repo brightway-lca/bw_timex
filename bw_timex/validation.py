@@ -224,7 +224,24 @@ class DynamicLCIAInputs(BaseModel):
     time_horizon_start: Optional[datetime] = None
     characterization_functions: Optional[dict] = None
     characterization_function_co2: Optional[Callable] = None
+    characterization_scenario: Optional[dict] = None
+    time_varying_re: bool = False
+    fallback_to_ipcc: bool = True
+    characterize_biogenic_uptake: bool = True
     use_disaggregated_lci: bool = False
+
+    @field_validator("characterization_scenario")
+    @classmethod
+    def validate_characterization_scenario(cls, v: Optional[dict]) -> Optional[dict]:
+        if v is None:
+            return v
+        missing = {"iam", "ssp", "rcp"} - set(v)
+        if missing:
+            raise ValueError(
+                f"characterization_scenario needs the keys 'iam', 'ssp' and 'rcp'; "
+                f"missing {sorted(missing)}."
+            )
+        return v
 
 
 class TemporalDistributionExchangeInputs(BaseModel):
