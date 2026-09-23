@@ -226,11 +226,15 @@ Result is stored in `tlca.timeline` (a DataFrame with `date_producer`, `producer
 
 | Argument | Default | Description |
 |---|---|---|
-| `metric` | `"radiative_forcing"` | `"radiative_forcing"` or `"GWP"` |
+| `metric` | `"radiative_forcing"` | `"radiative_forcing"` or `"GWP"` (IPCC AR6), or `"prospective_radiative_forcing"`, `"pGWP"`, `"pGTP"` (scenario-dependent, see [LCIA](lcia.md#prospective-metrics)) |
 | `time_horizon` | `100` | Time horizon in years |
 | `fixed_time_horizon` | `False` | `True` = Levasseur approach (horizon from the functional unit), `False` = conventional (horizon from each emission) |
 | `time_horizon_start` | `None` | Start of the fixed time horizon, defaults to now |
 | `characterization_functions` | `None` | `{biosphere_flow_id: function}`. Not needed for ecoinvent / `biosphere3`, where flows are mapped automatically |
+| `characterization_scenario` | `None` | Only for the prospective metrics: `{"iam": ..., "ssp": ..., "rcp": ...}`. Keys you leave out are derived from the background `scenario` where possible |
+| `time_varying_re` | `False` | Prospective metrics: let the radiative efficiency evolve over the decay period instead of holding it at the emission year |
+| `fallback_to_ipcc` | `True` | Prospective metrics: characterize GHGs without prospective factors (e.g. CO) with IPCC AR6 ones instead of skipping them |
+| `characterize_biogenic_uptake` | `True` | Include characterization functions for biogenic uptake flows |
 
 ### `run()` and `compare()`
 

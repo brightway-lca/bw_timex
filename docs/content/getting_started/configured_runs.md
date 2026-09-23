@@ -121,6 +121,16 @@ is its own record of the comparison, and plots directly:
 comparison.summary.plot.bar(x="label", y="static_score")
 ```
 
+
+For a prospective metric, `summary` also carries `cf_iam`, `cf_ssp` and `cf_rcp`:
+the characterization scenario each row actually used, whether it was derived from
+that row's background or given explicitly. They are `NaN` for rows characterized
+with the IPCC AR6 factors, so a mixed comparison still reads cleanly:
+
+```python
+comparison.summary[["label", "static_score", "dynamic_score", "cf_iam", "cf_ssp", "cf_rcp"]]
+```
+
 Each distinct background gets its own `TimexLCA`, and every calculation sharing
 that background runs on it - so a scenario × demand grid only pays for a new
 object when the background actually changes.
