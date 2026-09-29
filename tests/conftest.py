@@ -36,6 +36,7 @@ from .fixtures.temporal_grouping_fixture import (
     temporal_grouping_db_hourly,
     temporal_grouping_db_monthly,
 )
+from .fixtures.zero_amount_exchange_db_fixture import zero_amount_exchange_db
 from .fixtures.temporal_evolution_db_fixture import (
     temporal_evolution_amounts_db,
     temporal_evolution_db,
