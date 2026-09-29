@@ -12,4 +12,6 @@ The main user-facing class of `bw_timex`. A `TimexLCA` takes a Brightway demand,
 
 `TimexLCASettings` holds everything one calculation needs, and can be passed straight to `TimexLCA()`; `TimexLCA.compare()` runs a list of them and returns a `ComparisonResult`. See [Repeated Runs & Scenario Comparison](../content/getting_started/configured_runs.md).
 
+The prospective metrics (`pGWP`, `pGTP`, `prospective_radiative_forcing`) need a prospective characterization scenario, which `TimexLCASettings.characterization_scenario` can set explicitly or derive from `TimexLCASettings.scenario`. See [Prospective Scenarios](prospective_scenarios.md) for how that derivation works and for `available_scenarios()`.
+
 ::: bw_timex.timex_lca

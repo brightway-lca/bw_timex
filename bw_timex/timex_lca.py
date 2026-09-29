@@ -33,6 +33,7 @@ from scipy import sparse
 FACTORIZE_SOLVES_THRESHOLD = 8
 
 from .database_metadata import resolve_database_dates_from_metadata, split_scenario
+from .prospective_scenarios import resolve_characterization_scenario
 from ._lci_cache import (
     BACKGROUND_AGGREGATE_CACHE,
     BACKGROUND_SUPPLY_CACHE,
@@ -129,6 +130,10 @@ class TimexLCASettings:
             "time_horizon_start",
             "characterization_functions",
             "characterization_function_co2",
+            "characterization_scenario",
+            "time_varying_re",
+            "fallback_to_ipcc",
+            "characterize_biogenic_uptake",
             "use_disaggregated_lci",
         ),
     }
@@ -177,6 +182,25 @@ class TimexLCASettings:
     time_horizon_start: Optional[datetime] = None
     characterization_functions: Optional[dict] = None
     characterization_function_co2: Optional[dict] = None
+    #: Prospective characterization scenario, as `{"iam": ..., "ssp": ...,
+    #: "rcp": ...}`. Only used by the prospective metrics. `None` (the default)
+    #: derives it from `scenario`, axis by axis - see
+    #: `bw_timex.prospective_scenarios`. Any key given here wins over the
+    #: derived value for that axis; keys left out are filled in from the
+    #: derivation when it succeeds. Unlike `scenario` this does not select
+    #: databases, so it may vary between runs of one `TimexLCA`.
+    characterization_scenario: Optional[dict] = None
+    #: Passed to `dynamic_characterization.characterize`. Use a radiative
+    #: efficiency that evolves over the decay period instead of a fixed one from
+    #: the emission year. Prospective metrics only.
+    time_varying_re: bool = False
+    #: Passed to `dynamic_characterization.characterize`. Characterize GHGs
+    #: without prospective factors (e.g. CO) with IPCC AR6 ones instead of
+    #: skipping them. Prospective metrics only.
+    fallback_to_ipcc: bool = True
+    #: Passed to `dynamic_characterization.characterize`. Include
+    #: characterization functions for biogenic uptake flows.
+    characterize_biogenic_uptake: bool = True
     use_disaggregated_lci: bool = False
 
     # The grouped spelling. These are init-only: they are unpacked into the
@@ -260,7 +284,11 @@ class ComparisonResult:
         One row per calculation: its label, its scores, the settings it was run
         with, how long it took, and the error it raised, if any. Scenario
         metadata is spread over `scenario_*` columns, so scenarios can be
-        grouped and plotted directly.
+        grouped and plotted directly. `cf_iam` / `cf_ssp` / `cf_rcp` say which
+        prospective characterization scenario produced the row's scores (as
+        resolved by `TimexLCA.dynamic_lcia`, see
+        `current_characterization_scenario`); they are NaN for static metrics,
+        which do not use one.
     settings : list[TimexLCASettings]
         The settings of each row, in the same order - the full record of what
         produced the comparison.
@@ -778,6 +806,7 @@ class TimexLCA:
             "characterized_inventory",
             "current_metric",
             "current_time_horizon",
+            "current_characterization_scenario",
             "dynamic_inventory",
             "dynamic_inventory_df",
             "dynamic_inventory_disaggregated",
@@ -895,6 +924,10 @@ class TimexLCA:
                 time_horizon_start=settings.time_horizon_start,
                 characterization_functions=settings.characterization_functions,
                 characterization_function_co2=settings.characterization_function_co2,
+                characterization_scenario=settings.characterization_scenario,
+                time_varying_re=settings.time_varying_re,
+                fallback_to_ipcc=settings.fallback_to_ipcc,
+                characterize_biogenic_uptake=settings.characterize_biogenic_uptake,
                 use_disaggregated_lci=settings.use_disaggregated_lci,
             )
 
@@ -927,10 +960,14 @@ class TimexLCA:
         """Hashable identity of the background a settings object asks for.
 
         Two calculations can share one `TimexLCA` exactly when these match.
+        Mirrors `TimexLCASettings.FIXED_FIELDS`: a field that cannot change
+        between runs of one object must also decide whether two settings can
+        share one.
         """
         return (
             tuple(sorted((k, str(v)) for k, v in (settings.database_dates or {}).items())),
             tuple(sorted((k, str(v)) for k, v in (settings.scenario or {}).items())),
+            settings.create_missing,
             settings.use_global_lci_cache,
         )
 
@@ -952,6 +989,16 @@ class TimexLCA:
             # because the flows could not be characterized.
             "dynamic_score": score("dynamic_score"),
         }
+        characterization_scenario = getattr(
+            self, "current_characterization_scenario", None
+        ) or {}
+        row.update(
+            {
+                "cf_iam": characterization_scenario.get("iam", float("nan")),
+                "cf_ssp": characterization_scenario.get("ssp", float("nan")),
+                "cf_rcp": characterization_scenario.get("rcp", float("nan")),
+            }
+        )
         for key, value in (settings.scenario or {}).items():
             row[f"scenario_{key}"] = value
         row.update(
@@ -2090,6 +2137,10 @@ class TimexLCA:
         time_horizon_start: datetime = None,
         characterization_functions: dict = None,
         characterization_function_co2: dict = None,
+        characterization_scenario: dict = None,
+        time_varying_re: bool = False,
+        fallback_to_ipcc: bool = True,
+        characterize_biogenic_uptake: bool = True,
         use_disaggregated_lci: bool = False,
     ) -> pd.DataFrame:
         """
@@ -2105,7 +2156,11 @@ class TimexLCA:
         function for a biosphere flow, it will be ignored.
 
         Dynamic climate change metrics are supported for "GWP", "radiative_forcing",
-        "pGWP", "pGTP", and "prospective_radiative_forcing".
+        "pGWP", "pGTP", and "prospective_radiative_forcing". The latter three are
+        the prospective metrics: they take their characterization scenario from
+        `TimexLCASettings.scenario` (the background scenario, derived axis by
+        axis - see `bw_timex.prospective_scenarios`) unless
+        `characterization_scenario` says otherwise, in full or in part.
         The time horizon for the impact assessment can be set with the `time_horizon` parameter,
         defaulting to 100 years. The `fixed_time_horizon` parameter determines whether the emission
         time horizon for all emissions is calculated from a specific starting point `time_horizon_start`
@@ -2136,6 +2191,27 @@ class TimexLCA:
             Characterization function for CO2 emissions. Necessary if GWP metric is chosen. Default
             is None, which triggers the use of the provided dynamic characterization function of CO2
             based on IPCC AR6 Chapter 7.
+        characterization_scenario: dict, optional
+            Prospective characterization scenario, as `{"iam": ..., "ssp": ...,
+            "rcp": ...}`. Only used by the prospective metrics ("pGWP", "pGTP",
+            "prospective_radiative_forcing"). Default is None, which derives it
+            from `TimexLCASettings.scenario`, axis by axis (see
+            `bw_timex.prospective_scenarios`). A partial dict here is filled in
+            from that derivation for whichever axes it leaves out. Unlike
+            `scenario`, this does not select databases, so it may vary
+            between calls on one `TimexLCA`.
+        time_varying_re: bool, optional
+            Passed to `dynamic_characterization.characterize`. Use a radiative
+            efficiency that evolves over the decay period instead of a fixed one
+            from the emission year. Prospective metrics only. Default is False.
+        fallback_to_ipcc: bool, optional
+            Passed to `dynamic_characterization.characterize`. Characterize GHGs
+            without prospective factors (e.g. CO) with IPCC AR6 ones instead of
+            skipping them. Prospective metrics only. Default is True.
+        characterize_biogenic_uptake: bool, optional
+            Passed to `dynamic_characterization.characterize`. Include
+            characterization functions for biogenic uptake flows. Default is
+            True.
         use_disaggregated_lci: bool, optional
             Whether to use the disaggregated background LCI for the dynamic LCIA. Default is False.
             Use True if you want to perform a contribution analysis on the disaggregated background.
@@ -2158,6 +2234,10 @@ class TimexLCA:
             time_horizon_start=time_horizon_start,
             characterization_functions=characterization_functions,
             characterization_function_co2=characterization_function_co2,
+            characterization_scenario=characterization_scenario,
+            time_varying_re=time_varying_re,
+            fallback_to_ipcc=fallback_to_ipcc,
+            characterize_biogenic_uptake=characterize_biogenic_uptake,
             use_disaggregated_lci=use_disaggregated_lci,
         )
 
@@ -2168,6 +2248,11 @@ class TimexLCA:
 
         self.current_metric = metric
         self.current_time_horizon = time_horizon
+        self.current_characterization_scenario = resolve_characterization_scenario(
+            metric=metric,
+            characterization_scenario=characterization_scenario,
+            scenario=self.scenario,
+        )
 
         if use_disaggregated_lci:
             if not self.expanded_technosphere:
@@ -2229,6 +2314,10 @@ class TimexLCA:
             fixed_time_horizon=fixed_time_horizon,
             time_horizon_start=time_horizon_start,
             characterization_function_co2=characterization_function_co2,
+            time_varying_re=time_varying_re,
+            fallback_to_ipcc=fallback_to_ipcc,
+            characterize_biogenic_uptake=characterize_biogenic_uptake,
+            scenario=self.current_characterization_scenario,
         )
 
         return self.characterized_inventory

@@ -11,6 +11,11 @@ from .edge_extractor import EdgeExtractor
 from .errors import UnmappedDatabaseError
 from .helper_classes import SetList
 from .matrix_modifier import MatrixModifier
+from .prospective_scenarios import (
+    PROSPECTIVE_IAM_MAP,
+    VALID_SCENARIOS,
+    available_scenarios,
+)
 from .scenario_builder import ensure_scenario_databases
 from .timeline_builder import TimelineBuilder
 from .timex_lca import ComparisonResult, TimexLCA, TimexLCASettings
@@ -43,6 +48,10 @@ __all__ = [
     "SetList",
     # errors
     "UnmappedDatabaseError",
+    # prospective characterization scenarios
+    "PROSPECTIVE_IAM_MAP",
+    "VALID_SCENARIOS",
+    "available_scenarios",
     # utils
     "add_flows_to_characterization_functions",
     "add_temporal_distribution_to_exchange",

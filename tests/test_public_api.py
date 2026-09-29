@@ -54,3 +54,9 @@ def test_utils_are_exposed_at_top_level(name):
 def test_all_names_are_importable():
     for name in bw_timex.__all__:
         assert hasattr(bw_timex, name), f"{name} in __all__ but not importable"
+
+
+def test_prospective_scenario_helpers_are_exposed():
+    assert bw_timex.available_scenarios is not None
+    assert bw_timex.PROSPECTIVE_IAM_MAP["image"] == {"iam": "IMAGE", "ssp": "SSP1"}
+    assert ("IMAGE", "SSP1", "2.6") in bw_timex.VALID_SCENARIOS
