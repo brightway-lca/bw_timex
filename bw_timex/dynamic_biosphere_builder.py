@@ -252,11 +252,13 @@ class DynamicBiosphereBuilder:
             `temporal_market_recipes` / `temporal_market_scales`.
         """
 
+        # With expanded matrices, several timeline rows (one per consumer) can
+        # share a time-mapped process, and so a column, whose supply already
+        # sums them up. Read each column's biosphere exchanges only once.
+        visited_columns = set()
+
         for row in self.timeline.itertuples():
             idx = row.time_mapped_producer
-            # Deduplicates repeated (flow, time) entries within one activity,
-            # which the per-activity columns do implicitly.
-            seen_rows = set()
 
             if expand_technosphere:
                 process_col_index = self.activity_dict[
@@ -271,6 +273,10 @@ class DynamicBiosphereBuilder:
             ) = self.activity_time_mapping.reversed[idx]
 
             if idx in self.node_collections["temporalized_processes"]:
+                if expand_technosphere:
+                    if process_col_index in visited_columns:
+                        continue
+                    visited_columns.add(process_col_index)
 
                 time_in_datetime = convert_date_string_to_datetime(
                     self.temporal_grouping, str(time)
@@ -331,7 +337,6 @@ class DynamicBiosphereBuilder:
                             row=time_mapped_matrix_idx,
                             col=process_col_index,
                             amount=amount,
-                            seen_rows=seen_rows,
                         )
 
             elif idx in self.node_collections["temporal_markets"]:
@@ -416,7 +421,6 @@ class DynamicBiosphereBuilder:
                             row=time_mapped_matrix_idx,
                             col=process_col_index,
                             amount=aggregated_inventory[row_idx],
-                            seen_rows=seen_rows,
                         )
 
         if self.group_background_by_time:
@@ -590,21 +594,16 @@ class DynamicBiosphereBuilder:
 
         return demand
 
-    def _add_entry(self, row, col, amount, seen_rows=None):
+    def _add_entry(self, row, col, amount):
         """Add one dynamic biosphere entry, honouring `keep_activity_dimension`.
 
         With the activity dimension dropped, entries of different activities land
-        in the same column, so they are summed rather than deduplicated - and the
-        activity's supply is applied here, since there is no per-activity column
-        left to scale afterwards. `seen_rows` keeps the deduplication *within* an
-        activity that `add_matrix_entry_for_biosphere_flows` does.
+        in the same column - and the activity's supply is applied here, since
+        there is no per-activity column left to scale afterwards.
         """
         if self.keep_activity_dimension:
             self.add_matrix_entry_for_biosphere_flows(row=row, col=col, amount=amount)
             return
-        if row in seen_rows:
-            return
-        seen_rows.add(row)
         key = (row, 0)
         self._matrix_entries[key] = (
             self._matrix_entries.get(key, 0.0)
@@ -614,8 +613,9 @@ class DynamicBiosphereBuilder:
     def add_matrix_entry_for_biosphere_flows(self, row, col, amount):
         """
         Adds an entry to the internal matrix-entry mapping, which is then used to construct
-        the dynamic biosphere matrix. Only unique entries are added, i.e. if the same row and
-        col index already exists, the value is not added again.
+        the dynamic biosphere matrix. Entries at an existing row and col index are summed,
+        as bw2calc does for several biosphere exchanges of one activity to the same flow.
+        Repeated visits of the same activity must therefore be skipped by the caller.
 
         Parameters
         ----------
@@ -634,8 +634,7 @@ class DynamicBiosphereBuilder:
         """
 
         key = (row, col)
-        if key not in self._matrix_entries:
-            self._matrix_entries[key] = amount
+        self._matrix_entries[key] = self._matrix_entries.get(key, 0.0) + amount
 
     def get_biosphere_exchanges(self, original_db, original_code, producer_id=None):
         """Return cached biosphere exchanges for a producer.

@@ -11,6 +11,10 @@ from .fixtures.explicit_background_td_db_fixture import explicit_background_td_d
 from .fixtures.background_td_multdate_consumer_fixture import (
     background_td_multidate_consumer_db,
 )
+from .fixtures.duplicate_biosphere_exchange_db_fixture import (
+    duplicate_biosphere_exchange_db,
+    duplicate_biosphere_exchange_td_db,
+)
 from .fixtures.duplicate_code_db_fixture import duplicate_code_db
 from .fixtures.duplicate_exchange_db_fixture import (
     duplicate_exchange_db,
