@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-09-29
+* Fixed several biosphere exchanges from one activity to the same flow keeping only the first in the dynamic inventory; they are now summed, as in `bw2calc`. Also fixed a process shared by several timeline rows being counted once per row with `keep_activity_dimension=False` and `expand_technosphere=True` ([#242](https://github.com/brightway-lca/bw_timex/pull/242))
+* Fixed `graph_traversal="bfs"` crashing with `ValueError: Empty array` on zero-amount technosphere exchanges (or duplicates that cancel out) ([#243](https://github.com/brightway-lca/bw_timex/pull/243))
+
 ## [1.4.0] - 2026-09-18
 * Added an iterative block solver: background blocks and the functional unit are solved by a Jacobi-preconditioned Neumann series instead of an LU factorization, falling back to the LU backend for any block the series cannot handle (zero diagonal, divergence, or too large a backward error). On the premise EV teaching notebook this takes `lci()` from ~23 s to ~4 s, with the same results. Set `BW_TIMEX_NO_ITERATIVE_SOLVER=1` to solve every block with the LU backend instead ([#236](https://github.com/brightway-lca/bw_timex/pull/236))
 * Added performance improvement for `BlockStructure.detect`, which grouped the matrix nonzeros with `np.unique(..., axis=0)`; counting encoded group pairs instead takes that step from ~0.9 s to ~0.01 s on a premise-sized technosphere ([#236](https://github.com/brightway-lca/bw_timex/pull/236))

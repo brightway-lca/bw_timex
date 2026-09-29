@@ -25,7 +25,7 @@ from .utils import (
     create_electric_vehicle_example,
 )
 
-__version__ = "1.4.0"
+__version__ = "1.4.1"
 
 __all__ = [
     # forwarded from bw_temporalis for convenience
