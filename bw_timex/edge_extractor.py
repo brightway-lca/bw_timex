@@ -1607,6 +1607,12 @@ class EdgeExtractorBFS(VariantBackgroundMixin):
                         amount=np.array([td_producer]),
                     )
 
+                # Zero-amount exchanges (or duplicates netting to zero) carry no
+                # mass. Convolving them would yield an empty TemporalDistribution,
+                # so skip them, as the matrix does with structural zeros.
+                if not np.any(td_producer.amount):
+                    continue
+
                 distribution = (td * td_producer).simplify()
 
                 abs_td_producer = _join_datetime_and_timedelta_distributions(
