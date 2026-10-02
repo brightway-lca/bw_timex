@@ -99,29 +99,29 @@ class MatrixModifier:
         )  # 'sum_inter_duplicates=False': If the same market is used by multiple foreground processes, the market gets created again, inputs should not be summed.
 
         new_nodes = set()
+        # (row, col) -> (amount, flip). All entries go into the datapackage as
+        # one vector: one resource per entry made every lookup in bw2calc scan
+        # all of them. A later entry for the same index replaces the earlier
+        # one, which is what separate resources did with
+        # `sum_inter_duplicates=False`.
+        entries = {}
 
         for row in self.timeline.iloc[::-1].itertuples():
-            self.add_row_to_technosphere_datapackage(
-                row,
-                datapackage_technosphere,
-                new_nodes,
-            )
+            self.add_row_to_technosphere_datapackage(row, entries, new_nodes)
 
         # Adding the production exchanges for new nodes, net of any
         # self-consumption (which shares the same diagonal position; the
         # datapackage does not sum duplicate indices, so one would silently
         # overwrite the other).
         for node_id, production_amount in new_nodes:
-            datapackage_technosphere.add_persistent_vector(
-                matrix="technosphere_matrix",
-                name=uuid.uuid4().hex,
-                data_array=np.array(
-                    [production_amount - self.self_consumption.get(node_id, 0.0)],
-                    dtype=float,
-                ),
-                indices_array=np.array([(node_id, node_id)], dtype=bwp.INDICES_DTYPE),
+            entries[(node_id, node_id)] = (
+                production_amount - self.self_consumption.get(node_id, 0.0),
+                False,
             )
 
+        add_entries_as_one_vector(
+            datapackage_technosphere, "technosphere_matrix", entries
+        )
         return datapackage_technosphere
 
     def create_biosphere_datapackage(self) -> bwp.Datapackage:
@@ -148,6 +148,10 @@ class MatrixModifier:
         )  # array of unique ((original) producer_id, (new) time_mapped_producer_id) tuples
 
         datapackage_biosphere = bwp.create_datapackage(sum_inter_duplicates=False)
+        # Several exchanges of one producer to the same flow are summed, as
+        # they were within the producer's own resource. Producers never share
+        # a column, so nothing else repeats.
+        entries = {}
 
         for producer in unique_producers:
             original_producer_node = self.nodes[producer[0]]
@@ -162,38 +166,20 @@ class MatrixModifier:
                 # nodes they link to, so they get no biosphere of their own.
                 continue
 
-            indices = (
-                []
-            )  # list of (biosphere, technosphere) indices for the biosphere flow exchanges
-            amounts = []  # list of amounts corresponding to the bioflows
             for exc in original_producer_node.biosphere():
-                indices.append(
-                    (exc.input.id, new_producer_id)
-                )  # directly build a list of tuples to pass into the datapackage, the new_producer_id is the new column index
-                amounts.append(exc.amount)
-
-            if not indices:
-                continue
-
-            datapackage_biosphere.add_persistent_vector(
-                matrix="biosphere_matrix",
-                name=uuid.uuid4().hex,
-                data_array=np.array(amounts, dtype=float),
-                indices_array=np.array(
-                    indices,
-                    dtype=bwp.INDICES_DTYPE,
-                ),
+                index = (exc.input.id, new_producer_id)
+                amount = entries.get(index, (0.0, False))[0] + exc.amount
                 # Biosphere exchanges are never flipped: the sign of the flow
-                # is carried by the amount itself. One entry per index, since
-                # bw_processing requires matching shapes.
-                flip_array=np.zeros(len(indices), dtype=bool),
-            )
+                # is carried by the amount itself.
+                entries[index] = (amount, False)
+
+        add_entries_as_one_vector(datapackage_biosphere, "biosphere_matrix", entries)
         return datapackage_biosphere
 
     def add_row_to_technosphere_datapackage(
         self,
         row: pd.core.frame,
-        datapackage: bwp.Datapackage,
+        entries: dict,
         new_nodes: set,
     ) -> None:
         """
@@ -218,15 +204,17 @@ class MatrixModifier:
         ----------
         row : pd.core.frame
             A row of the timeline DataFrame representing an temporalized edge
-        datapackage : bwp.Datapackage
-            Append to this datapackage, if available. Otherwise create a new datapackage.
+        entries : dict
+            Technosphere entries collected so far, as `(row, col) -> (amount, flip)`.
+            A later entry for the same index replaces an earlier one.
         new_nodes : set
             Set of tuples (node_id, production_amount) to which new node ids are added.
 
         Returns
         -------
         None
-            Adds elements for this edge to the bwp.Datapackage and stores the ids of new nodes, temporalized nodes and temporal markets.
+            Adds the entries for this edge to `entries` and stores the ids of new nodes,
+            temporalized nodes and temporal markets.
         """
 
         if row.consumer == -1:  # functional unit
@@ -265,16 +253,7 @@ class MatrixModifier:
             )
         else:
             # Add entry between exploded consumer and exploded producer (not in background database)
-            datapackage.add_persistent_vector(
-                matrix="technosphere_matrix",
-                name=uuid.uuid4().hex,
-                data_array=np.array([scaled_amount], dtype=float),
-                indices_array=np.array(
-                    [(new_producer_id, new_consumer_id)],
-                    dtype=bwp.INDICES_DTYPE,
-                ),
-                flip_array=np.array([True], dtype=bool),
-            )
+            entries[(new_producer_id, new_consumer_id)] = (scaled_amount, True)
 
         # A row is a temporal market iff it carries temporal_market_shares.
         # Leaf producers (background frontier) carry shares; producers traversed
@@ -302,17 +281,10 @@ class MatrixModifier:
 
                 # Add entry between exploded producer and producer in background database
                 # -->("Temporal Market")
-                datapackage.add_persistent_vector(
-                    matrix="technosphere_matrix",
-                    name=uuid.uuid4().hex,
-                    data_array=np.array(
-                        [db_share], dtype=float
-                    ),  # temporal markets produce 1, so shares divide amount between dbs
-                    indices_array=np.array(
-                        [(producer_id_in_background_db, new_producer_id)],
-                        dtype=bwp.INDICES_DTYPE,
-                    ),
-                    flip_array=np.array([True], dtype=bool),
+                # temporal markets produce 1, so shares divide amount between dbs
+                entries[(producer_id_in_background_db, new_producer_id)] = (
+                    db_share,
+                    True,
                 )
                 self.temporal_market_ids.add(new_producer_id)
                 producer_production_amount = (
@@ -345,3 +317,20 @@ class MatrixModifier:
 
         # Add newly created producing process to new_nodes
         new_nodes.add((new_producer_id, producer_production_amount))
+
+
+def add_entries_as_one_vector(
+    datapackage: bwp.Datapackage, matrix: str, entries: dict
+) -> None:
+    """Add `(row, col) -> (amount, flip)` entries to `datapackage` as one vector."""
+    if not entries:
+        return
+    indices = np.array(list(entries), dtype=bwp.INDICES_DTYPE)
+    amounts, flips = zip(*entries.values())
+    datapackage.add_persistent_vector(
+        matrix=matrix,
+        name=uuid.uuid4().hex,
+        data_array=np.array(amounts, dtype=float),
+        indices_array=indices,
+        flip_array=np.array(flips, dtype=bool),
+    )
