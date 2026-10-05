@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* Changed the error `plot_characterized_inventory_as_waterfall` raises when there is no characterized inventory: it is now an `AttributeError` that says to call `TimexLCA.dynamic_lcia()` first, as `dynamic_score` and `plot_dynamic_characterized_inventory` already do. `static_lcia()` alone does not create `tlca.characterized_inventory` ([#149](https://github.com/brightway-lca/bw_timex/issues/149))
 
 ## [1.4.1] - 2026-09-29
 * Fixed several biosphere exchanges from one activity to the same flow keeping only the first in the dynamic inventory; they are now summed, as in `bw2calc`. Also fixed a process shared by several timeline rows being counted once per row with `keep_activity_dimension=False` and `expand_technosphere=True` ([#242](https://github.com/brightway-lca/bw_timex/pull/242))

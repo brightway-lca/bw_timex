@@ -501,3 +501,14 @@ def test_waterfall_xtick_interval_keeps_static_and_prospective_labels(monkeypatc
     assert {"static", "prospective"} <= visible
     assert visible == {"static", "prospective", "2025", "2030", "2035"}
     plt.close("all")
+
+
+def test_waterfall_without_dynamic_lcia_points_to_dynamic_lcia():
+    """After only `static_lcia()` there is no characterized inventory to plot."""
+    from bw_timex.utils import plot_characterized_inventory_as_waterfall
+
+    tlca = _FakeTimexLCA(range(2025, 2030))
+    del tlca.characterized_inventory
+
+    with pytest.raises(AttributeError, match=r"dynamic_lcia\(\) first"):
+        plot_characterized_inventory_as_waterfall(tlca)
