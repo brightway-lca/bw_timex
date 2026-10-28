@@ -36,13 +36,13 @@ dependencies = [
     "numpy",
     "pandas",
     "tqdm",
-    "bw_temporalis>=1.1",
+    "bw_temporalis>=1.1.1",
     "dynamic_characterization>=1.4.2",
     "matplotlib",
-    "seaborn",
+    "seaborn>=0.12.0",
     "loguru",
-    "ipython",
-    "ipywidgets",
+    "ipython>=7.6.0",
+    "ipywidgets>=7.5.0",
     "pydantic>=2.0",
     # MKL Pardiso is the fastest solver for the repeated block solves in
     # `lci()`, and `mkl` publishes wheels only for manylinux_2_28_x86_64 and

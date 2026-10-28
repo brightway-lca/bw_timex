@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* Raise the lower bound on `bw_temporalis` to 1.1.1, which fixes a circular import with bw2data 4.6, and set lower bounds on `ipython` (7.6.0), `ipywidgets` (7.5.0) and `seaborn` (0.12.0): their oldest releases fail to import on Python 3.12
 
 ## [1.4.1] - 2026-09-29
 * Fixed several biosphere exchanges from one activity to the same flow keeping only the first in the dynamic inventory; they are now summed, as in `bw2calc`. Also fixed a process shared by several timeline rows being counted once per row with `keep_activity_dimension=False` and `expand_technosphere=True` ([#242](https://github.com/brightway-lca/bw_timex/pull/242))
