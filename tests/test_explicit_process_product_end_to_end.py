@@ -9,6 +9,13 @@ from bw_timex import TemporalDistribution
 from bw_timex import TimexLCA
 
 
+def _assert_timeline_rows(observed, expected):
+    # pytest.approx rejects nested data since pytest 9.2: compare the
+    # (consumer year, producer year) pairs exactly and the amounts approximately.
+    assert [row[:2] for row in observed] == [row[:2] for row in expected]
+    assert [row[2] for row in observed] == pytest.approx([row[2] for row in expected])
+
+
 def _write_multilayer_explicit_process_product_db():
     bd.Database("bio").write(
         {("bio", "co2"): {"name": "carbon dioxide", "unit": "kg", "type": "emission"}}
@@ -248,13 +255,14 @@ def test_explicit_product_output_td_convolves_with_input_td():
         )
         for row in input_rows.itertuples()
     )
-    assert observed == pytest.approx(
+    _assert_timeline_rows(
+        observed,
         [
             (2030, 2030, 2.0),
             (2030, 2031, 6.0),
             (2032, 2032, 2.0),
             (2032, 2033, 6.0),
-        ]
+        ],
     )
 
     assert tlca.base_lca.score == pytest.approx(slca.score)
@@ -318,13 +326,14 @@ def test_multilayer_explicit_process_product_chain_with_evolution():
         )
         for row in component_rows.itertuples()
     )
-    assert observed_component_timeline == pytest.approx(
+    _assert_timeline_rows(
+        observed_component_timeline,
         [
             (2030, 2030, 0.5),
             (2030, 2031, 1.5),
             (2032, 2032, 0.5),
             (2032, 2033, 1.5),
-        ]
+        ],
     )
 
     background_rows = tlca.timeline[
@@ -338,13 +347,14 @@ def test_multilayer_explicit_process_product_chain_with_evolution():
         )
         for row in background_rows.itertuples()
     )
-    assert observed_background_timeline == pytest.approx(
+    _assert_timeline_rows(
+        observed_background_timeline,
         [
             (2030, 2030, 4.0),
             (2031, 2031, 4.0),
             (2032, 2032, 4.0),
             (2033, 2033, 4.0),
-        ]
+        ],
     )
     assert tlca.static_score == pytest.approx(8.0)
 
@@ -365,18 +375,20 @@ def test_multilayer_explicit_process_product_chain_with_evolution():
     ]
     # The timeline reports the amounts that are actually used: halved by the factor,
     # which is looked up at the consumer's date here, as the exchange asks for.
-    assert sorted(
+    observed_evolved_timeline = sorted(
         (
             row.date_consumer.year,
             row.date_producer.year,
             float(row.amount),
         )
         for row in evolved_component_rows.itertuples()
-    ) == pytest.approx(
+    )
+    _assert_timeline_rows(
+        observed_evolved_timeline,
         [
             (consumer_year, producer_year, amount * 0.5)
             for consumer_year, producer_year, amount in observed_component_timeline
-        ]
+        ],
     )
     assert set(evolved_component_rows["temporal_evolution_reference"]) == {"consumer"}
     assert set(evolved_component_rows["temporal_evolution_factor"]) == {0.5}
@@ -614,7 +626,7 @@ def test_explicit_output_coefficient_alpha_scales_inputs():
         (row.date_consumer.year, row.date_producer.year, float(row.amount))
         for row in input_rows.itertuples()
     )
-    assert observed == pytest.approx([(2030, 2030, 2.0), (2031, 2031, 2.0)])
+    _assert_timeline_rows(observed, [(2030, 2030, 2.0), (2031, 2031, 2.0)])
 
 
 @pytest.mark.parametrize("graph_traversal", ["priority", "bfs"])
