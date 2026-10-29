@@ -395,7 +395,9 @@ def plot_characterized_inventory_as_waterfall(
 
     """
     if not hasattr(lca_obj, "characterized_inventory"):
-        raise ValueError("LCA object does not have characterized inventory data.")
+        raise AttributeError(
+            "Characterized inventory not yet calculated. Call TimexLCA.dynamic_lcia() first."
+        )
 
     if not hasattr(lca_obj, "activity_time_mapping"):
         raise ValueError("Make sure to pass an instance of a TimexLCA.")
