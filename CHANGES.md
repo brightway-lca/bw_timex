@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* Fixed a `temporal_grouping` coarser than a temporal distribution summing a process's inputs over its dates in one time window instead of averaging them ([#84](https://github.com/brightway-lca/bw_timex/issues/84))
 * Changed the error `plot_characterized_inventory_as_waterfall` raises when there is no characterized inventory: it is now an `AttributeError` that says to call `TimexLCA.dynamic_lcia()` first, as `dynamic_score` and `plot_dynamic_characterized_inventory` already do. `static_lcia()` alone does not create `tlca.characterized_inventory` ([#149](https://github.com/brightway-lca/bw_timex/issues/149))
 * Added a speed-up for `lci()` with expanded matrices: the timeline's matrix entries now go into the datapackage as one vector per matrix instead of one resource per entry, which made `bw2calc` scan every resource on each lookup. On a synthetic case with 5,000 background activities in four years, `lci()` drops from 1.51 s to 0.36 s (median of 5), with identical matrices and scores ([#244](https://github.com/brightway-lca/bw_timex/pull/244))
 * Changed `MatrixModifier.add_row_to_technosphere_datapackage` to take a dict of entries, `(row, col) -> (amount, flip)`, instead of a `bwp.Datapackage`; `create_technosphere_datapackage` turns that dict into the datapackage ([#244](https://github.com/brightway-lca/bw_timex/pull/244))

@@ -265,6 +265,19 @@ class TimelineBuilder:
             lambda x: extract_date_as_string(x, self.temporal_grouping)
         )
 
+        # `amount` is per unit of the consumer at one date, so a consumer's dates in one
+        # window are averaged, weighted by its supply at each date, not summed.
+        supply = edges_df.groupby(["producer", "producer_date"])[
+            "cumulative_amount"
+        ].sum()
+        consumer_supply = supply.reindex(
+            pd.MultiIndex.from_arrays([edges_df["consumer"], edges_df["consumer_date"]])
+        ).to_numpy(dtype=float)
+        edges_df["_weighted_amount"] = edges_df["amount"] * consumer_supply
+        windows = edges_df.groupby(["producer", "producer_grouping_time"]).agg(
+            supply=("cumulative_amount", "sum"), dates=("producer_date", "nunique")
+        )
+
         # group unique pair of consumer and producer with the same grouping times
         # _te_key ensures exchanges with different temporal_evolution dicts stay separate
         grouped_edges = (
@@ -279,9 +292,26 @@ class TimelineBuilder:
                 ],
                 dropna=False,
             )
-            .agg({"amount": "sum", "cumulative_amount": "sum"})
+            .agg(
+                {"amount": "sum", "cumulative_amount": "sum", "_weighted_amount": "sum"}
+            )
             .reset_index()
         )
+        consumer_window = windows.reindex(
+            pd.MultiIndex.from_arrays(
+                [grouped_edges["consumer"], grouped_edges["consumer_grouping_time"]]
+            )
+        )
+        mean_amount = grouped_edges["_weighted_amount"].astype(float) / (
+            consumer_window["supply"].to_numpy(dtype=float)
+        )
+        # A consumer with one date in the window, the functional unit (consumer -1,
+        # a demand rather than a process) and a consumer without supply keep the sum.
+        grouped_edges["amount"] = mean_amount.where(
+            (consumer_window["dates"].to_numpy() > 1) & np.isfinite(mean_amount),
+            grouped_edges["amount"],
+        )
+        grouped_edges.drop(columns=["_weighted_amount"], inplace=True)
         # Reconstruct temporal_evolution dicts from the hashable _te_key
         grouped_edges["temporal_evolution"] = grouped_edges["_te_key"].apply(
             lambda k: dict(k) if isinstance(k, tuple) else None
