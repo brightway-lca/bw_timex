@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 * Changed the error `plot_characterized_inventory_as_waterfall` raises when there is no characterized inventory: it is now an `AttributeError` that says to call `TimexLCA.dynamic_lcia()` first, as `dynamic_score` and `plot_dynamic_characterized_inventory` already do. `static_lcia()` alone does not create `tlca.characterized_inventory` ([#149](https://github.com/brightway-lca/bw_timex/issues/149))
+* Added a speed-up for `lci()` with expanded matrices: the timeline's matrix entries now go into the datapackage as one vector per matrix instead of one resource per entry, which made `bw2calc` scan every resource on each lookup. On a synthetic case with 5,000 background activities in four years, `lci()` drops from 1.51 s to 0.36 s (median of 5), with identical matrices and scores ([#244](https://github.com/brightway-lca/bw_timex/pull/244))
+* Changed `MatrixModifier.add_row_to_technosphere_datapackage` to take a dict of entries, `(row, col) -> (amount, flip)`, instead of a `bwp.Datapackage`; `create_technosphere_datapackage` turns that dict into the datapackage ([#244](https://github.com/brightway-lca/bw_timex/pull/244))
 
 ## [1.4.1] - 2026-09-29
 * Fixed several biosphere exchanges from one activity to the same flow keeping only the first in the dynamic inventory; they are now summed, as in `bw2calc`. Also fixed a process shared by several timeline rows being counted once per row with `keep_activity_dimension=False` and `expand_technosphere=True` ([#242](https://github.com/brightway-lca/bw_timex/pull/242))
